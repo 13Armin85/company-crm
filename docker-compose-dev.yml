@@ -1,0 +1,292 @@
+name: plane-dev
+
+x-api: &api
+  image: plane-dev-api
+  build:
+    context: ./apps/api
+    dockerfile: Dockerfile.dev
+  volumes:
+    - ./apps/api:/code
+  environment: &api-environment
+    DJANGO_SETTINGS_MODULE: plane.settings.local
+    DEBUG: "1"
+    SECRET_KEY: ${DEV_SECRET_KEY:?Run bash setup-dev.sh or ./setup-dev.ps1 first, or set DEV_SECRET_KEY}
+    DATABASE_URL: postgresql://plane:plane@plane-db:5432/plane
+    REDIS_URL: redis://plane-redis:6379/
+    RABBITMQ_HOST: plane-mq
+    RABBITMQ_PORT: "5672"
+    RABBITMQ_USER: plane
+    RABBITMQ_PASSWORD: plane
+    RABBITMQ_VHOST: plane
+    AWS_ACCESS_KEY_ID: access-key
+    AWS_SECRET_ACCESS_KEY: secret-key
+    AWS_S3_ENDPOINT_URL: http://plane-minio:9000
+    AWS_S3_BUCKET_NAME: uploads
+    AWS_REGION: us-east-1
+    USE_MINIO: "1"
+    WEB_URL: http://localhost:3000
+    APP_BASE_URL: http://localhost:3000
+    ADMIN_BASE_URL: http://localhost:3001
+    ADMIN_BASE_PATH: /god-mode
+    SPACE_BASE_URL: http://localhost:3002
+    SPACE_BASE_PATH: /spaces
+    LIVE_BASE_URL: http://localhost:3100
+    LIVE_BASE_PATH: /live
+    LIVE_SERVER_SECRET_KEY: ${DEV_SECRET_KEY}
+    CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3100
+    ENABLE_EMAIL_PASSWORD: "1"
+    ENABLE_SIGNUP: "1"
+    INTERNAL_WORKSPACE_SLUG: ${INTERNAL_WORKSPACE_SLUG:-dev-workspace}
+    DISABLE_WORKSPACE_CREATION: "1"
+
+services:
+  plane-db:
+    image: postgres:15.7-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: plane
+      POSTGRES_PASSWORD: plane
+      POSTGRES_DB: plane
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U plane -d plane"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  plane-redis:
+    image: valkey/valkey:7.2.11-alpine
+    restart: unless-stopped
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  plane-mq:
+    image: rabbitmq:3.13.6-management-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: plane
+      RABBITMQ_DEFAULT_PASS: plane
+      RABBITMQ_DEFAULT_VHOST: plane
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+
+  plane-minio:
+    build:
+      context: ./deployments/dev
+      dockerfile: Dockerfile.minio
+      args:
+        GOPROXY: ${GO_PROXY:-https://proxy.golang.org|https://goproxy.io|direct}
+    restart: unless-stopped
+    command: server /export --console-address :9090
+    environment:
+      MINIO_ROOT_USER: access-key
+      MINIO_ROOT_PASSWORD: secret-key
+    volumes:
+      - uploads:/export
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9090:9090"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  migrator:
+    <<: *api
+    restart: "no"
+    environment:
+      <<: *api-environment
+      DEV_BOOTSTRAP: "1"
+      DEV_ADMIN_EMAIL: ${DEV_ADMIN_EMAIL:-admin@plane.local}
+      DEV_ADMIN_PASSWORD: ${DEV_ADMIN_PASSWORD:-AdminDev!2026}
+      DEV_USER_EMAIL: ${DEV_USER_EMAIL:-user@plane.local}
+      DEV_USER_PASSWORD: ${DEV_USER_PASSWORD:-UserDev!2026}
+      DEV_DEMO_PASSWORD: ${DEV_DEMO_PASSWORD:-DemoUser!2026}
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        python manage.py migrate
+        python manage.py bootstrap_dev
+        python manage.py seed_enterprise_demo
+        python manage.py configure_instance
+        python manage.py create_bucket
+        python manage.py clear_cache
+    depends_on:
+      plane-db:
+        condition: service_healthy
+      plane-redis:
+        condition: service_healthy
+      plane-mq:
+        condition: service_healthy
+      plane-minio:
+        condition: service_healthy
+
+  api:
+    <<: *api
+    restart: unless-stopped
+    command: python manage.py runserver 0.0.0.0:8000
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      migrator:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/instances/', timeout=10)",
+        ]
+      interval: 10s
+      timeout: 15s
+      retries: 30
+      start_period: 30s
+
+  worker:
+    <<: *api
+    restart: unless-stopped
+    command: celery -A plane worker -l info --concurrency=2
+    depends_on:
+      migrator:
+        condition: service_completed_successfully
+
+  beat-worker:
+    <<: *api
+    restart: unless-stopped
+    command: celery -A plane beat -l info --schedule=/tmp/celerybeat-schedule
+    depends_on:
+      migrator:
+        condition: service_completed_successfully
+
+  frontend:
+    build:
+      context: .
+      dockerfile: deployments/dev/Dockerfile.frontend
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com/}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      # Dependencies are installed in the image; tsdown updates exports while watching.
+      PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN: "false"
+      VITE_DEV_HOST: 0.0.0.0
+      VITE_DEV_MINIO_URL: http://plane-minio:9000
+      VITE_DEV_API_URL: http://api:8000
+      VITE_API_BASE_URL: http://localhost:3000
+      VITE_WEB_BASE_URL: http://localhost:3000
+      VITE_ADMIN_BASE_URL: http://localhost:3001
+      VITE_ADMIN_BASE_PATH: /god-mode
+      VITE_SPACE_BASE_URL: http://localhost:3002
+      VITE_SPACE_BASE_PATH: /spaces
+      VITE_LIVE_BASE_URL: http://localhost:3100
+      VITE_LIVE_BASE_PATH: /live
+      PORT: "3100"
+      API_BASE_URL: http://api:8000
+      WEB_BASE_URL: http://localhost:3000
+      LIVE_BASE_URL: http://localhost:3100
+      LIVE_BASE_PATH: /live
+      LIVE_SERVER_SECRET_KEY: ${DEV_SECRET_KEY}
+      REDIS_URL: redis://plane-redis:6379/
+      TURBO_TELEMETRY_DISABLED: "1"
+    ports:
+      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:3001:3001"
+      - "127.0.0.1:3002:3002"
+      - "127.0.0.1:3100:3100"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "Promise.all([...[3000,3001,3002,3100].map(p=>fetch('http://127.0.0.1:'+p+(p===3001?'/god-mode/':p===3002?'/spaces/':p===3100?'/live/health/':'/')).then(r=>{if(!r.ok)throw Error(r.status)})),fetch('http://localhost:3000/api/instances/').then(async r=>{if(!r.ok)throw Error(r.status);const data=await r.json();if(!data.instance?.is_setup_done||!data.config)throw Error('Instance not ready')})]).catch(()=>process.exit(1))",
+        ]
+      interval: 20s
+      timeout: 30s
+      retries: 30
+      start_period: 120s
+    develop:
+      watch:
+        - action: sync
+          path: ./apps/web
+          target: /app/apps/web
+          initial_sync: true
+          ignore: [node_modules/, build/, .react-router/, .turbo/, .env, package.json]
+        - action: sync
+          path: ./apps/admin
+          target: /app/apps/admin
+          initial_sync: true
+          ignore: [node_modules/, build/, .react-router/, .turbo/, .env, package.json]
+        - action: sync
+          path: ./apps/space
+          target: /app/apps/space
+          initial_sync: true
+          ignore: [node_modules/, build/, .react-router/, .turbo/, .env, package.json]
+        - action: sync
+          path: ./apps/live
+          target: /app/apps/live
+          initial_sync: true
+          ignore: [node_modules/, dist/, .turbo/, .env, package.json]
+        - action: sync
+          path: ./packages
+          target: /app/packages
+          initial_sync: true
+          ignore: ["**/node_modules/", "**/dist/", "**/.turbo/", "**/package.json"]
+        - action: rebuild
+          path: ./pnpm-lock.yaml
+        - action: rebuild
+          path: ./pnpm-workspace.yaml
+        - action: rebuild
+          path: ./package.json
+
+  pgadmin:
+    image: dpage/pgadmin4:9.17
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${DEV_PGADMIN_EMAIL:-admin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${DEV_PGADMIN_PASSWORD:-DatabaseDev!2026}
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    ports:
+      - "127.0.0.1:5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./deployments/dev/pgadmin-servers.json:/pgadmin4/servers.json:ro
+    depends_on:
+      plane-db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "/venv/bin/python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1/misc/ping', timeout=5)",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 30s
+
+volumes:
+  pgdata:
+  redisdata:
+  rabbitmq_data:
+  uploads:
+  pgadmin_data:

@@ -1,0 +1,36 @@
+/* Shared Hamkar palette. Keep the CRM and instance administration in sync. */
+:root {
+  --bg: #f7f8fa;
+  --surface: #fff;
+  --surface-soft: #f9fafb;
+  --sidebar-bg: #111827;
+  --sidebar-hover: #1f2937;
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-muted: #9ca3af;
+  --border: #e5e7eb;
+  --accent: #4f46e5;
+  --accent-soft: #eef2ff;
+  --green: #10b981;
+  --orange: #f59e0b;
+  --red: #ef4444;
+  --blue: #3b82f6;
+  --purple: #8b5cf6;
+  --yellow: #eab308;
+  --shadow: 0 1px 2px rgb(15 23 42 / 4%), 0 8px 28px rgb(15 23 42 / 4%);
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg: #0f1115;
+  --surface: #15181e;
+  --surface-soft: #1a1e25;
+  --sidebar-bg: #0a0d12;
+  --sidebar-hover: #1c222c;
+  --text-primary: #f3f4f6;
+  --text-secondary: #c3c7ce;
+  --text-muted: #7b8491;
+  --border: #262b35;
+  --accent-soft: color-mix(in srgb, var(--accent) 18%, transparent);
+  --shadow: 0 8px 28px rgb(0 0 0 / 18%);
+  color-scheme: dark;
+}

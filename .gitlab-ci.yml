@@ -1,0 +1,519 @@
+stages:
+  - build
+  - transfer
+  - deploy
+  - cleanup
+
+variables:
+  DOCKER_BUILDKIT: "1"
+  IMAGE_RETENTION: "5"
+
+
+# ============================================================
+# BUILD
+# ============================================================
+
+build-plane-images:
+  stage: build
+  tags:
+    - plane
+  image: docker:27-cli
+
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+  before_script:
+    - docker version
+    - echo "Building Plane release $CI_COMMIT_SHORT_SHA"
+
+  script:
+    - |
+      set -eu
+
+      docker build \
+        -f apps/web/Dockerfile.web \
+        -t "plane-custom-frontend:$CI_COMMIT_SHORT_SHA" .
+
+      docker build \
+        -f apps/admin/Dockerfile.admin \
+        -t "plane-custom-admin:$CI_COMMIT_SHORT_SHA" .
+
+      docker build \
+        -f apps/space/Dockerfile.space \
+        -t "plane-custom-space:$CI_COMMIT_SHORT_SHA" .
+
+      docker build \
+        -f apps/live/Dockerfile.live \
+        -t "plane-custom-live:$CI_COMMIT_SHORT_SHA" .
+
+      docker build \
+        -f apps/api/Dockerfile.api \
+        -t "plane-custom-backend:$CI_COMMIT_SHORT_SHA" \
+        apps/api
+
+      docker build \
+        -f apps/proxy/Dockerfile.ce \
+        -t "plane-custom-proxy:$CI_COMMIT_SHORT_SHA" \
+        apps/proxy
+
+      echo "All Plane images built successfully."
+
+      for IMAGE in \
+        plane-custom-frontend \
+        plane-custom-admin \
+        plane-custom-space \
+        plane-custom-live \
+        plane-custom-backend \
+        plane-custom-proxy
+      do
+        docker image inspect \
+          "${IMAGE}:$CI_COMMIT_SHORT_SHA" >/dev/null
+
+        echo "OK: ${IMAGE}:$CI_COMMIT_SHORT_SHA"
+      done
+
+      echo "Running local Caddy runtime checks..."
+
+      for IMAGE in \
+        plane-custom-frontend \
+        plane-custom-admin \
+        plane-custom-proxy
+      do
+        docker run --rm \
+          --entrypoint caddy \
+          "${IMAGE}:$CI_COMMIT_SHORT_SHA" \
+          version
+      done
+
+      echo "Build verification passed."
+
+
+# ============================================================
+# TRANSFER + INTEGRITY VERIFICATION
+# ============================================================
+
+transfer-images:
+  stage: transfer
+  tags:
+    - plane
+  image: docker:27-cli
+
+  needs:
+    - build-plane-images
+
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+  before_script:
+    - apk add --no-cache openssh-client coreutils
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
+    - chmod 600 ~/.ssh/id_ed25519
+    - ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+    - chmod 600 ~/.ssh/known_hosts
+
+  script:
+    - docker version
+
+    # --------------------------------------------------------
+    # Calculate content fingerprints BEFORE transfer
+    # --------------------------------------------------------
+
+    - |
+      set -eu
+
+      echo "Calculating source image fingerprints..."
+
+      FRONTEND_SHA="$(
+        docker run --rm \
+          --entrypoint sha256sum \
+          "plane-custom-frontend:$CI_COMMIT_SHORT_SHA" \
+          /usr/bin/caddy | awk '{print $1}'
+      )"
+
+      ADMIN_SHA="$(
+        docker run --rm \
+          --entrypoint sha256sum \
+          "plane-custom-admin:$CI_COMMIT_SHORT_SHA" \
+          /usr/bin/caddy | awk '{print $1}'
+      )"
+
+      PROXY_SHA="$(
+        docker run --rm \
+          --entrypoint sha256sum \
+          "plane-custom-proxy:$CI_COMMIT_SHORT_SHA" \
+          /usr/bin/caddy | awk '{print $1}'
+      )"
+
+      SPACE_SHA="$(
+        docker run --rm \
+          --entrypoint sha256sum \
+          "plane-custom-space:$CI_COMMIT_SHORT_SHA" \
+          /app/apps/space/build/server/index.js |
+          awk '{print $1}'
+      )"
+
+      LIVE_SHA="$(
+        docker run --rm \
+          --entrypoint sh \
+          "plane-custom-live:$CI_COMMIT_SHORT_SHA" \
+          -c \
+          'find /app/apps/live/dist -type f -exec sha256sum {} \; | sort | sha256sum | awk "{print \$1}"'
+      )"
+
+      BACKEND_SHA="$(
+        docker run --rm \
+          --entrypoint sh \
+          "plane-custom-backend:$CI_COMMIT_SHORT_SHA" \
+          -c \
+          '(sha256sum /code/manage.py; find /code/plane -type f -exec sha256sum {} \;) | sort | sha256sum | awk "{print \$1}"'
+      )"
+
+      echo "Frontend fingerprint: $FRONTEND_SHA"
+      echo "Admin fingerprint:    $ADMIN_SHA"
+      echo "Space fingerprint:    $SPACE_SHA"
+      echo "Live fingerprint:     $LIVE_SHA"
+      echo "Backend fingerprint:  $BACKEND_SHA"
+      echo "Proxy fingerprint:    $PROXY_SHA"
+
+      #
+      # Export them for the following script block.
+      #
+      cat > /tmp/plane-source-fingerprints <<EOF
+      FRONTEND_SHA=$FRONTEND_SHA
+      ADMIN_SHA=$ADMIN_SHA
+      SPACE_SHA=$SPACE_SHA
+      LIVE_SHA=$LIVE_SHA
+      BACKEND_SHA=$BACKEND_SHA
+      PROXY_SHA=$PROXY_SHA
+      EOF
+
+    # --------------------------------------------------------
+    # Transfer one image at a time
+    # --------------------------------------------------------
+
+    - |
+      set -eu
+
+      for IMAGE in \
+        plane-custom-frontend \
+        plane-custom-admin \
+        plane-custom-space \
+        plane-custom-live \
+        plane-custom-backend \
+        plane-custom-proxy
+      do
+        echo "========================================"
+        echo "Transferring ${IMAGE}:$CI_COMMIT_SHORT_SHA"
+        echo "========================================"
+
+        ARCHIVE="/tmp/${IMAGE}-${CI_COMMIT_SHORT_SHA}.tar.gz"
+        REMOTE_ARCHIVE="/tmp/${IMAGE}-${CI_COMMIT_SHORT_SHA}.tar.gz"
+
+        echo "Creating archive..."
+
+        docker save "${IMAGE}:$CI_COMMIT_SHORT_SHA" \
+          | gzip > "$ARCHIVE"
+
+        LOCAL_SHA="$(sha256sum "$ARCHIVE" | awk '{print $1}')"
+
+        echo "Archive SHA256 before transfer: $LOCAL_SHA"
+
+        scp \
+          "$ARCHIVE" \
+          "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_ARCHIVE"
+
+        REMOTE_SHA="$(
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" \
+            "sha256sum '$REMOTE_ARCHIVE' | awk '{print \$1}'"
+        )"
+
+        echo "Archive SHA256 after transfer:  $REMOTE_SHA"
+
+        if [ "$LOCAL_SHA" != "$REMOTE_SHA" ]; then
+          echo "ERROR: transfer checksum mismatch for $IMAGE"
+
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" \
+            "rm -f '$REMOTE_ARCHIVE'" || true
+
+          rm -f "$ARCHIVE"
+
+          exit 1
+        fi
+
+        echo "Archive checksum verified."
+
+        ssh "$DEPLOY_USER@$DEPLOY_HOST" \
+          "set -e; gunzip -c '$REMOTE_ARCHIVE' | docker load"
+
+        ssh "$DEPLOY_USER@$DEPLOY_HOST" \
+          "docker image inspect '${IMAGE}:$CI_COMMIT_SHORT_SHA' >/dev/null"
+
+        rm -f "$ARCHIVE"
+
+        ssh "$DEPLOY_USER@$DEPLOY_HOST" \
+          "rm -f '$REMOTE_ARCHIVE'"
+
+        echo "$IMAGE loaded successfully."
+      done
+
+    # --------------------------------------------------------
+    # Compare actual content after docker load
+    # --------------------------------------------------------
+
+    - |
+      set -eu
+
+      . /tmp/plane-source-fingerprints
+
+      echo "Comparing image contents after docker load..."
+
+      check_fingerprint()
+      {
+        NAME="$1"
+        EXPECTED="$2"
+        COMMAND="$3"
+
+        echo "Checking $NAME..."
+
+        ACTUAL="$(
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" "$COMMAND"
+        )"
+
+        echo "Expected: $EXPECTED"
+        echo "Actual:   $ACTUAL"
+
+        if [ "$EXPECTED" != "$ACTUAL" ]; then
+          echo "ERROR: content corruption detected in $NAME"
+          exit 1
+        fi
+
+        echo "OK: $NAME"
+      }
+
+      check_fingerprint \
+        "frontend" \
+        "$FRONTEND_SHA" \
+        "docker run --rm --entrypoint sha256sum plane-custom-frontend:$CI_COMMIT_SHORT_SHA /usr/bin/caddy | awk '{print \$1}'"
+
+      check_fingerprint \
+        "admin" \
+        "$ADMIN_SHA" \
+        "docker run --rm --entrypoint sha256sum plane-custom-admin:$CI_COMMIT_SHORT_SHA /usr/bin/caddy | awk '{print \$1}'"
+
+      check_fingerprint \
+        "space" \
+        "$SPACE_SHA" \
+        "docker run --rm --entrypoint sha256sum plane-custom-space:$CI_COMMIT_SHORT_SHA /app/apps/space/build/server/index.js | awk '{print \$1}'"
+
+      check_fingerprint \
+        "live" \
+        "$LIVE_SHA" \
+        "docker run --rm --entrypoint sh plane-custom-live:$CI_COMMIT_SHORT_SHA -c 'find /app/apps/live/dist -type f -exec sha256sum {} \; | sort | sha256sum | awk \"{print \\\$1}\"'"
+
+      check_fingerprint \
+        "backend" \
+        "$BACKEND_SHA" \
+        "docker run --rm --entrypoint sh plane-custom-backend:$CI_COMMIT_SHORT_SHA -c '(sha256sum /code/manage.py; find /code/plane -type f -exec sha256sum {} \;) | sort | sha256sum | awk \"{print \\\$1}\"'"
+
+      check_fingerprint \
+        "proxy" \
+        "$PROXY_SHA" \
+        "docker run --rm --entrypoint sha256sum plane-custom-proxy:$CI_COMMIT_SHORT_SHA /usr/bin/caddy | awk '{print \$1}'"
+
+      echo "All content fingerprints match."
+
+    # --------------------------------------------------------
+    # Runtime checks
+    # --------------------------------------------------------
+
+    - |
+      ssh "$DEPLOY_USER@$DEPLOY_HOST" "
+        set -eu
+
+        echo 'Running Production Caddy runtime tests...'
+
+        for IMAGE in \
+          plane-custom-frontend \
+          plane-custom-admin \
+          plane-custom-proxy
+        do
+          docker run --rm \
+            --entrypoint caddy \
+            \"\${IMAGE}:$CI_COMMIT_SHORT_SHA\" \
+            version
+        done
+      "
+
+    - echo "All transferred images passed integrity verification."
+
+
+# ============================================================
+# DEPLOY
+# ============================================================
+
+deploy-production:
+  stage: deploy
+  tags:
+    - plane
+  image: alpine:latest
+
+  needs:
+    - transfer-images
+
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+  before_script:
+    - apk add --no-cache openssh-client
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
+    - chmod 600 ~/.ssh/id_ed25519
+    - ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+    - chmod 600 ~/.ssh/known_hosts
+
+  script:
+    - echo "Deploying Plane release $CI_COMMIT_SHORT_SHA"
+
+    - |
+      ssh "$DEPLOY_USER@$DEPLOY_HOST" "
+        set -eu
+
+        cd /srv/plane-app/plane-app
+
+        export PLANE_RELEASE=$CI_COMMIT_SHORT_SHA
+
+        echo 'Checking release images...'
+
+        for IMAGE in \
+          plane-custom-frontend \
+          plane-custom-admin \
+          plane-custom-space \
+          plane-custom-live \
+          plane-custom-backend \
+          plane-custom-proxy
+        do
+          docker image inspect \
+            \"\${IMAGE}:$CI_COMMIT_SHORT_SHA\" >/dev/null
+        done
+
+        echo 'Final frontend runtime verification...'
+
+        docker run --rm \
+          --entrypoint caddy \
+          \"plane-custom-frontend:$CI_COMMIT_SHORT_SHA\" \
+          version
+
+        echo 'Running migrations...'
+
+        docker compose \
+          --env-file plane.env \
+          -f docker-compose.yaml \
+          -f docker-compose.cicd.yaml \
+          run --rm migrator
+
+        echo 'Starting application services...'
+
+        docker compose \
+          --env-file plane.env \
+          -f docker-compose.yaml \
+          -f docker-compose.cicd.yaml \
+          up -d --no-deps \
+          api worker beat-worker web admin space live proxy
+
+        echo 'Waiting for services...'
+        sleep 15
+
+        docker compose \
+          --env-file plane.env \
+          -f docker-compose.yaml \
+          -f docker-compose.cicd.yaml \
+          ps
+      "
+
+    - echo "Running Production health check..."
+
+    - |
+      ssh "$DEPLOY_USER@$DEPLOY_HOST" "
+        set -e
+
+        curl \
+          --fail \
+          --silent \
+          --show-error \
+          --retry 10 \
+          --retry-delay 3 \
+          --retry-connrefused \
+          http://127.0.0.1/ \
+          >/dev/null
+      "
+
+    - echo "Plane release $CI_COMMIT_SHORT_SHA deployed successfully."
+
+
+# ============================================================
+# CLEANUP — GITLAB BUILD HOST ONLY
+# ============================================================
+
+cleanup-old-images:
+  stage: cleanup
+  tags:
+    - plane
+  image: docker:27-cli
+
+  needs:
+    - deploy-production
+
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+  script:
+    - |
+      set -eu
+
+      echo "Cleaning old Plane images from GitLab build host..."
+      echo "Retention: newest $IMAGE_RETENTION images per repository"
+
+      for IMAGE in \
+        plane-custom-frontend \
+        plane-custom-admin \
+        plane-custom-space \
+        plane-custom-live \
+        plane-custom-backend \
+        plane-custom-proxy
+      do
+        echo "========================================"
+        echo "Cleaning $IMAGE"
+        echo "========================================"
+
+        OLD_IDS="$(
+          docker image ls "$IMAGE" \
+            --format '{{.ID}}' \
+            --no-trunc \
+          | awk -v keep="$IMAGE_RETENTION" 'NR > keep' \
+          | sort -u
+        )"
+
+        if [ -z "$OLD_IDS" ]; then
+          echo "Nothing to remove."
+          continue
+        fi
+
+        for IMAGE_ID in $OLD_IDS
+        do
+          if docker image rm "$IMAGE_ID"; then
+            echo "Removed $IMAGE_ID"
+          else
+            echo "SKIPPED $IMAGE_ID — referenced/in use"
+          fi
+        done
+      done
+
+      echo "Cleanup completed."
+
+      docker image ls \
+        --format '{{.Repository}}:{{.Tag}} {{.ID}} {{.Size}}' \
+        | grep '^plane-custom-' \
+        || true

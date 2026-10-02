@@ -1,0 +1,24 @@
+{
+  "name": "@plane/tailwind-config",
+  "version": "1.4.2",
+  "private": true,
+  "description": "common tailwind configuration across monorepo",
+  "license": "AGPL-3.0",
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "main": "tailwind.config.js",
+  "exports": {
+    "./crm-theme.css": "./crm-theme.css",
+    "./index.css": "./index.css",
+    "./postcss.config.js": "./postcss.config.js"
+  },
+  "dependencies": {
+    "@makeplane/propel": "catalog:",
+    "@tailwindcss/postcss": "catalog:",
+    "postcss": "catalog:"
+  },
+  "devDependencies": {
+    "tailwindcss": "catalog:"
+  }
+}

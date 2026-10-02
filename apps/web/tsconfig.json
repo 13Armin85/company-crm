@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "rootDirs": [".", "./.react-router/types"],
+    "paths": {
+      "@/*": ["./core/*"],
+      "@/app/*": ["./app/*"],
+      "@/helpers/*": ["./helpers/*"],
+      "@/styles/*": ["./styles/*"],
+      "package.json": ["./package.json"]
+    },
+    "strictNullChecks": true,
+    "exactOptionalPropertyTypes": false,
+    "noUnusedParameters": false,
+    "noUnusedLocals": false,
+    "noImplicitReturns": false,
+    "noImplicitOverride": false,
+    "types": ["vite/client"]
+  },
+  "extends": "@plane/typescript-config/react-router.json",
+  "include": [
+    "app/root.tsx",
+    "app/entry.client.tsx",
+    "app/routes.ts",
+    "app/crm/**/*.ts",
+    "app/crm/**/*.tsx",
+    "vite.config.ts",
+    "react-router.config.ts",
+    ".react-router/types/**/*",
+    "**/*.d.ts"
+  ]
+}

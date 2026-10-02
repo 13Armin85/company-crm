@@ -1,0 +1,13 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "Plane development",
+      "Group": "Servers",
+      "Host": "plane-db",
+      "Port": 5432,
+      "MaintenanceDB": "plane",
+      "Username": "plane",
+      "SSLMode": "prefer"
+    }
+  }
+}

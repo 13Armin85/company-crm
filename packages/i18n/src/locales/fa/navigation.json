@@ -1,0 +1,34 @@
+{
+  "command_k": {
+    "empty_state": {
+      "search": {
+        "title": "نتیجه‌ای یافت نشد"
+      }
+    }
+  },
+  "sidebar": {
+    "stickies": "ستیکی‌ها",
+    "your_work": "کارهای شما",
+    "projects": "پروژه‌ها",
+    "pages": "صفحات",
+    "new_work_item": "کار جدید",
+    "home": "خانه",
+    "inbox": "صندوق ورودی",
+    "workspace": "فضای کاری",
+    "views": "نمای‌ها",
+    "analytics": "به‌روزرسانی وضعیت کارهای مشخصه‌شده",
+    "work_items": "کارها",
+    "cycles": "چرخه‌ها",
+    "modules": "ماژول‌ها",
+    "intake": "درخواست‌های ورودی",
+    "drafts": "پیش‌نویس‌ها",
+    "favorites": "علاقمندی‌ها",
+    "pro": "پرو",
+    "upgrade": "به‌روزرسانی وضعیت کارهای مشخصه‌شده",
+    "pi_chat": "Plane AI",
+    "epics": "کاربری‌ها",
+    "upgrade_plan": "برنامه ارتقاء",
+    "plane_pro": "Plane Pro",
+    "business": "کسب‌وکار"
+  }
+}

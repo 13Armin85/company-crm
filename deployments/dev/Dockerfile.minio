@@ -1,0 +1,19 @@
+# MinIO's published images are unavailable. Build the pinned upstream release.
+FROM golang:1.26.8-alpine AS builder
+RUN apk add --no-cache git
+WORKDIR /src
+RUN git clone --depth 1 --branch RELEASE.2025-04-22T22-12-26Z https://github.com/minio/minio.git .
+# Fall back on access errors as well as missing modules (the pipe separator).
+ARG GOPROXY=https://proxy.golang.org|https://goproxy.io|direct
+ENV GOPROXY=$GOPROXY
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/minio .
+
+FROM alpine:3.22
+RUN apk add --no-cache ca-certificates curl tzdata && mkdir /export
+COPY --from=builder /out/minio /usr/local/bin/minio
+# Match the original image's user so existing uploads volumes remain writable.
+EXPOSE 9000 9090
+ENTRYPOINT ["minio"]
+CMD ["server", "/export", "--console-address", ":9090"]

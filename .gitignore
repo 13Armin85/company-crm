@@ -1,0 +1,184 @@
+node_modules
+.next
+.yarn
+
+### NextJS ###
+# Dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# Testing
+/coverage
+
+# Next.js
+/.next/
+/out/
+
+# Production
+dist/
+out/
+build/
+.react-router/
+
+# Misc
+.DS_Store
+*.pem
+.history
+tsconfig.tsbuildinfo
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-debug.log*
+
+# Local env files
+.env.dev
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Vercel
+.vercel
+
+# Turborepo
+.turbo
+
+## Django ##
+venv
+.venv
+*.pyc
+staticfiles
+mediafiles
+.env
+.DS_Store
+logs/
+htmlcov/
+.coverage
+
+node_modules/
+.pnpm-store/
+assets/dist/
+npm-debug.log
+yarn-error.log
+pnpm-debug.log
+
+# Editor directories and files
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+package-lock.json
+.vscode
+
+# Sentry
+.sentryclirc
+
+# lock files
+package-lock.json
+
+
+
+.secrets
+tmp/
+
+## packages
+dist
+.temp/
+deploy/selfhost/plane-app/
+
+## Storybook
+*storybook.log
+output.css
+
+dev-editor
+# Redis
+*.rdb
+*.rdb.gz
+
+storybook-static
+
+CLAUDE.md
+
+build/
+.react-router/
+
+build/
+.react-router/
+temp/
+scripts/
+!packages/i18n/scripts/
+
+# i18n auto-generated types (regenerated on every build)
+packages/i18n/src/types/keys.generated.ts
+
+# Local security notes (not for version control)
+/security/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.pytype/
+
+# Python virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Local databases
+*.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal
+*.db
+*.db-shm
+*.db-wal
+*.sql
+*.dump
+
+# Docker runtime state (Dockerfiles and Compose manifests remain tracked)
+.docker/
+docker-data/
+docker-volumes/
+pgdata/
+postgres-data/
+redis-data/
+rabbitmq-data/
+minio-data/
+pgadmin-data/
+uploads/
+*.pid
+*.sock
+docker-*.tar
+*.docker.tar
+
+# Runtime-generated backend assets
+apps/api/media/
+apps/api/mediafiles/
+apps/api/staticfiles/
+apps/api/plane/static-assets/collected-static/
+apps/api/plane/logs/
+
+# Ignore every local environment variant, but keep templates in Git
+.env.*
+!.env.example
+!**/.env.example
+!.env.dev.example
+
+# OS metadata
+Thumbs.db
+Desktop.ini
+.docker-dev.lock
+.cache/
+.docker-*-build.log
+.env.dev.??????

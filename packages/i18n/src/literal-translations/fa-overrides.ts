@@ -1,0 +1,120 @@
+const faLiteralOverrides: Record<string, string> = {
+  "Work in all dimensions.": "کارهایتان را از هر زاویه مدیریت کنید.",
+  "Welcome back to Plane.": "به Plane خوش آمدید.",
+  "Create your Plane account.": "حساب کاربری Plane خود را بسازید.",
+  "Create an account to start managing work with your team.": "برای مدیریت کارها همراه با تیمتان، حساب کاربری بسازید.",
+  "Log in to start managing work with your team.": "برای مدیریت کارها همراه با تیمتان وارد شوید.",
+  "Sign up": "ثبت‌نام",
+  "Sign in": "ورود",
+  "Manage your Plane instance": "مدیریت سامانهٔ Plane",
+  "Configure instance-wide settings to secure your instance": "تنظیمات کلی سامانه را برای حفظ امنیت آن پیکربندی کنید.",
+  "Are you sure you want to remove member-": "آیا مطمئنید که می‌خواهید این عضو را حذف کنید؟",
+  BoardLayoutIcon: "نماد نمای تخته‌ای",
+  Breadcrumb: "مسیر راهنما",
+  CalendarLayoutIcon: "نماد نمای تقویم",
+  CardLayoutIcon: "نماد نمای کارتی",
+  "Cycles help you and your team to progress faster, similar to the sprints commonly used in agile development.":
+    "چرخه‌ها به شما و تیمتان کمک می‌کنند سریع‌تر پیش بروید؛ مشابه اسپرینت‌های رایج در توسعهٔ چابک.",
+  DueDatePropertyIcon: "نماد تاریخ سررسید",
+  DuplicatePropertyIcon: "نماد تکثیر",
+  "Enter or paste a link": "پیوندی وارد یا جای‌گذاری کنید",
+  "Enter the public-share URL or link of the view or Page you are trying to see in the browser":
+    "نشانی عمومی نما یا صفحهٔ موردنظر را در مرورگر وارد کنید",
+  EstimatePropertyIcon: "نماد برآورد",
+  FigmaFileIcon: "نماد فایل Figma",
+  GridLayoutIcon: "نماد نمای شبکه‌ای",
+  HashPropertyIcon: "نماد عدد",
+  InfoIcon: "نماد اطلاعات",
+  "Join existing workspace": "پیوستن به فضای کاری موجود",
+  LabelPropertyIcon: "نماد برچسب",
+  "Let Plane collect anonymous usage data": "اجازه به Plane برای گردآوری داده‌های استفادهٔ ناشناس",
+  ListLayoutIcon: "نماد نمای فهرست",
+  MembersPropertyIcon: "نماد اعضا",
+  Navigation: "پیمایش",
+  "No shortcuts found for": "میان‌بری پیدا نشد برای",
+  OverdueDatePropertyIcon: "نماد تاریخ سررسید گذشته",
+  ParentPropertyIcon: "نماد مورد والد",
+  "Paste the code sent to your email": "کد ارسال‌شده به ایمیلتان را جای‌گذاری کنید",
+  PriorityPropertyIcon: "نماد اولویت",
+  RelatesToPropertyIcon: "نماد ارتباط با",
+  RelationPropertyIcon: "نماد ارتباط",
+  "removed an attachment": "یک پیوست را حذف کرد",
+  "s address bar and try again.": "در نوار نشانی مرورگر وارد کنید و دوباره تلاش کنید.",
+  "Sans serif": "بدون سریف",
+  ScopePropertyIcon: "نماد محدوده",
+  SheetLayoutIcon: "نماد نمای جدولی",
+  "Stack Trace": "ردگیری پشته",
+  StartDatePropertyIcon: "نماد تاریخ شروع",
+  StatePropertyIcon: "نماد وضعیت",
+  "Sticky toolbar": "نوار ابزار ثابت",
+  TimelineLayoutIcon: "نماد نمای خط زمانی",
+  "uploaded a new attachment": "یک پیوست جدید بارگذاری کرد",
+  UserCirclePropertyIcon: "نماد کاربر دایره‌ای",
+  UserPropertyIcon: "نماد کاربر",
+  UserSquarePropertyIcon: "نماد کاربر مربعی",
+  WorkflowsPropertyIcon: "نماد گردش‌کارها",
+  "Workspace icon": "نماد فضای کاری",
+  "You are offline. You can continue making changes. They will be synced when you are back online.":
+    "آفلاین هستید. می‌توانید به ایجاد تغییرات ادامه دهید؛ پس از اتصال دوباره همگام‌سازی می‌شوند.",
+  "where you host GitLab.": "جایی که GitLab را میزبانی می‌کنید.",
+
+  // Root metadata is generated outside React components, so it is included in
+  // the same language-aware compatibility layer as older UI literals.
+  "Open-source project management tool to manage work items, cycles, and product roadmaps easily":
+    "ابزار متن‌باز مدیریت پروژه برای مدیریت آسان کارها، چرخه‌ها و نقشهٔ راه محصول",
+  "Open-source project management tool to manage work items, sprints, and product roadmaps with peace of mind.":
+    "ابزار متن‌باز مدیریت پروژه برای مدیریت آسان کارها، چرخه‌ها و نقشهٔ راه محصول.",
+  "Plane - Modern project management": "Plane - مدیریت نوین پروژه",
+  "Plane Publish | Make your Plane boards public with one-click":
+    "Plane Publish | انتشار عمومی بردهای Plane با یک کلیک",
+  "Plane Publish is a customer feedback management tool built on top of plane.so":
+    "Plane Publish ابزار مدیریت بازخورد مشتری بر پایهٔ plane.so است",
+
+  // Authentication errors are returned as values and rendered by the toast
+  // system later, rather than being direct JSX children.
+  "Instance not configured. Please contact your administrator.":
+    "سامانه پیکربندی نشده است. با مدیر سامانه تماس بگیرید.",
+  "Invalid email. Please try again.": "آدرس ایمیل معتبر نیست. دوباره تلاش کنید.",
+  "Email required. Please try again.": "وارد کردن ایمیل الزامی است. دوباره تلاش کنید.",
+  "Sign up disabled. Please contact your administrator.": "ثبت‌نام غیرفعال است. با مدیر سامانه تماس بگیرید.",
+  "Magic link login disabled. Please contact your administrator.":
+    "ورود با پیوند یک‌بارمصرف غیرفعال است. با مدیر سامانه تماس بگیرید.",
+  "Password login disabled. Please contact your administrator.":
+    "ورود با رمز عبور غیرفعال است. با مدیر سامانه تماس بگیرید.",
+  "User account deactivated. Please contact your administrator.":
+    "حساب کاربری غیرفعال است. با مدیر سامانه تماس بگیرید.",
+  "This account cannot be used to sign in. Please use a personal account.":
+    "با این حساب نمی‌توان وارد شد. از یک حساب شخصی استفاده کنید.",
+  "Invalid password. Please try again.": "رمز عبور نادرست است. دوباره تلاش کنید.",
+  "Please use a stronger password.": "از رمز عبور قوی‌تری استفاده کنید.",
+  "SMTP not configured. Please contact your administrator.": "SMTP پیکربندی نشده است. با مدیر سامانه تماس بگیرید.",
+  "Email and password required. Please try again.": "وارد کردن ایمیل و رمز عبور الزامی است. دوباره تلاش کنید.",
+  "Authentication failed. Please try again.": "احراز هویت ناموفق بود. دوباره تلاش کنید.",
+  "Email and code required. Please try again.": "وارد کردن ایمیل و کد الزامی است. دوباره تلاش کنید.",
+  "Invalid magic code. Please try again.": "کد ورود نامعتبر است. دوباره تلاش کنید.",
+  "Expired magic code. Please try again.": "کد ورود منقضی شده است. دوباره تلاش کنید.",
+  "OAuth not configured. Please contact your administrator.": "OAuth پیکربندی نشده است. با مدیر سامانه تماس بگیرید.",
+  "Google not configured. Please contact your administrator.": "Google پیکربندی نشده است. با مدیر سامانه تماس بگیرید.",
+  "GitHub not configured. Please contact your administrator.": "GitHub پیکربندی نشده است. با مدیر سامانه تماس بگیرید.",
+  "GitLab not configured. Please contact your administrator.": "GitLab پیکربندی نشده است. با مدیر سامانه تماس بگیرید.",
+  "Google OAuth provider error. Please try again.": "خطای ارائه‌دهندهٔ Google OAuth. دوباره تلاش کنید.",
+  "GitHub OAuth provider error. Please try again.": "خطای ارائه‌دهندهٔ GitHub OAuth. دوباره تلاش کنید.",
+  "GitLab OAuth provider error. Please try again.": "خطای ارائه‌دهندهٔ GitLab OAuth. دوباره تلاش کنید.",
+  "Invalid password token.": "توکن رمز عبور نامعتبر است.",
+  "Invalid password token. Please try again.": "توکن رمز عبور نامعتبر است. دوباره تلاش کنید.",
+  "Expired password token. Please try again.": "توکن رمز عبور منقضی شده است. دوباره تلاش کنید.",
+  "Password required. Please try again.": "وارد کردن رمز عبور الزامی است. دوباره تلاش کنید.",
+  "Incorrect old password. Please try again.": "رمز عبور قبلی نادرست است. دوباره تلاش کنید.",
+  "Invalid new password. Please try again.": "رمز عبور جدید نامعتبر است. دوباره تلاش کنید.",
+  "Password already set. Please try again.": "رمز عبور قبلاً تنظیم شده است. دوباره تلاش کنید.",
+  "Admin already exists. Please try again.": "مدیر از قبل وجود دارد. دوباره تلاش کنید.",
+  "Email, password and first name required. Please try again.":
+    "وارد کردن ایمیل، رمز عبور و نام الزامی است. دوباره تلاش کنید.",
+  "Invalid admin email. Please try again.": "ایمیل مدیر نامعتبر است. دوباره تلاش کنید.",
+  "Invalid admin password. Please try again.": "رمز عبور مدیر نامعتبر است. دوباره تلاش کنید.",
+  "Rate limit exceeded. Please try again later.": "تعداد درخواست‌ها بیش از حد مجاز است. کمی بعد دوباره تلاش کنید.",
+  Error: "خطا",
+  "Something went wrong. Please try again.": "مشکلی پیش آمد. دوباره تلاش کنید.",
+};
+
+export default faLiteralOverrides;

@@ -1,0 +1,34 @@
+/**
+ * Copyright (c) 2023-present Plane Software, Inc. and contributors
+ * SPDX-License-Identifier: AGPL-3.0-only
+ * See the LICENSE file for details.
+ */
+
+import { observer } from "mobx-react";
+// components
+import { PageWrapper } from "@/components/common/page-wrapper";
+// hooks
+import { useInstance } from "@/hooks/store";
+// local imports
+import { GeneralConfigurationForm } from "./form";
+// types
+import type { Route } from "./+types/page";
+
+function GeneralPage() {
+  const { instance, instanceAdmins } = useInstance();
+
+  return (
+    <PageWrapper
+      header={{
+        title: "تنظیمات عمومی",
+        description: "نام سامانه، مدیران و اشتراک‌گذاری داده‌های استفاده را از اینجا مدیریت کنید.",
+      }}
+    >
+      {instance && instanceAdmins && <GeneralConfigurationForm instance={instance} instanceAdmins={instanceAdmins} />}
+    </PageWrapper>
+  );
+}
+
+export const meta: Route.MetaFunction = () => [{ title: "تنظیمات عمومی | مدیریت هم‌کار" }];
+
+export default observer(GeneralPage);

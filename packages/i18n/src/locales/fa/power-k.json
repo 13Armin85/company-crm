@@ -1,0 +1,192 @@
+{
+  "power_k": {
+    "actions_commands": {
+      "bulk_delete_work_items": "حذف انبوه کارها"
+    },
+    "contextual_actions": {
+      "work_item": {
+        "title": "عملیات کارها",
+        "indicator": "کار",
+        "change_state": "تغییر وضعیت",
+        "change_priority": "تغییر اولویت",
+        "change_assignees": "اختصاص به",
+        "assign_to_me": "اختصاص به من",
+        "unassign_from_me": "حذف اختصاص از من",
+        "change_estimate": "تغییر برآورد",
+        "add_to_cycle": "اضافه به چرخه",
+        "add_to_modules": "اضافه به ماژول‌ها",
+        "add_labels": "افزودن برچسب",
+        "subscribe": "اشتراه از طریق اعلانات",
+        "unsubscribe": "لغو اشتراه از طریق اعلانات",
+        "delete": "حذف",
+        "copy_id": "کپی شناسه",
+        "copy_id_toast_success": "شناسه کار به کلیپ‌بورد اضافه شد.",
+        "copy_id_toast_error": "خطا در کپی کردن شناسه کار به کلیپ‌بورد. لطفاً بعداً دوباره امتحان کنید.",
+        "copy_title": "کپی عنوان",
+        "copy_title_toast_success": "عنوان کار به کلیپ‌بورد اضافه شد.",
+        "copy_title_toast_error": "خطا در کپی کردن عنوان کار به کلیپ‌بورد. لطفاً بعداً دوباره امتحان کنید.",
+        "copy_url": "کپی URL",
+        "copy_url_toast_success": "URL کار به کلیپ‌بورد اضافه شد.",
+        "copy_url_toast_error": "خطا در کپی کردن URL کار به کلیپ‌بورد. لطفاً بعداً دوباره امتحان کنید."
+      },
+      "cycle": {
+        "title": "عملیات چرخه",
+        "indicator": "چرخه",
+        "add_to_favorites": "افزودن به علاقه‌مندی‌ها",
+        "remove_from_favorites": "حذف از علاقه‌مندی‌ها",
+        "copy_url": "کپی URL",
+        "copy_url_toast_success": "URL چرخه به کلیپ‌بورد اضافه شد.",
+        "copy_url_toast_error": "خطا در کپی کردن URL چرخه به کلیپ‌بورد. لطفاً بعداً دوباره امتحان کنید."
+      },
+      "module": {
+        "title": "عملیات ماژول",
+        "indicator": "ماژول",
+        "add_remove_members": "اضافه/حذف اعضا",
+        "change_status": "تغییر وضعیت",
+        "add_to_favorites": "افزودن به علاقه‌مندی‌ها",
+        "remove_from_favorites": "حذف از علاقه‌مندی‌ها",
+        "copy_url": "کپی URL",
+        "copy_url_toast_success": "URL ماژول به کلیپ‌بورد اضافه شد.",
+        "copy_url_toast_error": "خطا در کپی کردن URL ماژول به کلیپ‌بورد. لطفاً بعداً دوباره امتحان کنید."
+      },
+      "page": {
+        "title": "عملیات صفحه",
+        "indicator": "صفحه",
+        "lock": "قفل کردن",
+        "unlock": "باز کردن قفل",
+        "make_private": "خصوصی کردن",
+        "make_public": "عمومی کردن",
+        "archive": "آرشیو",
+        "restore": "بازگرداندن",
+        "add_to_favorites": "افزودن به علاقه‌مندی‌ها",
+        "remove_from_favorites": "حذف از علاقه‌مندی‌ها",
+        "copy_url": "کپی URL",
+        "copy_url_toast_success": "URL صفحه به کلیپ‌بورد اضافه شد.",
+        "copy_url_toast_error": "خطا در کپی کردن URL صفحه به کلیپ‌بورد. لطفاً بعداً دوباره امتحان کنید."
+      }
+    },
+    "creation_actions": {
+      "create_work_item": "کار جدید",
+      "create_page": "صفحه جدید",
+      "create_view": "نما جدید",
+      "create_cycle": "جدید چرخه",
+      "create_module": "جدید ماژول",
+      "create_project": "جدید پروژه",
+      "create_workspace": "جدید فضای کاری",
+      "create_project_automation": "جدید خودکارسازی"
+    },
+    "navigation_actions": {
+      "open_workspace": "فضای کاری را باز کنید",
+      "nav_home": "خانه را ببینید",
+      "nav_inbox": "صندوق ورودی را ببینید",
+      "nav_your_work": "کارهای شما را ببینید",
+      "nav_account_settings": " تنظیمات حساب را ببینید",
+      "open_project": "پروژه را باز کنید",
+      "nav_projects_list": "لیست پروژه‌ها را ببینید",
+      "nav_all_workspace_work_items": "تمام کارهای فعال را ببینید",
+      "nav_assigned_workspace_work_items": "کارهای اختصاصی را ببینید",
+      "nav_created_workspace_work_items": "کارهای ایجاد شده را ببینید",
+      "nav_subscribed_workspace_work_items": "کارهای عضوی را ببینید",
+      "nav_workspace_analytics": "تحلیل‌های فضای کاری را ببینید",
+      "nav_workspace_drafts": "پیش‌نویس‌های فضای کاری را ببینید",
+      "nav_workspace_archives": "بایگانی فضای کاری را ببینید",
+      "open_workspace_setting": " تنظیمات فضای کاری را باز کنید",
+      "nav_workspace_settings": " تنظیمات فضای کاری را ببینید",
+      "nav_project_work_items": "کارهای فعال را ببینید",
+      "open_project_cycle": "چرخه را باز کنید",
+      "nav_project_cycles": "تمام چرخه‌ها را ببینید",
+      "open_project_module": "ماژول را باز کنید",
+      "nav_project_modules": "تمام ماژول‌ها را ببینید",
+      "open_project_view": "نما پروژه را باز کنید",
+      "nav_project_views": "تمام نمای‌های پروژه را ببینید",
+      "nav_project_pages": "صفحات را ببینید",
+      "nav_project_intake": "درخواست‌های ورودی را ببینید",
+      "nav_project_archives": "بایگانی‌های پروژه را ببینید",
+      "open_project_setting": " تنظیمات پروژه را باز کنید",
+      "nav_project_settings": " تنظیمات پروژه را ببینید",
+      "nav_workspace_active_cycle": "تمام چرخه‌های فعال را ببینید",
+      "nav_project_overview": "برنامه‌بندی پروژه را ببینید"
+    },
+    "account_actions": {
+      "sign_out": "به‌روزرسانی وضعیت کارهای مشخصه‌شده",
+      "workspace_invites": "دعوت به فضای کاری"
+    },
+    "miscellaneous_actions": {
+      "toggle_app_sidebar": "بار جانبی برنامه را بگیرید",
+      "copy_current_page_url": "URL صفحه فعلی را کپی کنید",
+      "copy_current_page_url_toast_success": "URL صفحه فعلی به کلیپ‌بورد ارسال شد.",
+      "copy_current_page_url_toast_error": "خطا در کپی کردن URL صفحه فعلی به کلیپ‌بورد.",
+      "focus_top_nav_search": "ورودی جستجو را با دیده‌بان بگذارید"
+    },
+    "preferences_actions": {
+      "update_theme": "تغییر سبک رابط کاربری",
+      "update_timezone": "زمان بندی را تغییر دهید",
+      "update_start_of_week": "روز اول هفته را تغییر دهید",
+      "update_language": "زبان را تغییر دهید",
+      "toast": {
+        "theme": {
+          "success": "تغییر سبک موفقیت یافته.",
+          "error": "خطا در بروزرسانی سبک. دوباره امتحان کنید."
+        },
+        "timezone": {
+          "success": "زمان بندی موفقیت یافته.",
+          "error": "خطا در بروزرسانی زمان بندی. دوباره امتحان کنید."
+        },
+        "generic": {
+          "success": " تنظیمات موفقیت یافته.",
+          "error": "خطا در بروزرسانی تنظیمات. دوباره امتحان کنید."
+        }
+      }
+    },
+    "help_actions": {
+      "open_keyboard_shortcuts": "کوتیشن‌های کلیدی را باز کنید",
+      "open_plane_documentation": "مستندات Plane را ببینید",
+      "join_forum": "به فوروم‌مان پیوست",
+      "report_bug": "خطای سیستم را گزارش دهید",
+      "chat_with_us": "با ما گفتگو کنید"
+    },
+    "page_placeholders": {
+      "default": "فرمان یا جستجوی متن را وارد کنید",
+      "open_workspace": "فضای کاری را باز کنید",
+      "open_project": "پروژه را باز کنید",
+      "open_workspace_setting": " تنظیمات فضای کاری را باز کنید",
+      "open_project_cycle": "چرخه را باز کنید",
+      "open_project_module": "ماژول را باز کنید",
+      "open_project_view": "نما پروژه را باز کنید",
+      "open_project_setting": " تنظیمات پروژه را باز کنید",
+      "update_work_item_state": "تغییر وضعیت",
+      "update_work_item_priority": "تغییر اولویت",
+      "update_work_item_assignee": "اختصاص به",
+      "update_work_item_estimate": "تغییر برآورد",
+      "update_work_item_cycle": "اضافه به چرخه",
+      "update_work_item_module": "اضافه به ماژول‌ها",
+      "update_work_item_labels": "افزودن برچسب",
+      "update_module_member": "اعضای تیم را تغییر دهید",
+      "update_module_status": "تغییر وضعیت",
+      "update_theme": "سبک را تغییر دهید",
+      "update_timezone": "زمان بندی را تغییر دهید",
+      "update_start_of_week": "روز اول هفته را تغییر دهید",
+      "update_language": "زبان را تغییر دهید"
+    },
+    "search_menu": {
+      "no_results": "نتیجه‌ای یافت نشد",
+      "clear_search": "جستجوی را پاک کنید",
+      "go_to_advanced_search": "به جستجوی پیشرفته بروید"
+    },
+    "footer": {
+      "workspace_level": "سطح فضای کاری"
+    },
+    "group_titles": {
+      "actions": "عملیات‌ها",
+      "contextual": "متنی",
+      "navigation": "مکان‌یابی",
+      "create": "ایجاد",
+      "general": "عمومی",
+      "settings": "تنظیمات",
+      "account": "حساب",
+      "miscellaneous": "تنوعی",
+      "preferences": " ترجیحات",
+      "help": "کمک"
+    }
+  }
+}

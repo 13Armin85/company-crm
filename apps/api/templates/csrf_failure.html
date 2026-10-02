@@ -1,0 +1,65 @@
+<!-- templates/csrf_failure.html -->
+<!doctype html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>اعتبارسنجی CSRF ناموفق بود</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f8f9fa;
+        padding: 50px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+      }
+      .card {
+        max-width: 400px;
+        padding: 30px;
+        background-color: #ffffff;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      }
+      .card-header {
+        text-align: center;
+        margin-bottom: 20px;
+      }
+      .btn-primary {
+        display: block;
+        width: 100%;
+        padding: 10px;
+        background-color: #007bff;
+        color: #fff;
+        text-align: center;
+        text-decoration: none;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .btn-primary:hover {
+        background-color: #0056b3;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="card-header">
+        <h3>اعتبارسنجی CSRF ناموفق بود</h3>
+      </div>
+      <div class="card-body">
+        <p>
+          به نظر می‌رسد اعتبار فرم شما منقضی شده یا در پردازش درخواست مشکلی پیش آمده است.
+        </p>
+        <p>لطفاً راهکارهای زیر را امتحان کنید:</p>
+        <ul>
+          <li>صفحه را تازه کنید و دوباره فرم را ارسال کنید.</li>
+          <li>مطمئن شوید کوکی‌ها در مرورگر شما فعال هستند.</li>
+        </ul>
+        <a href="{{ root_url }}" class="btn-primary">رفتن به صفحهٔ اصلی</a>
+      </div>
+    </div>
+  </body>
+</html>

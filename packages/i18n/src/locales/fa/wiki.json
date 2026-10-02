@@ -1,0 +1,113 @@
+{
+  "wiki_collections": {
+    "predefined": {
+      "general": "عمومی",
+      "private": "خصوصی",
+      "shared": "اشتراک‌گذاری شد",
+      "archived": "ارشیو شد"
+    },
+    "fallback_name": "مجموعه",
+    "form": {
+      "name_required": "عنوان مجموعه الزامی است",
+      "name_max_length": "نام مجموعه باید کمتر از ۲۵۵ کاراکتر باشد",
+      "name_placeholder_create": "عنوانی برای مجموعه ارائه دهید",
+      "name_placeholder_edit": "نام مجموعه"
+    },
+    "create_modal": {
+      "title": "مجموعه جدید ایجاد کنید",
+      "submit": "ایجاد مجموعه"
+    },
+    "edit_modal": {
+      "title": "ویرایش مجموعه"
+    },
+    "delete_modal": {
+      "title": "حذف مجموعه",
+      "page_count": "این مجموعه {pageCount} {pageCount, plural, one {صفحه} other {صفحه}} دارد. نحوهٔ مدیریت آن‌ها را انتخاب کنید.",
+      "transfer_title": "انتقال صفحات و حذف مجموعه",
+      "transfer_description": "همه صفحات را به مجموعه دیگر منتقل کنید و سپس حذف کنید. صفحات و مجوزهای آن‌ها حفظ می‌شوند.",
+      "transfer_warning": "صفحات منتقل شده به مجوزهای مجموعه انتخابی وراثت می‌گیرند.",
+      "transfer_target_label": "مجموعه مقصد",
+      "transfer_target_placeholder": "مجموعه‌ای را انتخاب کنید",
+      "delete_with_pages_title": "حذف مجموعه با صفحات",
+      "delete_with_pages_description": "مجموعه و تمام صفحات آن را به طور دائم حذف کنید. این عملیات قابل‌انعکاس نیست.",
+      "submit": "حذف مجموعه"
+    },
+    "header": {
+      "add_page": "افزودن صفحه"
+    },
+    "menu": {
+      "create_new_page": "صفحه جدید ایجاد کنید",
+      "add_existing_page": "صفحه موجود اضافه کنید",
+      "edit_collection": "ویرایش مجموعه",
+      "collection_options": "گزینه‌های مجموعه"
+    },
+    "add_existing_page_modal": {
+      "search_placeholder": "جستجوی صفحات",
+      "success_message": "{count} {count, plural, one {صفحه} other {صفحه}} به مجموعه افزوده شد.",
+      "error_message": "صفحات نمی‌توانستهای منتقل شوند. لطفاً دوباره تلاش کنید.",
+      "no_pages_found": "هیچ صفحه‌ای یافت نشد که با جستجوی شما مطابقت داشته باشد",
+      "no_pages_available": "هیچ صفحه برای انتقال در دسترس نیست",
+      "submit": "جابجایی"
+    },
+    "list": {
+      "invite_only": "فقط دعوت‌کننده",
+      "remove_error": "حذف صفحه از مجموعه با شکست مواجه شد.",
+      "no_matching_pages": "هیچ صفحه‌ای مطابق نیست",
+      "remove_search_criteria": "برای مشاهده تمام صفحات، معیارهای جستجو را حذف کنید",
+      "remove_filters": "برای مشاهده تمام صفحات، فیلترهای را حذف کنید",
+      "no_pages_title": "هنوز صفحه‌ای وجود ندارد",
+      "no_pages_description": "این مجموعه هنوز هیچ صفحه‌ای ندارد.",
+      "untitled": "بدون عنوان",
+      "restricted_access": "دسترسی محدود",
+      "collapse_page": "کشیدن صفحه",
+      "expand_page": "افتح کردن صفحه",
+      "page_actions": "عملیات صفحه",
+      "page_link_copied": "لینک صفحه به کلیپ‌بورد کپی شد.",
+      "columns": {
+        "page_name": "نام صفحه",
+        "owner": "مالک",
+        "nested_pages": "صفحات زیرمجموعه",
+        "last_activity": "آخرین فعالیت",
+        "actions": "عملیات‌ها"
+      }
+    },
+    "toasts": {
+      "created": "مجموعه با موفقیت ایجاد شد.",
+      "create_error": "مجموعه نمی‌توانست ایجاد شود. لطفاً دوباره امتحان کنید.",
+      "renamed": "مجموعه موفقیتمندی تغییر نام یافت.",
+      "rename_error": "مجموعه نمی‌توانست به‌روزرسانی شود. لطفاً دوباره امتحان کنید.",
+      "transferred_deleted": "صفحات منتقل شد و مجموعه حذف شد.",
+      "deleted_with_pages": "مجموعه و صفحات آن حذف شد.",
+      "delete_error": "مجموعه نمی‌توانست حذف شود. لطفاً دوباره امتحان کنید.",
+      "target_required": "لطفاً یک مجموعه را برای جابجایی صفحات انتخاب کنید.",
+      "create_page_error": "صفحه نمی‌توانست ایجاد شود. لطفاً دوباره امتحان کنید.",
+      "create_page_in_collection_error": "صفحه نمی‌توانست ایجاد شده یا به مجموعه اضافه شود. لطفاً دوباره امتحان کنید.",
+      "collection_link_copied": "لینک مجموعه به کلیپ‌بورد کپی شد."
+    }
+  },
+  "wiki": {
+    "upgrade_flow": {
+      "title": "به‌روزرسانی برای رهگیری ویکی",
+      "description": "صفحات عمومی، تاریخچه نسخه، صفحات مشترک، همکاری واقعی‌زمان و صفحات فضای کاری را با نسخه Pro Plane رهگیری کنید.",
+      "upgrade_button": {
+        "text": "به‌روزرسانی وضعیت کارهای مشخصه‌شده"
+      },
+      "learn_more_button": {
+        "text": "بیشتر بدانید"
+      },
+      "download_button": {
+        "text": "دانلود داده",
+        "loading": "در حال دانلود..."
+      },
+      "tabs": {
+        "nested_pages": "صفحات زیرمجموعه‌ای",
+        "add_embeds": "افزودن گنجان‌بندی‌ها",
+        "publish_pages": "منتشر کردن صفحات",
+        "comments": "به‌روزرسانی وضعیت کارهای مشخصه‌شده"
+      }
+    },
+    "nested_pages_download_banner": {
+      "title": "صفحات زیرمجموعه‌ای نیاز به یک طرح پرداختی دارند. به‌روزرسانی برای رهگیری آنها."
+    }
+  }
+}

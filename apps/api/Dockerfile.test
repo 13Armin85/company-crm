@@ -1,0 +1,6 @@
+FROM plane-dev-api
+
+COPY requirements/test.txt /code/requirements/test.txt
+RUN pip install -r /code/requirements/test.txt --compile --no-cache-dir
+
+CMD ["pytest"]
