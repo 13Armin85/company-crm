@@ -1,6 +1,6 @@
-# انتشار همین پروژه روی Debian از طریق SSH
+# انتشار همین پروژه روی Debian یا Ubuntu از طریق SSH
 
-این راهنما برای کاربر `plane` روی سرور `192.168.10.20` است. کد روی ویندوز آماده و منتقل می‌شود؛ build و اجرای production روی Debian انجام می‌شود. فرض اولیه نصب تازه است. انتقال اطلاعات محیط توسعه، کاری جدا از انتقال سورس است؛ بخش پشتیبان‌گیری و بازیابی را ببینید.
+این راهنما برای کاربر `plane` روی سرور `192.168.10.20` است. کد روی ویندوز آماده و منتقل می‌شود؛ build و اجرای production روی Debian یا Ubuntu انجام می‌شود. خروجی واقعی سرور کاربر، Ubuntu 26.04 LTS با codename برابر `resolute` است؛ دستورات نصب Docker پایین، توزیع را از `/etc/os-release` می‌خوانند. فرض اولیه نصب تازه است. انتقال اطلاعات محیط توسعه، کاری جدا از انتقال سورس است؛ بخش پشتیبان‌گیری و بازیابی را ببینید.
 
 دو محل اجرای دستور داریم: **PowerShell کامپیوتر ویندوزی** و **Bash سرور بعد از SSH**. بلوک‌های `powershell` را روی ویندوز و بلوک‌های `bash` را روی سرور اجرا کنید.
 
@@ -9,7 +9,7 @@
 مسیر درخواست‌ها چنین است:
 
 ```text
-Browser -> Debian :80/:443 -> Caddy proxy
+Browser -> Linux :80/:443 -> Caddy proxy
                                |-> web
                                |-> admin (/god-mode/)
                                |-> space (/spaces/)
@@ -22,7 +22,18 @@ api + worker + beat-worker -> PostgreSQL + Valkey + RabbitMQ + MinIO
 
 `docker-compose-production.yml` تمام سرویس‌های برنامه را از سورس همین پوشه می‌سازد. `migrator` هنگام نصب و به‌روزرسانی اجرا می‌شود و سپس خارج می‌شود؛ سرویس دائمی نیست. pgAdmin پنل کمکی دیتابیس است و با profile اختیاری `tools` اجرا می‌شود.
 
-برای برنامه‌ریزی یک نصب کوچک، ۴ هسته، حداقل ۸ گیگابایت RAM و حدود ۶۰ گیگابایت فضای آزاد نقطه شروع مناسبی است؛ مصرف واقعی به کاربران و فایل‌ها بستگی دارد. ساخت چند فرانت‌اند و MinIO حافظه و فضای بیشتری از اجرای عادی مصرف می‌کند. اسکریپت build را به‌صورت ترتیبی اجرا می‌کند. لازم نیست Node، pnpm، Python یا PostgreSQL را روی میزبان نصب کنید؛ ابزارها داخل Docker هستند.
+برای برنامه‌ریزی یک نصب کوچک، ۴ هسته، ۸ گیگابایت RAM و حدود ۶۰ گیگابایت فضای دیسک نقطه شروع مناسبی است؛ این اعداد تضمین مصرف یا حداقل قطعی نیستند. مصرف واقعی به کاربران و فایل‌ها بستگی دارد. با ۵٫۳ گیگابایت RAM و ۴ گیگابایت swap هم می‌توان نصب کوچک را امتحان کرد؛ build ممکن است کند شود یا به حافظه بیشتری نیاز داشته باشد. ساخت چند فرانت‌اند و MinIO حافظه و فضای بیشتری از اجرای عادی مصرف می‌کند. اسکریپت build را به‌صورت ترتیبی اجرا می‌کند. لازم نیست Node، pnpm، Python یا PostgreSQL را روی میزبان نصب کنید؛ ابزارها داخل Docker هستند.
+
+در مشخصات فعلی سرور، filesystem ریشه ۱۹ گیگابایت و فضای آزاد آن ۱۱ گیگابایت است. برای ساخت همه imageها و نگهداری cache، این فضا حاشیه کمی دارد؛ پیش از build بهتر است حدود ۳۰ تا ۴۰ گیگابایت فضای آزاد فراهم شود. این برآورد برای برنامه‌ریزی است و مصرف دقیق با build مشخص می‌شود. ممکن است دیسک VM بزرگ‌تر باشد و فقط بخشی از آن به LVM ریشه اختصاص یافته باشد. برای تشخیص، این دستورهای فقط‌خواندنی را اجرا کنید:
+
+```bash
+nproc
+lsblk -o NAME,SIZE,FSTYPE,MOUNTPOINTS
+sudo vgs
+sudo lvs
+```
+
+اگر در ستون `VFree` فضای آزاد وجود داشته باشد، می‌توان با بررسی filesystem و مسیر logical volume، ظرفیت ریشه را از همان فضای آزاد بیشتر کرد. در غیر این صورت باید ظرفیت دیسک VM یا دیسک محل داده‌های Docker افزایش یابد. دستور تغییر partition یا LVM را پس از بررسی این خروجی‌ها انتخاب کنید.
 
 سرور به اینترنت برای apt، imageها، npm، pip و Go نیاز دارد. اجرای دستورها باید با Bash و کاربر دارای `sudo` انجام شود. مسیر نصب در این راهنما `/home/plane/company-crm` است؛ اگر home کاربر متفاوت است، خروجی `echo "$HOME"` را مبنا قرار دهید.
 
@@ -47,7 +58,7 @@ ssh -i "$env:USERPROFILE\.ssh\id_ed25519" plane@192.168.10.20
 Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0
 ```
 
-اگر پورت SSH سرور به‌جای ۲۲ مقدار دیگری است، از `ssh -p PORT` و `scp -P PORT` استفاده کنید. برای timeout، ارتباط شبکه/VPN، IP و سرویس SSH سرور را بررسی کنید. در کنسول خود Debian، مدیر سیستم می‌تواند اجرا کند:
+اگر پورت SSH سرور به‌جای ۲۲ مقدار دیگری است، از `ssh -p PORT` و `scp -P PORT` استفاده کنید. برای timeout، ارتباط شبکه/VPN، IP و سرویس SSH سرور را بررسی کنید. در کنسول خود سرور، مدیر سیستم می‌تواند اجرا کند:
 
 ```bash
 sudo apt-get update
@@ -78,21 +89,23 @@ usermod -aG sudo plane
 
 سپس کاربر `plane` از SSH خارج و دوباره وارد شود. برای اشغال بودن پورت ۸۰ یا ۴۴۳، برنامه صاحب پورت را با `ss` شناسایی کنید. قبل از ادامه، پورت آزاد یا reverse proxy موجود باید طبق معماری شما تنظیم شود؛ اسکریپت سرویس‌های دیگر سرور را متوقف نمی‌کند.
 
-## ۳. نصب Docker Engine و Compose روی Debian
+## ۳. نصب Docker Engine و Compose روی Debian یا Ubuntu
 
-اگر `sudo docker version` و `sudo docker compose version` موفق‌اند، نیاز به نصب دوباره نیست. برای Debian تازه، از [مخزن رسمی Docker برای Debian](https://docs.docker.com/engine/install/debian/) استفاده کنید:
+اگر `sudo docker version` و `sudo docker compose version` موفق‌اند، نیاز به نصب دوباره نیست. برای نصب تازه، مطابق مستندات رسمی [Docker برای Ubuntu](https://docs.docker.com/engine/install/ubuntu/) یا [Docker برای Debian](https://docs.docker.com/engine/install/debian/) عمل کنید. Ubuntu 26.04 در فهرست نسخه‌های پشتیبانی‌شده Docker است. بلوک زیر، مخزن همان توزیع را انتخاب می‌کند:
 
 ```bash
 sudo apt-get update
 sudo apt-get install -y ca-certificates curl openssl nano tmux
+docker_distro=$(. /etc/os-release && printf '%s' "$ID")
+docker_codename=$(. /etc/os-release && printf '%s' "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
 sudo install -m 0755 -d /etc/apt/keyrings
-sudo curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+sudo curl -fsSL "https://download.docker.com/linux/$docker_distro/gpg" -o /etc/apt/keyrings/docker.asc
 sudo chmod a+r /etc/apt/keyrings/docker.asc
 
 sudo tee /etc/apt/sources.list.d/docker.sources > /dev/null <<EOF
 Types: deb
-URIs: https://download.docker.com/linux/debian
-Suites: $(. /etc/os-release && echo "$VERSION_CODENAME")
+URIs: https://download.docker.com/linux/$docker_distro
+Suites: $docker_codename
 Components: stable
 Architectures: $(dpkg --print-architecture)
 Signed-By: /etc/apt/keyrings/docker.asc
@@ -106,7 +119,7 @@ sudo docker compose version
 sudo docker run --rm hello-world
 ```
 
-Docker فعلی، Debian ۱۲ و ۱۳ را در فهرست نصب پشتیبانی‌شده دارد؛ برای نسخه‌های دیگر مستندات همان نسخه را بررسی کنید. اگر قبلاً بسته‌های `docker.io`، `docker-compose`، `podman-docker`، `containerd` یا `runc` نصب شده‌اند و نصب conflict می‌دهد، طبق مستندات Docker و با بررسی workloadهای موجود، تعارض بسته‌ها را رفع کنید.
+این بلوک برای `ID=ubuntu` یا `ID=debian` است. اگر قبلاً دستور قدیمی Debian را روی Ubuntu اجرا کرده‌اید، همین بلوک، کلید و فایل `/etc/apt/sources.list.d/docker.sources` را با مقادیر درست Ubuntu جایگزین می‌کند. اگر قبلاً بسته‌های `docker.io`، `docker-compose`، `podman-docker`، `containerd` یا `runc` نصب شده‌اند و نصب conflict می‌دهد، طبق مستندات Docker و با بررسی workloadهای موجود، تعارض بسته‌ها را رفع کنید.
 
 در این راهنما فرمان‌های Docker با `sudo` اجرا می‌شوند. اگر Docker از قبل نصب است، ابزارهای میزبان را جداگانه نصب کنید:
 
