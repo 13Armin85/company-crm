@@ -1,0 +1,277 @@
+name: plane-production
+
+x-runtime: &runtime
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+x-frontend-args: &frontend-args
+  VITE_API_BASE_URL: ${PUBLIC_URL:?Run deployments/debian/init-env.sh first}
+  VITE_WEB_BASE_URL: ${PUBLIC_URL}
+  VITE_ADMIN_BASE_URL: ${PUBLIC_URL}
+  VITE_ADMIN_BASE_PATH: /god-mode
+  VITE_SPACE_BASE_URL: ${PUBLIC_URL}
+  VITE_SPACE_BASE_PATH: /spaces
+  VITE_LIVE_BASE_URL: ${PUBLIC_URL}
+  VITE_LIVE_BASE_PATH: /live
+
+x-backend: &backend
+  <<: *runtime
+  image: company-crm-api:production
+  pull_policy: never
+  environment:
+    DJANGO_SETTINGS_MODULE: plane.settings.production
+    DEBUG: "0"
+    SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env.production}
+    ALLOWED_HOSTS: ${ALLOWED_HOSTS:?Set ALLOWED_HOSTS in .env.production}
+    CORS_ALLOWED_ORIGINS: ${PUBLIC_URL}
+    WEB_URL: ${PUBLIC_URL}
+    APP_BASE_URL: ${PUBLIC_URL}
+    APP_BASE_PATH: ""
+    ADMIN_BASE_URL: ${PUBLIC_URL}
+    ADMIN_BASE_PATH: /god-mode
+    SPACE_BASE_URL: ${PUBLIC_URL}
+    SPACE_BASE_PATH: /spaces
+    LIVE_BASE_URL: ${PUBLIC_URL}
+    LIVE_BASE_PATH: /live
+    LIVE_SERVER_SECRET_KEY: ${LIVE_SERVER_SECRET_KEY:?Set LIVE_SERVER_SECRET_KEY in .env.production}
+    DATABASE_URL: postgresql://${POSTGRES_USER:-plane}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}@plane-db:5432/${POSTGRES_DB:-plane}
+    REDIS_URL: redis://plane-redis:6379/0
+    RABBITMQ_HOST: plane-mq
+    RABBITMQ_PORT: "5672"
+    RABBITMQ_USER: ${RABBITMQ_USER:-plane}
+    RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD in .env.production}
+    RABBITMQ_VHOST: plane
+    USE_MINIO: "1"
+    AWS_REGION: us-east-1
+    AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:?Set AWS_ACCESS_KEY_ID in .env.production}
+    AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?Set AWS_SECRET_ACCESS_KEY in .env.production}
+    AWS_S3_ENDPOINT_URL: http://plane-minio:9000
+    AWS_S3_BUCKET_NAME: uploads
+    MINIO_ENDPOINT_SSL: ${MINIO_ENDPOINT_SSL:-0}
+    FILE_SIZE_LIMIT: ${FILE_SIZE_LIMIT:-5242880}
+    GUNICORN_WORKERS: ${GUNICORN_WORKERS:-2}
+  depends_on:
+    plane-db:
+      condition: service_healthy
+    plane-redis:
+      condition: service_healthy
+    plane-mq:
+      condition: service_healthy
+    plane-minio:
+      condition: service_healthy
+
+services:
+  plane-db:
+    <<: *runtime
+    image: postgres:15.7-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-plane}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-plane}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  plane-redis:
+    <<: *runtime
+    image: valkey/valkey:7.2.11-alpine
+    command: valkey-server --appendonly yes
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  plane-mq:
+    <<: *runtime
+    image: rabbitmq:3.13.6-management-alpine
+    hostname: plane-mq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-plane}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+      RABBITMQ_DEFAULT_VHOST: plane
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 30s
+
+  plane-minio:
+    <<: *runtime
+    image: company-crm-minio:production
+    build:
+      context: .
+      dockerfile: deployments/dev/Dockerfile.minio
+    environment:
+      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID}
+      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY}
+    volumes:
+      - uploads:/export
+    ports:
+      - "127.0.0.1:9090:9090"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  migrator:
+    <<: *backend
+    restart: "no"
+    profiles: [maintenance]
+    command: ./bin/docker-entrypoint-migrator.sh
+
+  api:
+    <<: *backend
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile.api
+    command: ./bin/docker-entrypoint-api.sh
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/instances/', timeout=5)"
+      interval: 15s
+      timeout: 10s
+      retries: 30
+      start_period: 60s
+
+  worker:
+    <<: *backend
+    command: ./bin/docker-entrypoint-worker.sh
+    depends_on:
+      api:
+        condition: service_healthy
+      plane-mq:
+        condition: service_healthy
+
+  beat-worker:
+    <<: *backend
+    command: ./bin/docker-entrypoint-beat.sh
+    depends_on:
+      api:
+        condition: service_healthy
+      plane-mq:
+        condition: service_healthy
+
+  web:
+    <<: *runtime
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile.web
+      args: *frontend-args
+    depends_on:
+      api:
+        condition: service_healthy
+
+  admin:
+    <<: *runtime
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile.admin
+      args: *frontend-args
+    depends_on:
+      api:
+        condition: service_healthy
+
+  space:
+    <<: *runtime
+    build:
+      context: .
+      dockerfile: apps/space/Dockerfile.space
+      args: *frontend-args
+    depends_on:
+      api:
+        condition: service_healthy
+
+  live:
+    <<: *runtime
+    build:
+      context: .
+      dockerfile: apps/live/Dockerfile.live
+    environment:
+      API_BASE_URL: http://api:8000
+      CORS_ALLOWED_ORIGINS: ${PUBLIC_URL}
+      LIVE_BASE_PATH: /live
+      LIVE_SERVER_SECRET_KEY: ${LIVE_SERVER_SECRET_KEY}
+      REDIS_URL: redis://plane-redis:6379/0
+    depends_on:
+      api:
+        condition: service_healthy
+      plane-redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://localhost:3000/live/health/').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 30s
+
+  proxy:
+    <<: *runtime
+    build:
+      context: ./apps/proxy
+      dockerfile: Dockerfile.ce
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?Set SITE_ADDRESS in .env.production}
+      TRUSTED_PROXIES: "127.0.0.1/32 ::1/128"
+      BUCKET_NAME: uploads
+      FILE_SIZE_LIMIT: ${FILE_SIZE_LIMIT:-5242880}
+    ports:
+      - "${BIND_ADDRESS:-0.0.0.0}:80:80"
+      - "${BIND_ADDRESS:-0.0.0.0}:443:443"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+      admin:
+        condition: service_healthy
+      space:
+        condition: service_healthy
+      live:
+        condition: service_healthy
+
+  pgadmin:
+    <<: *runtime
+    profiles: [tools]
+    image: dpage/pgadmin4:9.17
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:?Set PGADMIN_PASSWORD in .env.production}
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    ports:
+      - "127.0.0.1:5050:80"
+    depends_on:
+      plane-db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  redisdata:
+  rabbitmq_data:
+  uploads:
+  caddy_data:
+  caddy_config:
+  pgadmin_data:

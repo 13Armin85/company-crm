@@ -3,6 +3,9 @@
 .env
 .env.dev
 .env.dev.??????
+.env.production
+.env.production.*
+backups/
 .docker-dev.lock
 .docker-*-build.log
 **/.env
