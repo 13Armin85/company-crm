@@ -13,7 +13,7 @@ on_error() {
 trap on_error ERR
 
 if [[ ! -f .env.production ]]; then
-    printf 'First run: bash deployments/debian/init-env.sh http://192.168.10.20\n' >&2
+    printf 'First run: bash deployments/debian/init-env.sh http://192.168.10.24\n' >&2
     exit 1
 fi
 if grep -q '^\([A-Z_]*\)=CHANGE_ME_' .env.production; then
