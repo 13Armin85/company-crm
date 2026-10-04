@@ -4,6 +4,8 @@
 
 دو محل اجرای دستور داریم: **PowerShell کامپیوتر ویندوزی** و **Bash سرور بعد از SSH**. بلوک‌های `powershell` را روی ویندوز و بلوک‌های `bash` را روی سرور اجرا کنید.
 
+برای مسیر Ubuntu، [راهنمای آماده‌سازی و اجرای Ubuntu](../ubuntu/README.fa.md) شامل اسکریپت نصب میزبان است. پس از انتقال سورس می‌توانید `bash deployments/ubuntu/setup-server.sh` را اجرا کنید؛ سپس initializer و deploy هم از مسیر `deployments/ubuntu/` قابل اجرا هستند.
+
 ## ۱. معماری و نیازهای سرور
 
 مسیر درخواست‌ها چنین است:
@@ -92,6 +94,8 @@ usermod -aG sudo plane
 ## ۳. نصب Docker Engine و Compose روی Debian یا Ubuntu
 
 اگر `sudo docker version` و `sudo docker compose version` موفق‌اند، نیاز به نصب دوباره نیست. برای نصب تازه، مطابق مستندات رسمی [Docker برای Ubuntu](https://docs.docker.com/engine/install/ubuntu/) یا [Docker برای Debian](https://docs.docker.com/engine/install/debian/) عمل کنید. Ubuntu 26.04 در فهرست نسخه‌های پشتیبانی‌شده Docker است. بلوک زیر، مخزن همان توزیع را انتخاب می‌کند:
+
+روی Ubuntu، پس از انتقال پروژه، اسکریپت `bash deployments/ubuntu/setup-server.sh` همین آماده‌سازی را انجام می‌دهد و با خطا متوقف می‌شود. دستورات دستی پایین نیز قابل استفاده‌اند.
 
 ```bash
 sudo apt-get update
@@ -195,6 +199,8 @@ bash deployments/debian/deploy.sh
 ```
 
 این اسکریپت تنظیمات را بررسی می‌کند، imageها را از کد فعلی می‌سازد، برای آماده شدن زیرساخت منتظر می‌ماند، migration را اجرا می‌کند و بعد تمام سرویس‌های برنامه را در پس‌زمینه بالا می‌آورد. اگر migration خطا دهد ادامه نمی‌دهد. اجرای اول، بسته به اینترنت و منابع، ممکن است طولانی شود. در صورت قطع ارتباط، دوباره SSH بزنید و با `tmux attach -t plane-deploy` برگردید. برای جدا شدن از tmux، `Ctrl+B` و سپس `D` را بزنید.
+
+پیش از build، فضای filesystem محل داده‌های Docker بررسی می‌شود؛ با کمتر از ۲۰ GiB آزاد، build شروع نمی‌شود. این بررسی اولیه تضمین کافی بودن فضای build نیست؛ ۳۰ تا ۴۰ گیگابایت آزاد برای برنامه‌ریزی پیشنهاد می‌شود. حد بررسی با متغیر عدد صحیح مثبت `PLANE_BUILD_MIN_FREE_GB` قابل تنظیم است. حالت `--no-build` این بررسی مربوط به ساخت image را اجرا نمی‌کند.
 
 معادل دستی همان مراحل، برای بررسی یا کنترل جداگانه:
 

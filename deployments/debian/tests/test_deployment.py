@@ -33,6 +33,10 @@ class DeploymentTests(unittest.TestCase):
         self.deployment.mkdir(parents=True)
         for filename in ("production.env.example", "init-env.sh", "deploy.sh"):
             shutil.copyfile(ROOT / "deployments" / "debian" / filename, self.deployment / filename)
+        ubuntu_deployment = self.project / "deployments" / "ubuntu"
+        ubuntu_deployment.mkdir()
+        for filename in ("init-env.sh", "deploy.sh"):
+            shutil.copyfile(ROOT / "deployments" / "ubuntu" / filename, ubuntu_deployment / filename)
         self.bash = os.environ.get("BASH_EXECUTABLE") or (
             r"C:\Program Files\Git\bin\bash.exe" if os.name == "nt" else shutil.which("bash")
         )
@@ -60,25 +64,31 @@ class DeploymentTests(unittest.TestCase):
         values = dict(line.split("=", 1) for line in content.splitlines() if line and not line.startswith("#"))
         return content, values
 
-    def mock_deploy(self, *args, migration_exit=0):
+    def mock_deploy(self, *args, migration_exit=0, free_kb=40 * 1024 * 1024, build_exit=0, entrypoint="deploy.sh"):
         calls_path = self.project / "docker-calls.txt"
         bash_env = self.project / "mock-docker.sh"
         bash_env.write_text(
+            'sudo() { "$@"; }\n'
             'docker() {\n'
             '    printf "%s\\n" "$*" >> "$DOCKER_CALLS"\n'
             '    case "$*" in\n'
+            '        "info --format {{.DockerRootDir}}") printf "/\\n" ;;\n'
+            '        *"build --pull") return "$BUILD_EXIT" ;;\n'
             '        *"run --rm --no-deps migrator") return "$MIGRATION_EXIT" ;;\n'
             '    esac\n'
             '    return 0\n'
-            '}\n',
+            '}\n'
+            'df() { printf "Filesystem 1024-blocks Used Available Capacity Mounted\\nfixture 999999999 1 %s 1%% /\\n" "$FREE_KB"; }\n',
             encoding="utf-8",
         )
         result = self.run_script(
-            "deploy.sh",
+            entrypoint,
             *args,
             BASH_ENV=bash_env.as_posix(),
             DOCKER_CALLS=calls_path.as_posix(),
             MIGRATION_EXIT=str(migration_exit),
+            BUILD_EXIT=str(build_exit),
+            FREE_KB=str(free_kb),
         )
         calls = calls_path.read_text(encoding="utf-8") if calls_path.exists() else ""
         return result, calls
@@ -134,10 +144,42 @@ class DeploymentTests(unittest.TestCase):
         result, calls = self.mock_deploy(migration_exit=23)
         self.assertEqual(result.returncode, 23)
         self.assertNotIn("up -d --wait --wait-timeout 900", calls)
+        self.assertIn("running database migrations", result.stderr)
+
+    def test_low_disk_space_stops_before_build_or_container_start(self):
+        self.initialize()
+        result, calls = self.mock_deploy(free_kb=11 * 1024 * 1024)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Build stopped", result.stderr)
+        self.assertNotIn("build --pull", calls)
+        self.assertNotIn("up -d", calls)
+
+    def test_failed_build_stops_before_container_start(self):
+        self.initialize()
+        result, calls = self.mock_deploy(build_exit=17)
+        self.assertEqual(result.returncode, 17)
+        self.assertIn("building production images", result.stderr)
+        self.assertNotIn("up -d", calls)
+
+    def test_ubuntu_initializer_creates_settings_and_preserves_existing_secrets(self):
+        result = self.run_script("../ubuntu/init-env.sh", "http://192.168.10.20")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        before = (self.project / ".env.production").read_text(encoding="utf-8")
+        self.assertIn("PUBLIC_URL=http://192.168.10.20", before)
+        self.assertNotIn("CHANGE_ME_", before)
+        result = self.run_script("../ubuntu/init-env.sh", "https://crm.example.com")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.project / ".env.production").read_text(encoding="utf-8"), before)
+
+    def test_ubuntu_deployment_stops_on_migration_failure(self):
+        self.initialize()
+        result, calls = self.mock_deploy(migration_exit=23, entrypoint="../ubuntu/deploy.sh")
+        self.assertEqual(result.returncode, 23)
+        self.assertNotIn("up -d --wait --wait-timeout 900", calls)
 
     def test_no_build_reuses_images_but_still_runs_migrations(self):
         self.initialize()
-        result, calls = self.mock_deploy("--no-build")
+        result, calls = self.mock_deploy("--no-build", free_kb=11 * 1024 * 1024)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn("build --pull", calls)
         self.assertIn("run --rm --no-deps migrator", calls)

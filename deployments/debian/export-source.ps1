@@ -27,4 +27,4 @@ if ($LASTEXITCODE -ne 0) {
     throw 'Source archive creation failed. Do not transfer this archive.'
 }
 Write-Output "Created: $archivePath"
-Write-Output 'Includes current source changes and the Debian production template; excludes local settings and runtime data.'
+Write-Output 'Includes current source changes and Ubuntu/Debian deployment files; excludes local settings and runtime data.'
