@@ -19,6 +19,7 @@ export * from "./favorite-star";
 export * from "./form-fields";
 export * from "./form-fields/compact-multi-selector";
 export * from "./form-fields/member-select";
+export * from "./form-fields/member-directory";
 export * from "./permission-catalog";
 export * from "./header";
 export * from "./link";

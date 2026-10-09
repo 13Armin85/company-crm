@@ -466,6 +466,8 @@ fieldset:disabled label {
 }
 .delegate-manager {
   margin-top: 16px;
+  min-width: 0;
+  scroll-margin-block: 20px;
 }
 .delegate-heading {
   display: flex;
@@ -487,37 +489,142 @@ fieldset:disabled label {
   font-size: 13px;
   line-height: 1.9;
 }
-.delegate-list {
+.delegate-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 20px;
+}
+.delegate-workspace.is-readonly {
+  grid-template-columns: minmax(0, 1fr);
+}
+.delegate-selected,
+.crm-member-directory {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-soft);
+}
+.delegate-section-heading,
+.crm-member-directory-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.delegate-section-heading h3,
+.crm-member-directory-heading h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.8;
+}
+.delegate-count {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.delegate-section-help,
+.crm-member-directory-help,
+.crm-member-directory-note {
+  margin: 8px 0 14px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.9;
+}
+.crm-member-directory-note {
+  margin: 12px 0 0;
+}
+.delegate-list,
+.crm-member-directory-results {
+  max-height: 380px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scroll-padding-block: 8px;
+}
+.delegate-list,
+.crm-member-directory-list {
   padding: 0;
-  margin: 0 0 20px;
+  margin: 0;
   list-style: none;
 }
-.delegate-manager li {
-  border-bottom: 1px solid var(--border);
+.delegate-list {
+  display: grid;
+  gap: 10px;
+  padding-inline-end: 4px;
+}
+.delegate-list:empty {
+  display: none;
+}
+.delegate-card {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
 }
 .delegate-position {
   display: grid;
   place-items: center;
-  flex: 0 0 30px;
+  width: 30px;
   height: 30px;
   border-radius: 8px;
   background: var(--accent-soft);
   color: var(--text-primary);
   font-size: 12px;
 }
-.delegate-name {
-  flex: 1;
+.delegate-person {
   min-width: 0;
-  overflow-wrap: anywhere;
 }
-.delegate-add {
+.delegate-status {
+  display: inline-block;
+  margin-block-start: 10px;
+  margin-inline-start: 50px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--text-primary);
+  font-size: 11px;
+  line-height: 1.9;
+}
+.delegate-status.is-inactive {
+  background: color-mix(in srgb, var(--orange) 12%, transparent);
+}
+.delegate-actions {
   display: flex;
-  align-items: flex-end;
-  gap: 12px;
-  padding: 16px;
+  grid-column: 2;
+  gap: 8px;
+  margin-inline-start: 50px;
+}
+.delegate-actions button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
   border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface-soft);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.delegate-actions button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.delegate-actions button:not(:disabled):hover {
+  background: var(--accent-soft);
+  color: var(--text-primary);
+}
+.delegate-actions .delegate-remove:not(:disabled):hover {
+  background: color-mix(in srgb, var(--red) 12%, transparent);
+  color: var(--red);
 }
 .delegate-footer {
   display: flex;
@@ -526,12 +633,188 @@ fieldset:disabled label {
   flex-wrap: wrap;
   gap: 12px;
   margin-block-start: 18px;
+  padding-block-start: 18px;
+  border-top: 1px solid var(--border);
 }
-.delegate-footer > span,
-.delegate-manager .delegate-empty {
+.delegate-footer > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.delegate-footer b {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+.delegate-footer .delegate-unsaved {
+  color: var(--text-primary);
+}
+.delegate-footer span {
   color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.9;
+}
+.delegate-empty,
+.crm-member-directory-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 10px;
+  padding: 30px 16px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.9;
+  text-align: center;
+}
+.delegate-empty b {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+.crm-member-directory-empty p {
+  margin: 0;
+}
+.crm-member-directory-empty button {
+  padding: 4px 8px;
+  color: var(--text-primary);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.delegate-active,
+.delegate-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--text-primary);
+  font-size: 12px;
+  line-height: 1.9;
+  overflow-wrap: anywhere;
+}
+.delegate-active svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.crm-member-directory-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-inline: 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  color: var(--text-secondary);
+}
+.crm-member-directory-search svg {
+  flex-shrink: 0;
+}
+.crm-member-directory-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.crm-member-directory-search input {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding-block: 10px;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  outline: 0;
+  font-size: 13px;
+}
+.crm-member-directory-search input::placeholder {
+  color: var(--text-secondary);
+}
+.crm-member-directory-list > li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 4px;
+  border-bottom: 1px solid var(--border);
+}
+.crm-member-directory-list > li:last-child {
+  border-bottom: 0;
+}
+.crm-member-identity {
+  display: flex;
+  align-items: flex-start;
+  flex: 1;
+  min-width: 0;
+  gap: 10px;
+}
+.crm-member-identity-avatar {
+  display: grid;
+  place-items: center;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--text-primary);
+  font-size: 12px;
+}
+.crm-member-identity-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.crm-member-identity-details {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 5px;
+  text-align: start;
+}
+.crm-member-identity-name,
+.crm-member-identity-email,
+.crm-member-identity-role {
+  display: block;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.8;
+}
+.crm-member-identity-name {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+.crm-member-identity-email,
+.crm-member-identity-role {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+.crm-member-identity-email {
+  text-align: right;
+}
+.crm-member-directory-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  gap: 5px;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+}
+.crm-member-directory-add:not(:disabled):hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.crm-member-directory-add:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 .crm-member-select {
   flex: 1;
@@ -657,20 +940,6 @@ fieldset:disabled label {
   justify-content: center;
   padding-inline: 12px;
 }
-.delegate-manager .row-actions button {
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  background: var(--surface-soft);
-}
-.delegate-manager .row-actions button:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-.delegate-manager .row-actions button:not(:disabled):hover {
-  background: var(--accent-soft);
-  color: var(--text-primary);
-}
 td.row-actions {
   display: table-cell;
   white-space: nowrap;
@@ -678,18 +947,11 @@ td.row-actions {
 td.row-actions .button + .button {
   margin-inline-start: 6px;
 }
-.delegate-manager li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
-  padding-block: 10px;
-}
 .access-modal :focus-visible,
 .compact-selector :focus-visible,
 .permission-catalog :focus-visible,
 .delegate-manager :focus-visible,
+.crm-member-directory :focus-visible,
 .crm-member-select-options :focus-visible,
 .team-action-menu :focus-visible {
   outline: 2px solid var(--accent);
@@ -706,6 +968,11 @@ td.row-actions .button + .button {
   background: var(--accent-soft);
   color: var(--accent);
 }
+@media (max-width: 1100px) {
+  .delegate-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 @media (max-width: 640px) {
   .permission-catalog-header {
     flex-wrap: wrap;
@@ -720,9 +987,28 @@ td.row-actions .button + .button {
     align-items: stretch;
     flex-direction: column;
   }
-  .delegate-add {
-    align-items: stretch;
-    flex-direction: column;
+  .delegate-heading {
+    gap: 10px;
+  }
+  .delegate-selected,
+  .crm-member-directory {
+    padding: 12px;
+  }
+  .delegate-card {
+    padding: 10px;
+    gap: 8px;
+  }
+  .crm-member-directory-list > li {
+    flex-wrap: wrap;
+  }
+  .crm-member-directory-list .crm-member-identity {
+    flex-basis: calc(100% - 4px);
+  }
+  .crm-member-directory-add {
+    margin-inline-start: 50px;
+  }
+  .delegate-footer .button {
+    width: 100%;
   }
   .access-dialog-position {
     padding: 8px;
