@@ -31,7 +31,7 @@ def test_workspace_admin_can_create_a_login_account(session_client, workspace):
 
 
 @pytest.mark.django_db
-def test_removing_managed_user_releases_username(session_client, workspace):
+def test_removing_workspace_membership_preserves_global_identity(session_client, workspace):
     create_response = session_client.post(
         f"/api/workspaces/{workspace.slug}/members/",
         {
@@ -47,19 +47,10 @@ def test_removing_managed_user_releases_username(session_client, workspace):
 
     assert session_client.delete(f"/api/workspaces/{workspace.slug}/members/{membership_id}/").status_code == 204
 
-    recreated = session_client.post(
-        f"/api/workspaces/{workspace.slug}/members/",
-        {
-            "email": "second-owner@example.com",
-            "password": "StrongPassword!2026",
-            "username": "reusable.username",
-            "display_name": "Second Owner",
-            "role": 15,
-        },
-        format="json",
-    )
-    assert recreated.status_code == 201
-    assert User.objects.get(email="second-owner@example.com").username == "reusable.username"
+    user = User.objects.get(email="first-owner@example.com")
+    assert user.username == "reusable.username"
+    assert user.is_active
+    assert not WorkspaceMember.objects.get(id=membership_id).is_active
 
 
 @pytest.mark.django_db
@@ -79,27 +70,21 @@ def test_workspace_admin_can_add_an_existing_account(session_client, workspace):
 
 
 @pytest.mark.django_db
-def test_signup_without_invitation_creates_owned_workspace(mocker):
+def test_signup_workflow_without_invitation_does_not_create_membership():
     user = User.objects.create_user(
         email="standalone@example.com",
         username="standalone-user",
         password="SafePass123!",
     )
-    seed = mocker.patch("plane.authentication.utils.user_auth_workflow.workspace_seed.delay")
 
     post_user_auth_workflow(user=user, is_signup=True, request=None)
 
-    membership = WorkspaceMember.objects.get(member=user, is_active=True)
-    assert membership.role == 20
-    assert membership.workspace.owner == user
-    assert membership.workspace.name == "فضای کاری من"
-    seed.assert_called_once_with(str(membership.workspace_id))
+    assert not WorkspaceMember.objects.filter(member=user).exists()
 
 
 @pytest.mark.django_db
-def test_signup_joins_configured_company_as_normal_member(mocker, monkeypatch, workspace):
+def test_signup_workflow_does_not_enroll_an_uninvited_company_member(monkeypatch, workspace):
     monkeypatch.setenv("INTERNAL_WORKSPACE_SLUG", workspace.slug)
-    seed = mocker.patch("plane.authentication.utils.user_auth_workflow.workspace_seed.delay")
     user = User.objects.create_user(
         email="company-member@example.com",
         username="company-member",
@@ -108,17 +93,16 @@ def test_signup_joins_configured_company_as_normal_member(mocker, monkeypatch, w
 
     post_user_auth_workflow(user=user, is_signup=True, request=None)
 
-    assert WorkspaceMember.objects.filter(
+    assert not WorkspaceMember.objects.filter(
         workspace=workspace,
         member=user,
         role=15,
         is_active=True,
     ).exists()
-    seed.assert_not_called()
 
 
 @pytest.mark.django_db
-def test_password_signup_creates_session_and_workspace(mocker):
+def test_password_signup_without_invitation_is_blocked():
     Instance.objects.create(
         instance_name="Test Instance",
         instance_id="signup-contract-instance",
@@ -127,7 +111,6 @@ def test_password_signup_creates_session_and_workspace(mocker):
         last_checked_at=timezone.now(),
         is_setup_done=True,
     )
-    mocker.patch("plane.authentication.utils.user_auth_workflow.workspace_seed.delay")
     client = Client(HTTP_USER_AGENT="Mozilla/5.0")
 
     response = client.post(
@@ -142,9 +125,6 @@ def test_password_signup_creates_session_and_workspace(mocker):
     )
 
     assert response.status_code == 302
-    assert "error_message" not in response.url
-    user = User.objects.get(email="browser-signup@example.com")
-    assert user.username == "browser.signup"
-    assert user.display_name == "browser.signup"
-    assert client.session.get("_auth_user_id") == str(user.id)
-    assert WorkspaceMember.objects.filter(member=user, role=20, is_active=True).exists()
+    assert "SIGNUP_DISABLED" in response.url
+    assert not User.objects.filter(email="browser-signup@example.com").exists()
+    assert "_auth_user_id" not in client.session

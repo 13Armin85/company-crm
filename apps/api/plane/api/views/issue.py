@@ -41,6 +41,9 @@ from drf_spectacular.utils import (
 )
 
 # Module imports
+from plane.app.permissions.crm import require_permission, require_any_permission, ProjectScopePermission
+from plane.app.services.access_control import has_permission
+from plane.app.services.access_mutations import require_field_permission
 from plane.api.serializers import (
     IssueAttachmentSerializer,
     IssueActivitySerializer,
@@ -67,6 +70,7 @@ from plane.app.permissions import (
 from plane.bgtasks.issue_activities_task import issue_activity
 from plane.db.models import (
     Issue,
+    IssueAssignee,
     IssueActivity,
     FileAsset,
     IssueComment,
@@ -184,7 +188,7 @@ class WorkspaceIssueAPIEndpoint(BaseAPIView):
 
     model = Issue
     webhook_event = "issue"
-    permission_classes = [ProjectEntityPermission]
+    permission_classes = [ProjectScopePermission]
     serializer_class = IssueSerializer
     use_read_replica = True
 
@@ -230,6 +234,7 @@ class WorkspaceIssueAPIEndpoint(BaseAPIView):
             404: WORK_ITEM_NOT_FOUND_RESPONSE,
         },
     )
+    @require_permission("Issue.View")
     def get(self, request, slug, project_identifier=None, issue_identifier=None):
         """Retrieve work item by identifiers
 
@@ -260,7 +265,7 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
 
     model = Issue
     webhook_event = "issue"
-    permission_classes = [ProjectEntityPermission]
+    permission_classes = [ProjectScopePermission]
     serializer_class = IssueSerializer
     use_read_replica = True
 
@@ -307,6 +312,7 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
             404: PROJECT_NOT_FOUND_RESPONSE,
         },
     )
+    @require_permission("Issue.View")
     def get(self, request, slug, project_id):
         """List work items
 
@@ -446,6 +452,7 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
             409: EXTERNAL_ID_EXISTS_RESPONSE,
         },
     )
+    @require_permission("Issue.Create")
     def post(self, request, slug, project_id):
         """Create work item
 
@@ -527,7 +534,7 @@ class IssueDetailAPIEndpoint(BaseAPIView):
 
     model = Issue
     webhook_event = "issue"
-    permission_classes = [ProjectEntityPermission]
+    permission_classes = [ProjectScopePermission]
     serializer_class = IssueSerializer
     use_read_replica = True
 
@@ -572,6 +579,7 @@ class IssueDetailAPIEndpoint(BaseAPIView):
             404: WORK_ITEM_NOT_FOUND_RESPONSE,
         },
     )
+    @require_permission("Issue.View")
     def get(self, request, slug, project_id, pk):
         """Retrieve work item
 
@@ -613,6 +621,7 @@ class IssueDetailAPIEndpoint(BaseAPIView):
             404: WORK_ITEM_NOT_FOUND_RESPONSE,
         },
     )
+    @require_permission("Issue.Edit", "Issue.Create")
     def put(self, request, slug, project_id):
         """Update or create work item
 
@@ -636,6 +645,10 @@ class IssueDetailAPIEndpoint(BaseAPIView):
                     external_id=external_id,
                     external_source=external_source,
                 )
+                for field in ("state", "state_id"):
+                    require_field_permission(request, slug, field, "Issue.Status.Edit")
+                for field in ("assignees", "assignee_ids"):
+                    require_field_permission(request, slug, field, "Issue.Assign")
 
                 # Get the current instance of the issue in order to track
                 # changes and dispatch the issue activity
@@ -768,7 +781,21 @@ class IssueDetailAPIEndpoint(BaseAPIView):
             409: EXTERNAL_ID_EXISTS_RESPONSE,
         },
     )
+    @require_permission("Issue.View")
+    @require_any_permission("Issue.Edit", "Issue.Status.Edit", "Issue.Assign")
     def patch(self, request, slug, project_id, pk):
+        for field in ("state", "state_id"):
+            require_field_permission(request, slug, field, "Issue.Status.Edit")
+        for field in ("assignees", "assignee_ids"):
+            require_field_permission(request, slug, field, "Issue.Assign")
+        if not has_permission(request.user, slug, "Issue.Edit", request=request):
+            if (
+                set(request.data) - {"state", "state_id", "assignees", "assignee_ids"}
+                or not IssueAssignee.objects.filter(
+                    issue_id=pk, issue__workspace__slug=slug, assignee=request.user
+                ).exists()
+            ):
+                return Response({"error": "Editing permission or an assigned issue is required."}, status=403)
         """Update work item
 
         Partially update an existing work item with the provided fields.
@@ -841,6 +868,7 @@ class IssueDetailAPIEndpoint(BaseAPIView):
             404: WORK_ITEM_NOT_FOUND_RESPONSE,
         },
     )
+    @require_permission("Issue.Delete")
     def delete(self, request, slug, project_id, pk):
         """Delete work item
 
@@ -2250,6 +2278,7 @@ class IssueSearchEndpoint(BaseAPIView):
             404: WORKSPACE_NOT_FOUND_RESPONSE,
         },
     )
+    @require_permission("Issue.View")
     def get(self, request, slug):
         """Search work items
 

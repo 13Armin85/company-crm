@@ -17,6 +17,7 @@ from plane.app.serializers import (
 )
 
 from plane.app.permissions import WorkspaceUserPermission
+from plane.app.permissions.crm import require_permission
 
 from plane.db.models import Project, ProjectMember, ProjectUserProperty, WorkspaceMember
 from plane.bgtasks.project_add_user_email_task import project_add_user_email
@@ -43,7 +44,7 @@ class ProjectMemberViewSet(BaseViewSet):
             .select_related("workspace", "workspace__owner")
         )
 
-    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    @require_permission("Project.Member.Manage")
     def create(self, request, slug, project_id):
         # Get the list of members to be added to the project and their roles i.e. the user_id and the role
         members = request.data.get("members", [])
@@ -208,134 +209,34 @@ class ProjectMemberViewSet(BaseViewSet):
 
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    @require_permission("Project.Member.Manage")
     def partial_update(self, request, slug, project_id, pk):
         project_member = ProjectMember.objects.get(pk=pk, workspace__slug=slug, project_id=project_id, is_active=True)
-
-        # Fetch the target's workspace role (used to cap the new project role)
-        target_workspace_role = WorkspaceMember.objects.get(
-            workspace__slug=slug, member=project_member.member, is_active=True
-        ).role
-        # Fetch the requester's workspace role to decide if they may bypass project-role checks
-        requester_workspace_role = WorkspaceMember.objects.get(
-            workspace__slug=slug, member=request.user, is_active=True
-        ).role
-        is_workspace_admin = requester_workspace_role == ROLE.ADMIN.value
-
-        # Check if the user is not editing their own role if they are not an admin
-        if request.user.id == project_member.member_id and not is_workspace_admin:
-            return Response(
-                {"error": "نمی‌توانید نقش خود را به‌روز کنید"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        # Check while updating user roles
-        requested_project_member = ProjectMember.objects.filter(
-            project_id=project_id,
-            workspace__slug=slug,
-            member=request.user,
-            is_active=True,
-        ).first()
-        requester_project_role = requested_project_member.role if requested_project_member else ROLE.ADMIN.value
-
-        if "role" in request.data:
-            # Only Admins can modify roles
-            if requester_project_role < ROLE.ADMIN.value and not is_workspace_admin:
-                return Response(
-                    {"error": "مجوز به‌روزرسانی نقش‌ها را ندارید"},
-                    status=status.HTTP_403_FORBIDDEN,
-                )
-
-            # Cannot modify a member whose role is equal to or higher than your own
-            if project_member.role >= requester_project_role and not is_workspace_admin:
-                return Response(
-                    {"error": "نمی‌توانید نقش عضوی را که برابر یا بالاتر از نقش شماست، به‌روز کنید"},
-                    status=status.HTTP_403_FORBIDDEN,
-                )
-
-            new_role = int(request.data.get("role"))
-
-            # Cannot assign a role equal to or higher than your own
-            if new_role >= requester_project_role and not is_workspace_admin:
-                return Response(
-                    {"error": "نمی‌توانید نقشی برابر یا بالاتر از نقش خود را اختصاص دهید"},
-                    status=status.HTTP_403_FORBIDDEN,
-                )
-
-            # Cannot assign a role higher than the target's workspace role
-            if target_workspace_role in [5] and new_role in [15, 20]:
-                return Response(
-                    {"error": "نمی‌توانید کاربری با نقش بالاتر از نقش فضای کاری اضافه کنید"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-        # Guard privileged `is_active` mutations (member (de)activation). These are NOT
-        # covered by the role block above, so without this check a GUEST could PATCH
-        # {"is_active": false} while omitting "role" to deactivate any member — including
-        # admins — and take over the project. Mirror the role block and destroy(): only a
-        # project admin (or workspace admin) may (de)activate a member, and never one whose
-        # role is equal to or higher than the requester's own.
-        if "is_active" in request.data:
-            if requester_project_role < ROLE.ADMIN.value and not is_workspace_admin:
-                return Response(
-                    {"error": "مجوز به‌روزرسانی وضعیت عضو را ندارید"},
-                    status=status.HTTP_403_FORBIDDEN,
-                )
-
-            if project_member.role >= requester_project_role and not is_workspace_admin:
-                return Response(
-                    {"error": "نمی‌توانید وضعیت عضوی را که برابر یا بالاتر از نقش شماست، به‌روز کنید"},
-                    status=status.HTTP_403_FORBIDDEN,
-                )
-
+        target_membership = WorkspaceMember.objects.get(
+            workspace__slug=slug, member=project_member.member, is_active=True, member__is_active=True
+        )
         update_data = request.data.copy()
-        if "role" in update_data:
-            update_data["role"] = (
-                ROLE.ADMIN.value if target_workspace_role == ROLE.ADMIN.value else ROLE.MEMBER.value
+        if set(update_data) - {"role", "is_active", "sort_order"}:
+            return Response(
+                {"error": "Only membership status, compatibility role and ordering may be edited."}, status=400
             )
+        if "role" in update_data:
+            if update_data["role"] not in (5, 15, 20):
+                return Response({"role": "Invalid compatibility role."}, status=400)
+            # Stored Plane roles mirror the adapter; they do not authorize this action.
+            update_data["role"] = ROLE.ADMIN.value if target_membership.role == ROLE.ADMIN.value else ROLE.MEMBER.value
         serializer = ProjectMemberSerializer(project_member, data=update_data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    @require_permission("Project.Member.Manage")
     def destroy(self, request, slug, project_id, pk):
         project_member = ProjectMember.objects.get(
-            workspace__slug=slug,
-            project_id=project_id,
-            pk=pk,
-            member__is_bot=False,
-            is_active=True,
+            workspace__slug=slug, project_id=project_id, pk=pk, member__is_bot=False, is_active=True
         )
-        # check requesting user role
-        requesting_project_member = ProjectMember.objects.filter(
-            workspace__slug=slug,
-            member=request.user,
-            project_id=project_id,
-            is_active=True,
-        ).first()
-        is_workspace_admin = WorkspaceMember.objects.filter(
-            workspace__slug=slug,
-            member=request.user,
-            role=ROLE.ADMIN.value,
-            is_active=True,
-        ).exists()
-        # User cannot remove himself
-        if requesting_project_member and str(project_member.id) == str(requesting_project_member.id):
-            return Response(
-                {"error": "نمی‌توانید خودتان را از فضای کاری حذف کنید. لطفاً از گزینه ترک فضای کاری استفاده کنید"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        # User cannot deactivate higher role
-        if not is_workspace_admin and (
-            requesting_project_member is None or requesting_project_member.role < project_member.role
-        ):
-            return Response(
-                {"error": "نمی‌توانید کاربری را که نقش بالاتر از شماست، حذف کنید"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
+        if project_member.member_id == request.user.id:
+            return Response({"error": "Use the leave-project action to remove your own membership."}, status=400)
         project_member.is_active = False
         project_member.save()
         return Response(status=status.HTTP_204_NO_CONTENT)

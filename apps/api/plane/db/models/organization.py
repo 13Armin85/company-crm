@@ -13,9 +13,11 @@ from .base import BaseModel
 
 class OrganizationPermission(BaseModel):
     workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="organization_permissions")
-    code = models.SlugField(max_length=100)
+    code = models.CharField(max_length=100)
     name = models.CharField(max_length=150)
     description = models.TextField(blank=True)
+    category = models.CharField(max_length=80, blank=True)
+    is_delegatable = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
 
     class Meta:
@@ -33,7 +35,8 @@ class OrganizationPermission(BaseModel):
 class OrganizationRole(BaseModel):
     workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="organization_roles")
     name = models.CharField(max_length=150)
-    level = models.PositiveIntegerField(default=0)
+    description = models.TextField(blank=True)
+    system_key = models.CharField(max_length=32, null=True, blank=True)
     is_active = models.BooleanField(default=True)
     permissions = models.ManyToManyField(
         OrganizationPermission,
@@ -44,13 +47,18 @@ class OrganizationRole(BaseModel):
 
     class Meta:
         db_table = "organization_roles"
-        ordering = ("-level", "name")
+        ordering = ("name",)
         constraints = [
             models.UniqueConstraint(
                 fields=["workspace", "name"],
                 condition=Q(deleted_at__isnull=True),
                 name="org_role_unique_active_name",
-            )
+            ),
+            models.UniqueConstraint(
+                fields=["workspace", "system_key"],
+                condition=Q(deleted_at__isnull=True, system_key__isnull=False),
+                name="org_role_unique_system_key",
+            ),
         ]
 
 
@@ -96,6 +104,10 @@ class UserOrganizationRole(BaseModel):
     def clean(self):
         if self.role_id and self.workspace_id != self.role.workspace_id:
             raise ValidationError("Role must belong to the selected workspace.")
+        if self.is_active:
+            validate_workspace_user(self.workspace_id, self.user_id)
+            if not self.role.is_active or self.role.deleted_at:
+                raise ValidationError({"role": "Role must be active."})
 
 
 class OrganizationUnit(BaseModel):
@@ -144,15 +156,25 @@ class OrganizationUnit(BaseModel):
 
         if (
             self.manager_id
-            and not self.workspace.workspace_member.filter(member_id=self.manager_id, is_active=True).exists()
+            and not self.workspace.workspace_member.filter(
+                member_id=self.manager_id, is_active=True, member__is_active=True
+            ).exists()
         ):
             raise ValidationError({"manager": "Manager must be an active workspace member."})
+        if self.manager_id and self.delegates.filter(user_id=self.manager_id, is_active=True).exists():
+            raise ValidationError({"manager": "Remove this user from the delegates before assigning them as manager."})
 
 
 class OrganizationUnitMember(BaseModel):
     unit = models.ForeignKey(OrganizationUnit, on_delete=models.CASCADE, related_name="memberships")
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="organization_units")
     is_active = models.BooleanField(default=True)
+
+    def clean(self):
+        if self.is_active:
+            validate_workspace_user(self.unit.workspace_id, self.user_id)
+            if not self.unit.is_active:
+                raise ValidationError({"unit": "Unit must be active."})
 
     class Meta:
         db_table = "organization_unit_members"
@@ -165,12 +187,148 @@ class OrganizationUnitMember(BaseModel):
         ]
 
 
+def validate_workspace_user(workspace_id, user_id):
+    from .workspace import WorkspaceMember
+
+    if not WorkspaceMember.objects.filter(
+        workspace_id=workspace_id, member_id=user_id, is_active=True, member__is_active=True
+    ).exists():
+        raise ValidationError({"user": "User must be an active member of this workspace."})
+
+
+class UserPermissionException(BaseModel):
+    class Effect(models.TextChoices):
+        ALLOW = "ALLOW", "Allow"
+        DENY = "DENY", "Deny"
+
+    workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="permission_exceptions")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="permission_exceptions")
+    permission = models.ForeignKey(OrganizationPermission, on_delete=models.PROTECT, related_name="user_exceptions")
+    effect = models.CharField(max_length=5, choices=Effect.choices)
+    starts_at = models.DateTimeField(null=True, blank=True)
+    ends_at = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "user_permission_exceptions"
+        indexes = [models.Index(fields=["workspace", "user", "is_active"], name="org_exception_user_idx")]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(starts_at__isnull=True) | Q(ends_at__isnull=True) | Q(ends_at__gt=models.F("starts_at")),
+                name="org_exception_valid_period",
+            ),
+            models.CheckConstraint(condition=Q(effect__in=["ALLOW", "DENY"]), name="org_exception_valid_effect"),
+            *[
+                models.UniqueConstraint(
+                    fields=["workspace", "user", "permission", "effect", *period_fields],
+                    condition=Q(is_active=True, deleted_at__isnull=True, **period_condition),
+                    name=f"org_exception_unique_{period_name}",
+                )
+                for period_name, period_fields, period_condition in (
+                    ("unbounded", [], {"starts_at__isnull": True, "ends_at__isnull": True}),
+                    ("start", ["starts_at"], {"starts_at__isnull": False, "ends_at__isnull": True}),
+                    ("end", ["ends_at"], {"starts_at__isnull": True, "ends_at__isnull": False}),
+                    ("bounded", ["starts_at", "ends_at"], {"starts_at__isnull": False, "ends_at__isnull": False}),
+                )
+            ],
+        ]
+
+    def clean(self):
+        validate_workspace_user(self.workspace_id, self.user_id)
+        if self.permission.workspace_id != self.workspace_id or not self.permission.is_active:
+            raise ValidationError({"permission": "Permission must be active in the same workspace."})
+        if self.starts_at and self.ends_at and self.ends_at <= self.starts_at:
+            raise ValidationError({"ends_at": "End must be after start."})
+        if self.is_active and self.deleted_at is None:
+            overlapping = UserPermissionException.objects.filter(
+                workspace_id=self.workspace_id,
+                user_id=self.user_id,
+                permission_id=self.permission_id,
+                effect=self.effect,
+                is_active=True,
+            ).exclude(pk=self.pk)
+            if self.starts_at:
+                overlapping = overlapping.filter(Q(ends_at__isnull=True) | Q(ends_at__gt=self.starts_at))
+            if self.ends_at:
+                overlapping = overlapping.filter(Q(starts_at__isnull=True) | Q(starts_at__lt=self.ends_at))
+            if overlapping.exists():
+                raise ValidationError({"permission": "An exception with the same effect already covers this period."})
+
+
+class OrganizationUnitDelegate(BaseModel):
+    unit = models.ForeignKey(OrganizationUnit, on_delete=models.CASCADE, related_name="delegates")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="unit_delegations")
+    priority = models.PositiveIntegerField(default=1)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "organization_unit_delegates"
+        ordering = ("priority", "created_at")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["unit", "user"],
+                condition=Q(deleted_at__isnull=True, is_active=True),
+                name="org_delegate_unique_user",
+            ),
+            models.UniqueConstraint(
+                fields=["unit", "priority"],
+                condition=Q(deleted_at__isnull=True, is_active=True),
+                name="org_delegate_unique_priority",
+            ),
+            models.CheckConstraint(condition=Q(priority__gte=1), name="org_delegate_positive_priority"),
+        ]
+
+    def clean(self):
+        validate_workspace_user(self.unit.workspace_id, self.user_id)
+        if self.unit.manager_id == self.user_id:
+            raise ValidationError({"user": "The primary manager cannot be their own delegate."})
+
+
+class UserAbsence(BaseModel):
+    class Status(models.TextChoices):
+        SCHEDULED = "scheduled", "Scheduled"
+        CANCELLED = "cancelled", "Cancelled"
+        ENDED = "ended", "Ended"
+
+    workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="user_absences")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="absences")
+    starts_at = models.DateTimeField()
+    ends_at = models.DateTimeField()
+    reason = models.TextField(blank=True)
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.SCHEDULED)
+
+    class Meta:
+        db_table = "user_absences"
+        ordering = ("-starts_at",)
+        indexes = [models.Index(fields=["workspace", "user", "status"], name="org_absence_user_idx")]
+        constraints = [
+            models.CheckConstraint(condition=Q(ends_at__gt=models.F("starts_at")), name="org_absence_valid_period")
+        ]
+
+    def clean(self):
+        validate_workspace_user(self.workspace_id, self.user_id)
+        if self.ends_at <= self.starts_at:
+            raise ValidationError({"ends_at": "End must be after start."})
+        if (
+            self.status == self.Status.SCHEDULED
+            and UserAbsence.objects.filter(
+                workspace_id=self.workspace_id,
+                user_id=self.user_id,
+                status=self.Status.SCHEDULED,
+                starts_at__lt=self.ends_at,
+                ends_at__gt=self.starts_at,
+            )
+            .exclude(pk=self.pk)
+            .exists()
+        ):
+            raise ValidationError({"starts_at": "Absence periods cannot overlap."})
+
+
 class TicketRoutingRule(BaseModel):
     workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="ticket_routing_rules")
     name = models.CharField(max_length=150)
     unit = models.ForeignKey(OrganizationUnit, on_delete=models.CASCADE, related_name="routing_rules")
     required_role = models.ForeignKey(OrganizationRole, on_delete=models.PROTECT, related_name="routing_rules")
-    required_level = models.PositiveIntegerField(default=0)
     is_active = models.BooleanField(default=True)
 
     class Meta:
@@ -221,7 +379,6 @@ class TicketRoleQueueEntry(BaseModel):
     issue = models.ForeignKey("db.Issue", on_delete=models.CASCADE, related_name="role_queue_entries")
     rule = models.ForeignKey(TicketRoutingRule, on_delete=models.PROTECT, related_name="queue_entries")
     required_role = models.ForeignKey(OrganizationRole, on_delete=models.PROTECT, related_name="queue_entries")
-    required_level = models.PositiveIntegerField(default=0)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.OPEN)
     claimed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,

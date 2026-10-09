@@ -6,32 +6,27 @@ from django.db.models import Max
 from rest_framework import status
 from rest_framework.response import Response
 
-from plane.app.permissions import ROLE, allow_permission
+from plane.app.permissions.crm import require_permission
+from plane.app.services.access_control import has_permission
 from plane.app.serializers import WorkspaceTaskSerializer
 from plane.app.views.base import BaseAPIView
-from plane.db.models import Workspace, WorkspaceMember, WorkspaceTask
+from plane.db.models import Workspace, WorkspaceTask
 
 
 class WorkspaceTaskListEndpoint(BaseAPIView):
-    @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
+    @require_permission("Issue.View")
     def get(self, request, slug):
-        membership = WorkspaceMember.objects.get(
-            workspace__slug=slug,
-            member=request.user,
-            is_active=True,
-        )
         tasks = WorkspaceTask.objects.filter(workspace__slug=slug).select_related("assignee")
-        if membership.role != ROLE.ADMIN.value:
+        if not has_permission(request.user, slug, "Issue.ViewAll", request=request):
             tasks = tasks.filter(assignee=request.user)
         return Response(WorkspaceTaskSerializer(tasks, many=True).data, status=status.HTTP_200_OK)
 
-    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    @require_permission("Issue.Create")
     def post(self, request, slug):
         with transaction.atomic():
             workspace = Workspace.objects.select_for_update().get(slug=slug)
             next_sequence = (
-                WorkspaceTask.all_objects.filter(workspace=workspace).aggregate(value=Max("sequence_id"))["value"]
-                or 0
+                WorkspaceTask.all_objects.filter(workspace=workspace).aggregate(value=Max("sequence_id"))["value"] or 0
             ) + 1
             serializer = WorkspaceTaskSerializer(
                 data=request.data,
@@ -49,16 +44,19 @@ class WorkspaceTaskDetailEndpoint(BaseAPIView):
             id=task_id,
         )
 
-    @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
+    @require_permission("Issue.View")
     def patch(self, request, slug, task_id):
         task = self._task(slug, task_id)
-        membership = WorkspaceMember.objects.get(
-            workspace__slug=slug,
-            member=request.user,
-            is_active=True,
-        )
-        is_admin = membership.role == ROLE.ADMIN.value
+        is_admin = has_permission(request.user, slug, "Issue.Edit", request=request)
         requested_fields = set(request.data.keys())
+        if "status" in requested_fields and not has_permission(
+            request.user, slug, "Issue.Status.Edit", request=request
+        ):
+            return Response({"error": "Status permission is required."}, status=403)
+        if "assignee_id" in requested_fields and not has_permission(
+            request.user, slug, "Issue.Assign", request=request
+        ):
+            return Response({"error": "Assignment permission is required."}, status=403)
         if not is_admin:
             if task.assignee_id != request.user.id:
                 return Response({"error": "این کار به شما واگذار نشده است."}, status=status.HTTP_403_FORBIDDEN)
@@ -83,7 +81,7 @@ class WorkspaceTaskDetailEndpoint(BaseAPIView):
         serializer.save()
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    @require_permission("Issue.Delete")
     def delete(self, request, slug, task_id):
         self._task(slug, task_id).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)

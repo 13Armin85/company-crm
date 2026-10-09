@@ -2,9 +2,19 @@ import type { ReactNode } from "react";
 import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
 import type { LinksFunction, MetaFunction } from "react-router";
 import appStyles from "@/styles/index.css?url";
-import vazirmatn from "../../../packages/tailwind-config/fonts/Vazirmatn-Variable.woff2?url";
+import vazirmatn from "@plane/tailwind-config/fonts/Vazirmatn-Variable.woff2?url";
+import { COMPANY_BRAND_VERSION } from "@plane/constants";
+import appleTouchIcon from "@/app/assets/favicon/apple-touch-icon.png?url";
+import favicon16 from "@/app/assets/favicon/favicon-16x16.png?url";
+import favicon32 from "@/app/assets/favicon/favicon-32x32.png?url";
+import faviconIco from "@/app/assets/favicon/favicon.ico?url";
 
 export const links: LinksFunction = () => [
+  { rel: "icon", type: "image/png", sizes: "32x32", href: favicon32 },
+  { rel: "icon", type: "image/png", sizes: "16x16", href: favicon16 },
+  { rel: "shortcut icon", href: faviconIco },
+  { rel: "apple-touch-icon", sizes: "180x180", href: appleTouchIcon },
+  { rel: "manifest", href: `/site.webmanifest.json?v=${COMPANY_BRAND_VERSION}` },
   { rel: "stylesheet", href: appStyles },
   { rel: "preload", href: vazirmatn, as: "font", type: "font/woff2", crossOrigin: "anonymous" },
 ];

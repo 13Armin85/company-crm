@@ -25,6 +25,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.response import Response
 
+from plane.app.permissions.crm import require_permission
 from plane.app.permissions import (
     WorkSpaceAdminPermission,
     WorkSpaceBasePermission,
@@ -153,7 +154,7 @@ class WorkSpaceViewSet(BaseViewSet):
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
 
-    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    @require_permission("Workspace.Edit")
     def partial_update(self, request, *args, **kwargs):
         return super().partial_update(request, *args, **kwargs)
 
@@ -165,6 +166,7 @@ class WorkSpaceViewSet(BaseViewSet):
         return
 
     @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    @require_permission("Workspace.Edit")
     def destroy(self, request, *args, **kwargs):
         # Get the workspace
         workspace = self.get_object()

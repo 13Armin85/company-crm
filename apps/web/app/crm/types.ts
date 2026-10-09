@@ -14,7 +14,9 @@ export interface Member {
   email: string;
   initials: string;
   avatarUrl?: string;
-  role: "مدیر" | "عضو" | "مهمان";
+  role: string;
+  roles?: { id: string; name: string; system_key?: string }[];
+  isActive?: boolean;
   avatarColor: string;
   online?: boolean;
 }
@@ -90,14 +92,18 @@ export interface ActivityItem {
 export interface OrganizationRole {
   id: string;
   name: string;
-  level: number;
+  description: string;
+  systemKey?: string;
   isActive: boolean;
   permissionIds: string[];
+  userCount?: number;
   createdAt?: string;
   updatedAt?: string;
 }
 
 export interface OrganizationPermission {
+  category: string;
+  isDelegatable: boolean;
   id: string;
   code: string;
   name: string;
@@ -126,10 +132,8 @@ export interface OrganizationUserProfile {
   username: string;
   email: string;
   isActive: boolean;
-  workspaceRole: number;
   roleIds: string[];
   unitIds: string[];
-  maximumRoleLevel: number;
 }
 
 export interface TicketRoutingRule {
@@ -139,7 +143,6 @@ export interface TicketRoutingRule {
   unitTitle: string;
   requiredRoleId: string;
   roleName: string;
-  requiredLevel: number;
   isActive: boolean;
 }
 
@@ -153,7 +156,6 @@ export interface TicketRoleQueueEntry {
   ruleName: string;
   requiredRoleId: string;
   roleName: string;
-  requiredLevel: number;
   status: "open" | "claimed" | "closed";
   claimedById?: string;
   claimedByName?: string;

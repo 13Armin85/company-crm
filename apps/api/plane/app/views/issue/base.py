@@ -33,6 +33,8 @@ from rest_framework.response import Response
 
 # Module imports
 from plane.app.permissions import ROLE, allow_permission
+from plane.app.permissions.crm import require_permission
+from plane.app.services.access_control import has_permission
 from plane.app.services import TicketRoutingService
 from plane.app.serializers import (
     IssueCreateSerializer,
@@ -266,6 +268,7 @@ class IssueViewSet(BaseViewSet):
 
     @method_decorator(gzip_page)
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
+    @require_permission("Issue.View")
     def list(self, request, slug, project_id):
         extra_filters = {}
         if request.GET.get("updated_at__gt", None) is not None:
@@ -404,7 +407,7 @@ class IssueViewSet(BaseViewSet):
                 on_results=lambda issues: issue_on_results(group_by=group_by, issues=issues, sub_group_by=sub_group_by),
             )
 
-    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    @require_permission("Issue.Create")
     def create(self, request, slug, project_id):
         project = Project.objects.get(pk=project_id, workspace__slug=slug)
 
@@ -526,6 +529,7 @@ class IssueViewSet(BaseViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], creator=True, model=Issue)
+    @require_permission("Issue.View")
     def retrieve(self, request, slug, project_id, pk=None):
         project = Project.objects.get(pk=project_id, workspace__slug=slug)
 
@@ -660,7 +664,7 @@ class IssueViewSet(BaseViewSet):
         serializer = IssueDetailSerializer(issue, expand=self.expand)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER], creator=True, model=Issue)
+    @require_permission("Issue.View")
     def partial_update(self, request, slug, project_id, pk=None):
         queryset = self.get_queryset()
         queryset = self.apply_annotations(queryset)
@@ -710,12 +714,11 @@ class IssueViewSet(BaseViewSet):
         if not issue:
             return Response({"error": "کار یافت نشد."}, status=status.HTTP_404_NOT_FOUND)
 
-        is_workspace_admin = WorkspaceMember.objects.filter(
-            member=request.user,
-            workspace__slug=slug,
-            role=ROLE.ADMIN.value,
-            is_active=True,
-        ).exists()
+        is_workspace_admin = has_permission(request.user, slug, "Issue.Edit", request=request)
+        if "state_id" in request.data and not has_permission(request.user, slug, "Issue.Status.Edit", request=request):
+            return Response({"error": "Status permission is required."}, status=403)
+        if "assignee_ids" in request.data and not has_permission(request.user, slug, "Issue.Assign", request=request):
+            return Response({"error": "Assignment permission is required."}, status=403)
         if not is_workspace_admin:
             requested_fields = set(request.data.keys())
             if requested_fields - {"state_id", "assignee_ids"}:
@@ -819,7 +822,7 @@ class IssueViewSet(BaseViewSet):
             return Response(status=status.HTTP_204_NO_CONTENT)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    @require_permission("Issue.Delete")
     def destroy(self, request, slug, project_id, pk=None):
         issue = Issue.objects.get(workspace__slug=slug, project_id=project_id, pk=pk)
 

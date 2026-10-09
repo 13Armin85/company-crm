@@ -4,14 +4,12 @@
  * See the LICENSE file for details.
  */
 
+import { BrandLogo } from "@plane/ui";
+
 export function LogoSpinner() {
   return (
     <div role="status" aria-label="در حال بارگذاری" className="flex items-center justify-center">
-      <span className="admin-brand-mark motion-safe:animate-pulse" aria-hidden="true">
-        <i />
-        <i />
-        <i />
-      </span>
+      <BrandLogo decorative className="admin-brand-mark motion-safe:animate-pulse" />
     </div>
   );
 }

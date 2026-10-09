@@ -9,6 +9,8 @@ import logging
 import secrets
 
 # Django imports
+from django.db import transaction
+from django.core.exceptions import ValidationError
 from django.db.models import Case, Count, IntegerField, Q, When
 from django.contrib.auth import logout
 from django.utils import timezone
@@ -24,6 +26,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 
 # Module imports
+from plane.app.services.access_control import ensure_admin_available
 from plane.app.serializers import (
     AccountSerializer,
     IssueActivitySerializer,
@@ -39,6 +42,7 @@ from plane.db.models import (
     Profile,
     ProjectMember,
     User,
+    Workspace,
     WorkspaceMember,
     WorkspaceMemberInvite,
     Session,
@@ -72,7 +76,7 @@ class UserEndpoint(BaseViewSet):
             return [EmailVerificationThrottle()]
         return super().get_throttles()
 
-    @method_decorator(cache_control(private=True, max_age=12))
+    @method_decorator(cache_control(private=True, no_store=True, max_age=0))
     @method_decorator(vary_on_cookie)
     def retrieve(self, request):
         serialized_data = UserMeSerializer(request.user).data
@@ -249,9 +253,20 @@ class UserEndpoint(BaseViewSet):
         serialized_data = UserMeSerializer(user).data
         return Response(serialized_data, status=status.HTTP_200_OK)
 
+    @transaction.atomic
     def deactivate(self, request):
         # Check all workspace user is active
         user = self.get_object()
+        # The legacy account endpoint must not bypass CRM's last-admin protection.
+        workspace_ids = WorkspaceMember.objects.filter(member=user, is_active=True).values_list(
+            "workspace_id", flat=True
+        )
+        workspaces_to_check = list(Workspace.objects.filter(id__in=workspace_ids).order_by("id").select_for_update())
+        try:
+            for workspace in workspaces_to_check:
+                ensure_admin_available(workspace, excluding_user_id=user.id)
+        except ValidationError as exc:
+            return Response(exc.message_dict, status=status.HTTP_400_BAD_REQUEST)
 
         # Instance admin check
         if InstanceAdmin.objects.filter(user=user).exists():

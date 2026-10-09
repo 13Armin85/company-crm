@@ -4,6 +4,7 @@
  * See the LICENSE file for details.
  */
 import { useEffect, useState } from "react";
+import { BrandLogo } from "@plane/ui";
 import { observer } from "mobx-react";
 import { useTheme as useNextTheme } from "next-themes";
 import { LogOutOutline, PaletteOutline } from "@makeplane/propel/icons";
@@ -27,11 +28,7 @@ export const AdminSidebarDropdown = observer(function AdminSidebarDropdown() {
   return (
     <>
       <div className="admin-brand" title="هم‌کار | مدیریت سامانه">
-        <span className="admin-brand-mark" aria-hidden="true">
-          <i />
-          <i />
-          <i />
-        </span>
+        <BrandLogo className="admin-brand-mark" />
         {!isSidebarCollapsed && (
           <div>
             <strong>هم‌کار</strong>
@@ -50,13 +47,13 @@ export const AdminSidebarDropdown = observer(function AdminSidebarDropdown() {
           {!isSidebarCollapsed && (
             <div className="min-w-0">
               <span className="block truncate text-white">{currentUser?.display_name || "مدیر سامانه"}</span>
-              <small className="block truncate text-slate-400" dir="ltr">
+              <small className="text-slate-400 block truncate" dir="ltr">
                 {currentUser?.email}
               </small>
             </div>
           )}
         </Menu.Button>
-        <Menu.Items className="absolute start-0 z-40 mt-2 w-56 rounded-xl border border-subtle bg-surface-1 p-2 text-12 text-primary shadow-lg outline-none">
+        <Menu.Items className="shadow-lg absolute start-0 z-40 mt-2 w-56 rounded-xl border border-subtle bg-surface-1 p-2 text-12 text-primary outline-none">
           <Menu.Item
             as="button"
             type="button"

@@ -42,7 +42,7 @@ def test_workspace_admin_creates_standalone_task_and_assignee_sees_it(session_cl
     session_client.force_authenticate(user=assignee)
     own_tasks = session_client.get(f"/api/workspaces/{workspace.slug}/tasks/")
     assert own_tasks.status_code == 200
-    assert [row["id"] for row in own_tasks.data] == [str(task.id)]
+    assert [row["id"] for row in own_tasks.json()] == [str(task.id)]
 
 
 @pytest.mark.django_db

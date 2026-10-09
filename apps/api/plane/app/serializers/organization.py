@@ -14,11 +14,22 @@ from plane.db.models import (
 class OrganizationPermissionSerializer(serializers.ModelSerializer):
     class Meta:
         model = OrganizationPermission
-        fields = ("id", "code", "name", "description", "is_active", "created_at", "updated_at")
-        read_only_fields = ("id", "created_at", "updated_at")
+        fields = (
+            "id",
+            "code",
+            "name",
+            "description",
+            "category",
+            "is_delegatable",
+            "is_active",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = fields
 
 
 class OrganizationRoleSerializer(serializers.ModelSerializer):
+    user_count = serializers.IntegerField(read_only=True, default=0)
     permission_ids = serializers.PrimaryKeyRelatedField(
         source="permissions",
         many=True,
@@ -27,8 +38,18 @@ class OrganizationRoleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = OrganizationRole
-        fields = ("id", "name", "level", "is_active", "permission_ids", "created_at", "updated_at")
-        read_only_fields = ("id", "created_at", "updated_at")
+        fields = (
+            "id",
+            "name",
+            "description",
+            "system_key",
+            "is_active",
+            "permission_ids",
+            "user_count",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = ("id", "system_key", "created_at", "updated_at")
 
 
 class OrganizationUnitSerializer(serializers.ModelSerializer):
@@ -63,7 +84,7 @@ class OrganizationUnitSerializer(serializers.ModelSerializer):
         read_only_fields = ("id", "created_at", "updated_at")
 
     def get_member_ids(self, obj):
-        return list(obj.memberships.filter(is_active=True).values_list("user_id", flat=True))
+        return [row.user_id for row in obj.memberships.all() if row.is_active and row.deleted_at is None]
 
 
 class TicketRoutingRuleSerializer(serializers.ModelSerializer):
@@ -84,7 +105,6 @@ class TicketRoutingRuleSerializer(serializers.ModelSerializer):
             "unit_title",
             "required_role_id",
             "role_name",
-            "required_level",
             "is_active",
             "created_at",
             "updated_at",
@@ -129,7 +149,6 @@ class TicketRoleQueueEntrySerializer(serializers.ModelSerializer):
             "rule_name",
             "required_role_id",
             "role_name",
-            "required_level",
             "status",
             "claimed_by_id",
             "claimed_by_name",

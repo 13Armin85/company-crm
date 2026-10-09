@@ -33,7 +33,7 @@ COPY packages/typescript-config/package.json ./packages/typescript-config/packag
 COPY packages/ui/package.json ./packages/ui/package.json
 COPY packages/utils/package.json ./packages/utils/package.json
 RUN --mount=type=cache,id=plane-dev-pnpm,target=/pnpm/store \
-    node /usr/local/lib/node_modules/pnpm/bin/pnpm.cjs install --frozen-lockfile --store-dir=/pnpm/store --fetch-timeout=600000 --fetch-retries=5 --network-concurrency=4 --registry="$NPM_REGISTRY"
+    node /usr/local/lib/node_modules/pnpm/bin/pnpm.cjs install --frozen-lockfile --prefer-offline --store-dir=/pnpm/store --fetch-timeout=600000 --fetch-retries=5 --network-concurrency=4 --registry="$NPM_REGISTRY"
 COPY . .
 RUN chmod +x /usr/local/lib/node_modules/pnpm/bin/pnpm.cjs
 # Live accepts an env file; Compose supplies its actual configuration.

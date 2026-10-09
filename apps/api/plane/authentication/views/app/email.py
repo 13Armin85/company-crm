@@ -72,6 +72,10 @@ class SignInAuthEndpoint(View):
             return HttpResponseRedirect(url)
         # Validate email
         email = email.strip().lower()
+        if "@" not in email:
+            identity = User.objects.filter(username__iexact=email, is_active=True).first()
+            if identity:
+                email = identity.email
         try:
             validate_email(email)
         except ValidationError:

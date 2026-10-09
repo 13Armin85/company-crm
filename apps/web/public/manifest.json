@@ -1,27 +1,24 @@
 {
-  "name": "Plane",
-  "short_name": "Plane",
+  "description": "Company workspace",
+  "short_name": "Amard",
+  "background_color": "#111827",
   "icons": [
     {
-      "src": "/icons/icon-192x192.png",
-      "sizes": "192x192",
+      "purpose": "any",
       "type": "image/png",
-      "purpose": "any maskable"
+      "sizes": "192x192",
+      "src": "./branding/amard-icon-192.png"
     },
     {
-      "src": "/icons/icon-348x348.png",
-      "sizes": "348x348",
-      "type": "image/png"
-    },
-    {
-      "src": "/icons/icon-512x512.png",
+      "purpose": "any",
+      "type": "image/png",
       "sizes": "512x512",
-      "type": "image/png"
+      "src": "./branding/amard-icon-512.png"
     }
   ],
-  "theme_color": "#FFFFFF",
-  "background_color": "#FFFFFF",
-  "start_url": "/",
+  "theme_color": "#1749d1",
   "display": "standalone",
-  "orientation": "portrait"
+  "name": "Amard CRM",
+  "scope": "./",
+  "start_url": "./"
 }

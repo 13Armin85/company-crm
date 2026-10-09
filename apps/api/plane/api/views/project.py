@@ -21,6 +21,7 @@ from drf_spectacular.types import OpenApiTypes
 
 
 # Module imports
+from plane.app.permissions.crm import require_permission, ProjectScopePermission
 from plane.db.models import (
     Cycle,
     Intake,
@@ -49,7 +50,6 @@ from plane.api.serializers import (
     ProjectCreateSerializer,
     ProjectUpdateSerializer,
 )
-from plane.app.permissions import ProjectBasePermission, WorkSpaceAdminPermission
 from plane.utils.openapi import (
     project_docs,
     PROJECT_ID_PARAMETER,
@@ -80,7 +80,9 @@ class ProjectListCreateAPIEndpoint(BaseAPIView):
     serializer_class = ProjectSerializer
     model = Project
     webhook_event = "project"
-    permission_classes = [ProjectBasePermission]
+    permission_classes = [ProjectScopePermission]
+    allow_workspace_project_access = True
+    allow_public_project_access = True
     use_read_replica = True
 
     def get_queryset(self):
@@ -164,6 +166,7 @@ class ProjectListCreateAPIEndpoint(BaseAPIView):
             404: PROJECT_NOT_FOUND_RESPONSE,
         },
     )
+    @require_permission("Project.View")
     def get(self, request, slug):
         """List projects
 
@@ -221,6 +224,7 @@ class ProjectListCreateAPIEndpoint(BaseAPIView):
             409: PROJECT_NAME_TAKEN_RESPONSE,
         },
     )
+    @require_permission("Project.Create")
     def post(self, request, slug):
         """Create project
 
@@ -344,7 +348,9 @@ class ProjectListLiteAPIEndpoint(BaseAPIView):
 
     serializer_class = ProjectLiteSerializer
     model = Project
-    permission_classes = [ProjectBasePermission]
+    permission_classes = [ProjectScopePermission]
+    allow_workspace_project_access = True
+    allow_public_project_access = True
     use_read_replica = True
 
     def get_queryset(self):
@@ -391,6 +397,7 @@ class ProjectListLiteAPIEndpoint(BaseAPIView):
             404: WORKSPACE_NOT_FOUND_RESPONSE,
         },
     )
+    @require_permission("Project.View")
     def get(self, request, slug):
         """List projects (lite)
 
@@ -434,7 +441,9 @@ class ProjectDetailAPIEndpoint(BaseAPIView):
     model = Project
     webhook_event = "project"
 
-    permission_classes = [ProjectBasePermission]
+    permission_classes = [ProjectScopePermission]
+    allow_workspace_project_access = True
+    allow_public_project_access = True
     use_read_replica = True
 
     def get_queryset(self):
@@ -513,6 +522,7 @@ class ProjectDetailAPIEndpoint(BaseAPIView):
             404: PROJECT_NOT_FOUND_RESPONSE,
         },
     )
+    @require_permission("Project.View")
     def get(self, request, slug, pk):
         """Retrieve project
 
@@ -543,6 +553,7 @@ class ProjectDetailAPIEndpoint(BaseAPIView):
             409: PROJECT_NAME_TAKEN_RESPONSE,
         },
     )
+    @require_permission("Project.Edit")
     def patch(self, request, slug, pk):
         """Update project
 
@@ -620,6 +631,7 @@ class ProjectDetailAPIEndpoint(BaseAPIView):
             204: DELETED_RESPONSE,
         },
     )
+    @require_permission("Project.Delete")
     def delete(self, request, slug, pk):
         """Delete project
 
@@ -649,7 +661,9 @@ class ProjectDetailAPIEndpoint(BaseAPIView):
 class ProjectArchiveUnarchiveAPIEndpoint(BaseAPIView):
     """Project Archive and Unarchive Endpoint"""
 
-    permission_classes = [ProjectBasePermission]
+    permission_classes = [ProjectScopePermission]
+    allow_workspace_project_access = True
+    allow_public_project_access = True
 
     @project_docs(
         operation_id="archive_project",
@@ -663,6 +677,7 @@ class ProjectArchiveUnarchiveAPIEndpoint(BaseAPIView):
             204: ARCHIVED_RESPONSE,
         },
     )
+    @require_permission("Project.Edit")
     def post(self, request, slug, project_id):
         """Archive project
 
@@ -687,6 +702,7 @@ class ProjectArchiveUnarchiveAPIEndpoint(BaseAPIView):
             204: UNARCHIVED_RESPONSE,
         },
     )
+    @require_permission("Project.Edit")
     def delete(self, request, slug, project_id):
         """Unarchive project
 
@@ -712,9 +728,11 @@ ALLOWED_PROJECT_SUMMARY_FIELDS = [
 
 
 class ProjectSummaryAPIEndpoint(BaseAPIView):
-    permission_classes = [WorkSpaceAdminPermission]
+    permission_classes = [ProjectScopePermission]
+    allow_workspace_project_access = True
     use_read_replica = True
 
+    @require_permission("Project.View")
     def get(self, request, slug, project_id):
         """Get project summary
 

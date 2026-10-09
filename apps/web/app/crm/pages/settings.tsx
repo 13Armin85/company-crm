@@ -61,7 +61,7 @@ export default function SettingsPage() {
   const [workspaceName, setWorkspaceName] = useState("");
   const updateWorkspace = useUpdateWorkspace(workspaceSlug);
   const { data: access } = useWorkspaceAccess();
-  const isAdmin = access?.isAdmin === true;
+  const canManage = access?.can("User.View") === true;
   const { data: savedAppearance } = useAppearance();
   const updateAppearance = useUpdateAppearance();
   const { data: notificationPreferences } = useNotificationPreferences();
@@ -79,8 +79,8 @@ export default function SettingsPage() {
   }, [savedAppearance]);
   useEffect(() => setWorkspaceName(workspace?.name ?? ""), [workspace?.name]);
   useEffect(() => {
-    if (access && !isAdmin && section === "members") setSection("profile");
-  }, [access, isAdmin, section]);
+    if (access && !canManage && section === "members") setSection("profile");
+  }, [access, canManage, section]);
   return (
     <div>
       <PageHeader
@@ -88,7 +88,7 @@ export default function SettingsPage() {
         title="تنظیمات"
         description="فضای کاری و تجربه شخصی خود را مدیریت کنید"
         actions={
-          isAdmin ? (
+          access?.can("Workspace.Edit") ? (
             <Button
               icon={Save}
               onClick={() => workspaceName.trim() && updateWorkspace.mutate({ name: workspaceName })}
@@ -102,7 +102,7 @@ export default function SettingsPage() {
       <div className="settings-layout">
         <aside className="settings-nav">
           {settingsNav
-            .filter((item) => item.id !== "members" || isAdmin)
+            .filter((item) => item.id !== "members" || canManage)
             .map(({ id, label, icon: Icon }) => (
               <button key={id} className={section === id ? "active" : ""} onClick={() => setSection(id)}>
                 <Icon size={18} />
@@ -114,7 +114,7 @@ export default function SettingsPage() {
         <main className="settings-main">
           {section === "profile" ? (
             <ProfileSettings />
-          ) : section === "members" && isAdmin ? (
+          ) : section === "members" && canManage ? (
             <section className="settings-section settings-connected">
               <Users size={28} />
               <div>
@@ -174,7 +174,7 @@ export default function SettingsPage() {
                     <span>نام فضای کاری</span>
                     <input
                       value={workspaceName}
-                      readOnly={!isAdmin}
+                      readOnly={!access?.can("Workspace.Edit")}
                       onChange={(event) => setWorkspaceName(event.target.value)}
                     />
                   </label>

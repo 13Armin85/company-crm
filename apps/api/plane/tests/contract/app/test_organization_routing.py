@@ -47,7 +47,7 @@ def create_issue(workspace):
 @pytest.mark.django_db
 def test_routing_climbs_to_eligible_parent_manager(workspace):
     parent_manager = add_member(workspace, "parent-manager")
-    required_role = OrganizationRole.objects.create(workspace=workspace, name="Support manager", level=50)
+    required_role = OrganizationRole.objects.create(workspace=workspace, name="Support manager")
     UserOrganizationRole.objects.create(
         workspace=workspace,
         user=parent_manager,
@@ -60,7 +60,6 @@ def test_routing_climbs_to_eligible_parent_manager(workspace):
         name="Technical escalation",
         unit=child,
         required_role=required_role,
-        required_level=50,
     )
     issue = create_issue(workspace)
 
@@ -75,8 +74,8 @@ def test_routing_climbs_to_eligible_parent_manager(workspace):
 @pytest.mark.django_db
 def test_manager_without_required_role_is_sent_to_role_queue(workspace):
     manager = add_member(workspace, "wrong-role-manager")
-    required_role = OrganizationRole.objects.create(workspace=workspace, name="Finance manager", level=50)
-    other_role = OrganizationRole.objects.create(workspace=workspace, name="Sales expert", level=80)
+    required_role = OrganizationRole.objects.create(workspace=workspace, name="Finance manager")
+    other_role = OrganizationRole.objects.create(workspace=workspace, name="Sales expert")
     UserOrganizationRole.objects.create(workspace=workspace, user=manager, role=other_role)
     unit = OrganizationUnit.objects.create(workspace=workspace, title="Finance", manager=manager)
     rule = TicketRoutingRule.objects.create(
@@ -84,7 +83,6 @@ def test_manager_without_required_role_is_sent_to_role_queue(workspace):
         name="Finance approval",
         unit=unit,
         required_role=required_role,
-        required_level=50,
     )
     issue = create_issue(workspace)
 
@@ -109,7 +107,7 @@ def test_organization_unit_rejects_cycles(workspace):
 def test_changing_team_manager_does_not_reassign_historical_tickets(workspace):
     previous_manager = add_member(workspace, "previous-manager")
     current_manager = add_member(workspace, "current-manager")
-    required_role = OrganizationRole.objects.create(workspace=workspace, name="Sales manager", level=50)
+    required_role = OrganizationRole.objects.create(workspace=workspace, name="Sales manager")
     UserOrganizationRole.objects.bulk_create(
         [
             UserOrganizationRole(workspace=workspace, user=previous_manager, role=required_role),
@@ -122,7 +120,6 @@ def test_changing_team_manager_does_not_reassign_historical_tickets(workspace):
         name="Sales routing",
         unit=unit,
         required_role=required_role,
-        required_level=50,
     )
     issue = create_issue(workspace)
 
@@ -136,7 +133,7 @@ def test_changing_team_manager_does_not_reassign_historical_tickets(workspace):
 
 @pytest.mark.django_db
 def test_issue_create_api_runs_selected_routing_rule(session_client, workspace, create_user, mocker):
-    required_role = OrganizationRole.objects.create(workspace=workspace, name="API manager", level=50)
+    required_role = OrganizationRole.objects.create(workspace=workspace, name="API manager")
     UserOrganizationRole.objects.create(workspace=workspace, user=create_user, role=required_role)
     unit = OrganizationUnit.objects.create(workspace=workspace, title="API support", manager=create_user)
     rule = TicketRoutingRule.objects.create(
@@ -144,7 +141,6 @@ def test_issue_create_api_runs_selected_routing_rule(session_client, workspace, 
         name="API support routing",
         unit=unit,
         required_role=required_role,
-        required_level=50,
     )
     project = Project.objects.create(workspace=workspace, name="API Routing", identifier="API")
     state = State.objects.create(
@@ -177,7 +173,7 @@ def test_issue_create_api_runs_selected_routing_rule(session_client, workspace, 
 
 @pytest.mark.django_db
 def test_eligible_user_can_claim_role_queue_entry(session_client, workspace, create_user):
-    required_role = OrganizationRole.objects.create(workspace=workspace, name="Queue specialist", level=30)
+    required_role = OrganizationRole.objects.create(workspace=workspace, name="Queue specialist")
     UserOrganizationRole.objects.create(workspace=workspace, user=create_user, role=required_role)
     unit = OrganizationUnit.objects.create(workspace=workspace, title="Unmanaged queue")
     rule = TicketRoutingRule.objects.create(
@@ -185,7 +181,6 @@ def test_eligible_user_can_claim_role_queue_entry(session_client, workspace, cre
         name="Queue fallback",
         unit=unit,
         required_role=required_role,
-        required_level=30,
     )
     issue = create_issue(workspace)
     TicketRoutingService.route(issue, rule)
@@ -206,23 +201,12 @@ def test_eligible_user_can_claim_role_queue_entry(session_client, workspace, cre
 
 @pytest.mark.django_db
 def test_admin_can_manage_permissions_and_role_permission_links(session_client, workspace):
-    permission_response = session_client.post(
-        f"/api/workspaces/{workspace.slug}/organization/permissions/",
-        {
-            "code": "ticket-approve",
-            "name": "Approve tickets",
-            "description": "Allows operational ticket approval",
-        },
-        format="json",
-    )
-
-    assert permission_response.status_code == status.HTTP_201_CREATED
-    permission_id = permission_response.data["id"]
+    permission = OrganizationPermission.objects.get(workspace=workspace, code="Referral.Approve")
+    permission_id = str(permission.id)
     role_response = session_client.post(
         f"/api/workspaces/{workspace.slug}/organization/roles/",
         {
             "name": "Approval manager",
-            "level": 60,
             "permission_ids": [permission_id],
         },
         format="json",
@@ -236,8 +220,8 @@ def test_admin_can_manage_permissions_and_role_permission_links(session_client, 
 @pytest.mark.django_db
 def test_admin_updates_user_profile_with_independent_multi_roles_and_teams(session_client, workspace):
     member = add_member(workspace, "profile-member")
-    first_role = OrganizationRole.objects.create(workspace=workspace, name="Senior sales", level=30)
-    second_role = OrganizationRole.objects.create(workspace=workspace, name="Support manager", level=50)
+    first_role = OrganizationRole.objects.create(workspace=workspace, name="Senior sales")
+    second_role = OrganizationRole.objects.create(workspace=workspace, name="Support manager")
     first_unit = OrganizationUnit.objects.create(workspace=workspace, title="Domestic sales")
     second_unit = OrganizationUnit.objects.create(workspace=workspace, title="Technical support")
 
@@ -249,7 +233,6 @@ def test_admin_updates_user_profile_with_independent_multi_roles_and_teams(sessi
             "display_name": "Ali Ahmadi",
             "username": "ali.enterprise",
             "email": "ali.enterprise@example.com",
-            "password": "SafeNewPassword!2026",
             "is_active": True,
             "role_ids": [str(first_role.id), str(second_role.id)],
             "unit_ids": [str(first_unit.id), str(second_unit.id)],
@@ -260,7 +243,7 @@ def test_admin_updates_user_profile_with_independent_multi_roles_and_teams(sessi
     assert response.status_code == status.HTTP_200_OK
     member.refresh_from_db()
     assert member.username == "ali.enterprise"
-    assert member.check_password("SafeNewPassword!2026")
+    assert member.check_password("SafePass123!")
     assert set(UserOrganizationRole.objects.filter(user=member, is_active=True).values_list("role_id", flat=True)) == {
         first_role.id,
         second_role.id,

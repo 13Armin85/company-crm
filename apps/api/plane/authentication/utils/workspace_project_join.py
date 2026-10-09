@@ -10,13 +10,14 @@ from plane.db.models import (
     WorkspaceMemberInvite,
 )
 from plane.utils.cache import invalidate_cache_directly
+from plane.app.services.permission_registry import initialize_bulk_memberships
 
 
 def process_workspace_project_invitations(user):
     """This function takes in User and adds him to all workspace and projects that the user has accepted invited of"""
 
     # Check if user has any accepted invites for workspace and add them to workspace
-    workspace_member_invites = WorkspaceMemberInvite.objects.filter(email=user.email, accepted=True)
+    workspace_member_invites = WorkspaceMemberInvite.objects.filter(email__iexact=user.email, accepted=True, workspace__deleted_at__isnull=True)
 
     WorkspaceMember.objects.bulk_create(
         [
@@ -39,7 +40,7 @@ def process_workspace_project_invitations(user):
         )
 
     # Check if user has any project invites
-    project_member_invites = ProjectMemberInvite.objects.filter(email=user.email, accepted=True)
+    project_member_invites = ProjectMemberInvite.objects.filter(email__iexact=user.email, accepted=True, workspace__deleted_at__isnull=True)
 
     # Add user to workspace
     WorkspaceMember.objects.bulk_create(
@@ -56,10 +57,12 @@ def process_workspace_project_invitations(user):
     )
 
     # Now add the users to project
+    initialize_bulk_memberships(WorkspaceMember.objects.filter(member=user, is_active=True))
     ProjectMember.objects.bulk_create(
         [
             ProjectMember(
                 workspace_id=project_member_invite.workspace_id,
+                project_id=project_member_invite.project_id,
                 role=(project_member_invite.role if project_member_invite.role in [5, 15] else 15),
                 member=user,
                 created_by_id=project_member_invite.created_by_id,

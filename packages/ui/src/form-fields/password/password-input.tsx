@@ -18,6 +18,10 @@ type TPasswordInputProps = {
   showToggle?: boolean;
   error?: boolean;
   autoComplete?: React.HTMLInputAutoCompleteAttribute;
+  required?: boolean;
+  minLength?: number;
+  disabled?: boolean;
+  toggleLabels?: { show: string; hide: string };
 };
 
 export function PasswordInput({
@@ -29,10 +33,14 @@ export function PasswordInput({
   showToggle = true,
   error = false,
   autoComplete = "off",
+  required = false,
+  minLength,
+  disabled = false,
+  toggleLabels = { show: "Show password", hide: "Hide password" },
 }: TPasswordInputProps) {
   const [showPassword, setShowPassword] = useState(false);
   return (
-    <div className="relative">
+    <div className="relative" dir="ltr">
       <input
         dir="ltr"
         id={id}
@@ -49,11 +57,17 @@ export function PasswordInput({
         )}
         placeholder={placeholder}
         autoComplete={autoComplete}
+        required={required}
+        minLength={minLength}
+        disabled={disabled}
       />
       {showToggle && (
-        <Tooltip tooltipContent={showPassword ? "Hide password" : "Show password"} position="top">
+        <Tooltip tooltipContent={showPassword ? toggleLabels.hide : toggleLabels.show} position="top">
           <button
             type="button"
+            aria-label={showPassword ? toggleLabels.hide : toggleLabels.show}
+            aria-pressed={showPassword}
+            disabled={disabled}
             onClick={() => setShowPassword(!showPassword)}
             className="absolute inset-y-0 end-0 flex items-center pe-3 text-secondary transition-colors duration-200 hover:text-primary"
           >

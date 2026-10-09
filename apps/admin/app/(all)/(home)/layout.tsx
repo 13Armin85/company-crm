@@ -5,6 +5,7 @@
  */
 
 import { useEffect } from "react";
+import { BrandLogo } from "@plane/ui";
 import { observer } from "mobx-react";
 import { useRouter } from "next/navigation";
 import { Outlet } from "react-router";
@@ -25,11 +26,7 @@ function RootLayout() {
     <div className="admin-auth">
       <section className="admin-auth-showcase" aria-label="هم‌کار">
         <div className="admin-brand">
-          <span className="admin-brand-mark" aria-hidden="true">
-            <i />
-            <i />
-            <i />
-          </span>
+          <BrandLogo variant="full" className="admin-auth-logo" />
           <strong>هم‌کار</strong>
         </div>
         <span className="admin-auth-badge">پنل مدیریت سامانه · God mode</span>

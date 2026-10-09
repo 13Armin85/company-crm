@@ -14,7 +14,7 @@ export default function ProjectsPage() {
   const { data: issues = [], isLoading: issuesLoading } = useIssues();
   const { data: members = [], isLoading: membersLoading } = useMembers();
   const { data: access } = useWorkspaceAccess();
-  const isAdmin = access?.isAdmin === true;
+  const canManage = access?.can("Project.Create") === true;
   const setCreate = useUIStore((state) => state.setCreateOpen);
   const filtered = useMemo(
     () =>
@@ -48,7 +48,7 @@ export default function ProjectsPage() {
         title="پروژه‌ها"
         description={`${toFa(projects.length)} پروژه برای برنامه‌ریزی و پیگیری کارهای تیم`}
         actions={
-          isAdmin ? (
+          canManage ? (
             <Button icon={Plus} onClick={() => setCreate(true, "project")}>
               پروژه جدید
             </Button>
@@ -92,7 +92,7 @@ export default function ProjectsPage() {
           title="پروژه‌ای پیدا نشد"
           description="عبارت جستجو یا فیلتر انتخابی را تغییر دهید."
           action={
-            isAdmin ? (
+            canManage ? (
               <Button icon={Plus} onClick={() => setCreate(true, "project")}>
                 ساخت پروژه
               </Button>
@@ -146,7 +146,7 @@ export default function ProjectsPage() {
                   <td>{persianDate(project.targetDate)}</td>
                   <td>{persianDate(project.updatedAt, { year: "numeric" })}</td>
                   <td>
-                    {isAdmin && (
+                    {canManage && (
                       <Link
                         className="plain-icon"
                         to={`/projects/${project.id}?tab=settings`}

@@ -112,4 +112,4 @@ phase="starting the Docker service"
 phase="verifying Docker"
 "${root_command[@]}" docker info >/dev/null
 "${root_command[@]}" docker compose version
-printf 'Ubuntu host is ready. Next: bash deployments/ubuntu/init-env.sh http://192.168.10.24\n'
+printf 'Ubuntu host is ready. Next: bash deployments/ubuntu/init-env.sh http://192.168.10.20\n'

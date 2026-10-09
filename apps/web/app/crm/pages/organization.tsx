@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Building2, ChevronDown, ChevronLeft, Edit3, Plus, UserRound, XCircle } from "lucide-react";
+import { Building2, ChevronDown, ChevronLeft, Edit3, Plus, UsersRound, XCircle } from "lucide-react";
 import { Navigate } from "react-router";
 import {
   useDeactivateOrganizationUnit,
@@ -11,6 +11,8 @@ import {
 import { Button, EmptyState, PageHeader, Skeleton } from "../components";
 import { useUIStore } from "../store";
 import type { OrganizationUnit } from "../types";
+import { AccessModal, MultiSelector } from "../access/components";
+import { DelegateManager } from "../access/delegate-manager";
 
 type UnitForm = { id?: string; title: string; parentId?: string; managerId?: string; memberIds: string[] };
 const emptyForm: UnitForm = { title: "", memberIds: [] };
@@ -19,34 +21,42 @@ export default function OrganizationPage() {
   const slug = useUIStore((state) => state.workspaceSlug) ?? "";
   const setFormDirty = useUIStore((state) => state.setFormDirty);
   const { data: access, isLoading: accessLoading } = useWorkspaceAccess();
-  const { data: units = [], isLoading } = useOrganizationUnits(undefined, access?.isAdmin === true);
+  const { data: units = [], isLoading } = useOrganizationUnits(
+    undefined,
+    access?.can("OrganizationUnit.View") === true
+  );
   const { data: members = [] } = useMembers();
   const saveUnit = useSaveOrganizationUnit(slug);
   const deactivateUnit = useDeactivateOrganizationUnit(slug);
   const [form, setForm] = useState<UnitForm>();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [draggedId, setDraggedId] = useState<string>();
+  const [delegateUnit, setDelegateUnit] = useState<OrganizationUnit>();
   const roots = useMemo(() => units.filter((unit) => !unit.parentId), [units]);
   useEffect(() => {
     setFormDirty("organization-unit", Boolean(form));
     return () => setFormDirty("organization-unit", false);
   }, [form, setFormDirty]);
   if (accessLoading) return <Skeleton rows={6} />;
-  if (!access?.isAdmin) return <Navigate to="/my-work" replace />;
+  if (!access?.can("OrganizationUnit.View")) return <Navigate to="/my-work" replace />;
 
   const submit = () => {
     if (!form?.title.trim()) return;
-    saveUnit.mutate(form, { onSuccess: () => setForm(undefined) });
+    saveUnit.mutate(
+      {
+        ...form,
+        managerId: access.can("OrganizationUnit.Manager.Assign") ? (form.managerId ?? "") : undefined,
+        memberIds: access.can("OrganizationUnit.Member.Manage") ? form.memberIds : undefined,
+      },
+      { onSuccess: () => setForm(undefined) }
+    );
   };
   const moveUnit = (unit: OrganizationUnit, parentId?: string) => {
-    if (unit.id === parentId || unit.parentId === parentId) return;
+    if (!access.can("OrganizationUnit.Edit") || unit.id === parentId || unit.parentId === parentId) return;
     saveUnit.mutate({
       id: unit.id,
       title: unit.title,
       parentId,
-      managerId: unit.managerId,
-      memberIds: unit.memberIds,
-      isActive: unit.isActive,
     });
   };
   const renderUnit = (unit: OrganizationUnit, depth = 0) => {
@@ -57,7 +67,7 @@ export default function OrganizationPage() {
         <div
           className={`org-node ${unit.isActive ? "" : "is-inactive"}`}
           style={{ marginInlineStart: `${depth * 24}px` }}
-          draggable
+          draggable={access.can("OrganizationUnit.Edit")}
           onDragStart={() => setDraggedId(unit.id)}
           onDragOver={(event) => event.preventDefault()}
           onDrop={() => {
@@ -92,24 +102,37 @@ export default function OrganizationPage() {
           </div>
           {!unit.isActive && <span className="state-pill is-off">غیرفعال</span>}
           <div className="org-node-actions">
-            <button onClick={() => setForm({ title: "", parentId: unit.id, memberIds: [] })} title="افزودن زیرمجموعه">
-              <Plus size={15} />
-            </button>
             <button
-              onClick={() =>
-                setForm({
-                  id: unit.id,
-                  title: unit.title,
-                  parentId: unit.parentId,
-                  managerId: unit.managerId,
-                  memberIds: unit.memberIds,
-                })
-              }
-              title="ویرایش"
+              type="button"
+              onClick={() => setDelegateUnit(unit)}
+              title="جانشینان"
+              aria-label={"جانشینان " + unit.title}
+              aria-expanded={delegateUnit?.id === unit.id}
             >
-              <Edit3 size={15} />
+              <UsersRound size={16} aria-hidden="true" />
             </button>
-            {unit.isActive && (
+            {access.can("OrganizationUnit.Create") && (
+              <button onClick={() => setForm({ title: "", parentId: unit.id, memberIds: [] })} title="افزودن زیرمجموعه">
+                <Plus size={15} />
+              </button>
+            )}
+            {access.can("OrganizationUnit.Edit") && (
+              <button
+                onClick={() =>
+                  setForm({
+                    id: unit.id,
+                    title: unit.title,
+                    parentId: unit.parentId,
+                    managerId: unit.managerId,
+                    memberIds: unit.memberIds,
+                  })
+                }
+                title="ویرایش"
+              >
+                <Edit3 size={15} />
+              </button>
+            )}
+            {unit.isActive && access.can("OrganizationUnit.Disable") && (
               <button onClick={() => deactivateUnit.mutate(unit.id)} title="غیرفعال‌کردن">
                 <XCircle size={15} />
               </button>
@@ -128,9 +151,11 @@ export default function OrganizationPage() {
         title="ساختار سازمانی"
         description="واحدها را به‌صورت درختی مدیریت کنید؛ برای جابه‌جایی یک واحد، آن را روی والد جدید رها کنید."
         actions={
-          <Button icon={Plus} onClick={() => setForm(emptyForm)}>
-            واحد جدید
-          </Button>
+          access.can("OrganizationUnit.Create") && (
+            <Button icon={Plus} onClick={() => setForm(emptyForm)}>
+              واحد جدید
+            </Button>
+          )
         }
       />
       <section
@@ -151,19 +176,22 @@ export default function OrganizationPage() {
           <EmptyState title="ساختار سازمانی خالی است" description="اولین واحد سازمانی را ایجاد کنید." />
         )}
       </section>
+      {delegateUnit && (
+        <DelegateManager
+          key={delegateUnit.id}
+          unitId={delegateUnit.id}
+          unitTitle={delegateUnit.title}
+          managerId={delegateUnit.managerId}
+          onClose={() => setDelegateUnit(undefined)}
+        />
+      )}
       {form && (
-        <div
-          className="modal-layer"
-          role="presentation"
-          onMouseDown={(e) => e.target === e.currentTarget && setForm(undefined)}
+        <AccessModal
+          title={form.id ? "ویرایش واحد" : "افزودن واحد"}
+          busy={saveUnit.isPending}
+          onClose={() => setForm(undefined)}
         >
-          <section className="create-modal organization-modal">
-            <header>
-              <div>
-                <span className="modal-kicker">ساختار سازمانی</span>
-                <h2>{form.id ? "ویرایش واحد" : "افزودن واحد"}</h2>
-              </div>
-            </header>
+          <section className="organization-modal">
             <label>
               <span>عنوان واحد</span>
               <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
@@ -187,6 +215,7 @@ export default function OrganizationPage() {
             <label>
               <span>مدیر فعلی</span>
               <select
+                disabled={!access.can("OrganizationUnit.Manager.Assign")}
                 value={form.managerId ?? ""}
                 onChange={(e) => setForm({ ...form, managerId: e.target.value || undefined })}
               >
@@ -198,28 +227,21 @@ export default function OrganizationPage() {
                 ))}
               </select>
             </label>
-            <fieldset className="member-picker">
-              <legend>
-                <UserRound size={15} /> اعضای تیم
-              </legend>
-              {members.map((member) => (
-                <label key={member.id}>
-                  <input
-                    type="checkbox"
-                    checked={form.memberIds.includes(member.id)}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        memberIds: e.target.checked
-                          ? [...form.memberIds, member.id]
-                          : form.memberIds.filter((id) => id !== member.id),
-                      })
-                    }
-                  />
-                  {member.displayName}
-                </label>
-              ))}
-            </fieldset>
+            <MultiSelector
+              label="اعضای واحد"
+              selected={form.memberIds}
+              onChange={(memberIds) => setForm({ ...form, memberIds })}
+              disabled={!access.can("OrganizationUnit.Member.Manage")}
+              options={members
+                .filter((member) => member.isActive !== false)
+                .map((member) => ({
+                  id: member.id,
+                  title: member.displayName,
+                  description: member.email,
+                  initials: member.initials,
+                  avatarUrl: member.avatarUrl,
+                }))}
+            />
             <footer>
               <Button variant="secondary" onClick={() => setForm(undefined)}>
                 انصراف
@@ -229,7 +251,7 @@ export default function OrganizationPage() {
               </Button>
             </footer>
           </section>
-        </div>
+        </AccessModal>
       )}
     </div>
   );

@@ -5,7 +5,7 @@ project_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 env_file="$project_root/.env.production"
 
 if [[ $# -ne 1 ]]; then
-    printf 'Usage: bash deployments/debian/init-env.sh http://192.168.10.24\n' >&2
+    printf 'Usage: bash deployments/debian/init-env.sh http://192.168.10.20\n' >&2
     printf '   or: bash deployments/debian/init-env.sh https://crm.example.com\n' >&2
     exit 1
 fi

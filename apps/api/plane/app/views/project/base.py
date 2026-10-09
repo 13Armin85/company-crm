@@ -17,6 +17,8 @@ from rest_framework.response import Response
 
 # Module imports
 from plane.app.permissions import ROLE, ProjectMemberPermission, allow_permission
+from plane.app.permissions.crm import require_permission
+from plane.app.services.access_control import has_permission
 from plane.app.serializers import (
     DeployBoardSerializer,
     ProjectListSerializer,
@@ -37,7 +39,6 @@ from plane.db.models import (
     State,
     DEFAULT_STATES,
     Workspace,
-    WorkspaceMember,
 )
 from plane.db.models.intake import IntakeIssueStatus
 from plane.utils.host import base_host
@@ -98,27 +99,17 @@ class ProjectViewSet(BaseViewSet):
             .distinct()
         )
 
-    @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
+    @require_permission("Project.View")
     def list_detail(self, request, slug):
         fields = [field for field in request.GET.get("fields", "").split(",") if field]
         projects = self.get_queryset().order_by("sort_order", "name")
-        if WorkspaceMember.objects.filter(
-            member=request.user,
-            workspace__slug=slug,
-            is_active=True,
-            role=ROLE.GUEST.value,
-        ).exists():
+        if not has_permission(request.user, slug, "Project.ViewAll", request=request):
             projects = projects.filter(
                 project_projectmember__member=self.request.user,
                 project_projectmember__is_active=True,
             )
 
-        if WorkspaceMember.objects.filter(
-            member=request.user,
-            workspace__slug=slug,
-            is_active=True,
-            role=ROLE.MEMBER.value,
-        ).exists():
+        if not has_permission(request.user, slug, "Project.ViewAll", request=request):
             projects = projects.filter(
                 project_projectmember__member=self.request.user,
                 project_projectmember__is_active=True,
@@ -139,7 +130,7 @@ class ProjectViewSet(BaseViewSet):
         projects = ProjectListSerializer(projects, many=True, fields=fields if fields else None).data
         return Response(projects, status=status.HTTP_200_OK)
 
-    @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
+    @require_permission("Project.View")
     def list(self, request, slug):
         sort_order = ProjectUserProperty.objects.filter(
             user=self.request.user,
@@ -193,30 +184,20 @@ class ProjectViewSet(BaseViewSet):
             "updated_by",
         )
 
-        if WorkspaceMember.objects.filter(
-            member=request.user,
-            workspace__slug=slug,
-            is_active=True,
-            role=ROLE.GUEST.value,
-        ).exists():
+        if not has_permission(request.user, slug, "Project.ViewAll", request=request):
             projects = projects.filter(
                 project_projectmember__member=self.request.user,
                 project_projectmember__is_active=True,
             )
 
-        if WorkspaceMember.objects.filter(
-            member=request.user,
-            workspace__slug=slug,
-            is_active=True,
-            role=ROLE.MEMBER.value,
-        ).exists():
+        if not has_permission(request.user, slug, "Project.ViewAll", request=request):
             projects = projects.filter(
                 project_projectmember__member=self.request.user,
                 project_projectmember__is_active=True,
             )
         return Response(projects, status=status.HTTP_200_OK)
 
-    @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
+    @require_permission("Project.View")
     def retrieve(self, request, slug, pk):
         project = self.get_queryset().filter(archived_at__isnull=True).filter(pk=pk).first()
 
@@ -225,12 +206,7 @@ class ProjectViewSet(BaseViewSet):
 
         member_ids = [str(project_member.member_id) for project_member in project.members_list]
 
-        is_workspace_admin = WorkspaceMember.objects.filter(
-            member=request.user,
-            workspace__slug=slug,
-            is_active=True,
-            role=ROLE.ADMIN.value,
-        ).exists()
+        is_workspace_admin = has_permission(request.user, slug, "Project.ViewAll", request=request)
         if not is_workspace_admin and str(request.user.id) not in member_ids:
             if project.network == ProjectNetwork.SECRET.value:
                 return Response(
@@ -254,7 +230,7 @@ class ProjectViewSet(BaseViewSet):
         serializer = ProjectListSerializer(project)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    @require_permission("Project.Create")
     def create(self, request, slug):
         workspace = Workspace.objects.get(slug=slug)
 
@@ -311,14 +287,10 @@ class ProjectViewSet(BaseViewSet):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    @require_permission("Project.Edit")
     def partial_update(self, request, slug, pk=None):
         # try:
-        is_workspace_admin = WorkspaceMember.objects.filter(
-            member=request.user,
-            workspace__slug=slug,
-            is_active=True,
-            role=ROLE.ADMIN.value,
-        ).exists()
+        is_workspace_admin = has_permission(request.user, slug, "Project.Edit", request=request)
 
         if not is_workspace_admin:
             return Response(
@@ -370,13 +342,9 @@ class ProjectViewSet(BaseViewSet):
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    @require_permission("Project.Delete")
     def destroy(self, request, slug, pk):
-        if WorkspaceMember.objects.filter(
-            member=request.user,
-            workspace__slug=slug,
-            is_active=True,
-            role=ROLE.ADMIN.value,
-        ).exists():
+        if has_permission(request.user, slug, "Project.Delete", request=request):
             project = Project.objects.get(pk=pk, workspace__slug=slug)
             project.delete()
             webhook_activity.delay(

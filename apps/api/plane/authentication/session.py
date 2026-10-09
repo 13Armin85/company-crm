@@ -6,6 +6,9 @@ from rest_framework.authentication import SessionAuthentication
 
 
 class BaseSessionAuthentication(SessionAuthentication):
+    def authenticate_header(self, request):
+        return "Session"
+
     # Disable csrf for the rest apis
     def enforce_csrf(self, request):
         return

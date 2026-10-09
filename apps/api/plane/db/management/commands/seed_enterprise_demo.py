@@ -12,6 +12,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from plane.app.services import TicketRoutingService
+from plane.app.services.permission_registry import PERMISSION_REGISTRY, sync_permission_catalog
 from plane.db.models import (
     Cycle,
     CycleIssue,
@@ -120,68 +121,67 @@ class Command(BaseCommand):
         return result
 
     def _seed_permissions(self, workspace):
-        specs = [
-            ("ticket-view", "مشاهده تیکت", "مشاهده تیکت‌های قابل دسترس"),
-            ("ticket-assign", "ارجاع تیکت", "ارجاع و انتقال مسئولیت تیکت"),
-            ("ticket-resolve", "حل تیکت", "تغییر وضعیت تیکت به حل‌شده"),
-            ("ticket-approve", "تأیید تیکت", "تأیید مرحله مدیریتی تیکت"),
-            ("sales-approve", "تأیید فروش", "تأیید درخواست‌های فروش"),
-            ("finance-approve", "تأیید مالی", "تأیید درخواست‌های مالی"),
-            ("leave-approve", "تأیید مرخصی", "آماده استفاده در گردش کار مرخصی"),
-            ("purchase-approve", "تأیید خرید", "آماده استفاده در گردش کار خرید"),
-        ]
-        result = {}
-        for code, name, description in specs:
-            permission, _ = OrganizationPermission.objects.get_or_create(
-                workspace=workspace,
-                code=code,
-                defaults={"name": name, "description": description, "is_active": True},
+        sync_permission_catalog(workspace)
+        return {
+            permission.code: permission
+            for permission in OrganizationPermission.objects.filter(
+                workspace=workspace, is_active=True, code__in=PERMISSION_REGISTRY
             )
-            result[code] = permission
-        return result
+        }
 
     def _seed_roles(self, workspace, permissions):
         specs = {
-            "support": ("کارشناس پشتیبانی", 10, ["ticket-view", "ticket-resolve"]),
-            "developer": ("برنامه‌نویس", 15, ["ticket-view", "ticket-resolve"]),
-            "sales": ("کارشناس فروش", 20, ["ticket-view"]),
-            "senior_sales": ("کارشناس ارشد فروش", 30, ["ticket-view", "ticket-assign"]),
+            "support": (
+                "کارشناس پشتیبانی",
+                ["Issue.View", "Issue.Status.Edit", "Routing.Queue.View", "Routing.Queue.Claim"],
+            ),
+            "developer": ("برنامه‌نویس", ["Project.View", "Issue.View", "Issue.Edit", "Issue.Status.Edit"]),
+            "sales": ("کارشناس فروش", ["Issue.View"]),
+            "senior_sales": ("کارشناس ارشد فروش", ["Issue.View", "Issue.Assign", "Referral.Create"]),
             "support_manager": (
                 "مدیر پشتیبانی",
-                50,
-                ["ticket-view", "ticket-assign", "ticket-resolve", "ticket-approve"],
+                [
+                    "Issue.View",
+                    "Issue.Assign",
+                    "Issue.Status.Edit",
+                    "Referral.Approve",
+                    "User.View",
+                    "OrganizationUnit.View",
+                    "Absence.View",
+                    "Absence.Create",
+                    "Absence.Edit",
+                    "Absence.End",
+                ],
             ),
             "sales_manager": (
                 "مدیر فروش",
-                50,
-                ["ticket-view", "ticket-assign", "sales-approve"],
+                [
+                    "Issue.View",
+                    "Issue.Assign",
+                    "Referral.Approve",
+                    "User.View",
+                    "OrganizationUnit.View",
+                    "Absence.View",
+                    "Absence.Create",
+                    "Absence.Edit",
+                    "Absence.End",
+                ],
             ),
             "finance_manager": (
                 "مدیر مالی",
-                60,
-                ["ticket-view", "finance-approve", "purchase-approve"],
+                ["Issue.View", "Referral.Approve", "Absence.View", "Absence.Create", "Absence.Edit", "Absence.End"],
             ),
             "ceo": (
                 "مدیرعامل",
-                100,
-                [
-                    "ticket-view",
-                    "ticket-assign",
-                    "ticket-resolve",
-                    "ticket-approve",
-                    "sales-approve",
-                    "finance-approve",
-                    "leave-approve",
-                    "purchase-approve",
-                ],
+                list(PERMISSION_REGISTRY),
             ),
         }
         result = {}
-        for key, (name, level, permission_codes) in specs.items():
+        for key, (name, permission_codes) in specs.items():
             role, _ = OrganizationRole.objects.get_or_create(
                 workspace=workspace,
                 name=name,
-                defaults={"level": level, "is_active": True},
+                defaults={"is_active": True},
             )
             for code in permission_codes:
                 RolePermission.objects.get_or_create(role=role, permission=permissions[code])
@@ -503,19 +503,18 @@ class Command(BaseCommand):
 
     def _seed_routing(self, workspace, units, roles, issues):
         specs = {
-            "support": ("ارجاع پشتیبانی نرم‌افزار", units["software_support"], roles["support_manager"], 50),
-            "sales": ("ارجاع فروش خارجی", units["foreign_sales"], roles["sales_manager"], 50),
-            "queue": ("صف تأیید مالی", units["finance_queue"], roles["finance_manager"], 60),
+            "support": ("ارجاع پشتیبانی نرم‌افزار", units["software_support"], roles["support_manager"]),
+            "sales": ("ارجاع فروش خارجی", units["foreign_sales"], roles["sales_manager"]),
+            "queue": ("صف تأیید مالی", units["finance_queue"], roles["finance_manager"]),
         }
         rules = {}
-        for key, (name, unit, role, required_level) in specs.items():
+        for key, (name, unit, role) in specs.items():
             rule, _ = TicketRoutingRule.objects.get_or_create(
                 workspace=workspace,
                 name=name,
                 defaults={
                     "unit": unit,
                     "required_role": role,
-                    "required_level": required_level,
                     "is_active": True,
                 },
             )

@@ -80,34 +80,17 @@
   font-size: 10px;
 }
 .admin-brand-mark {
-  position: relative;
   display: inline-block;
   flex-shrink: 0;
-  width: 29px;
-  height: 29px;
-  border-radius: 9px;
-  background: linear-gradient(145deg, #7169ff, var(--accent));
-  box-shadow: 0 3px 10px #4f46e533;
+  width: 38px;
+  height: 32px;
+  object-fit: contain;
 }
-.admin-brand-mark i {
-  position: absolute;
-  bottom: 7px;
-  width: 4px;
-  border-radius: 2px;
-  background: #fff;
-  transform: rotate(35deg);
-}
-.admin-brand-mark i:nth-child(1) {
-  right: 7px;
-  height: 8px;
-}
-.admin-brand-mark i:nth-child(2) {
-  right: 13px;
-  height: 14px;
-}
-.admin-brand-mark i:nth-child(3) {
-  right: 19px;
-  height: 11px;
+.admin-auth-logo {
+  display: block;
+  width: 160px;
+  height: auto;
+  object-fit: contain;
 }
 .admin-sidebar[data-collapsed="true"] .admin-brand {
   justify-content: center;

@@ -5,12 +5,12 @@
  */
 
 import { Links, Meta, Outlet, Scripts } from "react-router";
+import { COMPANY_BRAND_VERSION, SPACE_BASE_PATH } from "@plane/constants";
 // assets
 import appleTouchIcon from "@/app/assets/favicon/apple-touch-icon.png?url";
 import favicon16 from "@/app/assets/favicon/favicon-16x16.png?url";
 import favicon32 from "@/app/assets/favicon/favicon-32x32.png?url";
 import faviconIco from "@/app/assets/favicon/favicon.ico?url";
-import siteWebmanifest from "@/app/assets/favicon/site.webmanifest?url";
 import { LogoSpinner } from "@/components/common/logo-spinner";
 import globalStyles from "@/styles/globals.css?url";
 // types
@@ -31,7 +31,7 @@ export const links: Route.LinksFunction = () => [
   { rel: "icon", type: "image/png", sizes: "32x32", href: favicon32 },
   { rel: "icon", type: "image/png", sizes: "16x16", href: favicon16 },
   { rel: "shortcut icon", href: faviconIco },
-  { rel: "manifest", href: siteWebmanifest },
+  { rel: "manifest", href: `${SPACE_BASE_PATH}/site.webmanifest.json?v=${COMPANY_BRAND_VERSION}` },
   { rel: "stylesheet", href: globalStyles },
   {
     rel: "preload",

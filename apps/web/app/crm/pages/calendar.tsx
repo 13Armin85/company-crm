@@ -56,7 +56,7 @@ export default function CalendarPage() {
         title="تقویم"
         description="موعدهای واقعی کارها در همه پروژه‌ها"
         actions={
-          access?.isAdmin ? (
+          access?.can("Issue.Create") ? (
             <Button icon={Plus} onClick={() => setCreate(true, "issue")}>
               کار جدید
             </Button>

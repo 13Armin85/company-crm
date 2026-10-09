@@ -1,7 +1,9 @@
 import { create } from "axios";
 import type { AxiosError, InternalAxiosRequestConfig } from "axios";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { QueryClient } from "@tanstack/react-query";
 import { useUIStore } from "./store";
+import { publishSessionEnd } from "./access/session-events";
 import type {
   ActivityItem,
   Cycle,
@@ -25,15 +27,19 @@ const mapOrganizationPermission = (item: Record<string, unknown>): OrganizationP
   code: String(item.code),
   name: String(item.name),
   description: String(item.description ?? ""),
+  category: String(item.category ?? ""),
+  isDelegatable: Boolean(item.is_delegatable),
   isActive: Boolean(item.is_active),
 });
 
 const mapOrganizationRole = (item: Record<string, unknown>): OrganizationRole => ({
   id: String(item.id),
   name: String(item.name),
-  level: Number(item.level ?? 0),
+  description: String(item.description ?? ""),
+  systemKey: item.system_key ? String(item.system_key) : undefined,
   isActive: Boolean(item.is_active),
   permissionIds: Array.isArray(item.permission_ids) ? item.permission_ids.map(String) : [],
+  userCount: Number(item.user_count ?? 0),
   createdAt: item.created_at ? String(item.created_at) : undefined,
   updatedAt: item.updated_at ? String(item.updated_at) : undefined,
 });
@@ -57,7 +63,6 @@ const mapTicketRoutingRule = (item: Record<string, unknown>): TicketRoutingRule 
   unitTitle: String(item.unit_title ?? ""),
   requiredRoleId: String(item.required_role_id),
   roleName: String(item.role_name ?? ""),
-  requiredLevel: Number(item.required_level ?? 0),
   isActive: Boolean(item.is_active),
 });
 
@@ -71,7 +76,6 @@ const mapTicketRoleQueueEntry = (item: Record<string, unknown>): TicketRoleQueue
   ruleName: String(item.rule_name ?? ""),
   requiredRoleId: String(item.required_role_id),
   roleName: String(item.role_name ?? ""),
-  requiredLevel: Number(item.required_level ?? 0),
   status: String(item.status) as TicketRoleQueueEntry["status"],
   claimedById: item.claimed_by_id ? String(item.claimed_by_id) : undefined,
   claimedByName: item.claimed_by_name ? String(item.claimed_by_name) : undefined,
@@ -79,16 +83,10 @@ const mapTicketRoleQueueEntry = (item: Record<string, unknown>): TicketRoleQueue
 });
 
 const origin = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/api\/v1\/?$/, "").replace(/\/$/, "");
-const api = create({ baseURL: origin, timeout: 20000, withCredentials: true });
+export const api = create({ baseURL: origin, timeout: 20000, withCredentials: true });
 let csrfToken: string | undefined;
 
 api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
-  const storedToken =
-    localStorage.getItem("api_key") || localStorage.getItem("access_token") || localStorage.getItem("accessToken");
-  if (storedToken) {
-    config.headers["X-Api-Key"] = storedToken;
-    config.headers.Authorization = `Bearer ${storedToken}`;
-  }
   if (config.method && !["get", "head", "options"].includes(config.method)) {
     if (!csrfToken) csrfToken = (await api.get<{ csrf_token: string }>("/auth/get-csrf-token/")).data.csrf_token;
     config.headers["X-CSRFTOKEN"] = csrfToken;
@@ -108,7 +106,6 @@ const initials = (name: string) =>
     .slice(0, 2)
     .map((word) => word[0])
     .join(" ");
-const roleName = (role: unknown): Member["role"] => (Number(role) >= 20 ? "مدیر" : "عضو");
 const mapMember = (row: Record<string, unknown>, index = 0): Member => {
   const person = (row.member ?? row) as Record<string, unknown>;
   const name = String(person.display_name ?? `${person.first_name ?? ""} ${person.last_name ?? ""}`).trim() || "کاربر";
@@ -119,7 +116,11 @@ const mapMember = (row: Record<string, unknown>, index = 0): Member => {
     email: String(person.email ?? ""),
     initials: initials(name),
     avatarUrl: person.avatar_url ? String(person.avatar_url) : person.avatar ? String(person.avatar) : undefined,
-    role: roleName(row.role),
+    role: Array.isArray(row.organization_roles)
+      ? row.organization_roles.map((role) => String((role as { name: string }).name)).join("، ")
+      : "",
+    roles: Array.isArray(row.organization_roles) ? (row.organization_roles as Member["roles"]) : [],
+    isActive: row.is_active !== false && person.is_active !== false,
     avatarColor: ["#4f46e5", "#ec4899", "#0ea5e9", "#f59e0b"][index % 4],
   };
 };
@@ -266,7 +267,7 @@ const mapWorkspaceTask = (item: Record<string, unknown>, members: Member[]): Iss
     labels: [],
   };
 };
-const errorMessage = (error: unknown, fallback: string) => {
+export const errorMessage = (error: unknown, fallback: string) => {
   if (error instanceof Error && !(error as AxiosError).response) return error.message || fallback;
   const data = (error as AxiosError<Record<string, unknown>>)?.response?.data;
   const value = data?.error ?? data?.detail ?? (data ? Object.values(data)[0] : undefined);
@@ -277,8 +278,8 @@ const useSlug = (provided?: string) => useUIStore((state) => provided || state.w
 export const useWorkspaces = () =>
   useQuery({
     queryKey: ["workspaces"],
-    queryFn: async (): Promise<Workspace[]> =>
-      unwrap<Record<string, unknown>[]>((await api.get("/api/users/me/workspaces/")).data).map((item) => ({
+    queryFn: async ({ signal }): Promise<Workspace[]> =>
+      unwrap<Record<string, unknown>[]>((await api.get("/api/users/me/workspaces/", { signal })).data).map((item) => ({
         id: String(item.id),
         name: String(item.name),
         slug: String(item.slug),
@@ -289,35 +290,37 @@ export const useWorkspaces = () =>
 export const useCurrentUser = () =>
   useQuery({
     queryKey: ["current-user"],
-    queryFn: async (): Promise<Member> => mapMember((await api.get("/api/users/me/")).data),
+    queryFn: async ({ signal }): Promise<Member> =>
+      mapMember((await api.get("/api/users/me/", { signal, headers: { "Cache-Control": "no-cache" } })).data),
     retry: false,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
-export const useWorkspaceAccess = (providedSlug?: string) => {
-  const slug = useSlug(providedSlug);
-  return useQuery({
-    queryKey: ["workspace-access", slug],
-    enabled: Boolean(slug),
-    retry: false,
-    queryFn: async (): Promise<{ role: number; isAdmin: boolean }> => {
-      const data = (await api.get(`/api/workspaces/${slug}/workspace-members/me/`)).data as { role?: number };
-      const role = Number(data.role ?? 0);
-      return { role, isAdmin: role === 20 };
-    },
-  });
-};
+export { useAccess as useWorkspaceAccess } from "./access/api";
 
-export const useSignOut = () =>
-  useMutation({
+export async function clearClientSession(client: QueryClient) {
+  await client.cancelQueries();
+  client.clear();
+  csrfToken = undefined;
+  if (typeof localStorage !== "undefined") {
+    for (const key of ["api_key", "access_token", "accessToken", "hamkar-workspace"]) localStorage.removeItem(key);
+  }
+  useUIStore.getState().resetSession();
+}
+
+export const useSignOut = () => {
+  const client = useQueryClient();
+  return useMutation({
     mutationFn: () => api.post("/auth/sign-out/", {}),
-    onSuccess: () => {
-      localStorage.removeItem("api_key");
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("accessToken");
-      window.location.assign("/login");
+    onSuccess: async () => {
+      publishSessionEnd();
+      await clearClientSession(client);
+      window.location.replace("/login");
     },
     onError: (error) => useUIStore.getState().toast(errorMessage(error, "خروج از حساب انجام نشد"), "error"),
   });
+};
 
 export const useUpdateUserProfile = () => {
   const client = useQueryClient();
@@ -575,7 +578,7 @@ export const useMembers = (providedSlug?: string, projectId?: string) => {
         const memberId = String(membership.member ?? "");
         const member = workspaceMembers.find((candidate) => candidate.id === memberId);
         if (!member) return [];
-        return [{ ...member, membershipId: String(membership.id), role: roleName(membership.role) }];
+        return [{ ...member, membershipId: String(membership.id) }];
       });
     },
   });
@@ -879,7 +882,7 @@ export const useCreateWorkspaceUser = (slug: string) => {
       username: string;
       password?: string;
       display_name: string;
-      role: 15 | 20;
+      role_ids?: string[];
     }) => api.post(`/api/workspaces/${slug}/members/`, payload),
     onSuccess: () => {
       client.invalidateQueries({ queryKey: ["members", slug] });
@@ -887,18 +890,6 @@ export const useCreateWorkspaceUser = (slug: string) => {
       useUIStore.getState().toast("حساب کاربر ساخته و به فضای کاری اضافه شد");
     },
     onError: (error) => useUIStore.getState().toast(errorMessage(error, "ساخت حساب کاربر انجام نشد"), "error"),
-  });
-};
-export const useUpdateMemberRole = (slug: string) => {
-  const client = useQueryClient();
-  return useMutation({
-    mutationFn: ({ membershipId, role }: { membershipId: string; role: number }) =>
-      api.patch(`/api/workspaces/${slug}/members/${membershipId}/`, { role }),
-    onSuccess: () => {
-      client.invalidateQueries({ queryKey: ["members", slug] });
-      useUIStore.getState().toast("نقش عضو ذخیره شد");
-    },
-    onError: (error) => useUIStore.getState().toast(errorMessage(error, "تغییر نقش انجام نشد"), "error"),
   });
 };
 export const useRemoveMember = (slug: string) => {
@@ -925,49 +916,6 @@ export const useOrganizationPermissions = (providedSlug?: string, enabled = true
   });
 };
 
-export const useSaveOrganizationPermission = (slug: string) => {
-  const client = useQueryClient();
-  return useMutation({
-    mutationFn: async (payload: {
-      id?: string;
-      code: string;
-      name: string;
-      description: string;
-      isActive?: boolean;
-    }) => {
-      const body = {
-        code: payload.code,
-        name: payload.name,
-        description: payload.description,
-        is_active: payload.isActive ?? true,
-      };
-      const response = payload.id
-        ? await api.patch(`/api/workspaces/${slug}/organization/permissions/${payload.id}/`, body)
-        : await api.post(`/api/workspaces/${slug}/organization/permissions/`, body);
-      return mapOrganizationPermission(response.data);
-    },
-    onSuccess: () => {
-      client.invalidateQueries({ queryKey: ["organization-permissions", slug] });
-      useUIStore.getState().toast("دسترسی عملیاتی ذخیره شد");
-    },
-    onError: (error) => useUIStore.getState().toast(errorMessage(error, "ذخیره دسترسی انجام نشد"), "error"),
-  });
-};
-
-export const useDeactivateOrganizationPermission = (slug: string) => {
-  const client = useQueryClient();
-  return useMutation({
-    mutationFn: (permissionId: string) =>
-      api.delete(`/api/workspaces/${slug}/organization/permissions/${permissionId}/`),
-    onSuccess: () => {
-      client.invalidateQueries({ queryKey: ["organization-permissions", slug] });
-      client.invalidateQueries({ queryKey: ["organization-roles", slug] });
-      useUIStore.getState().toast("دسترسی غیرفعال شد");
-    },
-    onError: (error) => useUIStore.getState().toast(errorMessage(error, "غیرفعال‌کردن دسترسی انجام نشد"), "error"),
-  });
-};
-
 export const useOrganizationRoles = (providedSlug?: string, enabled = true) => {
   const slug = useSlug(providedSlug);
   return useQuery({
@@ -985,16 +933,16 @@ export const useSaveOrganizationRole = (slug: string) => {
   return useMutation({
     mutationFn: async (payload: {
       id?: string;
-      name: string;
-      level: number;
+      name?: string;
+      description?: string;
       permissionIds?: string[];
       isActive?: boolean;
     }) => {
       const body = {
         name: payload.name,
-        level: payload.level,
-        permission_ids: payload.permissionIds ?? [],
-        is_active: payload.isActive ?? true,
+        description: payload.description,
+        permission_ids: payload.permissionIds,
+        is_active: payload.isActive,
       };
       const response = payload.id
         ? await api.patch(`/api/workspaces/${slug}/organization/roles/${payload.id}/`, body)
@@ -1003,6 +951,8 @@ export const useSaveOrganizationRole = (slug: string) => {
     },
     onSuccess: () => {
       client.invalidateQueries({ queryKey: ["organization-roles", slug] });
+      client.invalidateQueries({ queryKey: ["workspace-access", slug] });
+      client.invalidateQueries({ queryKey: ["user-effective-access", slug] });
       useUIStore.getState().toast("نقش سازمانی ذخیره شد");
     },
     onError: (error) => useUIStore.getState().toast(errorMessage(error, "ذخیره نقش انجام نشد"), "error"),
@@ -1015,6 +965,8 @@ export const useDeactivateOrganizationRole = (slug: string) => {
     mutationFn: (roleId: string) => api.delete(`/api/workspaces/${slug}/organization/roles/${roleId}/`),
     onSuccess: () => {
       client.invalidateQueries({ queryKey: ["organization-roles", slug] });
+      client.invalidateQueries({ queryKey: ["workspace-access", slug] });
+      client.invalidateQueries({ queryKey: ["user-effective-access", slug] });
       useUIStore.getState().toast("نقش غیرفعال شد");
     },
     onError: (error) => useUIStore.getState().toast(errorMessage(error, "غیرفعال‌کردن نقش انجام نشد"), "error"),
@@ -1047,9 +999,9 @@ export const useSaveOrganizationUnit = (slug: string) => {
       const body = {
         title: payload.title,
         parent_id: payload.parentId || null,
-        manager_id: payload.managerId || null,
-        member_ids: payload.memberIds ?? [],
-        is_active: payload.isActive ?? true,
+        ...(payload.managerId !== undefined ? { manager_id: payload.managerId || null } : {}),
+        member_ids: payload.memberIds,
+        is_active: payload.isActive,
       };
       const response = payload.id
         ? await api.patch(`/api/workspaces/${slug}/organization/units/${payload.id}/`, body)
@@ -1092,10 +1044,8 @@ export const useOrganizationUserProfile = (userId?: string, providedSlug?: strin
         username: String(item.username ?? ""),
         email: String(item.email ?? ""),
         isActive: Boolean(item.is_active),
-        workspaceRole: Number(item.workspace_role),
         roleIds: Array.isArray(item.role_ids) ? item.role_ids.map(String) : [],
         unitIds: Array.isArray(item.unit_ids) ? item.unit_ids.map(String) : [],
-        maximumRoleLevel: Number(item.maximum_role_level ?? 0),
       };
     },
   });
@@ -1105,18 +1055,19 @@ export const useUpdateOrganizationUserProfile = (slug: string, userId: string) =
   const client = useQueryClient();
   return useMutation({
     mutationFn: (payload: {
-      first_name: string;
-      last_name: string;
-      display_name: string;
-      username: string;
-      email: string;
-      password?: string;
-      is_active: boolean;
-      role_ids: string[];
-      unit_ids: string[];
+      first_name?: string;
+      last_name?: string;
+      display_name?: string;
+      username?: string;
+      email?: string;
+      is_active?: boolean;
+      role_ids?: string[];
+      unit_ids?: string[];
     }) => api.patch(`/api/workspaces/${slug}/organization/users/${userId}/`, payload),
     onSuccess: () => {
       client.invalidateQueries({ queryKey: ["organization-user-profile", slug, userId] });
+      client.invalidateQueries({ queryKey: ["workspace-access", slug] });
+      client.invalidateQueries({ queryKey: ["user-effective-access", slug] });
       client.invalidateQueries({ queryKey: ["members", slug] });
       useUIStore.getState().toast("پروفایل کاربر ذخیره شد");
     },
@@ -1144,15 +1095,13 @@ export const useSaveTicketRoutingRule = (slug: string) => {
       name: string;
       unitId: string;
       requiredRoleId: string;
-      requiredLevel: number;
       isActive?: boolean;
     }) => {
       const body = {
         name: payload.name,
         unit_id: payload.unitId,
         required_role_id: payload.requiredRoleId,
-        required_level: payload.requiredLevel,
-        is_active: payload.isActive ?? true,
+        is_active: payload.isActive,
       };
       const response = payload.id
         ? await api.patch(`/api/workspaces/${slug}/organization/routing-rules/${payload.id}/`, body)
@@ -1180,11 +1129,11 @@ export const useDeactivateTicketRoutingRule = (slug: string) => {
   });
 };
 
-export const useTicketRoleQueue = (providedSlug?: string) => {
+export const useTicketRoleQueue = (providedSlug?: string, enabled = true) => {
   const slug = useSlug(providedSlug);
   return useQuery({
     queryKey: ["ticket-role-queue", slug],
-    enabled: Boolean(slug),
+    enabled: Boolean(slug) && enabled,
     queryFn: async (): Promise<TicketRoleQueueEntry[]> =>
       unwrap<Record<string, unknown>[]>((await api.get(`/api/workspaces/${slug}/organization/role-queue/`)).data).map(
         mapTicketRoleQueueEntry

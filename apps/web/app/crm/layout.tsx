@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrandLogo } from "@plane/ui";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { Navigate, NavLink, Outlet, useBlocker, useLocation, useNavigate } from "react-router";
 import {
   Bell,
@@ -33,6 +34,8 @@ import {
   useUpdateAppearance,
   useWorkspaceAccess,
   useWorkspaces,
+  api,
+  clearClientSession,
 } from "./api";
 import {
   Breadcrumb,
@@ -45,6 +48,13 @@ import {
 } from "./components";
 import { useUIStore } from "./store";
 import { toFa } from "./utils";
+import { permissionsForPath } from "./access/permission-map";
+import {
+  hidePrivateContent,
+  revealPrivateContent,
+  publishSessionEnd,
+  subscribeToSessionEnd,
+} from "./access/session-events";
 
 const navItems = [
   { to: "/", label: "خانه", icon: Home, end: true },
@@ -57,6 +67,7 @@ const navItems = [
   { to: "/organization", label: "ساختار سازمانی", icon: Building2, adminOnly: true },
   { to: "/roles", label: "نقش‌های سازمانی", icon: ShieldCheck, adminOnly: true },
   { to: "/routing", label: "ارجاع هوشمند", icon: GitBranch },
+  { to: "/absences", label: "عدم حضور", icon: CalendarDays },
 ];
 
 function AppLayout() {
@@ -83,8 +94,8 @@ function AppLayout() {
   const { data: projects = [] } = useProjects();
   const { data: notifications = [] } = useNotifications();
   const { data: currentUser } = useCurrentUser();
-  const { data: access } = useWorkspaceAccess();
-  const isAdmin = access?.isAdmin === true;
+  const { data: access, error: accessError } = useWorkspaceAccess();
+  const canCreate = access?.can("Issue.Create") === true;
   const [gPressed, setGPressed] = useState(false);
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -171,11 +182,7 @@ function AppLayout() {
     >
       <aside className="sidebar" id="primary-navigation">
         <div className="brand">
-          <span className="brand-mark">
-            <i />
-            <i />
-            <i />
-          </span>
+          <BrandLogo className="brand-mark" />
           <strong>هم‌کار</strong>
           <button
             type="button"
@@ -188,7 +195,7 @@ function AppLayout() {
         </div>
         <nav className="main-nav">
           {navItems
-            .filter((item) => !item.adminOnly || isAdmin)
+            .filter((item) => permissionsForPath(item.to).every((code) => access?.can(code)))
             .map(({ to, label, icon: Icon, end }) => (
               <NavLink
                 to={to}
@@ -208,7 +215,7 @@ function AppLayout() {
         <div className="recent-projects">
           <p>
             پروژه‌های اخیر{" "}
-            {isAdmin && (
+            {access?.can("Project.Create") && (
               <button onClick={() => setCreate(true, "project")}>
                 <Plus size={14} />
               </button>
@@ -306,7 +313,7 @@ function AppLayout() {
               <span>جستجو در هم‌کار...</span>
               <kbd>Ctrl K</kbd>
             </button>
-            {isAdmin && (
+            {canCreate && (
               <button className="create-button" onClick={() => setCreate(true, "issue")}>
                 <Plus size={17} />
                 <span>ایجاد</span>
@@ -337,7 +344,21 @@ function AppLayout() {
           </div>
         </header>
         <main className="page-content">
-          {workspaceError ? <Navigate to={`/login${location.search}`} replace /> : <Outlet />}
+          {workspaceError || accessError ? (
+            <p role="alert">دریافت فضای کاری یا دسترسی انجام نشد. صفحه را دوباره بارگذاری کنید.</p>
+          ) : !workspaces.length ? (
+            <p role="status">عضویت فعالی در یک شرکت ندارید.</p>
+          ) : !access ? (
+            <div role="status">در حال بررسی دسترسی…</div>
+          ) : permissionsForPath(location.pathname).every((code) => access.can(code)) ? (
+            <Outlet />
+          ) : (
+            <section role="alert" className="panel">
+              <h2>دسترسی به این صفحه را ندارید</h2>
+              <p>برای تغییر دسترسی با مدیر شرکت هماهنگ کنید.</p>
+              <NavLink to="/settings">تنظیمات حساب</NavLink>
+            </section>
+          )}
         </main>
       </div>
       <NotificationDrawer />
@@ -388,7 +409,102 @@ export default function CrmRootLayout() {
   );
   return (
     <QueryClientProvider client={client}>
-      <AppLayout />
+      <AuthenticationBoundary />
     </QueryClientProvider>
   );
+}
+
+export function AuthenticationBoundary() {
+  const client = useQueryClient();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { data: user, isLoading, error, refetch } = useCurrentUser();
+  const [verifying, setVerifying] = useState(false);
+  const [verifiedLocation, setVerifiedLocation] = useState<string>();
+  useEffect(() => {
+    let active = true;
+    let ended = false;
+    let sequence = 0;
+    const endSession = () => {
+      if (ended) return;
+      ended = true;
+      hidePrivateContent();
+      setVerifying(true);
+      void clearClientSession(client).then(() => {
+        if (active) navigate("/login", { replace: true });
+        return undefined;
+      });
+    };
+    const verify = async () => {
+      if (ended) return;
+      const current = ++sequence;
+      hidePrivateContent();
+      setVerifying(true);
+      const result = await refetch();
+      if (!active || ended || current !== sequence) return;
+      if (result.isError) {
+        publishSessionEnd();
+        endSession();
+        return;
+      }
+      setVerifiedLocation(location.key);
+      revealPrivateContent();
+      setVerifying(false);
+    };
+    const pagehide = () => {
+      // Hide synchronously before the browser captures a history/bfcache snapshot.
+      hidePrivateContent();
+      setVerifying(true);
+    };
+    const pageshow = (event: PageTransitionEvent) => {
+      if (event.persisted) void verify();
+    };
+    const focus = () => void verify();
+    const visibility = () => {
+      if (document.visibilityState === "visible") void verify();
+    };
+    const unsubscribe = subscribeToSessionEnd(endSession);
+    void verify();
+    window.addEventListener("pagehide", pagehide);
+    window.addEventListener("pageshow", pageshow);
+    window.addEventListener("focus", focus);
+    document.addEventListener("visibilitychange", visibility);
+    return () => {
+      active = false;
+      unsubscribe();
+      window.removeEventListener("pagehide", pagehide);
+      window.removeEventListener("pageshow", pageshow);
+      window.removeEventListener("focus", focus);
+      document.removeEventListener("visibilitychange", visibility);
+    };
+  }, [client, navigate, refetch, location.key]);
+  useEffect(() => {
+    const interceptor = api.interceptors.response.use(
+      (response) => response,
+      async (requestError: unknown) => {
+        const status = (requestError as { response?: { status?: number } }).response?.status;
+        if (status === 401) {
+          publishSessionEnd();
+          await clearClientSession(client);
+          navigate("/login", { replace: true });
+        }
+        return Promise.reject(requestError);
+      }
+    );
+    return () => api.interceptors.response.eject(interceptor);
+  }, [client, navigate]);
+  if (isLoading)
+    return (
+      <main className="access-loading" role="status">
+        در حال بررسی حساب…
+      </main>
+    );
+  if (error || !user) return <Navigate to="/login" replace />;
+  if (isLoading || verifying || verifiedLocation !== location.key)
+    return (
+      <main className="access-loading" role="status">
+        در حال بررسی حساب…
+      </main>
+    );
+  return <AppLayout />;
 }

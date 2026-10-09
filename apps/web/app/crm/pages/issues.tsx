@@ -30,7 +30,7 @@ export default function IssuesPage() {
     [issues, query, status]
   );
   if (accessLoading) return <Skeleton rows={7} />;
-  if (!access?.isAdmin) return <Navigate to="/my-work" replace />;
+  if (!access?.can("Issue.ViewAll")) return <Navigate to="/my-work" replace />;
   return (
     <div>
       <PageHeader

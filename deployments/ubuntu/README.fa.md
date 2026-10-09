@@ -1,8 +1,12 @@
 # استقرار کامل پروژه روی Ubuntu از طریق SSH
 
-این راهنما برای دریافت پروژه از [مخزن company-crm](https://github.com/13Armin85/company-crm.git)، شاخه `main`، سرور Ubuntu با IP برابر `192.168.10.24` و کاربر `plane` است. فرمان‌های `powershell` روی ویندوز و فرمان‌های `bash` داخل SSH سرور اجرا می‌شوند. هر مرحله باید موفق شود، سپس مرحله بعد را اجرا کنید.
+سرور اصلی `192.168.10.20` و سرور تست `192.168.10.24` است؛ کاربر SSH هر دو `plane` است. برنامه مستقیماً روی Ubuntu با Docker Engine و Caddy اجرا می‌شود. برای این استقرار، Windows Server، IIS یا ماشین مجازی ویندوز نصب نکنید. رمز SSH را هنگام اتصال وارد کنید و در مخزن یا فایل تنظیمات برنامه ذخیره نکنید.
 
-طبق انتخاب فعلی، برنامه روی `http://192.168.10.24` در شبکه شرکت منتشر می‌شود؛ دامنه و port forwarding روتر برای این حالت لازم نیست. برای دسترسی اینترنتی در آینده، بخش دامنه و HTTPS هم لازم است. فرض این راهنما نصب تازه است؛ دریافت سورس، دیتابیس و فایل‌های محیط توسعه را منتقل نمی‌کند. نسخه Ubuntu و منابع این سرور هنوز از طریق SSH بررسی نشده‌اند.
+برای نصب جداگانه روی سرور تست، همین مراحل را با IP برابر `192.168.10.24` انجام دهید و initializer را با `bash deployments/ubuntu/init-env.sh http://192.168.10.24` اجرا کنید. این سرور باید Ubuntu باشد و SSH آن فعال باشد؛ داده‌ها و کلیدهای هر سرور مستقل می‌مانند. تنظیمات `.env.production` سرور اصلی را روی سرور تست کپی نکنید.
+
+این راهنما برای دریافت پروژه از [مخزن company-crm](https://github.com/13Armin85/company-crm.git)، شاخه `main`، سرور Ubuntu با IP برابر `192.168.10.20` و کاربر `plane` است. فرمان‌های `powershell` روی ویندوز و فرمان‌های `bash` داخل SSH سرور اجرا می‌شوند. هر مرحله باید موفق شود، سپس مرحله بعد را اجرا کنید.
+
+طبق انتخاب فعلی، برنامه روی `http://192.168.10.20` در شبکه شرکت منتشر می‌شود؛ دامنه و port forwarding روتر برای این حالت لازم نیست. برای دسترسی اینترنتی در آینده، بخش دامنه و HTTPS هم لازم است. فرض این راهنما نصب تازه است؛ دریافت سورس، دیتابیس و فایل‌های محیط توسعه را منتقل نمی‌کند. نسخه Ubuntu و منابع این سرور هنوز از طریق SSH بررسی نشده‌اند.
 
 ## ۱. اتصال به سرور
 
@@ -10,14 +14,14 @@
 
 ```powershell
 Set-Location 'C:\Users\11\Desktop\company-crm'
-Test-NetConnection 192.168.10.24 -Port 22
-ssh plane@192.168.10.24
+Test-NetConnection 192.168.10.20 -Port 22
+ssh plane@192.168.10.20
 ```
 
 تست باید `TcpTestSucceeded: True` بدهد. در اولین SSH، fingerprint را با مدیر سرور تطبیق دهید و سپس `yes` وارد کنید. رمز Linux کاربر `plane` را وارد کنید؛ نمایش ندادن کاراکترهای رمز طبیعی است. اگر کلید SSH دارید:
 
 ```powershell
-ssh -i "$env:USERPROFILE\.ssh\id_ed25519" plane@192.168.10.24
+ssh -i "$env:USERPROFILE\.ssh\id_ed25519" plane@192.168.10.20
 ```
 
 اگر ویندوز فرمان `ssh` ندارد، در PowerShell با دسترسی Administrator اجرا و سپس ترمینال جدید باز کنید:
@@ -52,7 +56,7 @@ sudo -v
 sudo ss -lntp
 ```
 
-کاربر باید `plane` و توزیع باید Ubuntu باشد. IP `192.168.10.24` باید روی یکی از interfaceها وجود داشته باشد. برای ثابت ماندن IP، در DHCP روتر برای سرور reservation تنظیم کنید یا IP ثابت موجود را با مدیر شبکه هماهنگ کنید.
+کاربر باید `plane` و توزیع باید Ubuntu باشد. IP `192.168.10.20` باید روی یکی از interfaceها وجود داشته باشد. برای ثابت ماندن IP، در DHCP روتر برای سرور reservation تنظیم کنید یا IP ثابت موجود را با مدیر شبکه هماهنگ کنید.
 
 اگر `sudo -v` اجازه نداد، مدیر سیستم از حساب دارای sudo اجرا کند:
 
@@ -82,7 +86,7 @@ ls docker-compose-production.yml deployments/ubuntu deployments/debian
 
 مخزن در زمان بررسی عمومی است، پس clone با HTTPS به رمز GitHub نیاز ندارد. اگر خانه کاربر `/home/plane` است، مسیر نصب `/home/plane/company-crm` خواهد بود. clone را با `sudo` اجرا نکنید تا مالک فایل‌ها خود کاربر `plane` باشد. اگر پوشه `company-crm` از قبل وجود دارد، ابتدا محتوای آن را بررسی کنید؛ پوشه نصب یا داده‌های موجود را حذف یا با نسخه تازه جایگزین نکنید. برای checkout قبلی همین مخزن، از روند به‌روزرسانی بخش ۱۱ استفاده کنید.
 
-اسکریپت‌های لازم و Compose مخصوص production در شاخه `main` موجودند؛ برای نصب اولیه، تغییر کد روی ویندوز لازم نیست. پیام راهنمای بعضی اسکریپت‌های نسخه GitHub ممکن است IP نمونه `192.168.10.20` را نشان دهد؛ مقدار عملیاتی در این راهنما `192.168.10.24` است و آن را به initializer می‌دهیم.
+اسکریپت‌های لازم و Compose مخصوص production در شاخه `main` موجودند. مقصد اصلی این راهنما `192.168.10.20` است؛ برای نصب آزمایشی روی `192.168.10.24`، IP سرور تست را در اتصال SSH و initializer وارد کنید. برای انتشار تغییرات commit‌نشدهٔ همین کامپیوتر، از انتقال سورس در بخش بعد استفاده کنید.
 
 ### تغییرات محلی و دریافت آن‌ها روی سرور
 
@@ -113,7 +117,7 @@ git push origin HEAD
 Set-Location 'C:\Users\11\Desktop\company-crm'
 powershell -NoProfile -ExecutionPolicy Bypass -File .\deployments\debian\export-source.ps1
 if ($LASTEXITCODE -ne 0) { throw 'ساخت آرشیو ناموفق بود؛ ادامه ندهید.' }
-scp .\tmp\company-crm-source.tar.gz plane@192.168.10.24:company-crm-source.tar.gz
+scp .\tmp\company-crm-source.tar.gz plane@192.168.10.20:company-crm-source.tar.gz
 if ($LASTEXITCODE -ne 0) { throw 'انتقال فایل ناموفق بود؛ ادامه ندهید.' }
 ```
 
@@ -154,7 +158,7 @@ sudo docker run --rm hello-world
 
 ```bash
 cd "$HOME/company-crm"
-bash deployments/ubuntu/init-env.sh http://192.168.10.24
+bash deployments/ubuntu/init-env.sh http://192.168.10.20
 nano .env.production
 ```
 
@@ -163,10 +167,10 @@ nano .env.production
 مقادیر زیر را بررسی کنید؛ `BIND_ADDRESS` را از مقدار اولیه `0.0.0.0` به IP سرور تغییر دهید:
 
 ```dotenv
-PUBLIC_URL=http://192.168.10.24
-SITE_ADDRESS=http://192.168.10.24
-BIND_ADDRESS=192.168.10.24
-ALLOWED_HOSTS=192.168.10.24,localhost,127.0.0.1,api
+PUBLIC_URL=http://192.168.10.20
+SITE_ADDRESS=http://192.168.10.20
+BIND_ADDRESS=192.168.10.20
+ALLOWED_HOSTS=192.168.10.20,localhost,127.0.0.1,api
 MINIO_ENDPOINT_SSL=0
 PGADMIN_EMAIL=your-admin@example.com
 ```
@@ -220,24 +224,24 @@ cd "$HOME/company-crm"
 dc() { sudo docker compose --env-file .env.production -f docker-compose-production.yml "$@"; }
 dc ps -a
 dc logs --tail 100 api worker beat-worker live proxy
-curl -fsS http://192.168.10.24/api/instances/
-curl -fsS http://192.168.10.24/live/health/
-curl -I http://192.168.10.24/
+curl -fsS http://192.168.10.20/api/instances/
+curl -fsS http://192.168.10.20/live/health/
+curl -I http://192.168.10.20/
 ```
 
 در PowerShell ویندوز هم دسترسی وب را بررسی کنید:
 
 ```powershell
-Test-NetConnection 192.168.10.24 -Port 80
+Test-NetConnection 192.168.10.20 -Port 80
 ```
 
 در مرورگر کامپیوترتان:
 
-| بخش | آدرس |
-| --- | --- |
-| ساخت حساب مدیر و تنظیم instance | http://192.168.10.24/god-mode/ |
-| برنامه اصلی | http://192.168.10.24/ |
-| صفحات منتشرشده | http://192.168.10.24/spaces/ |
+| بخش                             | آدرس                           |
+| ------------------------------- | ------------------------------ |
+| ساخت حساب مدیر و تنظیم instance | http://192.168.10.20/god-mode/ |
+| برنامه اصلی                     | http://192.168.10.20/          |
+| صفحات منتشرشده                  | http://192.168.10.20/spaces/   |
 
 ابتدا فرم God mode را با ایمیل و رمز مدیر تکمیل کنید، سپس وارد برنامه شوید و workspace بسازید. ورود، ساخت کار، upload/download فایل و ویرایش هم‌زمان در دو مرورگر را آزمایش کنید؛ هنگام انجام کارها لاگ worker را هم ببینید.
 
@@ -255,7 +259,7 @@ nano .env.production
 نام کاربری و رمز موردنیاز را از فایل بخوانید. در یک PowerShell ویندوزی دیگر، تونل را باز و ترمینالش را باز نگه دارید:
 
 ```powershell
-ssh -N -L 5050:127.0.0.1:5050 -L 9090:127.0.0.1:9090 plane@192.168.10.24
+ssh -N -L 5050:127.0.0.1:5050 -L 9090:127.0.0.1:9090 plane@192.168.10.20
 ```
 
 pgAdmin در `http://localhost:5050` با `PGADMIN_EMAIL` و `PGADMIN_PASSWORD` و کنسول MinIO در `http://localhost:9090` با `AWS_ACCESS_KEY_ID` و `AWS_SECRET_ACCESS_KEY` باز می‌شود. در pgAdmin یک Server ثبت کنید: Host برابر `plane-db`، Port برابر `5432`، Maintenance database برابر `POSTGRES_DB`، Username برابر `POSTGRES_USER` و Password برابر `POSTGRES_PASSWORD` فایل env.
@@ -265,9 +269,9 @@ pgAdmin در `http://localhost:5050` با `PGADMIN_EMAIL` و `PGADMIN_PASSWORD` 
 اگر استفاده فقط در شبکه شرکت است، مراحل قبلی انتشار LAN را کامل کرده‌اند. برای اینترنت، `crm.example.com` نمونه است؛ همه‌جا آن را با دامنه واقعی خود عوض کنید.
 
 1. در DNS دامنه، رکورد A برای `crm` را به IP عمومی شرکت وصل کنید. AAAA فقط در صورت داشتن مسیر IPv6 صحیح لازم است.
-2. روی روتر، TCP پورت ۸۰ عمومی را به `192.168.10.24:80` و TCP پورت ۴۴۳ عمومی را به `192.168.10.24:443` forward کنید. IP داخلی سرور باید ثابت بماند.
+2. روی روتر، TCP پورت ۸۰ عمومی را به `192.168.10.20:80` و TCP پورت ۴۴۳ عمومی را به `192.168.10.20:443` forward کنید. IP داخلی سرور باید ثابت بماند.
 3. دسترسی ورودی این دو پورت را در firewall شبکه باز کنید. اگر شرکت پشت CGNAT است، ابتدا IP عمومی قابل ورود یا راهکار VPN/تونل مناسب تهیه کنید.
-4. برای دسترسی از داخل شرکت هم دامنه باید کار کند: NAT loopback روتر یا DNS داخلی که دامنه را به `192.168.10.24` resolve کند. دسترسی به همین دامنه از containerها را هم بررسی کنید، چون Spaces برای metadata از آدرس عمومی API استفاده می‌کند.
+4. برای دسترسی از داخل شرکت هم دامنه باید کار کند: NAT loopback روتر یا DNS داخلی که دامنه را به `192.168.10.20` resolve کند. دسترسی به همین دامنه از containerها را هم بررسی کنید، چون Spaces برای metadata از آدرس عمومی API استفاده می‌کند.
 
 برای تغییر نصب LAN موجود، روی سرور فایل env را ویرایش و رمزها را حفظ کنید:
 
@@ -281,7 +285,7 @@ nano .env.production
 ```dotenv
 PUBLIC_URL=https://crm.example.com
 SITE_ADDRESS=https://crm.example.com
-BIND_ADDRESS=192.168.10.24
+BIND_ADDRESS=192.168.10.20
 ALLOWED_HOSTS=crm.example.com,localhost,127.0.0.1,api
 MINIO_ENDPOINT_SSL=1
 ```
@@ -382,7 +386,7 @@ ls -lh "$backup_dir"
 
 ```powershell
 New-Item -ItemType Directory -Force -Path .\tmp\server-backups | Out-Null
-scp -r plane@192.168.10.24:plane-backups/REPLACE_WITH_BACKUP_DIRECTORY .\tmp\server-backups\
+scp -r plane@192.168.10.20:plane-backups/REPLACE_WITH_BACKUP_DIRECTORY .\tmp\server-backups\
 ```
 
 داده‌های صف/کش و گواهی‌های Caddy در این backup نیستند. روش restore در نصب تازه و محدودیت‌های آن در بخش ۱۲ [راهنمای مشترک](../debian/README.fa.md) آمده است. restore را در محیط جداگانه آزمایش کنید.

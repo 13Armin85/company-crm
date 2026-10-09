@@ -1,339 +1,193 @@
-import { useEffect, useState } from "react";
-import { Edit3, KeyRound, Plus, ShieldCheck, XCircle } from "lucide-react";
+import { useState } from "react";
+import { Plus } from "lucide-react";
 import { Navigate } from "react-router";
+import { PermissionCatalog } from "@plane/ui";
 import {
-  useDeactivateOrganizationPermission,
-  useDeactivateOrganizationRole,
   useOrganizationPermissions,
   useOrganizationRoles,
-  useSaveOrganizationPermission,
   useSaveOrganizationRole,
+  useDeactivateOrganizationRole,
   useWorkspaceAccess,
 } from "../api";
-import { Button, EmptyState, PageHeader, Skeleton } from "../components";
+import { Button, PageHeader, SearchBox, Skeleton } from "../components";
+import { AccessModal, MultiSelector } from "../access/components";
+import { permissionPresentation } from "../access/permission-labels";
 import { useUIStore } from "../store";
-import type { OrganizationPermission, OrganizationRole } from "../types";
-import { toFa } from "../utils";
-
-type RoleForm = Pick<OrganizationRole, "name" | "level" | "permissionIds" | "isActive"> & { id?: string };
-type PermissionForm = Pick<OrganizationPermission, "code" | "name" | "description" | "isActive"> & { id?: string };
+import type { OrganizationRole } from "../types";
 
 export default function RolesPage() {
   const slug = useUIStore((state) => state.workspaceSlug) ?? "";
-  const setFormDirty = useUIStore((state) => state.setFormDirty);
   const { data: access, isLoading: accessLoading } = useWorkspaceAccess();
-  const isAdmin = access?.isAdmin === true;
-  const { data: roles = [], isLoading } = useOrganizationRoles(undefined, isAdmin);
-  const { data: permissions = [], isLoading: permissionsLoading } = useOrganizationPermissions(undefined, isAdmin);
-  const saveRole = useSaveOrganizationRole(slug);
-  const deactivateRole = useDeactivateOrganizationRole(slug);
-  const savePermission = useSaveOrganizationPermission(slug);
-  const deactivatePermission = useDeactivateOrganizationPermission(slug);
-  const [editingRole, setEditingRole] = useState<RoleForm>();
-  const [editingPermission, setEditingPermission] = useState<PermissionForm>();
-
-  useEffect(() => {
-    setFormDirty("organization-access", Boolean(editingRole || editingPermission));
-    return () => setFormDirty("organization-access", false);
-  }, [editingPermission, editingRole, setFormDirty]);
-
+  const { data: roles = [], isLoading, error } = useOrganizationRoles(undefined, access?.can("Role.View") ?? false);
+  const {
+    data: permissions = [],
+    isLoading: permissionsLoading,
+    error: permissionsError,
+  } = useOrganizationPermissions(undefined, access?.can("Permission.View") ?? false);
+  const save = useSaveOrganizationRole(slug);
+  const deactivate = useDeactivateOrganizationRole(slug);
+  const [editing, setEditing] = useState<OrganizationRole>();
+  const [roleQuery, setRoleQuery] = useState("");
+  const presentedPermissions = permissions.map(permissionPresentation);
+  const canEdit = access?.can("Role.Edit") || access?.can("Role.Permission.Assign");
   if (accessLoading) return <Skeleton rows={5} />;
-  if (!access?.isAdmin) return <Navigate to="/my-work" replace />;
-
+  if (!access?.can("Role.View")) return <Navigate to="/my-work" replace />;
   return (
     <div>
       <PageHeader
         eyebrow="مدیریت سازمان"
-        title="نقش‌ها و دسترسی‌ها"
-        description="Role جایگاه سازمانی، Level معیار سلسله‌مراتب و Permission دسترسی عملیاتی مستقل است."
+        title="نقش‌ها و مجوزها"
+        description="هر نقش مجموعه‌ای از مجوزهاست. کاربران می‌توانند چند نقش فعال داشته باشند."
         actions={
-          <div className="page-actions">
-            <Button
-              icon={KeyRound}
-              variant="secondary"
-              onClick={() => setEditingPermission({ code: "", name: "", description: "", isActive: true })}
-            >
-              دسترسی جدید
-            </Button>
+          access.can("Role.Create") && (
             <Button
               icon={Plus}
-              onClick={() => setEditingRole({ name: "", level: 10, permissionIds: [], isActive: true })}
+              onClick={() => setEditing({ id: "", name: "", description: "", permissionIds: [], isActive: true })}
             >
               نقش جدید
             </Button>
-          </div>
+          )
         }
       />
-
-      <section className="management-section">
-        <header className="section-heading">
-          <div>
-            <h2>Role Management</h2>
-            <p>هر کاربر می‌تواند هم‌زمان چند نقش فعال داشته باشد.</p>
-          </div>
-        </header>
-        <div className="table-card organization-table">
-          {isLoading ? (
-            <Skeleton rows={5} />
-          ) : !roles.length ? (
-            <EmptyState title="نقشی تعریف نشده" description="اولین نقش سازمانی را بسازید." />
-          ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>نام</th>
-                  <th>Level</th>
-                  <th>Permissionها</th>
-                  <th>وضعیت</th>
-                  <th>عملیات</th>
-                </tr>
-              </thead>
-              <tbody>
-                {roles.map((role) => (
+      <SearchBox value={roleQuery} onChange={setRoleQuery} placeholder="جستجوی نام یا توضیح نقش…" />
+      {error && <p role="alert">دریافت نقش‌ها انجام نشد.</p>}
+      {isLoading ? (
+        <Skeleton rows={5} />
+      ) : (
+        <div className="table-card">
+          <table>
+            <thead>
+              <tr>
+                <th>نام نقش</th>
+                <th>توضیح</th>
+                <th>وضعیت</th>
+                <th>مجوزها</th>
+                <th>کاربران دارای نقش</th>
+                <th>عملیات</th>
+              </tr>
+            </thead>
+            <tbody>
+              {roles
+                .filter((role) => `${role.name} ${role.description}`.toLowerCase().includes(roleQuery.toLowerCase()))
+                .map((role) => (
                   <tr key={role.id}>
                     <td>
-                      <span className="role-title">
-                        <ShieldCheck size={17} />
-                        {role.name}
-                      </span>
+                      {role.name} {role.systemKey && <small>پیش‌فرض</small>}
                     </td>
-                    <td>{toFa(role.level)}</td>
-                    <td>{toFa(role.permissionIds.length)}</td>
-                    <td>
-                      <span className={`state-pill ${role.isActive ? "is-on" : "is-off"}`}>
-                        {role.isActive ? "فعال" : "غیرفعال"}
-                      </span>
-                    </td>
+                    <td>{role.description}</td>
+                    <td>{role.isActive ? "فعال" : "غیرفعال"}</td>
+                    <td>{role.permissionIds.length.toLocaleString("fa-IR")}</td>
+                    <td>{(role.userCount ?? 0).toLocaleString("fa-IR")}</td>
                     <td className="row-actions">
-                      <button onClick={() => setEditingRole(role)} title="ویرایش">
-                        <Edit3 size={16} />
-                      </button>
-                      {role.isActive && (
-                        <button onClick={() => deactivateRole.mutate(role.id)} title="غیرفعال‌کردن">
-                          <XCircle size={16} />
-                        </button>
+                      {!canEdit && (
+                        <Button variant="secondary" onClick={() => setEditing(role)}>
+                          مشاهده مجوزها
+                        </Button>
+                      )}
+                      {(access.can("Role.Edit") || access.can("Role.Permission.Assign")) && (
+                        <Button variant="secondary" onClick={() => setEditing(role)}>
+                          {access.can("Role.Edit") ? "ویرایش" : "ویرایش مجوزها"}
+                        </Button>
+                      )}
+                      {access.can("Role.Disable") && (
+                        <Button
+                          variant="secondary"
+                          disabled={deactivate.isPending || save.isPending}
+                          onClick={() =>
+                            role.isActive ? deactivate.mutate(role.id) : save.mutate({ id: role.id, isActive: true })
+                          }
+                        >
+                          {role.isActive ? "غیرفعال کردن" : "فعال کردن"}
+                        </Button>
                       )}
                     </td>
                   </tr>
                 ))}
-              </tbody>
-            </table>
-          )}
+            </tbody>
+          </table>
         </div>
-      </section>
-
-      <section className="management-section">
-        <header className="section-heading">
-          <div>
-            <h2>Permission Management</h2>
-            <p>مجوزهای عملیاتی بدون وابستگی به عنوان شغلی تعریف می‌شوند.</p>
-          </div>
-        </header>
-        <div className="table-card organization-table">
-          {permissionsLoading ? (
-            <Skeleton rows={4} />
-          ) : !permissions.length ? (
-            <EmptyState
-              title="دسترسی عملیاتی تعریف نشده"
-              description="Permissionهای مورد نیاز فرایندها را ایجاد کنید."
-            />
-          ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>کد</th>
-                  <th>نام</th>
-                  <th>توضیح</th>
-                  <th>وضعیت</th>
-                  <th>عملیات</th>
-                </tr>
-              </thead>
-              <tbody>
-                {permissions.map((permission) => (
-                  <tr key={permission.id}>
-                    <td dir="ltr">
-                      <code>{permission.code}</code>
-                    </td>
-                    <td>{permission.name}</td>
-                    <td>{permission.description || "—"}</td>
-                    <td>
-                      <span className={`state-pill ${permission.isActive ? "is-on" : "is-off"}`}>
-                        {permission.isActive ? "فعال" : "غیرفعال"}
-                      </span>
-                    </td>
-                    <td className="row-actions">
-                      <button onClick={() => setEditingPermission(permission)} title="ویرایش">
-                        <Edit3 size={16} />
-                      </button>
-                      {permission.isActive && (
-                        <button onClick={() => deactivatePermission.mutate(permission.id)} title="غیرفعال‌کردن">
-                          <XCircle size={16} />
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </section>
-
-      {editingRole && (
-        <div
-          className="modal-layer"
-          role="presentation"
-          onMouseDown={(event) => event.target === event.currentTarget && setEditingRole(undefined)}
+      )}
+      {access.can("Permission.View") && (
+        <PermissionCatalog
+          items={presentedPermissions}
+          isLoading={permissionsLoading}
+          hasError={Boolean(permissionsError)}
+        />
+      )}
+      {editing && (
+        <AccessModal
+          title={editing.id ? (canEdit ? "ویرایش نقش" : "مشاهده نقش") : "نقش جدید"}
+          busy={save.isPending}
+          onClose={() => setEditing(undefined)}
         >
           <form
-            className="create-modal organization-modal"
             onSubmit={(event) => {
               event.preventDefault();
-              saveRole.mutate(editingRole, { onSuccess: () => setEditingRole(undefined) });
+              const original = roles.find((role) => role.id === editing.id);
+              const originalPermissions = [...(original?.permissionIds ?? [])];
+              const editedPermissions = [...editing.permissionIds];
+              originalPermissions.sort();
+              editedPermissions.sort();
+              const permissionsChanged =
+                !original || JSON.stringify(originalPermissions) !== JSON.stringify(editedPermissions);
+              save.mutate(
+                {
+                  name: !editing.id || access.can("Role.Edit") ? editing.name : undefined,
+                  description: !editing.id || access.can("Role.Edit") ? editing.description : undefined,
+                  id: editing.id || undefined,
+                  permissionIds:
+                    access.can("Role.Permission.Assign") && permissionsChanged
+                      ? editing.permissionIds.filter((id) =>
+                          permissions.some((permission) => permission.id === id && permission.isActive)
+                        )
+                      : undefined,
+                },
+                { onSuccess: () => setEditing(undefined) }
+              );
             }}
           >
-            <header>
-              <div>
-                <span className="modal-kicker">Role Management</span>
-                <h2>{editingRole.id ? "ویرایش نقش" : "نقش جدید"}</h2>
-              </div>
-            </header>
             <label>
               <span>نام نقش</span>
               <input
-                value={editingRole.name}
-                onChange={(event) => setEditingRole({ ...editingRole, name: event.target.value })}
-                required
-              />
-            </label>
-            <label>
-              <span>Level</span>
-              <input
-                type="number"
-                min={0}
-                value={editingRole.level}
-                onChange={(event) => setEditingRole({ ...editingRole, level: Number(event.target.value) })}
-                required
-              />
-            </label>
-            <label className="active-toggle">
-              <input
-                type="checkbox"
-                checked={editingRole.isActive}
-                onChange={(event) => setEditingRole({ ...editingRole, isActive: event.target.checked })}
-              />
-              <span>نقش فعال باشد</span>
-            </label>
-            <fieldset className="member-picker permission-picker">
-              <legend>
-                <KeyRound size={15} /> دسترسی‌های عملیاتی
-              </legend>
-              {permissions
-                .filter((permission) => permission.isActive || editingRole.permissionIds.includes(permission.id))
-                .map((permission) => (
-                  <label key={permission.id} className={!permission.isActive ? "is-inactive" : ""}>
-                    <input
-                      type="checkbox"
-                      disabled={!permission.isActive}
-                      checked={editingRole.permissionIds.includes(permission.id)}
-                      onChange={(event) =>
-                        setEditingRole({
-                          ...editingRole,
-                          permissionIds: event.target.checked
-                            ? [...editingRole.permissionIds, permission.id]
-                            : editingRole.permissionIds.filter((id) => id !== permission.id),
-                        })
-                      }
-                    />
-                    <span>
-                      {permission.name}
-                      <small dir="ltr">{permission.code}</small>
-                    </span>
-                  </label>
-                ))}
-            </fieldset>
-            <footer>
-              <Button variant="secondary" onClick={() => setEditingRole(undefined)}>
-                انصراف
-              </Button>
-              <Button type="submit" disabled={saveRole.isPending || !editingRole.name.trim()}>
-                ذخیره نقش
-              </Button>
-            </footer>
-          </form>
-        </div>
-      )}
-
-      {editingPermission && (
-        <div
-          className="modal-layer"
-          role="presentation"
-          onMouseDown={(event) => event.target === event.currentTarget && setEditingPermission(undefined)}
-        >
-          <form
-            className="create-modal"
-            onSubmit={(event) => {
-              event.preventDefault();
-              savePermission.mutate(editingPermission, { onSuccess: () => setEditingPermission(undefined) });
-            }}
-          >
-            <header>
-              <div>
-                <span className="modal-kicker">Permission Management</span>
-                <h2>{editingPermission.id ? "ویرایش دسترسی" : "دسترسی جدید"}</h2>
-              </div>
-            </header>
-            <label>
-              <span>کد یکتا</span>
-              <input
-                dir="ltr"
-                pattern="[a-z0-9_-]+"
-                value={editingPermission.code}
-                onChange={(event) =>
-                  setEditingPermission({
-                    ...editingPermission,
-                    code: event.target.value.toLowerCase().replace(/\s+/g, "-"),
-                  })
-                }
-                required
-              />
-            </label>
-            <label>
-              <span>نام نمایشی</span>
-              <input
-                value={editingPermission.name}
-                onChange={(event) => setEditingPermission({ ...editingPermission, name: event.target.value })}
+                disabled={Boolean(editing.id) && !access.can("Role.Edit")}
+                value={editing.name}
+                onChange={(event) => setEditing({ ...editing, name: event.target.value })}
                 required
               />
             </label>
             <label>
               <span>توضیح</span>
               <textarea
-                value={editingPermission.description}
-                onChange={(event) => setEditingPermission({ ...editingPermission, description: event.target.value })}
+                disabled={Boolean(editing.id) && !access.can("Role.Edit")}
+                value={editing.description}
+                onChange={(event) => setEditing({ ...editing, description: event.target.value })}
               />
             </label>
-            <label className="active-toggle">
-              <input
-                type="checkbox"
-                checked={editingPermission.isActive}
-                onChange={(event) => setEditingPermission({ ...editingPermission, isActive: event.target.checked })}
-              />
-              <span>دسترسی فعال باشد</span>
-            </label>
+            <MultiSelector
+              label="مجوزهای نقش"
+              disabled={!access.can("Role.Permission.Assign")}
+              selected={editing.permissionIds}
+              onChange={(permissionIds) => setEditing({ ...editing, permissionIds })}
+              options={presentedPermissions.map((permission) => ({
+                id: permission.id,
+                title: permission.name,
+                description: permission.description,
+                category: permission.category,
+                disabled: !permission.isActive,
+              }))}
+            />
             <footer>
-              <Button variant="secondary" onClick={() => setEditingPermission(undefined)}>
+              <Button variant="secondary" disabled={save.isPending} onClick={() => setEditing(undefined)}>
                 انصراف
               </Button>
-              <Button
-                type="submit"
-                disabled={savePermission.isPending || !editingPermission.code.trim() || !editingPermission.name.trim()}
-              >
-                ذخیره دسترسی
-              </Button>
+              {(!editing.id || canEdit) && (
+                <Button type="submit" disabled={save.isPending || !editing.name.trim()}>
+                  ذخیره نقش
+                </Button>
+              )}
             </footer>
           </form>
-        </div>
+        </AccessModal>
       )}
     </div>
   );

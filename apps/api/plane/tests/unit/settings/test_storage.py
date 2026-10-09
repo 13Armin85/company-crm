@@ -4,8 +4,31 @@
 
 import os
 from unittest.mock import Mock, patch
+from django.test import override_settings
 import pytest
 from plane.settings.storage import S3Storage
+
+
+@pytest.mark.unit
+class TestS3StorageDjangoUploads:
+    @override_settings(AWS_S3_FILE_OVERWRITE=False)
+    @patch("plane.settings.storage.boto3.client")
+    def test_existing_upload_gets_a_unique_filename(self, mock_client):
+        storage = S3Storage()
+
+        with patch.object(storage, "exists", side_effect=[True, False]):
+            name = storage.get_available_name("workspace/upload.txt")
+
+        assert name.startswith("workspace/upload_")
+        assert name.endswith(".txt")
+        assert name != "workspace/upload.txt"
+
+    @override_settings(AWS_S3_FILE_OVERWRITE=True)
+    @patch("plane.settings.storage.boto3.client")
+    def test_overwrite_setting_keeps_the_requested_filename(self, mock_client):
+        storage = S3Storage()
+
+        assert storage.get_available_name("workspace/upload.txt") == "workspace/upload.txt"
 
 
 @pytest.mark.unit

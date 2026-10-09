@@ -12,6 +12,12 @@ from drf_spectacular.utils import (
 )
 
 # Module imports
+from plane.app.permissions.crm import (
+    require_permission,
+    require_any_permission,
+    WorkspaceScopePermission,
+    ProjectScopePermission,
+)
 from .base import BaseAPIView
 from plane.api.serializers import (
     UserLiteSerializer,
@@ -20,7 +26,6 @@ from plane.api.serializers import (
     ProjectMemberLiteAPISerializer,
 )
 from plane.db.models import User, Workspace, WorkspaceMember, Project, ProjectMember
-from plane.utils.permissions import ProjectMemberPermission, WorkSpaceAdminPermission, ProjectAdminPermission
 from plane.utils.openapi import (
     WORKSPACE_SLUG_PARAMETER,
     PROJECT_ID_PARAMETER,
@@ -37,7 +42,7 @@ from plane.utils.openapi import (
 
 
 class WorkspaceMemberAPIEndpoint(BaseAPIView):
-    permission_classes = [WorkSpaceAdminPermission]
+    permission_classes = [WorkspaceScopePermission]
     use_read_replica = True
 
     @extend_schema(
@@ -74,6 +79,7 @@ class WorkspaceMemberAPIEndpoint(BaseAPIView):
         },
     )
     # Get all the users that are present inside the workspace
+    @require_any_permission("User.View", "Issue.Assign")
     def get(self, request, slug):
         """List workspace members
 
@@ -100,13 +106,8 @@ class WorkspaceMemberAPIEndpoint(BaseAPIView):
 
 
 class ProjectMemberListCreateAPIEndpoint(BaseAPIView):
-    permission_classes = [ProjectMemberPermission]
+    permission_classes = [ProjectScopePermission]
     use_read_replica = True
-
-    def get_permissions(self):
-        if self.request.method == "GET":
-            return [ProjectMemberPermission()]
-        return [ProjectAdminPermission()]
 
     @extend_schema(
         operation_id="get_project_members",
@@ -126,6 +127,7 @@ class ProjectMemberListCreateAPIEndpoint(BaseAPIView):
         },
     )
     # Get all the users that are present inside the workspace
+    @require_permission("Project.View")
     def get(self, request, slug, project_id):
         """List project members
 
@@ -157,10 +159,14 @@ class ProjectMemberListCreateAPIEndpoint(BaseAPIView):
         responses={201: OpenApiResponse(description="Project member created", response=ProjectMemberSerializer)},
         request=OpenApiRequest(request=ProjectMemberSerializer),
     )
+    @require_permission("Project.Member.Manage")
     def post(self, request, slug, project_id):
         serializer = ProjectMemberSerializer(data=request.data, context={"slug": slug})
         serializer.is_valid(raise_exception=True)
-        serializer.save(project_id=project_id)
+        membership = WorkspaceMember.objects.get(
+            workspace__slug=slug, member=serializer.validated_data["member"], is_active=True
+        )
+        serializer.save(project_id=project_id, role=20 if membership.role == 20 else 15)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
@@ -180,6 +186,7 @@ class ProjectMemberDetailAPIEndpoint(ProjectMemberListCreateAPIEndpoint):
         },
     )
     # Get a project member by ID
+    @require_permission("Project.View")
     def get(self, request, slug, project_id, pk):
         """Get project member
 
@@ -208,11 +215,16 @@ class ProjectMemberDetailAPIEndpoint(ProjectMemberListCreateAPIEndpoint):
         responses={200: OpenApiResponse(description="Project member updated", response=ProjectMemberSerializer)},
         request=OpenApiRequest(request=ProjectMemberSerializer),
     )
+    @require_permission("Project.Member.Manage")
     def patch(self, request, slug, project_id, pk):
         project_member = ProjectMember.objects.get(project_id=project_id, workspace__slug=slug, pk=pk)
         serializer = ProjectMemberSerializer(project_member, data=request.data, partial=True, context={"slug": slug})
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        member = serializer.validated_data.get("member", project_member.member)
+        membership = WorkspaceMember.objects.get(
+            workspace__slug=slug, member=member, is_active=True, member__is_active=True
+        )
+        serializer.save(role=20 if membership.role == 20 else 15)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @extend_schema(
@@ -223,6 +235,7 @@ class ProjectMemberDetailAPIEndpoint(ProjectMemberListCreateAPIEndpoint):
         parameters=[WORKSPACE_SLUG_PARAMETER, PROJECT_ID_PARAMETER],
         responses={204: OpenApiResponse(description="Project member deleted")},
     )
+    @require_permission("Project.Member.Manage")
     def delete(self, request, slug, project_id, pk):
         project_member = ProjectMember.objects.get(project_id=project_id, workspace__slug=slug, pk=pk)
         project_member.is_active = False
@@ -233,7 +246,7 @@ class ProjectMemberDetailAPIEndpoint(ProjectMemberListCreateAPIEndpoint):
 class WorkspaceMemberLiteAPIEndpoint(BaseAPIView):
     """Workspace members (lite) list endpoint."""
 
-    permission_classes = [WorkSpaceAdminPermission]
+    permission_classes = [WorkspaceScopePermission]
     use_read_replica = True
 
     @extend_schema(
@@ -254,6 +267,7 @@ class WorkspaceMemberLiteAPIEndpoint(BaseAPIView):
             404: WORKSPACE_NOT_FOUND_RESPONSE,
         },
     )
+    @require_any_permission("User.View", "Issue.Assign")
     def get(self, request, slug):
         """List workspace members (lite)
 
@@ -280,7 +294,7 @@ class WorkspaceMemberLiteAPIEndpoint(BaseAPIView):
 class ProjectMemberLiteAPIEndpoint(BaseAPIView):
     """Project members (lite) list endpoint."""
 
-    permission_classes = [ProjectMemberPermission]
+    permission_classes = [ProjectScopePermission]
     use_read_replica = True
 
     @extend_schema(
@@ -301,6 +315,7 @@ class ProjectMemberLiteAPIEndpoint(BaseAPIView):
             404: PROJECT_NOT_FOUND_RESPONSE,
         },
     )
+    @require_permission("Project.View")
     def get(self, request, slug, project_id):
         """List project members (lite)
 

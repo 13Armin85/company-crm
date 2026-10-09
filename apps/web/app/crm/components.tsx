@@ -177,10 +177,11 @@ export function IssueRow({
   const { data: teamMembers = [] } = useMembers();
   const { data: projectMembers = [] } = useMembers(undefined, issue.scope === "project" ? issue.projectId : undefined);
   const navigate = useNavigate();
-  const isAdmin = access?.isAdmin === true;
-  const eligibleMembers = isAdmin && issue.scope === "project" ? projectMembers : teamMembers;
-  const canChangeStatus = isAdmin || issue.assignee?.id === currentUser?.id;
-  const canTransfer = isAdmin || issue.assignee?.id === currentUser?.id;
+  const canEdit = access?.can("Issue.Edit") === true;
+  const eligibleMembers = canEdit && issue.scope === "project" ? projectMembers : teamMembers;
+  const canChangeStatus =
+    access?.can("Issue.Status.Edit") === true && (canEdit || issue.assignee?.id === currentUser?.id);
+  const canTransfer = access?.can("Issue.Assign") === true && (canEdit || issue.assignee?.id === currentUser?.id);
   const statusOptions: Status[] = ["Todo", "In Progress", "Review", "Done", "Blocked"];
 
   useEffect(() => {
@@ -305,7 +306,7 @@ export function IssueRow({
                 </select>
               </label>
             )}
-            {isAdmin && (
+            {access?.can("Issue.Delete") && (
               <button
                 className="danger-action"
                 onClick={() => {
@@ -327,7 +328,8 @@ export function ProjectCard({ project }: { project: Project }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const slug = useUIStore((state) => state.workspaceSlug) ?? "";
   const { data: access } = useWorkspaceAccess();
-  const isAdmin = access?.isAdmin === true;
+  const canEdit = access?.can("Project.Edit") === true;
+  const canDelete = access?.can("Project.Delete") === true;
   const archiveProject = useArchiveProject(slug, project.id, Boolean(project.archivedAt));
   const deleteProject = useDeleteProject(slug, project.id);
   return (
@@ -336,34 +338,38 @@ export function ProjectCard({ project }: { project: Project }) {
         <span className="project-symbol" style={{ background: `${project.color}18`, color: project.color }}>
           {project.identifier.slice(0, 1)}
         </span>
-        {isAdmin && (
+        {(canEdit || canDelete) && (
           <button className="plain-icon" aria-label="منوی پروژه" onClick={() => setMenuOpen((value) => !value)}>
             •••
           </button>
         )}
-        {isAdmin && menuOpen && (
+        {(canEdit || canDelete) && menuOpen && (
           <div className="action-menu">
-            {!project.archivedAt && <Link to={`/projects/${project.id}?tab=settings`}>ویرایش پروژه</Link>}
-            <button
-              onClick={() => {
-                archiveProject.mutate();
-                setMenuOpen(false);
-              }}
-            >
-              {project.archivedAt ? "خروج از بایگانی" : "بایگانی پروژه"}
-            </button>
-            <button
-              className="danger-action"
-              disabled={deleteProject.isPending}
-              onClick={() => {
-                if (window.confirm(`پروژه «${project.name}» و همه اطلاعات وابسته به آن حذف شود؟`)) {
-                  deleteProject.mutate();
-                }
-                setMenuOpen(false);
-              }}
-            >
-              <Trash2 size={15} /> حذف پروژه
-            </button>
+            {canEdit && !project.archivedAt && <Link to={`/projects/${project.id}?tab=settings`}>ویرایش پروژه</Link>}
+            {canEdit && (
+              <button
+                onClick={() => {
+                  archiveProject.mutate();
+                  setMenuOpen(false);
+                }}
+              >
+                {project.archivedAt ? "خروج از بایگانی" : "بایگانی پروژه"}
+              </button>
+            )}
+            {canDelete && (
+              <button
+                className="danger-action"
+                disabled={deleteProject.isPending}
+                onClick={() => {
+                  if (window.confirm(`پروژه «${project.name}» و همه اطلاعات وابسته به آن حذف شود؟`)) {
+                    deleteProject.mutate();
+                  }
+                  setMenuOpen(false);
+                }}
+              >
+                <Trash2 size={15} /> حذف پروژه
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -657,7 +663,7 @@ export function CreateModal() {
     (activeProjects.some((project) => project.id === routeProjectId) ? (routeProjectId ?? "workspace") : "workspace");
   const selectedProjectId = selectedScope === "workspace" ? undefined : selectedScope;
   const { data: members = [] } = useMembers(undefined, selectedProjectId);
-  const { data: routingRules = [] } = useTicketRoutingRules(undefined, access?.isAdmin === true);
+  const { data: routingRules = [] } = useTicketRoutingRules(undefined, access?.can("Routing.View") === true);
   const activeRoutingRules = useMemo(() => routingRules.filter((rule) => rule.isActive), [routingRules]);
   const createProject = useCreateProject(slug);
   const createIssue = useCreateIssue(slug, selectedProjectId);
@@ -689,7 +695,7 @@ export function CreateModal() {
     if (kind === "project") createProject.mutate({ name, identifier, description: "" }, { onSuccess: done });
     else createIssue.mutate({ name, priority, targetDate, assigneeId, routingRuleId }, { onSuccess: done });
   };
-  if (!open || !access?.isAdmin) return null;
+  if (!open || !access?.can(kind === "project" ? "Project.Create" : "Issue.Create")) return null;
   return (
     <div
       className="modal-layer"
@@ -798,7 +804,7 @@ export function CreateModal() {
                     <option value="">بدون مسیریابی خودکار</option>
                     {activeRoutingRules.map((rule) => (
                       <option key={rule.id} value={rule.id}>
-                        {rule.name} — {rule.unitTitle} / {rule.roleName} (Level {toFa(rule.requiredLevel)})
+                        {rule.name} — {rule.unitTitle} / {rule.roleName}
                       </option>
                     ))}
                   </select>

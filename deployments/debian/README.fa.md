@@ -1,6 +1,8 @@
 # انتشار همین پروژه روی Debian یا Ubuntu از طریق SSH
 
-این راهنما برای کاربر `plane` روی سرور `192.168.10.24` است. کد روی ویندوز آماده و منتقل می‌شود؛ build و اجرای production روی Debian یا Ubuntu انجام می‌شود. نسخه دقیق Ubuntu و منابع این سرور هنوز بررسی نشده‌اند؛ دستورات نصب Docker پایین، توزیع را از `/etc/os-release` می‌خوانند. فرض اولیه نصب تازه است. انتقال اطلاعات محیط توسعه، کاری جدا از انتقال سورس است؛ بخش پشتیبان‌گیری و بازیابی را ببینید.
+مقصد اصلی `192.168.10.20` و مقصد تست `192.168.10.24` است. هر دو با کاربر SSH برابر `plane` استفاده می‌شوند؛ برای تست، IP را در فرمان‌های اتصال و initializer عوض کنید. انتشار مستقیماً با Docker Engine روی Linux انجام می‌شود؛ Windows Server یا IIS برای این مسیر لازم نیست.
+
+این راهنما برای کاربر `plane` روی سرور `192.168.10.20` است. کد روی ویندوز آماده و منتقل می‌شود؛ build و اجرای production روی Debian یا Ubuntu انجام می‌شود. نسخه دقیق Ubuntu و منابع این سرور هنوز بررسی نشده‌اند؛ دستورات نصب Docker پایین، توزیع را از `/etc/os-release` می‌خوانند. فرض اولیه نصب تازه است. انتقال اطلاعات محیط توسعه، کاری جدا از انتقال سورس است؛ بخش پشتیبان‌گیری و بازیابی را ببینید.
 
 دو محل اجرای دستور داریم: **PowerShell کامپیوتر ویندوزی** و **Bash سرور بعد از SSH**. بلوک‌های `powershell` را روی ویندوز و بلوک‌های `bash` را روی سرور اجرا کنید.
 
@@ -44,14 +46,14 @@ sudo lvs
 در PowerShell:
 
 ```powershell
-Test-NetConnection 192.168.10.24 -Port 22
-ssh plane@192.168.10.24
+Test-NetConnection 192.168.10.20 -Port 22
+ssh plane@192.168.10.20
 ```
 
 در اولین اتصال، fingerprint کلید میزبان را با مدیر سرور تطبیق دهید، سپس `yes` وارد کنید. رمز Linux کاربر `plane` را وارد کنید؛ هنگام تایپ رمز چیزی نمایش داده نمی‌شود. اگر از کلید SSH موجود استفاده می‌کنید:
 
 ```powershell
-ssh -i "$env:USERPROFILE\.ssh\id_ed25519" plane@192.168.10.24
+ssh -i "$env:USERPROFILE\.ssh\id_ed25519" plane@192.168.10.20
 ```
 
 اگر `ssh` روی ویندوز وجود ندارد، در PowerShell با دسترسی Administrator کلاینت OpenSSH را نصب و یک ترمینال تازه باز کنید:
@@ -140,7 +142,7 @@ sudo apt-get install -y openssl nano tmux
 Set-Location 'C:\Users\11\Desktop\company-crm'
 powershell -NoProfile -ExecutionPolicy Bypass -File .\deployments\debian\export-source.ps1
 if ($LASTEXITCODE -ne 0) { throw 'ساخت آرشیو ناموفق بود؛ انتقال را ادامه ندهید.' }
-scp .\tmp\company-crm-source.tar.gz plane@192.168.10.24:company-crm-source.tar.gz
+scp .\tmp\company-crm-source.tar.gz plane@192.168.10.20:company-crm-source.tar.gz
 if ($LASTEXITCODE -ne 0) { throw 'انتقال آرشیو ناموفق بود.' }
 ```
 
@@ -167,7 +169,7 @@ find deployments/ubuntu deployments/debian apps/api/bin -type f -name '*.sh' -ex
 
 ```bash
 cd "$HOME/company-crm"
-bash deployments/debian/init-env.sh http://192.168.10.24
+bash deployments/debian/init-env.sh http://192.168.10.20
 nano .env.production
 ```
 
@@ -176,10 +178,10 @@ nano .env.production
 مقادیر مهم برای حالت LAN:
 
 ```dotenv
-PUBLIC_URL=http://192.168.10.24
-SITE_ADDRESS=http://192.168.10.24
-BIND_ADDRESS=192.168.10.24
-ALLOWED_HOSTS=192.168.10.24,localhost,127.0.0.1,api
+PUBLIC_URL=http://192.168.10.20
+SITE_ADDRESS=http://192.168.10.20
+BIND_ADDRESS=192.168.10.20
+ALLOWED_HOSTS=192.168.10.20,localhost,127.0.0.1,api
 MINIO_ENDPOINT_SSL=0
 PGADMIN_EMAIL=your-admin@example.com
 ```
@@ -233,20 +235,20 @@ cd "$HOME/company-crm"
 dc() { sudo docker compose --env-file .env.production -f docker-compose-production.yml "$@"; }
 dc ps -a
 dc logs --tail 100 api worker beat-worker live proxy
-curl -fsS http://192.168.10.24/api/instances/
-curl -fsS http://192.168.10.24/live/health/
-curl -I http://192.168.10.24/
+curl -fsS http://192.168.10.20/api/instances/
+curl -fsS http://192.168.10.20/live/health/
+curl -I http://192.168.10.20/
 ```
 
 در مرورگر **کامپیوتر خودتان**:
 
-| بخش | آدرس LAN |
-| --- | --- |
-| برنامه اصلی | http://192.168.10.24/ |
-| راه‌اندازی و مدیریت instance | http://192.168.10.24/god-mode/ |
-| صفحات منتشرشده | http://192.168.10.24/spaces/ |
-| API | http://192.168.10.24/api/instances/ |
-| سلامت Live | http://192.168.10.24/live/health/ |
+| بخش                          | آدرس LAN                            |
+| ---------------------------- | ----------------------------------- |
+| برنامه اصلی                  | http://192.168.10.20/               |
+| راه‌اندازی و مدیریت instance | http://192.168.10.20/god-mode/      |
+| صفحات منتشرشده               | http://192.168.10.20/spaces/        |
+| API                          | http://192.168.10.20/api/instances/ |
+| سلامت Live                   | http://192.168.10.20/live/health/   |
 
 در نصب تازه، `/god-mode/` را باز کنید و فرم راه‌اندازی instance را با ایمیل و رمز دلخواه مدیر تکمیل کنید. سپس وارد برنامه اصلی شوید و workspace بسازید. این نصب، حساب‌های نمونه README محیط توسعه را ایجاد نمی‌کند.
 
@@ -266,7 +268,7 @@ grep '^PGADMIN_' .env.production
 در یک **PowerShell ویندوزی جداگانه**، تونل را باز نگه دارید:
 
 ```powershell
-ssh -N -L 5050:127.0.0.1:5050 -L 9090:127.0.0.1:9090 plane@192.168.10.24
+ssh -N -L 5050:127.0.0.1:5050 -L 9090:127.0.0.1:9090 plane@192.168.10.20
 ```
 
 اکنون pgAdmin در http://localhost:5050 و کنسول MinIO در http://localhost:9090 قابل استفاده‌اند. رمز pgAdmin همان `PGADMIN_PASSWORD` است؛ برای MinIO از `AWS_ACCESS_KEY_ID` و `AWS_SECRET_ACCESS_KEY` در `.env.production` استفاده کنید.
@@ -275,10 +277,10 @@ ssh -N -L 5050:127.0.0.1:5050 -L 9090:127.0.0.1:9090 plane@192.168.10.24
 
 ## ۹. انتشار اینترنتی با دامنه و HTTPS
 
-`192.168.10.24` یک IP خصوصی است. افراد خارج از شرکت برای دسترسی به آن، به VPN یا دامنه/IP عمومی و مسیر شبکه نیاز دارند. برای دامنه فرضی `crm.example.com`:
+`192.168.10.20` یک IP خصوصی است. افراد خارج از شرکت برای دسترسی به آن، به VPN یا دامنه/IP عمومی و مسیر شبکه نیاز دارند. برای دامنه فرضی `crm.example.com`:
 
-1. رکورد DNS نوع A را به **IP عمومی روتر/سرور شرکت** وصل کنید؛ رکورد A اینترنتی را به `192.168.10.24` ندهید. AAAA را فقط با مسیر IPv6 درست اضافه کنید.
-2. روی روتر، TCP پورت‌های ۸۰ و ۴۴۳ را به `192.168.10.24` با همان پورت‌ها forward کنید. SSH، دیتابیس، صف، pgAdmin و MinIO console را forward نکنید.
+1. رکورد DNS نوع A را به **IP عمومی روتر/سرور شرکت** وصل کنید؛ رکورد A اینترنتی را به `192.168.10.20` ندهید. AAAA را فقط با مسیر IPv6 درست اضافه کنید.
+2. روی روتر، TCP پورت‌های ۸۰ و ۴۴۳ را به `192.168.10.20` با همان پورت‌ها forward کنید. SSH، دیتابیس، صف، pgAdmin و MinIO console را forward نکنید.
 3. اگر اتصال شرکت پشت CGNAT است، برای این روش به IP عمومی قابل ورود، VPN یا یک راهکار تونل نیاز دارید.
 4. در شبکه شرکت، دامنه باید قابل دسترسی باشد؛ معمولاً split DNS به IP داخلی یا NAT loopback روتر لازم است. containerهای سرور هم باید دامنه را resolve و باز کنند؛ Spaces برای metadata از آدرس عمومی API استفاده می‌کند.
 
@@ -294,7 +296,7 @@ nano .env.production
 ```dotenv
 PUBLIC_URL=https://crm.example.com
 SITE_ADDRESS=https://crm.example.com
-BIND_ADDRESS=192.168.10.24
+BIND_ADDRESS=192.168.10.20
 ALLOWED_HOSTS=crm.example.com,localhost,127.0.0.1,api
 MINIO_ENDPOINT_SSL=1
 ```
@@ -390,7 +392,7 @@ ls -lh "$backup_dir"
 
 ```powershell
 New-Item -ItemType Directory -Force -Path .\tmp\server-backups | Out-Null
-scp -r plane@192.168.10.24:plane-backups/20261004-120000 .\tmp\server-backups\
+scp -r plane@192.168.10.20:plane-backups/20261004-120000 .\tmp\server-backups\
 ```
 
 نام پوشه نمونه را با نام واقعی backup خود عوض کنید. این backup داده‌های برنامه را پوشش می‌دهد؛ RabbitMQ/Valkey و گواهی Caddy در آن نیستند. هنگام restore روی نصب تازه، taskهای در صف بازنمی‌گردند و Caddy برای دامنه دوباره گواهی می‌گیرد. برای بازیابی کامل عملیاتی، volumeهای صف/کش و Caddy را هم با روش backup هماهنگ و در حالت توقف snapshot کنید.

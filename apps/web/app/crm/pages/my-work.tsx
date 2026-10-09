@@ -55,7 +55,7 @@ export default function MyWorkPage() {
         title="کارهای من"
         description="روزت را برنامه‌ریزی کن و روی مهم‌ترین کارها تمرکز داشته باش"
         actions={
-          access?.isAdmin ? (
+          access?.can("Issue.Create") ? (
             <Button icon={Plus} onClick={() => setCreate(true, "issue")}>
               افزودن کار
             </Button>
@@ -79,8 +79,8 @@ export default function MyWorkPage() {
           <IssueKanbanBoard
             issues={myIssues}
             onStatusChange={(issue, status) => updateStatus.mutate({ issue, status })}
-            onCreate={access?.isAdmin ? () => setCreate(true, "issue") : undefined}
-            transferMembers={access && !access.isAdmin ? teamMembers : undefined}
+            onCreate={access?.can("Issue.Create") ? () => setCreate(true, "issue") : undefined}
+            transferMembers={access && !access.can("Issue.Create") ? teamMembers : undefined}
             transferDisabled={reassignIssue.isPending}
             onAssigneeChange={(issue, assigneeId) => reassignIssue.mutate({ issue, assigneeId })}
           />

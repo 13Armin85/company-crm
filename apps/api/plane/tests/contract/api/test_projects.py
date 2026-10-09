@@ -79,7 +79,14 @@ class TestProjectListCreateAPIEndpoint:
         # should not produce a duplicate row).
         assert ProjectMember.objects.filter(project=project, member=create_user, role=20).count() == 1
         # Default workflow states must be created.
-        assert State.objects.filter(project=project).count() == 5
+        assert set(State.objects.filter(project=project).values_list("name", flat=True)) == {
+            "Backlog",
+            "Todo",
+            "In Progress",
+            "Review",
+            "Done",
+            "Cancelled",
+        }
 
     @pytest.mark.django_db
     def test_create_project_with_lead_as_other_user(
@@ -102,7 +109,14 @@ class TestProjectListCreateAPIEndpoint:
         # Both creator and other_workspace_member are admins.
         assert ProjectMember.objects.filter(project=project, member=create_user, role=20).exists()
         assert ProjectMember.objects.filter(project=project, member=other_workspace_member, role=20).exists()
-        assert State.objects.filter(project=project).count() == 5
+        assert set(State.objects.filter(project=project).values_list("name", flat=True)) == {
+            "Backlog",
+            "Todo",
+            "In Progress",
+            "Review",
+            "Done",
+            "Cancelled",
+        }
 
     @pytest.mark.django_db
     def test_create_project_without_lead(self, api_key_client, workspace, create_user):
@@ -119,7 +133,14 @@ class TestProjectListCreateAPIEndpoint:
         assert response.status_code == status.HTTP_201_CREATED, f"Got {response.status_code}: {response.data!r}"
         project = Project.objects.get(id=response.data["id"])
         assert ProjectMember.objects.filter(project=project, member=create_user, role=20).count() == 1
-        assert State.objects.filter(project=project).count() == 5
+        assert set(State.objects.filter(project=project).values_list("name", flat=True)) == {
+            "Backlog",
+            "Todo",
+            "In Progress",
+            "Review",
+            "Done",
+            "Cancelled",
+        }
 
     @pytest.mark.django_db
     def test_create_project_with_lead_not_in_workspace_returns_400(self, api_key_client, workspace, outsider_user):
@@ -255,7 +276,14 @@ class TestProjectListCreateAPIEndpoint:
         # before the on_commit callback fired).
         project = Project.objects.get(id=response.data["id"])
         assert ProjectMember.objects.filter(project=project).count() == 1
-        assert State.objects.filter(project=project).count() == 5
+        assert set(State.objects.filter(project=project).values_list("name", flat=True)) == {
+            "Backlog",
+            "Todo",
+            "In Progress",
+            "Review",
+            "Done",
+            "Cancelled",
+        }
         # The dispatch was attempted but its failure was swallowed by
         # transaction.on_commit(robust=True).
         mocked_activity.delay.assert_called_once()

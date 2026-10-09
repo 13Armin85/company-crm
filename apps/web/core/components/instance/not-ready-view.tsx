@@ -4,11 +4,9 @@
  * See the LICENSE file for details.
  */
 
-import Link from "next/link";
 import { GOD_MODE_URL } from "@plane/constants";
 // assets
-import GradientLogo from "@/app/assets/auth/gradient-logo.webp?url";
-import GradientBgLogo from "@/app/assets/auth/gradient-bg-logo.webp?url";
+import { BrandLogo } from "@plane/ui";
 import DefaultLayout from "@/layouts/default-layout";
 import { PlaneLockup } from "@plane/propel/icons";
 import { Button } from "@plane/propel/button";
@@ -18,18 +16,8 @@ export function InstanceNotReady() {
     <DefaultLayout>
       <div className="relative z-10 flex h-screen w-screen overflow-hidden">
         {/* Background decorations */}
-        <img
-          src={GradientBgLogo}
-          className="pointer-events-none absolute -start-32 -top-24 h-56 w-96 opacity-15"
-          alt=""
-          aria-hidden="true"
-        />
-        <img
-          src={GradientBgLogo}
-          className="pointer-events-none absolute -end-20 -bottom-16 h-56 w-96 opacity-15"
-          alt=""
-          aria-hidden="true"
-        />
+        <BrandLogo decorative className="pointer-events-none absolute -start-32 -top-24 h-56 w-96 opacity-15" />
+        <BrandLogo decorative className="pointer-events-none absolute -end-20 -bottom-16 h-56 w-96 opacity-15" />
         {/* Main content */}
         <div className="flex h-full w-full flex-col items-center px-8 pt-6 pb-10">
           <div className="sticky top-0 flex w-full shrink-0 items-center justify-between gap-6">
@@ -37,7 +25,7 @@ export function InstanceNotReady() {
           </div>
           <div className="flex h-full w-full flex-col items-center justify-center gap-7">
             <div className="flex flex-col items-center gap-11">
-              <img src={GradientLogo} className="h-24 w-40 object-contain" alt="Plane Logo" />
+              <BrandLogo variant="full" className="h-32 w-48 object-contain" />
               <div className="flex max-w-124 flex-col items-center gap-3">
                 <h1 className="text-h2-semibold text-primary">Welcome to Plane</h1>
                 <p className="text-center text-body-md-regular text-secondary">

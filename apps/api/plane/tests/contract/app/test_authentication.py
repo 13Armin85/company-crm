@@ -232,6 +232,21 @@ class TestSignInEndpoint:
         assert "_auth_user_id" in django_client.session
 
     @pytest.mark.django_db
+    def test_username_login_and_logout_clear_session(self, django_client, setup_user, setup_instance):
+        setup_user.username = "crm.username"
+        setup_user.save(update_fields=["username"])
+        response = django_client.post(
+            reverse("sign-in"), {"email": "CRM.USERNAME", "password": "user@123", "next_path": "/login"}
+        )
+        assert response.status_code == 302
+        assert "error_code" not in response.url
+        assert "_auth_user_id" in django_client.session
+        response = django_client.post(reverse("sign-out"))
+        assert response.status_code in (200, 302)
+        assert "_auth_user_id" not in django_client.session
+        assert django_client.get("/api/users/me/").status_code in (401, 403)
+
+    @pytest.mark.django_db
     def test_next_path_redirection(self, django_client, setup_user, setup_instance):
         """Test sign-in with next_path parameter"""
         url = reverse("sign-in")
@@ -408,9 +423,12 @@ class TestMagicSignUp:
 
     @pytest.mark.django_db
     @patch("plane.bgtasks.magic_link_code_task.magic_link.delay")
-    def test_magic_code_sign_up(self, mock_magic_link, django_client, api_client, setup_instance):
+    def test_magic_code_sign_up(self, mock_magic_link, django_client, api_client, setup_instance, workspace):
         """Test successful magic link sign-up process"""
         email = "newuser@plane.so"
+        from plane.db.models import WorkspaceMemberInvite
+
+        WorkspaceMemberInvite.objects.create(workspace=workspace, email=email, token=uuid.uuid4().hex, role=15)
 
         # First generate a magic link token
         gen_url = reverse("magic-generate")
@@ -440,9 +458,12 @@ class TestMagicSignUp:
 
     @pytest.mark.django_db
     @patch("plane.bgtasks.magic_link_code_task.magic_link.delay")
-    def test_magic_sign_up_with_next_path(self, mock_magic_link, django_client, api_client, setup_instance):
+    def test_magic_sign_up_with_next_path(self, mock_magic_link, django_client, api_client, setup_instance, workspace):
         """Test magic sign-up with next_path parameter"""
         email = "newuser2@plane.so"
+        from plane.db.models import WorkspaceMemberInvite
+
+        WorkspaceMemberInvite.objects.create(workspace=workspace, email=email, token=uuid.uuid4().hex, role=15)
 
         # First generate a magic link token
         gen_url = reverse("magic-generate")
@@ -528,8 +549,8 @@ class TestMagicSignInVerifyAttempts:
         # First (MAX-1) wrong attempts: each redirects with INVALID_MAGIC_CODE_SIGN_IN.
         for i in range(MagicCodeProvider.MAX_VERIFY_ATTEMPTS - 1):
             response = django_client.post(url, {"email": self.EMAIL, "code": "000000"}, follow=False)
-            assert response.status_code == 302, f"attempt {i+1} unexpected status"
-            assert "INVALID_MAGIC_CODE_SIGN_IN" in response.url, f"attempt {i+1} did not return INVALID"
+            assert response.status_code == 302, f"attempt {i + 1} unexpected status"
+            assert "INVALID_MAGIC_CODE_SIGN_IN" in response.url, f"attempt {i + 1} did not return INVALID"
 
         # Token and counter both still live, with counter at MAX-1.
         assert ri.exists(f"magic_{self.EMAIL}")
@@ -769,9 +790,7 @@ class TestBotUserLoginBlocked:
         """Password sign-in with a bot's *correct* credentials is still rejected:
         the block happens after credential verification, so no session is created."""
         url = reverse("sign-in")
-        response = django_client.post(
-            url, {"email": self.BOT_EMAIL, "password": self.PASSWORD}, follow=False
-        )
+        response = django_client.post(url, {"email": self.BOT_EMAIL, "password": self.PASSWORD}, follow=False)
         assert response.status_code == 302
         assert "BOT_USER_LOGIN_FORBIDDEN" in response.url
         # The block must prevent authentication.
@@ -779,9 +798,7 @@ class TestBotUserLoginBlocked:
 
     @pytest.mark.django_db
     @patch("plane.bgtasks.magic_link_code_task.magic_link.delay")
-    def test_bot_magic_sign_in_blocked(
-        self, mock_magic_link, django_client, api_client, bot_user, setup_instance
-    ):
+    def test_bot_magic_sign_in_blocked(self, mock_magic_link, django_client, api_client, bot_user, setup_instance):
         """The same block applies via a second provider (magic code), proving the
         guard sits at the shared chokepoint rather than in one provider."""
         token = _generate_magic_token(api_client, self.BOT_EMAIL)
@@ -796,9 +813,7 @@ class TestBotUserLoginBlocked:
         """Control: a normal user with the identical setup still signs in — the
         guard is scoped strictly to is_bot and does not regress human logins."""
         url = reverse("sign-in")
-        response = django_client.post(
-            url, {"email": self.HUMAN_EMAIL, "password": self.PASSWORD}, follow=False
-        )
+        response = django_client.post(url, {"email": self.HUMAN_EMAIL, "password": self.PASSWORD}, follow=False)
         assert response.status_code == 302
         assert "BOT_USER_LOGIN_FORBIDDEN" not in response.url
         assert "error_code" not in response.url

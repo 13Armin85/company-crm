@@ -62,7 +62,7 @@ export default function ProjectDetailPage() {
   const workspaceMembersQuery = useMembers();
   const { data: access } = useWorkspaceAccess();
   const { data: currentUser } = useCurrentUser();
-  const isAdmin = access?.isAdmin === true;
+  const canManage = access?.can("Project.Edit") === true;
   const cyclesQuery = useCycles(id);
   const project = projectQuery.data;
   const issues = issuesQuery.data ?? [];
@@ -75,8 +75,8 @@ export default function ProjectDetailPage() {
   const progress = issues.length ? Math.round((complete / issues.length) * 100) : 0;
 
   useEffect(() => {
-    if (access && !isAdmin && tab === "settings") setTab("overview");
-  }, [access, isAdmin, tab]);
+    if (access && !canManage && tab === "settings") setTab("overview");
+  }, [access, canManage, tab]);
 
   if (projectQuery.isLoading) return <Skeleton rows={5} />;
   if (!project) return <EmptyState title="پروژه پیدا نشد" description="پروژه حذف شده یا به آن دسترسی ندارید." />;
@@ -95,12 +95,12 @@ export default function ProjectDetailPage() {
           <Button variant="secondary" icon={Users} onClick={() => setTab("overview")}>
             اعضای پروژه ({toFa(members.length)})
           </Button>
-          {isAdmin && (
+          {access?.can("Issue.Create") && (
             <Button icon={Plus} onClick={() => setCreate(true, "issue")}>
               کار جدید
             </Button>
           )}
-          {isAdmin && (
+          {canManage && (
             <div className="menu-anchor">
               <button className="icon-button" aria-label="منوی پروژه" onClick={() => setMenuOpen((value) => !value)}>
                 <MoreHorizontal size={19} />
@@ -125,7 +125,7 @@ export default function ProjectDetailPage() {
                   </button>
                   <button
                     className="danger-action"
-                    disabled={deleteProject.isPending}
+                    disabled={!access?.can("Project.Delete") || deleteProject.isPending}
                     onClick={() => {
                       setMenuOpen(false);
                       if (window.confirm(`پروژه «${project.name}» و همه اطلاعات وابسته به آن حذف شود؟`)) {
@@ -143,7 +143,7 @@ export default function ProjectDetailPage() {
       </div>
       <TabBar
         items={tabs
-          .filter((item) => item.id !== "settings" || isAdmin)
+          .filter((item) => item.id !== "settings" || canManage)
           .map((item) => ({
             id: item.id,
             label: item.label,
@@ -173,7 +173,7 @@ export default function ProjectDetailPage() {
               title="هنوز کاری ثبت نشده"
               description="اولین کار این پروژه را ایجاد کنید."
               action={
-                isAdmin ? (
+                access?.can("Issue.Create") ? (
                   <Button icon={Plus} onClick={() => setCreate(true, "issue")}>
                     کار جدید
                   </Button>
@@ -204,7 +204,10 @@ export default function ProjectDetailPage() {
                       </small>
                       <select
                         value={issue.status}
-                        disabled={!isAdmin && issue.assignee?.id !== currentUser?.id}
+                        disabled={
+                          !access?.can("Issue.Status.Edit") ||
+                          (!access?.can("Issue.Edit") && issue.assignee?.id !== currentUser?.id)
+                        }
                         onChange={(event) => updateStatus.mutate({ issue, status: event.target.value as Status })}
                       >
                         {statuses.map((value) => (
@@ -226,7 +229,7 @@ export default function ProjectDetailPage() {
           projectId={id}
           cycles={cyclesQuery.data ?? []}
           loading={cyclesQuery.isLoading}
-          canManage={isAdmin}
+          canManage={canManage}
         />
       )}
       {tab === "calendar" && (
@@ -278,7 +281,7 @@ export default function ProjectDetailPage() {
           )}
         </div>
       )}
-      {tab === "settings" && isAdmin && (
+      {tab === "settings" && canManage && (
         <ProjectSettings
           slug={slug}
           project={project}
@@ -501,6 +504,7 @@ function ProjectSettings({
     [targetDate, setTargetDate] = useState(project.targetDate || ""),
     [lead, setLead] = useState(project.projectLeadId || "");
   const update = useUpdateProject(slug, project.id);
+  const { data: access } = useWorkspaceAccess();
   const addMember = useAddProjectMember(slug, project.id);
   const removeMember = useRemoveProjectMember(slug, project.id);
   const [memberToAdd, setMemberToAdd] = useState("");
@@ -548,49 +552,51 @@ function ProjectSettings({
           </select>
         </label>
       </div>
-      <section className="project-member-settings">
-        <h3>اعضای پروژه</h3>
-        <div className="add-project-member">
-          <select value={memberToAdd} onChange={(event) => setMemberToAdd(event.target.value)}>
-            <option value="">انتخاب عضو فضای کاری</option>
-            {workspaceMembers
-              .filter((candidate) => !members.some((member) => member.id === candidate.id))
-              .map((member) => (
-                <option key={member.id} value={member.id}>
+      {access?.can("Project.Member.Manage") && (
+        <section className="project-member-settings">
+          <h3>اعضای پروژه</h3>
+          <div className="add-project-member">
+            <select value={memberToAdd} onChange={(event) => setMemberToAdd(event.target.value)}>
+              <option value="">انتخاب عضو فضای کاری</option>
+              {workspaceMembers
+                .filter((candidate) => !members.some((member) => member.id === candidate.id))
+                .map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {member.displayName}
+                  </option>
+                ))}
+            </select>
+            <Button
+              icon={Plus}
+              disabled={!memberToAdd || addMember.isPending}
+              onClick={() => addMember.mutate(memberToAdd, { onSuccess: () => setMemberToAdd("") })}
+            >
+              افزودن به پروژه
+            </Button>
+          </div>
+          <div className="project-member-list">
+            {members.map((member) => (
+              <div key={member.id}>
+                <span>
+                  <Avatar member={member} size="sm" />
                   {member.displayName}
-                </option>
-              ))}
-          </select>
-          <Button
-            icon={Plus}
-            disabled={!memberToAdd || addMember.isPending}
-            onClick={() => addMember.mutate(memberToAdd, { onSuccess: () => setMemberToAdd("") })}
-          >
-            افزودن به پروژه
-          </Button>
-        </div>
-        <div className="project-member-list">
-          {members.map((member) => (
-            <div key={member.id}>
-              <span>
-                <Avatar member={member} size="sm" />
-                {member.displayName}
-              </span>
-              <button
-                type="button"
-                disabled={!member.membershipId}
-                onClick={() =>
-                  member.membershipId &&
-                  window.confirm(`حذف ${member.displayName} از پروژه؟`) &&
-                  removeMember.mutate(member.membershipId)
-                }
-              >
-                حذف
-              </button>
-            </div>
-          ))}
-        </div>
-      </section>
+                </span>
+                <button
+                  type="button"
+                  disabled={!member.membershipId}
+                  onClick={() =>
+                    member.membershipId &&
+                    window.confirm(`حذف ${member.displayName} از پروژه؟`) &&
+                    removeMember.mutate(member.membershipId)
+                  }
+                >
+                  حذف
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </form>
   );
 }

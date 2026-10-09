@@ -1,0 +1,19 @@
+name: company-crm-local
+
+# Reuse the existing workstation images, network and persistent data volumes.
+# Backend source is mounted by docker-compose-dev.yml; rebuild frontend for updates.
+services:
+  plane-minio:
+    # This workstation already has the pinned image used by its uploads volume.
+    image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
+    build: !reset null
+  migrator:
+    image: company-crm-local-api
+  api:
+    image: company-crm-local-api
+  worker:
+    image: company-crm-local-api
+  beat-worker:
+    image: company-crm-local-api
+  frontend:
+    image: company-crm-local-frontend

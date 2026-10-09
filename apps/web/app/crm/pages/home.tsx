@@ -24,7 +24,7 @@ export default function HomePage() {
   const { data: members = [], isLoading: membersLoading } = useMembers();
   const { data: currentUser, isLoading: userLoading } = useCurrentUser();
   const { data: access } = useWorkspaceAccess();
-  const isAdmin = access?.isAdmin === true;
+  const canManage = access?.can("Issue.Create") === true;
   const { data: activities = [], isLoading: activitiesLoading } = useUserActivities();
   const now = new Date();
   const weekAgo = new Date(now.getTime() - 7 * 86_400_000);
@@ -77,7 +77,7 @@ export default function HomePage() {
           <Button variant="secondary" icon={CalendarDays} onClick={() => navigate("/calendar")}>
             برنامه امروز
           </Button>
-          {isAdmin && (
+          {canManage && (
             <Button icon={Plus} onClick={() => setCreate(true, "issue")}>
               ایجاد کار جدید
             </Button>
@@ -151,7 +151,7 @@ export default function HomePage() {
                 title="پروژه‌ای وجود ندارد"
                 description="اولین پروژه واقعی فضای کاری را ایجاد کنید."
                 action={
-                  isAdmin ? (
+                  canManage ? (
                     <Button icon={Plus} onClick={() => setCreate(true, "project")}>
                       پروژه جدید
                     </Button>
@@ -243,7 +243,7 @@ export default function HomePage() {
               <SectionHeader title="تیم شما" subtitle={`${toFa(members.length)} عضو در فضای کاری`} />
               <AvatarStack members={members} max={5} />
             </div>
-            {isAdmin && (
+            {canManage && (
               <Link to="/team">
                 <Users size={17} /> مدیریت تیم <ArrowUpLeft size={15} />
               </Link>
@@ -255,7 +255,7 @@ export default function HomePage() {
               <span>تقویم تیم</span>
               <ArrowLeft size={15} />
             </Link>
-            {isAdmin && (
+            {canManage && (
               <Link to="/issues">
                 <ListChecks size={18} />
                 <span>همه کارها</span>

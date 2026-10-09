@@ -12,6 +12,7 @@ Covers the credential-hygiene guarantees of the external API request logger:
 
 import hashlib
 import hmac
+import json
 from unittest.mock import Mock, patch
 
 import pytest
@@ -35,6 +36,24 @@ def middleware():
 
 @pytest.mark.unit
 class TestAPITokenLogMiddleware:
+    def test_passwords_are_redacted_in_nested_json_and_forms(self, middleware):
+        body = json.dumps(
+            {
+                "email": "member@example.com",
+                "password": "secret-one",
+                "nested": [{"new_password": "secret-two", "confirm_password": "secret-three"}],
+            }
+        ).encode()
+        redacted = middleware._redacted_body(body)
+        assert "secret-" not in redacted
+        assert "member@example.com" in redacted
+        assert "secret-form" not in middleware._redacted_body(b"email=user&password=secret-form")
+
+    def test_tokens_and_secrets_are_redacted(self, middleware):
+        for field in ("token", "access_token", "refresh_token", "api_key", "client_secret", "secret_key"):
+            assert "secret-value" not in middleware._redacted_body(json.dumps({field: "secret-value"}).encode())
+            assert "secret-value" not in middleware._redacted_body(f"{field}=secret-value".encode())
+
     API_KEY = "plane_api_supersecretvalue"
     AUTHORIZATION = "Bearer secret-bearer-token"
     COOKIE = "sessionid=secret-session-value"
@@ -56,9 +75,7 @@ class TestAPITokenLogMiddleware:
     def test_token_identifier_is_hashed_not_plaintext(self, middleware, request_factory):
         log_data = self._captured_log_data(middleware, request_factory)
 
-        expected_hash = hmac.new(
-            settings.SECRET_KEY.encode(), self.API_KEY.encode(), hashlib.sha256
-        ).hexdigest()
+        expected_hash = hmac.new(settings.SECRET_KEY.encode(), self.API_KEY.encode(), hashlib.sha256).hexdigest()
         assert log_data["token_identifier"] == expected_hash
         assert self.API_KEY not in log_data["token_identifier"]
 

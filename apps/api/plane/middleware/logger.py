@@ -5,8 +5,10 @@
 # Python imports
 import hashlib
 import hmac
+import json
 import logging
 import time
+from urllib.parse import parse_qsl, urlencode
 
 # Django imports
 from django.conf import settings
@@ -115,6 +117,50 @@ class APITokenLogMiddleware:
 
     # Headers whose values must never be persisted in plaintext logs
     SENSITIVE_HEADERS = frozenset({"x-api-key", "authorization", "cookie"})
+    SENSITIVE_FIELDS = frozenset(
+        {
+            "password",
+            "new_password",
+            "confirm_password",
+            "current_password",
+            "old_password",
+            "password_confirmation",
+            "csrfmiddlewaretoken",
+            "csrf_token",
+            "token",
+            "access_token",
+            "refresh_token",
+            "api_key",
+            "client_secret",
+            "secret_key",
+            "invitation_token",
+        }
+    )
+
+    def _redacted_body(self, content):
+        decoded = self._safe_decode_body(content)
+        if not decoded:
+            return decoded
+
+        def redact(value):
+            if isinstance(value, dict):
+                return {
+                    key: "[REDACTED]" if key.lower() in self.SENSITIVE_FIELDS else redact(item)
+                    for key, item in value.items()
+                }
+            if isinstance(value, list):
+                return [redact(item) for item in value]
+            return value
+
+        try:
+            return json.dumps(redact(json.loads(decoded)), ensure_ascii=False)
+        except (ValueError, TypeError):
+            pairs = parse_qsl(decoded, keep_blank_values=True)
+            if any(key.lower() in self.SENSITIVE_FIELDS for key, _ in pairs):
+                return urlencode(
+                    [(key, "[REDACTED]" if key.lower() in self.SENSITIVE_FIELDS else value) for key, value in pairs]
+                )
+            return decoded
 
     def _redacted_headers(self, request):
         """
@@ -146,10 +192,10 @@ class APITokenLogMiddleware:
                 ).hexdigest(),
                 "path": request.path,
                 "method": request.method,
-                "query_params": request.META.get("QUERY_STRING", ""),
+                "query_params": self._redacted_body(request.META.get("QUERY_STRING", "").encode()),
                 "headers": self._redacted_headers(request),
-                "body": self._safe_decode_body(request_body) if request_body else None,
-                "response_body": self._safe_decode_body(response.content) if response.content else None,
+                "body": self._redacted_body(request_body) if request_body else None,
+                "response_body": self._redacted_body(response.content) if response.content else None,
                 "response_code": response.status_code,
                 "ip_address": get_client_ip(request=request),
                 "user_agent": request.META.get("HTTP_USER_AGENT", None),

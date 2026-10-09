@@ -9,6 +9,7 @@
   ],
   "main": "tailwind.config.js",
   "exports": {
+    "./fonts/Vazirmatn-Variable.woff2": "./fonts/Vazirmatn-Variable.woff2",
     "./crm-theme.css": "./crm-theme.css",
     "./index.css": "./index.css",
     "./postcss.config.js": "./postcss.config.js"

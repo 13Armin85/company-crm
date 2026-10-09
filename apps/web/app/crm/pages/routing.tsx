@@ -13,9 +13,10 @@ import {
 import { Button, EmptyState, PageHeader, Skeleton } from "../components";
 import { useUIStore } from "../store";
 import type { TicketRoutingRule } from "../types";
-import { persianDate, toFa } from "../utils";
+import { persianDate } from "../utils";
+import { Navigate } from "react-router";
 
-type RuleForm = Pick<TicketRoutingRule, "name" | "unitId" | "requiredRoleId" | "requiredLevel" | "isActive"> & {
+type RuleForm = Pick<TicketRoutingRule, "name" | "unitId" | "requiredRoleId" | "isActive"> & {
   id?: string;
 };
 
@@ -23,11 +24,17 @@ export default function RoutingPage() {
   const slug = useUIStore((state) => state.workspaceSlug) ?? "";
   const setFormDirty = useUIStore((state) => state.setFormDirty);
   const { data: access, isLoading: accessLoading } = useWorkspaceAccess();
-  const isAdmin = access?.isAdmin === true;
-  const { data: rules = [], isLoading: rulesLoading } = useTicketRoutingRules(undefined, isAdmin);
-  const { data: queue = [], isLoading: queueLoading } = useTicketRoleQueue();
-  const { data: units = [] } = useOrganizationUnits(undefined, isAdmin);
-  const { data: roles = [] } = useOrganizationRoles(undefined, isAdmin);
+  const canManage = access?.can("Routing.Manage") === true;
+  const { data: rules = [], isLoading: rulesLoading } = useTicketRoutingRules(
+    undefined,
+    access?.can("Routing.View") ?? false
+  );
+  const { data: queue = [], isLoading: queueLoading } = useTicketRoleQueue(
+    undefined,
+    access?.can("Routing.Queue.View") ?? false
+  );
+  const { data: units = [] } = useOrganizationUnits(undefined, canManage);
+  const { data: roles = [] } = useOrganizationRoles(undefined, canManage);
   const saveRule = useSaveTicketRoutingRule(slug);
   const deactivateRule = useDeactivateTicketRoutingRule(slug);
   const claimQueue = useClaimTicketRoleQueue(slug);
@@ -39,18 +46,19 @@ export default function RoutingPage() {
   }, [editing, setFormDirty]);
 
   if (accessLoading) return <Skeleton rows={6} />;
+  if (!access?.can("Routing.Queue.View")) return <Navigate to="/my-work" replace />;
 
   return (
     <div>
       <PageHeader
         eyebrow="گردش کار سازمانی"
         title="ارجاع هوشمند تیکت"
-        description="ابتدا مدیر واحد بررسی می‌شود؛ در صورت نبود Role یا Level کافی، مسیر تا والد ادامه می‌یابد و در نهایت تیکت وارد Role Queue می‌شود."
+        description="ابتدا مدیر یا جانشین فعال واحد بررسی می‌شود؛ در صورت نبود نقش لازم، مسیر تا والد ادامه می‌یابد و سپس تیکت وارد صف نقش می‌شود."
         actions={
-          isAdmin ? (
+          canManage ? (
             <Button
               icon={Plus}
-              onClick={() => setEditing({ name: "", unitId: "", requiredRoleId: "", requiredLevel: 0, isActive: true })}
+              onClick={() => setEditing({ name: "", unitId: "", requiredRoleId: "", isActive: true })}
             >
               قانون جدید
             </Button>
@@ -58,7 +66,7 @@ export default function RoutingPage() {
         }
       />
 
-      {isAdmin && (
+      {canManage && (
         <section className="management-section">
           <header className="section-heading">
             <div>
@@ -70,7 +78,7 @@ export default function RoutingPage() {
             {rulesLoading ? (
               <Skeleton rows={4} />
             ) : !rules.length ? (
-              <EmptyState title="قانونی تعریف نشده" description="برای اتصال Team، Role و Level یک قانون بسازید." />
+              <EmptyState title="قانونی تعریف نشده" description="برای اتصال واحد و نقش یک قانون بسازید." />
             ) : (
               <table>
                 <thead>
@@ -78,7 +86,6 @@ export default function RoutingPage() {
                     <th>نام</th>
                     <th>واحد شروع</th>
                     <th>Role مورد نیاز</th>
-                    <th>Level</th>
                     <th>وضعیت</th>
                     <th>عملیات</th>
                   </tr>
@@ -94,7 +101,6 @@ export default function RoutingPage() {
                       </td>
                       <td>{rule.unitTitle}</td>
                       <td>{rule.roleName}</td>
-                      <td>{toFa(rule.requiredLevel)}</td>
                       <td>
                         <span className={`state-pill ${rule.isActive ? "is-on" : "is-off"}`}>
                           {rule.isActive ? "فعال" : "غیرفعال"}
@@ -123,7 +129,7 @@ export default function RoutingPage() {
         <header className="section-heading">
           <div>
             <h2>Role Queue</h2>
-            <p>{isAdmin ? "تیکت‌های بدون مدیر واجد شرایط" : "تیکت‌هایی که با نقش و Level شما قابل دریافت‌اند"}</p>
+            <p>{canManage ? "تیکت‌های بدون مدیر واجد شرایط" : "تیکت‌هایی که با نقش فعال شما قابل دریافت‌اند"}</p>
           </div>
         </header>
         <div className="table-card organization-table">
@@ -138,7 +144,6 @@ export default function RoutingPage() {
                   <th>تیکت</th>
                   <th>پروژه</th>
                   <th>قانون</th>
-                  <th>Role / Level</th>
                   <th>زمان ورود</th>
                   <th>عملیات</th>
                 </tr>
@@ -149,9 +154,7 @@ export default function RoutingPage() {
                     <td>{entry.issueName}</td>
                     <td>{entry.projectName}</td>
                     <td>{entry.ruleName}</td>
-                    <td>
-                      {entry.roleName} / {toFa(entry.requiredLevel)}
-                    </td>
+                    <td>{entry.roleName}</td>
                     <td>{entry.createdAt ? persianDate(entry.createdAt) : "—"}</td>
                     <td>
                       <Button
@@ -221,11 +224,9 @@ export default function RoutingPage() {
               <select
                 value={editing.requiredRoleId}
                 onChange={(event) => {
-                  const role = roles.find((item) => item.id === event.target.value);
                   setEditing({
                     ...editing,
                     requiredRoleId: event.target.value,
-                    requiredLevel: role?.level ?? editing.requiredLevel,
                   });
                 }}
                 required
@@ -235,20 +236,10 @@ export default function RoutingPage() {
                   .filter((role) => role.isActive || role.id === editing.requiredRoleId)
                   .map((role) => (
                     <option key={role.id} value={role.id}>
-                      {role.name} — Level {toFa(role.level)}
+                      {role.name}
                     </option>
                   ))}
               </select>
-            </label>
-            <label>
-              <span>حداقل Level</span>
-              <input
-                type="number"
-                min={0}
-                value={editing.requiredLevel}
-                onChange={(event) => setEditing({ ...editing, requiredLevel: Number(event.target.value) })}
-                required
-              />
             </label>
             <label className="active-toggle">
               <input

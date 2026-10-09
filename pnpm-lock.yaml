@@ -637,12 +637,18 @@ importers:
       '@plane/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n
+      '@plane/propel':
+        specifier: workspace:*
+        version: link:../../packages/propel
       '@plane/services':
         specifier: workspace:*
         version: link:../../packages/services
       '@plane/types':
         specifier: workspace:*
         version: link:../../packages/types
+      '@plane/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       '@plane/utils':
         specifier: workspace:*
         version: link:../../packages/utils

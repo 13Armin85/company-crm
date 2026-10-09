@@ -4,19 +4,12 @@
  * See the LICENSE file for details.
  */
 
-import { useTheme } from "next-themes";
-// assets
-import LogoSpinnerDark from "@/app/assets/images/logo-spinner-dark.gif?url";
-import LogoSpinnerLight from "@/app/assets/images/logo-spinner-light.gif?url";
+import { BrandLogo } from "@plane/ui";
 
 export function LogoSpinner() {
-  const { resolvedTheme } = useTheme();
-
-  const logoSrc = resolvedTheme === "dark" ? LogoSpinnerDark : LogoSpinnerLight;
-
   return (
-    <div className="flex items-center justify-center">
-      <img src={logoSrc} alt="logo" className="h-6 w-auto object-contain sm:h-11" />
+    <div role="status" aria-label="در حال بارگذاری" className="flex items-center justify-center">
+      <BrandLogo decorative className="h-6 w-auto object-contain motion-safe:animate-pulse sm:h-11" />
     </div>
   );
 }

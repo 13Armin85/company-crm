@@ -101,6 +101,9 @@ from .organization import (
     TicketRoutingDecision,
     TicketRoutingRule,
     UserOrganizationRole,
+    UserPermissionException,
+    OrganizationUnitDelegate,
+    UserAbsence,
 )
 
 from .description import Description, DescriptionVersion

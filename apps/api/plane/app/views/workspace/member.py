@@ -8,9 +8,8 @@ import re
 
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
-from django.db import transaction
+from django.db import IntegrityError
 from django.db.models import Count, Q, OuterRef, Subquery, IntegerField
-from django.utils import timezone
 from django.db.models.functions import Coalesce
 
 # Third party modules
@@ -18,6 +17,11 @@ from rest_framework import status
 from rest_framework.response import Response
 
 from plane.app.permissions import WorkspaceEntityPermission, allow_permission, ROLE
+from plane.app.permissions.crm import require_permission, require_any_permission
+from plane.app.services.access_control import has_permission, sync_plane_membership
+from plane.app.services.access_mutations import access_transaction, audit_access, remove_workspace_user, sync_user_roles
+from plane.db.models import OrganizationRole, UserOrganizationRole
+from django.contrib.auth.password_validation import validate_password
 
 # Module imports
 from plane.app.serializers import (
@@ -48,7 +52,7 @@ class WorkSpaceMemberViewSet(BaseViewSet):
             .select_related("member", "member__avatar_asset")
         )
 
-    @allow_permission(allowed_roles=[ROLE.ADMIN], level="WORKSPACE")
+    @require_permission("User.Create")
     def create(self, request, slug):
         email = str(request.data.get("email", "")).strip().lower()
         password = str(request.data.get("password", ""))
@@ -82,42 +86,115 @@ class WorkSpaceMemberViewSet(BaseViewSet):
         if user is None and username and User.objects.filter(username__iexact=username).exists():
             return Response({"error": "این نام کاربری قبلاً انتخاب شده است"}, status=status.HTTP_400_BAD_REQUEST)
 
-        with transaction.atomic():
-            workspace = Workspace.objects.get(slug=slug)
-            if user is None:
-                user = User(
-                    email=email,
-                    username=username or f"workspace-user-{uuid.uuid4().hex}",
-                    display_name=display_name or email.split("@", 1)[0],
-                    is_email_verified=True,
-                    is_managed=True,
+        workspace = Workspace.objects.get(slug=slug)
+        role_ids = request.data.get("role_ids")
+        if (role_ids is not None or role == ROLE.ADMIN.value) and not has_permission(
+            request.user, workspace, "User.Role.Assign", request=request
+        ):
+            return Response({"error": "Role assignment permission is required."}, status=403)
+        if user is None:
+            try:
+                validate_password(password, user=User(email=email, username=username))
+            except ValidationError as exc:
+                return Response({"password": exc.messages}, status=400)
+        try:
+            with access_transaction(workspace):
+                if user is None:
+                    user = User(
+                        email=email,
+                        username=username or f"u-{uuid.uuid4().hex[:24]}",
+                        display_name=display_name or email.split("@", 1)[0],
+                        is_email_verified=True,
+                        is_managed=True,
+                    )
+                    user.set_password(password)
+                    user.save()
+                    Profile.objects.get_or_create(user=user)
+                membership, _ = WorkspaceMember.objects.update_or_create(
+                    workspace=workspace,
+                    member=user,
+                    defaults={"role": role, "is_active": True},
                 )
-                user.set_password(password)
-                user.save()
-                Profile.objects.get_or_create(user=user)
-            membership, _ = WorkspaceMember.objects.update_or_create(
-                workspace=workspace,
-                member=user,
-                defaults={"role": role, "is_active": True},
-            )
 
+                if role_ids is not None:
+                    sync_user_roles(workspace, user, role_ids)
+                elif (
+                    not UserOrganizationRole.objects.filter(
+                        workspace=workspace, user=user, is_active=True, role__is_active=True
+                    ).exists()
+                    or "role" in request.data
+                ):
+                    initial_role = OrganizationRole.objects.get(
+                        workspace=workspace, system_key="admin" if role == ROLE.ADMIN.value else "member"
+                    )
+                    sync_user_roles(workspace, user, [initial_role.id])
+                sync_plane_membership(workspace, user)
+                audit_access(request, workspace, "user.create", user.id)
+        except (ValidationError, IntegrityError) as exc:
+            return Response(
+                getattr(exc, "message_dict", {"error": getattr(exc, "messages", ["Invalid membership selection."])}),
+                status=400,
+            )
         return Response(WorkspaceMemberAdminSerializer(membership).data, status=status.HTTP_201_CREATED)
 
-    @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
+    @require_any_permission(
+        "Issue.View",
+        "User.View",
+        "OrganizationUnit.Member.Manage",
+        "OrganizationUnit.Manager.Assign",
+        "OrganizationUnit.Delegate.Manage",
+        "Absence.Create",
+    )
     def list(self, request, slug):
-        workspace_member = WorkspaceMember.objects.get(member=request.user, workspace__slug=slug, is_active=True)
-
-        workspace_members = self.get_queryset().filter(is_active=True, member__is_bot=False)
-        if workspace_member.role == ROLE.ADMIN.value:
+        workspace_members = self.get_queryset().filter(member__is_bot=False)
+        if not any(
+            has_permission(request.user, slug, code, request=request)
+            for code in (
+                "User.View",
+                "OrganizationUnit.Member.Manage",
+                "OrganizationUnit.Manager.Assign",
+                "OrganizationUnit.Delegate.Manage",
+                "Absence.Create",
+            )
+        ):
+            project_ids = ProjectMember.objects.filter(
+                workspace__slug=slug, member=request.user, is_active=True
+            ).values_list("project_id", flat=True)
+            colleague_ids = ProjectMember.objects.filter(
+                workspace__slug=slug, project_id__in=project_ids, is_active=True
+            ).values_list("member_id", flat=True)
+            workspace_members = workspace_members.filter(is_active=True, member__is_active=True)
+            if not has_permission(request.user, slug, "Issue.Assign", request=request):
+                workspace_members = workspace_members.filter(Q(member_id__in=colleague_ids) | Q(member=request.user))
+        if has_permission(request.user, slug, "User.View", request=request):
             serializer = WorkspaceMemberAdminSerializer(workspace_members, fields=("id", "member", "role"), many=True)
         else:
             serializer = WorkSpaceMemberSerializer(workspace_members, fields=("id", "member", "role"), many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        data = serializer.data
+        if isinstance(data, list):
+            assignments = UserOrganizationRole.objects.filter(
+                workspace__slug=slug, is_active=True, role__is_active=True
+            ).select_related("role")
+            roles_by_user = {}
+            for assignment in assignments:
+                roles_by_user.setdefault(str(assignment.user_id), []).append(
+                    {
+                        "id": str(assignment.role_id),
+                        "name": assignment.role.name,
+                        "system_key": assignment.role.system_key,
+                    }
+                )
+            memberships_by_user = {str(row.member_id): row for row in workspace_members}
+            for row in data:
+                user_id = str(row["member"]["id"])
+                row["organization_roles"] = roles_by_user.get(user_id, [])
+                row["is_active"] = (
+                    memberships_by_user[user_id].is_active and memberships_by_user[user_id].member.is_active
+                )
+        return Response(data, status=status.HTTP_200_OK)
 
-    @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
+    @require_any_permission("Issue.View", "User.View")
     def retrieve(self, request, slug, pk):
-        workspace_member = WorkspaceMember.objects.get(member=request.user, workspace__slug=slug, is_active=True)
-
         try:
             # Get the specific workspace member by pk
             member = self.get_queryset().get(pk=pk)
@@ -127,110 +204,67 @@ class WorkSpaceMemberViewSet(BaseViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        if workspace_member.role > ROLE.GUEST.value:
+        if not any(has_permission(request.user, slug, code, request=request) for code in ("User.View", "Issue.Assign")):
+            project_ids = ProjectMember.objects.filter(
+                workspace__slug=slug, member=request.user, is_active=True
+            ).values_list("project_id", flat=True)
+            if (
+                member.member_id != request.user.id
+                and not ProjectMember.objects.filter(
+                    workspace__slug=slug, project_id__in=project_ids, member_id=member.member_id, is_active=True
+                ).exists()
+            ):
+                return Response(status=404)
+        if has_permission(request.user, slug, "User.View", request=request):
             serializer = WorkspaceMemberAdminSerializer(member, fields=("id", "member", "role"))
         else:
             serializer = WorkSpaceMemberSerializer(member, fields=("id", "member", "role"))
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    @allow_permission(allowed_roles=[ROLE.ADMIN], level="WORKSPACE")
+    @require_permission("User.Role.Assign")
     def partial_update(self, request, slug, pk):
-        if "role" in request.data:
+        membership = self.get_queryset().get(pk=pk)
+        workspace = membership.workspace
+        ids = request.data.get("role_ids")
+        if ids is None and "role" in request.data:
             try:
-                role = int(request.data["role"])
-            except (TypeError, ValueError):
-                return Response({"error": "نقش کاربر نامعتبر است"}, status=status.HTTP_400_BAD_REQUEST)
-            if role not in [ROLE.MEMBER.value, ROLE.ADMIN.value]:
-                return Response({"error": "نقش باید مدیر یا کاربر عادی باشد"}, status=status.HTTP_400_BAD_REQUEST)
-
-        workspace_member = WorkspaceMember.objects.get(
-            pk=pk, workspace__slug=slug, member__is_bot=False, is_active=True
-        )
-        if request.user.id == workspace_member.member_id:
-            return Response(
-                {"error": "نمی‌توانید نقش خود را به‌روز کنید"},
-                status=status.HTTP_400_BAD_REQUEST,
+                numeric_role = int(request.data["role"])
+            except (ValueError, TypeError):
+                return Response({"role": ["Invalid role."]}, status=400)
+            if numeric_role not in (15, 20):
+                return Response({"role": ["Invalid role."]}, status=400)
+            ids = list(
+                OrganizationRole.objects.filter(
+                    workspace=workspace, system_key="admin" if numeric_role == 20 else "member"
+                ).values_list("id", flat=True)
             )
+        if ids is None:
+            return Response({"role_ids": ["Role identifiers are required."]}, status=400)
+        try:
+            with access_transaction(workspace):
+                sync_user_roles(workspace, membership.member, ids)
+                audit_access(
+                    request,
+                    workspace,
+                    "user.roles",
+                    membership.member_id,
+                    changes={"role_ids": [role_id for role_id in ids]},
+                )
+        except ValidationError as exc:
+            return Response(getattr(exc, "message_dict", {"error": exc.messages}), status=400)
+        membership.refresh_from_db()
+        return Response(WorkspaceMemberAdminSerializer(membership).data)
 
-        serializer = WorkSpaceMemberSerializer(workspace_member, data=request.data, partial=True)
-
-        if serializer.is_valid():
-            serializer.save()
-            if "role" in request.data:
-                ProjectMember.objects.filter(
-                    workspace__slug=slug,
-                    member_id=workspace_member.member_id,
-                    is_active=True,
-                ).update(role=role, updated_at=timezone.now())
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    @allow_permission(allowed_roles=[ROLE.ADMIN], level="WORKSPACE")
+    @require_permission("User.Delete")
     def destroy(self, request, slug, pk):
-        # Check the user role who is deleting the user
-        workspace_member = WorkspaceMember.objects.get(
-            workspace__slug=slug, pk=pk, member__is_bot=False, is_active=True
-        )
-
-        # check requesting user role
-        requesting_workspace_member = WorkspaceMember.objects.get(
-            workspace__slug=slug, member=request.user, is_active=True
-        )
-
-        if str(workspace_member.id) == str(requesting_workspace_member.id):
-            return Response(
-                {"error": "نمی‌توانید خودتان را از فضای کاری حذف کنید. لطفاً از گزینه ترک فضای کاری استفاده کنید"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if requesting_workspace_member.role < workspace_member.role:
-            return Response(
-                {"error": "نمی‌توانید کاربری را که نقش بالاتر از شماست، حذف کنید"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if (
-            Project.objects.annotate(
-                total_members=Count("project_projectmember"),
-                member_with_role=Count(
-                    "project_projectmember",
-                    filter=Q(
-                        project_projectmember__member_id=workspace_member.id,
-                        project_projectmember__role=20,
-                    ),
-                ),
-            )
-            .filter(total_members=1, member_with_role=1, workspace__slug=slug)
-            .exists()
-        ):
-            return Response(
-                {
-                    "error": "کاربر در برخی پروژه‌ها عضو است که در آن‌ها تنها مدیر است؛ باید از آن پروژه خارج شود یا کاربر دیگری را به مدیریت تفویض کند."  # noqa: E501
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # Deactivate the users from the projects where the user is part of
-        _ = ProjectMember.objects.filter(
-            workspace__slug=slug, member_id=workspace_member.member_id, is_active=True
-        ).update(is_active=False, updated_at=timezone.now())
-
-        workspace_member.is_active = False
-        workspace_member.save()
-
-        # Accounts created by workspace administrators are lifecycle-managed by
-        # the application. Once their final membership is removed, anonymize
-        # login identifiers so the username/email can safely be reused while
-        # historical issue and audit foreign keys remain intact.
-        user = workspace_member.member
-        if user.is_managed and not WorkspaceMember.objects.filter(member=user, is_active=True).exists():
-            tombstone = uuid.uuid4().hex
-            user.username = f"deleted-{tombstone}"
-            user.email = f"deleted-{tombstone}@invalid.local"
-            user.is_active = False
-            user.set_unusable_password()
-            user.save(update_fields=["username", "email", "is_active", "password", "updated_at"])
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        membership = self.get_queryset().get(pk=pk)
+        try:
+            with access_transaction(membership.workspace):
+                remove_workspace_user(membership.workspace, membership.member)
+                audit_access(request, membership.workspace, "user.remove", membership.member_id)
+        except ValidationError as exc:
+            return Response(getattr(exc, "message_dict", {"error": exc.messages}), status=400)
+        return Response(status=204)
 
     @invalidate_cache(
         path="/api/workspaces/:slug/members/",
@@ -242,50 +276,14 @@ class WorkSpaceMemberViewSet(BaseViewSet):
     @invalidate_cache(path="api/users/me/workspaces/", user=False, multiple=True)
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def leave(self, request, slug):
-        workspace_member = WorkspaceMember.objects.get(workspace__slug=slug, member=request.user, is_active=True)
-
-        # Check if the leaving user is the only admin of the workspace
-        if (
-            workspace_member.role == 20
-            and not WorkspaceMember.objects.filter(workspace__slug=slug, role=20, is_active=True).count() > 1
-        ):
-            return Response(
-                {
-                    "error": "نمی‌توانید فضای کاری را ترک کنید، چون شما تنها مدیر فضای کاری هستید. شما باید فضای کاری را حذف کنید یا کاربر دیگری را به مدیریت ارتقا دهید."  # noqa: E501
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if (
-            Project.objects.annotate(
-                total_members=Count("project_projectmember"),
-                member_with_role=Count(
-                    "project_projectmember",
-                    filter=Q(
-                        project_projectmember__member_id=request.user.id,
-                        project_projectmember__role=20,
-                    ),
-                ),
-            )
-            .filter(total_members=1, member_with_role=1, workspace__slug=slug)
-            .exists()
-        ):
-            return Response(
-                {
-                    "error": "شما در برخی پروژه‌هایی که عضو ادمن تنها هستید، باید از پروژه خارج شوید یا کاربر دیگری را به ادمنیت تفویض کنید."  # noqa: E501
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # # Deactivate the users from the projects where the user is part of
-        _ = ProjectMember.objects.filter(
-            workspace__slug=slug, member_id=workspace_member.member_id, is_active=True
-        ).update(is_active=False, updated_at=timezone.now())
-
-        # # Deactivate the user
-        workspace_member.is_active = False
-        workspace_member.save()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        membership = WorkspaceMember.objects.get(workspace__slug=slug, member=request.user, is_active=True)
+        try:
+            with access_transaction(membership.workspace):
+                remove_workspace_user(membership.workspace, request.user)
+                audit_access(request, membership.workspace, "user.leave", request.user.id)
+        except ValidationError as exc:
+            return Response(getattr(exc, "message_dict", {"error": exc.messages}), status=400)
+        return Response(status=204)
 
 
 class WorkspaceMemberUserViewsEndpoint(BaseAPIView):
@@ -324,12 +322,7 @@ class WorkspaceProjectMemberEndpoint(BaseAPIView):
     permission_classes = [WorkspaceEntityPermission]
 
     def get(self, request, slug):
-        is_workspace_admin = WorkspaceMember.objects.filter(
-            workspace__slug=slug,
-            member=request.user,
-            role=ROLE.ADMIN.value,
-            is_active=True,
-        ).exists()
+        is_workspace_admin = has_permission(request.user, slug, "Project.ViewAll", request=request)
         project_ids = (
             Project.objects.filter(workspace__slug=slug).values_list("id", flat=True)
             if is_workspace_admin

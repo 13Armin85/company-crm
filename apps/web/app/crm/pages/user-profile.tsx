@@ -8,179 +8,168 @@ import {
   useUpdateOrganizationUserProfile,
   useWorkspaceAccess,
 } from "../api";
+import { MultiSelector } from "../access/components";
+import { UserAccessPanel } from "../access/user-access";
 import { Button, PageHeader, Skeleton } from "../components";
 import { useUIStore } from "../store";
 import type { OrganizationUserProfile } from "../types";
-import { toFa } from "../utils";
 
 export default function UserProfilePage() {
   const { userId = "" } = useParams();
   const slug = useUIStore((state) => state.workspaceSlug) ?? "";
   const setFormDirty = useUIStore((state) => state.setFormDirty);
   const { data: access, isLoading: accessLoading } = useWorkspaceAccess();
-  const { data: profile, isLoading } = useOrganizationUserProfile(userId);
-  const isAdmin = access?.isAdmin === true;
-  const { data: roles = [] } = useOrganizationRoles(undefined, isAdmin);
-  const { data: units = [] } = useOrganizationUnits(undefined, isAdmin);
-  const updateProfile = useUpdateOrganizationUserProfile(slug, userId);
-  const [form, setForm] = useState<OrganizationUserProfile & { password: string }>();
+  const { data: profile, isLoading, error } = useOrganizationUserProfile(userId);
+  const { data: roles = [] } = useOrganizationRoles(undefined, access?.can("User.Role.Assign") ?? false);
+  const { data: units = [] } = useOrganizationUnits(
+    undefined,
+    (access?.can("OrganizationUnit.View") || access?.can("OrganizationUnit.Member.Manage")) ?? false
+  );
+  const update = useUpdateOrganizationUserProfile(slug, userId);
+  const [form, setForm] = useState<OrganizationUserProfile>();
   useEffect(() => {
-    if (profile) setForm({ ...profile, password: "" });
+    if (profile) setForm(profile);
   }, [profile]);
-  const isDirty = useMemo(() => {
-    if (!form || !profile) return false;
-    const sameIds = (left: string[], right: string[]) =>
-      left.length === right.length && left.every((id) => right.includes(id));
-    return (
-      form.firstName !== profile.firstName ||
-      form.lastName !== profile.lastName ||
-      form.displayName !== profile.displayName ||
-      form.username !== profile.username ||
-      form.email !== profile.email ||
-      form.isActive !== profile.isActive ||
-      Boolean(form.password) ||
-      !sameIds(form.roleIds, profile.roleIds) ||
-      !sameIds(form.unitIds, profile.unitIds)
-    );
-  }, [form, profile]);
+  const isDirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(profile), [form, profile]);
   useEffect(() => {
     setFormDirty("organization-user-profile", isDirty);
     return () => setFormDirty("organization-user-profile", false);
   }, [isDirty, setFormDirty]);
-  const maximumSelectedLevel = useMemo(
-    () =>
-      Math.max(
-        0,
-        ...roles.filter((role) => form?.roleIds.includes(role.id) && role.isActive).map((role) => role.level)
-      ),
-    [form?.roleIds, roles]
-  );
   if (accessLoading) return <Skeleton rows={6} />;
-  if (!access?.isAdmin) return <Navigate to="/my-work" replace />;
+  if (!access?.can("User.View")) return <Navigate to="/my-work" replace />;
+  if (error) return <p role="alert">دریافت پروفایل انجام نشد.</p>;
   if (isLoading || !form) return <Skeleton rows={7} />;
-  const toggle = (key: "roleIds" | "unitIds", id: string, checked: boolean) =>
-    setForm({ ...form, [key]: checked ? [...form[key], id] : form[key].filter((value) => value !== id) });
+  const canEdit = access.can("User.Edit");
+  const canSave = canEdit || access.can("User.Role.Assign") || access.can("OrganizationUnit.Member.Manage");
   return (
     <div>
       <PageHeader
         eyebrow="مدیریت کاربران"
         title={form.displayName || "پروفایل کاربر"}
-        description={`بالاترین Level فعال: ${toFa(maximumSelectedLevel)}`}
+        description="اطلاعات هویتی و دسترسی‌های کاربر در این شرکت"
         actions={
-          <Button
-            icon={Save}
-            type="submit"
-            disabled={updateProfile.isPending}
-            onClick={() =>
-              updateProfile.mutate({
-                first_name: form.firstName,
-                last_name: form.lastName,
-                display_name: form.displayName,
-                username: form.username,
-                email: form.email,
-                password: form.password || undefined,
-                is_active: form.isActive,
-                role_ids: form.roleIds,
-                unit_ids: form.unitIds,
-              })
-            }
-          >
-            ذخیره تغییرات
-          </Button>
+          canSave && (
+            <Button
+              icon={Save}
+              disabled={update.isPending || !isDirty}
+              onClick={() =>
+                update.mutate({
+                  ...(canEdit
+                    ? {
+                        first_name: form.firstName,
+                        last_name: form.lastName,
+                        display_name: form.displayName,
+                        username: form.username,
+                        email: form.email,
+                        is_active: form.isActive,
+                      }
+                    : {}),
+                  role_ids:
+                    access.can("User.Role.Assign") &&
+                    form.isActive &&
+                    profile?.isActive &&
+                    JSON.stringify(form.roleIds) !== JSON.stringify(profile.roleIds)
+                      ? form.roleIds
+                      : undefined,
+                  unit_ids:
+                    access.can("OrganizationUnit.Member.Manage") &&
+                    form.isActive &&
+                    profile?.isActive &&
+                    JSON.stringify(form.unitIds) !== JSON.stringify(profile.unitIds)
+                      ? form.unitIds
+                      : undefined,
+                })
+              }
+            >
+              ذخیره تغییرات
+            </Button>
+          )
         }
       />
       <section className="panel user-profile-admin">
         <header>
           <UserRound size={24} />
-          <div>
-            <h2>اطلاعات حساب</h2>
-            <p>نام کاربری و ایمیل در کل سیستم یکتا هستند.</p>
-          </div>
+          <h2>اطلاعات حساب</h2>
         </header>
-        <div className="form-grid">
-          <label>
-            <span>نام</span>
-            <input value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} />
-          </label>
-          <label>
-            <span>نام خانوادگی</span>
-            <input value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} />
-          </label>
-          <label>
-            <span>نام نمایشی</span>
-            <input value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} />
-          </label>
-          <label>
-            <span>Username</span>
-            <input dir="ltr" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
-          </label>
-          <label>
-            <span>Email</span>
+        <fieldset disabled={!canEdit || update.isPending}>
+          <div className="form-grid">
+            <label>
+              <span>نام</span>
+              <input value={form.firstName} onChange={(event) => setForm({ ...form, firstName: event.target.value })} />
+            </label>
+            <label>
+              <span>نام خانوادگی</span>
+              <input value={form.lastName} onChange={(event) => setForm({ ...form, lastName: event.target.value })} />
+            </label>
+            <label>
+              <span>نام نمایشی</span>
+              <input
+                value={form.displayName}
+                onChange={(event) => setForm({ ...form, displayName: event.target.value })}
+              />
+            </label>
+            <label>
+              <span>نام کاربری</span>
+              <input
+                dir="ltr"
+                value={form.username}
+                onChange={(event) => setForm({ ...form, username: event.target.value })}
+              />
+            </label>
+            <label>
+              <span>ایمیل</span>
+              <input
+                dir="ltr"
+                type="email"
+                value={form.email}
+                onChange={(event) => setForm({ ...form, email: event.target.value })}
+              />
+            </label>
+          </div>
+          <label className="active-toggle">
             <input
-              dir="ltr"
-              type="email"
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              type="checkbox"
+              checked={form.isActive}
+              onChange={(event) => setForm({ ...form, isActive: event.target.checked })}
             />
+            <span>عضویت فعال در این شرکت</span>
           </label>
-          <label>
-            <span>رمز عبور جدید (اختیاری)</span>
-            <input
-              dir="ltr"
-              type="password"
-              minLength={8}
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-            />
-          </label>
-        </div>
-        <label className="active-toggle">
-          <input
-            type="checkbox"
-            checked={form.isActive}
-            onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
-          />
-          <span>حساب فعال باشد</span>
-        </label>
+        </fieldset>
       </section>
       <div className="profile-assignment-grid">
         <section className="panel assignment-card">
-          <h2>Roleها</h2>
-          <p>یک کاربر می‌تواند هم‌زمان چند نقش فعال داشته باشد.</p>
-          {roles.map((role) => (
-            <label key={role.id} className={!role.isActive ? "is-inactive" : ""}>
-              <input
-                type="checkbox"
-                disabled={!role.isActive}
-                checked={form.roleIds.includes(role.id)}
-                onChange={(e) => toggle("roleIds", role.id, e.target.checked)}
-              />
-              <span>
-                {role.name}
-                <small>Level {toFa(role.level)}</small>
-              </span>
-            </label>
-          ))}
+          <h2>نقش‌ها</h2>
+          {!form.isActive && <p>برای تغییر نقش، ابتدا عضویت کاربر را فعال و ذخیره کنید.</p>}
+          <MultiSelector
+            label="نقش‌های سازمانی"
+            disabled={update.isPending || !access.can("User.Role.Assign") || !form.isActive || !profile?.isActive}
+            selected={form.roleIds}
+            onChange={(roleIds) => setForm({ ...form, roleIds })}
+            options={roles.map((role) => ({
+              id: role.id,
+              title: role.name,
+              description: role.description,
+              disabled: !role.isActive,
+            }))}
+          />
         </section>
         <section className="panel assignment-card">
-          <h2>Teamها</h2>
-          <p>عضویت تیم مستقل از Role است.</p>
-          {units.map((unit) => (
-            <label key={unit.id} className={!unit.isActive ? "is-inactive" : ""}>
-              <input
-                type="checkbox"
-                disabled={!unit.isActive}
-                checked={form.unitIds.includes(unit.id)}
-                onChange={(e) => toggle("unitIds", unit.id, e.target.checked)}
-              />
-              <span>
-                {unit.title}
-                <small>{unit.managerName ? `مدیر: ${unit.managerName}` : "بدون مدیر"}</small>
-              </span>
-            </label>
-          ))}
+          <h2>واحدهای سازمانی</h2>
+          <MultiSelector
+            label="واحدها"
+            disabled={update.isPending || !access.can("OrganizationUnit.Member.Manage") || !form.isActive}
+            selected={form.unitIds}
+            onChange={(unitIds) => setForm({ ...form, unitIds })}
+            options={units.map((unit) => ({
+              id: unit.id,
+              title: unit.title,
+              description: unit.managerName,
+              disabled: !unit.isActive,
+            }))}
+          />
         </section>
       </div>
+      <UserAccessPanel userId={userId} />
     </div>
   );
 }

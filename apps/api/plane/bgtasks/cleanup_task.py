@@ -88,6 +88,7 @@ def get_api_logs_queryset():
     logger.info(f"API logs cutoff time: {cutoff_time}")
     return (
         APIActivityLog.all_objects.filter(created_at__lte=cutoff_time)
+        .exclude(token_identifier__startswith="crm-migration:")
         .values_list("id", flat=True)
         .iterator(chunk_size=BATCH_SIZE)
     )

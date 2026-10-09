@@ -15,11 +15,14 @@ from django.utils import timezone
 
 # Third party modules
 from rest_framework import status
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 
 # Module imports
-from plane.app.permissions import WorkSpaceAdminPermission
+from plane.app.permissions.crm import require_permission, require_any_permission
+from plane.app.services.access_control import has_permission
+from plane.app.services.access_mutations import require_field_permission, audit_access
 from plane.app.serializers import (
     WorkSpaceMemberInviteSerializer,
     WorkSpaceMemberInvitePublicSerializer,
@@ -39,7 +42,7 @@ class WorkspaceInvitationsViewset(BaseViewSet):
     serializer_class = WorkSpaceMemberInviteSerializer
     model = WorkspaceMemberInvite
 
-    permission_classes = [WorkSpaceAdminPermission]
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         return self.filter_queryset(
@@ -49,21 +52,44 @@ class WorkspaceInvitationsViewset(BaseViewSet):
             .select_related("workspace", "workspace__owner", "created_by")
         )
 
+    @require_permission("User.View")
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+
+    @require_permission("User.View")
+    def retrieve(self, request, *args, **kwargs):
+        return super().retrieve(request, *args, **kwargs)
+
+    @require_any_permission("User.Edit", "User.Role.Assign")
+    def partial_update(self, request, *args, **kwargs):
+        require_field_permission(request, kwargs["slug"], "role", "User.Role.Assign")
+        if set(request.data) - {"role"} and not has_permission(
+            request.user, kwargs["slug"], "User.Edit", request=request
+        ):
+            raise PermissionDenied("Missing permission: User.Edit")
+        if "role" in request.data and request.data["role"] not in (5, 10, 15, 20):
+            return Response({"role": "Invalid compatibility role."}, status=status.HTTP_400_BAD_REQUEST)
+        response = super().partial_update(request, *args, **kwargs)
+        if response.status_code == 200:
+            audit_access(request, Workspace.objects.get(slug=kwargs["slug"]), "invitation.updated", kwargs["pk"])
+        return response
+
+    @require_permission("User.Create")
     def create(self, request, slug):
         emails = request.data.get("emails", [])
         # Check if email is provided
         if not emails:
             return Response({"error": "آدرس‌های ایمیل الزامی هستند"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # check for role level of the requesting user
-        requesting_user = WorkspaceMember.objects.get(workspace__slug=slug, member=request.user, is_active=True)
-
-        # Check if any invited user has an higher role
-        if len([email for email in emails if int(email.get("role", 5)) > requesting_user.role]):
-            return Response(
-                {"error": "نمی‌توانید کاربری را با نقش بالاتر دیتال کنید"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        if not isinstance(emails, list) or any(not isinstance(email, dict) for email in emails):
+            return Response({"emails": "Expected a list of invitation objects."}, status=status.HTTP_400_BAD_REQUEST)
+        if any(email.get("role", 5) not in (5, 10, 15, 20) for email in emails):
+            return Response({"role": "Invalid compatibility role."}, status=status.HTTP_400_BAD_REQUEST)
+        # Numeric values are accepted only as Plane compatibility input.
+        if any(email.get("role", 5) == 20 for email in emails) and not has_permission(
+            request.user, slug, "User.Role.Assign", request=request
+        ):
+            raise PermissionDenied("Missing permission: User.Role.Assign")
 
         # Get the workspace object
         workspace = Workspace.objects.get(slug=slug)
@@ -127,6 +153,7 @@ class WorkspaceInvitationsViewset(BaseViewSet):
 
         return Response({"message": "ایمیل‌ها با موفقیت ارسال شدند"}, status=status.HTTP_200_OK)
 
+    @require_permission("User.Delete")
     def destroy(self, request, slug, pk):
         workspace_member_invite = WorkspaceMemberInvite.objects.get(pk=pk, workspace__slug=slug)
         workspace_member_invite.delete()
@@ -278,6 +305,15 @@ class UserWorkspaceInvitationsViewSet(BaseViewSet):
         )
 
         # Delete joined workspace invites
+        from plane.app.services.permission_registry import initialize_bulk_memberships
+
+        initialize_bulk_memberships(
+            WorkspaceMember.objects.filter(
+                member=request.user,
+                workspace_id__in=workspace_invitations.values_list("workspace_id", flat=True),
+                is_active=True,
+            )
+        )
         workspace_invitations.delete()
 
         return Response(status=status.HTTP_204_NO_CONTENT)

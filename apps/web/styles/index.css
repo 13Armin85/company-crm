@@ -72,34 +72,11 @@ a {
   white-space: nowrap;
 }
 .brand-mark {
-  position: relative;
-  width: 29px;
-  height: 29px;
-  flex: 0 0 29px;
-  border-radius: 9px;
-  background: linear-gradient(145deg, #7169ff, var(--accent));
-  box-shadow: 0 7px 18px #4f46e555;
-}
-.brand-mark i {
-  position: absolute;
   display: block;
-  background: white;
-  border-radius: 2px;
-  width: 4px;
-  bottom: 7px;
-  transform: rotate(35deg);
-}
-.brand-mark i:nth-child(1) {
-  height: 8px;
-  right: 7px;
-}
-.brand-mark i:nth-child(2) {
-  height: 14px;
-  right: 13px;
-}
-.brand-mark i:nth-child(3) {
-  height: 11px;
-  right: 19px;
+  width: 38px;
+  height: 32px;
+  flex: 0 0 38px;
+  object-fit: contain;
 }
 .main-nav {
   display: flex;
@@ -3424,9 +3401,12 @@ a {
     0 0 0 140px #ffffff05;
 }
 .auth-brand-mark {
-  width: 45px;
-  height: 45px;
-  transform: scale(1.2);
+  display: block;
+  width: min(240px, 100%);
+  height: auto;
+  object-fit: contain;
+  position: relative;
+  z-index: 1;
 }
 .auth-showcase > div {
   position: relative;

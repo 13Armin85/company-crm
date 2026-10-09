@@ -29,6 +29,7 @@ export default [
     route("organization", "./crm/pages/organization.tsx"),
     route("roles", "./crm/pages/roles.tsx"),
     route("routing", "./crm/pages/routing.tsx"),
+    route("absences", "./crm/pages/absences.tsx"),
     route("settings", "./crm/pages/settings.tsx"),
     route("*", "./crm/pages/not-found.tsx"),
   ]),

@@ -1,7 +1,6 @@
 """Deterministic organization-aware ticket routing."""
 
 from django.db import transaction
-from django.db.models import Max
 
 from plane.db.models import (
     Issue,
@@ -38,8 +37,22 @@ class TicketRoutingService:
         )
         if not active_roles.filter(role_id=rule.required_role_id).exists():
             return None
-        maximum_level = active_roles.aggregate(level=Max("role__level"))["level"] or 0
-        return manager if maximum_level >= rule.required_level else None
+        from .access_control import delegation_context
+
+        substitution = delegation_context(rule.workspace_id).get(unit.id)
+        if substitution:
+            from plane.db.models import User
+
+            return User.objects.get(pk=substitution["user_id"])
+        from plane.db.models import UserAbsence
+        from django.utils import timezone
+
+        now = timezone.now()
+        if UserAbsence.objects.filter(
+            workspace_id=rule.workspace_id, user=manager, status="scheduled", starts_at__lte=now, ends_at__gt=now
+        ).exists():
+            return None
+        return manager
 
     @classmethod
     @transaction.atomic
@@ -87,7 +100,6 @@ class TicketRoutingService:
             status=TicketRoleQueueEntry.Status.OPEN,
             defaults={
                 "required_role": rule.required_role,
-                "required_level": rule.required_level,
             },
         )
         return TicketRoutingDecision.objects.create(

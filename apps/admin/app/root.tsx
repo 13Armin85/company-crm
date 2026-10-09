@@ -7,6 +7,7 @@
 import type { ReactNode } from "react";
 import { Links, Meta, Outlet, Scripts } from "react-router";
 import type { LinksFunction } from "react-router";
+import { ADMIN_BASE_PATH, COMPANY_BRAND_VERSION } from "@plane/constants";
 import appleTouchIcon from "@/app/assets/favicon/apple-touch-icon.png?url";
 import favicon16 from "@/app/assets/favicon/favicon-16x16.png?url";
 import favicon32 from "@/app/assets/favicon/favicon-32x32.png?url";
@@ -28,7 +29,7 @@ export const links: LinksFunction = () => [
   { rel: "icon", type: "image/png", sizes: "32x32", href: favicon32 },
   { rel: "icon", type: "image/png", sizes: "16x16", href: favicon16 },
   { rel: "shortcut icon", href: faviconIco },
-  { rel: "manifest", href: `/site.webmanifest.json` },
+  { rel: "manifest", href: `${ADMIN_BASE_PATH}/site.webmanifest.json?v=${COMPANY_BRAND_VERSION}` },
   { rel: "stylesheet", href: globalStyles },
   {
     rel: "preload",

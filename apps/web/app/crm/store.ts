@@ -27,6 +27,7 @@ interface UIState {
   setWorkspaceSlug: (value: string) => void;
   setFormDirty: (key: string, value: boolean) => void;
   clearDirtyForms: () => void;
+  resetSession: () => void;
   toast: (message: string, kind?: Toast["kind"]) => void;
   removeToast: (id: number) => void;
 }
@@ -70,6 +71,15 @@ export const useUIStore = create<UIState>((set, get) => ({
         : state.dirtyForms.filter((item) => item !== key),
     })),
   clearDirtyForms: () => set({ dirtyForms: [] }),
+  resetSession: () =>
+    set({
+      workspaceSlug: undefined,
+      dirtyForms: [],
+      notificationOpen: false,
+      commandOpen: false,
+      createOpen: false,
+      toasts: [],
+    }),
   toast: (message, kind = "success") => {
     const id = Date.now();
     set({ toasts: [...get().toasts, { id, message, kind }] });

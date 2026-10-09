@@ -11,6 +11,7 @@ from io import BytesIO
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
+from django.db.models import Q
 from plane.utils.url_security import pinned_fetch_following_redirects
 
 # Django imports
@@ -100,15 +101,21 @@ class Adapter:
         return
 
     def __check_signup(self, email):
-        """Check if sign up is enabled or not and raise exception if not enabled"""
+        """Only an outstanding organization invitation may provision an account.
 
-        # Get configuration value
-        (ENABLE_SIGNUP,) = get_configuration_value(
-            [{"key": "ENABLE_SIGNUP", "default": os.environ.get("ENABLE_SIGNUP", "1")}]
+        Existing users can still authenticate through every configured provider.
+        Public registration stays disabled even with a stale ENABLE_SIGNUP value.
+        """
+        invitations = WorkspaceMemberInvite.objects.filter(
+            Q(accepted=True) | Q(accepted=False, responded_at__isnull=True),
+            email__iexact=email, workspace__deleted_at__isnull=True,
         )
-
-        # Check if sign up is disabled and invite is present or not
-        if ENABLE_SIGNUP == "0" and not WorkspaceMemberInvite.objects.filter(email=email).exists():
+        if self.provider == "email":
+            # Password registration must prove possession of the invitation;
+            # magic/OAuth providers already verify control of the email address.
+            token = self.request.POST.get("invitation_token", "")
+            invitations = invitations.filter(token=token) if token else invitations.none()
+        if not invitations.exists():
             self.logger.warning("Sign up is disabled and invite is not present")
             # Raise exception
             raise AuthenticationException(

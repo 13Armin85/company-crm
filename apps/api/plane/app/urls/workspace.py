@@ -3,6 +3,17 @@
 # See the LICENSE file for details.
 
 from django.urls import path
+from plane.app.views.workspace.access import (
+    AccessMeEndpoint,
+    EffectivePermissionsEndpoint,
+    OrganizationPasswordEndpoint,
+    OrganizationRemoveUserEndpoint,
+    UserExceptionListEndpoint,
+    UserExceptionDetailEndpoint,
+    UnitDelegateEndpoint,
+    AbsenceListEndpoint,
+    AbsenceDetailEndpoint,
+)
 
 
 from plane.app.views import (
@@ -54,6 +65,23 @@ from plane.app.views import (
 
 
 urlpatterns = [
+    path("workspaces/<str:slug>/access/me/", AccessMeEndpoint.as_view()),
+    path(
+        "workspaces/<str:slug>/organization/users/<uuid:user_id>/effective-permissions/",
+        EffectivePermissionsEndpoint.as_view(),
+    ),
+    path("workspaces/<str:slug>/organization/users/<uuid:user_id>/password/", OrganizationPasswordEndpoint.as_view()),
+    path(
+        "workspaces/<str:slug>/organization/users/<uuid:user_id>/membership/", OrganizationRemoveUserEndpoint.as_view()
+    ),
+    path("workspaces/<str:slug>/organization/users/<uuid:user_id>/exceptions/", UserExceptionListEndpoint.as_view()),
+    path(
+        "workspaces/<str:slug>/organization/users/<uuid:user_id>/exceptions/<uuid:exception_id>/",
+        UserExceptionDetailEndpoint.as_view(),
+    ),
+    path("workspaces/<str:slug>/organization/units/<uuid:unit_id>/delegates/", UnitDelegateEndpoint.as_view()),
+    path("workspaces/<str:slug>/organization/absences/", AbsenceListEndpoint.as_view()),
+    path("workspaces/<str:slug>/organization/absences/<uuid:absence_id>/", AbsenceDetailEndpoint.as_view()),
     path(
         "workspaces/<str:slug>/organization/permissions/",
         OrganizationPermissionListEndpoint.as_view(),
