@@ -1,12 +1,13 @@
-import { toJalaali } from "jalaali-js";
+import { displayPersianDate, validTimeZone } from "@plane/ui";
 
 import type { Priority, Status } from "./types";
 
 export const toFa = (value: string | number) => String(value).replace(/\d/g, (digit) => "۰۱۲۳۴۵۶۷۸۹"[Number(digit)]);
 export const persianDate = (date?: string | Date, options?: Intl.DateTimeFormatOptions) => {
   if (!date) return "بدون تاریخ";
-  const parsedDate = new Date(date);
-  const { jy, jm, jd } = toJalaali(parsedDate.getFullYear(), parsedDate.getMonth() + 1, parsedDate.getDate());
+  const parsed = displayPersianDate(date, validTimeZone(options?.timeZone));
+  if (!parsed) return "تاریخ نامعتبر";
+  const { jy, jm, jd } = parsed;
   const months = [
     "فروردین",
     "اردیبهشت",
@@ -21,7 +22,15 @@ export const persianDate = (date?: string | Date, options?: Intl.DateTimeFormatO
     "بهمن",
     "اسفند",
   ];
-  return `${toFa(jd)} ${months[jm - 1]}${options?.year ? ` ${toFa(jy)}` : ""}`;
+  const clock = options?.hour
+    ? " · " +
+      new Intl.DateTimeFormat("fa-IR", {
+        timeZone: validTimeZone(options.timeZone),
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(new Date(date))
+    : "";
+  return `${toFa(jd)} ${months[jm - 1]}${options?.year ? ` ${toFa(jy)}` : ""}${clock}`;
 };
 export const greeting = (hour = new Date().getHours()) => {
   if (hour < 12) return "صبح بخیر";

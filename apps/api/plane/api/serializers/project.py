@@ -96,6 +96,7 @@ class ProjectCreateSerializer(BaseSerializer):
 
         read_only_fields = [
             "id",
+            "identifier",
             "workspace",
             "created_at",
             "updated_at",
@@ -140,14 +141,6 @@ class ProjectCreateSerializer(BaseSerializer):
         return data
 
     def create(self, validated_data):
-        identifier = validated_data.get("identifier", "").strip().upper()
-
-        if identifier == "":
-            raise serializers.ValidationError(detail="شناسه‌ی پروژه الزامی است")
-
-        if ProjectIdentifier.objects.filter(name=identifier, workspace_id=self.context["workspace_id"]).exists():
-            raise serializers.ValidationError(detail="شناسه‌ی پروژه قبلاً استفاده شده است")
-
         if validated_data.get("logo_props", None) is None:
             # Generate a random icon and color for the project icon
             validated_data["logo_props"] = {
@@ -228,6 +221,7 @@ class ProjectSerializer(BaseSerializer):
         fields = "__all__"
         read_only_fields = [
             "id",
+            "identifier",
             "emoji",
             "workspace",
             "created_at",
@@ -281,13 +275,6 @@ class ProjectSerializer(BaseSerializer):
         return data
 
     def create(self, validated_data):
-        identifier = validated_data.get("identifier", "").strip().upper()
-        if identifier == "":
-            raise serializers.ValidationError(detail="شناسه‌ی پروژه الزامی است")
-
-        if ProjectIdentifier.objects.filter(name=identifier, workspace_id=self.context["workspace_id"]).exists():
-            raise serializers.ValidationError(detail="شناسه‌ی پروژه قبلاً استفاده شده است")
-
         project = Project.objects.create(**validated_data, workspace_id=self.context["workspace_id"])
         _ = ProjectIdentifier.objects.create(
             name=project.identifier,

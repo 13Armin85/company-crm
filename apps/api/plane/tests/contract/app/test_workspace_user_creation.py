@@ -50,7 +50,10 @@ def test_removing_workspace_membership_preserves_global_identity(session_client,
     user = User.objects.get(email="first-owner@example.com")
     assert user.username == "reusable.username"
     assert user.is_active
-    assert not WorkspaceMember.objects.get(id=membership_id).is_active
+    assert not WorkspaceMember.objects.filter(id=membership_id).exists()
+    deleted = WorkspaceMember.all_objects.get(id=membership_id)
+    assert not deleted.is_active
+    assert deleted.deleted_at is not None
 
 
 @pytest.mark.django_db

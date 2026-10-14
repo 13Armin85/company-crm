@@ -3,6 +3,7 @@ export interface PermissionExplanation {
   code: string;
   name: string;
   category: string;
+  description?: string;
   granted: boolean;
   source: "user_deny" | "user_allow" | "role" | "delegation" | "no_access";
   role_ids?: string[];
@@ -25,6 +26,7 @@ export interface PermissionExplanation {
 export interface EffectiveAccess {
   permissions: string[];
   explanations: PermissionExplanation[];
+  role_grants?: Omit<PermissionExplanation, "granted">[];
   can: (code: string) => boolean;
 }
 
@@ -32,6 +34,9 @@ export interface PermissionException {
   id: string;
   permission: string;
   permission_code: string;
+  permission_name?: string;
+  permission_category?: string;
+  permission_description?: string;
   effect: "ALLOW" | "DENY";
   starts_at: string | null;
   ends_at: string | null;

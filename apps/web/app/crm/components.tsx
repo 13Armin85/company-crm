@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { IdentifierBadge, ModalCore, PersianDatePicker, SearchableSelect } from "@plane/ui";
+import { DialogTitle } from "@headlessui/react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import {
@@ -15,11 +17,11 @@ import {
   Plus,
   Search,
   Sparkles,
+  ShieldCheck,
   Trash2,
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { jalaaliMonthLength, toGregorian, toJalaali } from "jalaali-js";
 import {
   useArchiveProject,
   useCreateIssue,
@@ -32,29 +34,43 @@ import {
   useMarkNotificationRead,
   useMembers,
   useNotifications,
+  useNotificationDetails,
+  useOrganizationRoles,
+  useOrganizationUnits,
   useProjects,
   useReassignIssue,
   useTicketRoutingRules,
   useUpdateIssueStatus,
   useWorkspaceAccess,
 } from "./api";
+import { AccessModal } from "./access/components";
 import { useUIStore } from "./store";
-import type { Issue, Member, Priority, Project, Status } from "./types";
+import type { Issue, Member, NotificationItem, Priority, Project, Status } from "./types";
 import { persianDate, priorityFa, statusFa, toFa } from "./utils";
+import { issueReference, matchesRecordSearch } from "./identifiers";
 
 export function IconButton({
   children,
   label,
   onClick,
   className = "",
+  disabled = false,
 }: {
   children: ReactNode;
   label: string;
   onClick?: () => void;
   className?: string;
+  disabled?: boolean;
 }) {
   return (
-    <button className={`icon-button ${className}`} aria-label={label} title={label} onClick={onClick}>
+    <button
+      type="button"
+      disabled={disabled}
+      className={`icon-button ${className}`}
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+    >
       {children}
     </button>
   );
@@ -179,9 +195,9 @@ export function IssueRow({
   const navigate = useNavigate();
   const canEdit = access?.can("Issue.Edit") === true;
   const eligibleMembers = canEdit && issue.scope === "project" ? projectMembers : teamMembers;
-  const canChangeStatus =
-    access?.can("Issue.Status.Edit") === true && (canEdit || issue.assignee?.id === currentUser?.id);
-  const canTransfer = access?.can("Issue.Assign") === true && (canEdit || issue.assignee?.id === currentUser?.id);
+  const ownsIssue = Boolean(currentUser?.id) && issue.assignee?.id === currentUser?.id;
+  const canChangeStatus = access?.can("Issue.Status.Edit") === true && (canEdit || ownsIssue);
+  const canTransfer = access?.can("Issue.Assign") === true && (canEdit || ownsIssue);
   const statusOptions: Status[] = ["Todo", "In Progress", "Review", "Done", "Blocked"];
 
   useEffect(() => {
@@ -213,7 +229,7 @@ export function IssueRow({
       <button
         className="issue-check"
         aria-label="تکمیل کار"
-        disabled={!canChangeStatus}
+        disabled={!canChangeStatus || updateStatus.isPending || issue.status === "Done"}
         onClick={() => issue.status !== "Done" && updateStatus.mutate({ issue, status: "Done" })}
       >
         <CircleDot size={16} />
@@ -227,15 +243,13 @@ export function IssueRow({
         <strong>{issue.name}</strong>
         {!table && (
           <span className="issue-code" dir="ltr">
-            {issue.scope === "workspace" ? "خارج از پروژه" : `${issue.projectIdentifier}-${toFa(issue.sequenceId)}`}
+            {issueReference(issue)}
           </span>
         )}
       </button>
       {table && (
         <span className="issue-project" dir="ltr">
-          {issue.scope === "workspace"
-            ? `TEAM-${toFa(issue.sequenceId)}`
-            : `${issue.projectIdentifier}-${toFa(issue.sequenceId)}`}
+          <IdentifierBadge value={issueReference(issue)} label="شناسه کار" />
         </span>
       )}
       {table && (
@@ -247,7 +261,34 @@ export function IssueRow({
           <span>{issue.scope === "workspace" ? "خارج از پروژه" : issue.projectName || issue.projectIdentifier}</span>
         </span>
       )}
-      <StatusBadge status={issue.status} />
+      {canChangeStatus ? (
+        <div
+          className={`status status-${issue.status.replace(" ", "-").toLowerCase()} issue-status-control`}
+          aria-busy={updateStatus.isPending}
+        >
+          <i aria-hidden="true" />
+          <SearchableSelect
+            label={`تغییر وضعیت ${issue.name}`}
+            wrapOptions={false}
+            value={issue.status}
+            disabled={updateStatus.isPending}
+            onChange={(value) => {
+              const status = statusOptions.find((option) => option === value);
+              if (status && status !== issue.status && !updateStatus.isPending) {
+                updateStatus.mutate({ issue, status });
+              }
+            }}
+            options={statusOptions.map((status) => ({ id: status, title: statusFa[status] }))}
+          />
+          {updateStatus.isPending && (
+            <span className="sr-only" role="status">
+              در حال ذخیره وضعیت کار…
+            </span>
+          )}
+        </div>
+      ) : (
+        <StatusBadge status={issue.status} />
+      )}
       <PriorityBadge priority={issue.priority} />
       <span className="issue-date">
         <Clock3 size={14} />
@@ -276,7 +317,7 @@ export function IssueRow({
             {statusOptions.map((status) => (
               <button
                 key={status}
-                disabled={status === issue.status}
+                disabled={status === issue.status || updateStatus.isPending}
                 onClick={() => {
                   updateStatus.mutate({ issue, status });
                   setMenuOpen(false);
@@ -286,24 +327,25 @@ export function IssueRow({
               </button>
             ))}
             {canTransfer && eligibleMembers.length > 1 && (
-              <label className="issue-transfer-control">
+              <label className="issue-transfer-control" htmlFor={`issue-transfer-${issue.id}`}>
                 <small>انتقال به عضو دیگر</small>
-                <select
+                <SearchableSelect
+                  id={`issue-transfer-${issue.id}`}
+                  label="انتقال به عضو دیگر"
                   value={issue.assignee?.id ?? ""}
                   disabled={reassignIssue.isPending}
-                  onChange={(event) => {
-                    if (event.target.value && event.target.value !== issue.assignee?.id) {
-                      reassignIssue.mutate({ issue, assigneeId: event.target.value });
+                  onChange={(id) => {
+                    if (id && id !== issue.assignee?.id) {
+                      reassignIssue.mutate({ issue, assigneeId: id });
                       setMenuOpen(false);
                     }
                   }}
-                >
-                  {eligibleMembers.map((member) => (
-                    <option key={member.id} value={member.id}>
-                      {member.displayName}
-                    </option>
-                  ))}
-                </select>
+                  options={eligibleMembers.map((member) => ({
+                    id: member.id,
+                    title: member.displayName,
+                    description: member.email,
+                  }))}
+                />
               </label>
             )}
             {access?.can("Issue.Delete") && (
@@ -392,6 +434,7 @@ export function ProjectCard({ project }: { project: Project }) {
           </span>
         </footer>
       </Link>
+      <IdentifierBadge value={project.identifier} label="شناسه پروژه" />
     </article>
   );
 }
@@ -449,22 +492,127 @@ export function ToastRegion() {
   );
 }
 
+export function NotificationDetails({
+  notification: selected,
+  onClose,
+}: {
+  notification: NotificationItem;
+  onClose: () => void;
+}) {
+  const notification = useNotificationDetails(selected.id);
+  const { data: currentUser } = useCurrentUser();
+  const details = notification.data ?? selected;
+  return (
+    <AccessModal title="جزئیات اعلان" onClose={() => onClose()}>
+      <section className="notification-details">
+        <h3>{details.title}</h3>
+        <IdentifierBadge value={details.id} label="شناسه اعلان" />
+        <dl>
+          {details.eventLabel && (
+            <>
+              <dt>نوع رویداد</dt>
+              <dd>{details.eventLabel}</dd>
+            </>
+          )}
+          {details.entityName && (
+            <>
+              <dt>کار مرتبط</dt>
+              <dd>{details.entityName}</dd>
+            </>
+          )}
+          {details.projectName && (
+            <>
+              <dt>پروژه</dt>
+              <dd>{details.projectName}</dd>
+            </>
+          )}
+          {details.actor && (
+            <>
+              <dt>انجام‌دهنده</dt>
+              <dd>{details.actor}</dd>
+            </>
+          )}
+          <dt>زمان</dt>
+          <dd>
+            {persianDate(details.time, {
+              year: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+              timeZone: currentUser?.timeZone,
+            })}
+          </dd>
+        </dl>
+        {details.changes && (
+          <dl aria-label="جزئیات تغییر">
+            {details.changes.map((change) => (
+              <Fragment key={change.label}>
+                <dt>{change.label}</dt>
+                <dd>{change.value}</dd>
+              </Fragment>
+            ))}
+          </dl>
+        )}
+        {notification.isLoading && <p role="status">در حال دریافت متن کامل…</p>}
+        {notification.isError && (
+          <div role="alert" className="inline-error">
+            دریافت جزئیات کامل انجام نشد.
+            <Button variant="secondary" onClick={() => void notification.refetch()}>
+              تلاش دوباره
+            </Button>
+          </div>
+        )}
+        <p className="notification-message">{details.description || "متن تکمیلی برای این اعلان ثبت نشده است."}</p>
+      </section>
+      <footer>
+        {details.actionHref ? (
+          <Link className="button button-secondary" to={details.actionHref} onClick={() => onClose()}>
+            {details.actionLabel}
+          </Link>
+        ) : (
+          details.projectId && (
+            <Link
+              className="button button-secondary"
+              to={`/projects/${details.projectId}?tab=issues`}
+              onClick={() => onClose()}
+            >
+              مشاهده کارهای پروژه
+            </Link>
+          )
+        )}
+        <Button onClick={() => onClose()}>بستن</Button>
+      </footer>
+    </AccessModal>
+  );
+}
+
 const notificationIcons = {
   mention: MessageSquare,
   assignment: CheckCircle2,
   update: Sparkles,
   comment: MessageSquare,
+  security: ShieldCheck,
 };
 export function NotificationDrawer() {
   const open = useUIStore((state) => state.notificationOpen);
   const setOpen = useUIStore((state) => state.setNotificationOpen);
-  const { data = [], isLoading } = useNotifications();
+  const { data = [], isLoading, isError, refetch } = useNotifications();
+  const [tab, setTab] = useState<"all" | "unread">("all");
+  const shown = tab === "unread" ? data.filter((item) => !item.read) : data;
+  useEffect(() => {
+    if (open) void refetch();
+  }, [open, refetch]);
+  const [selected, setSelected] = useState<NotificationItem>();
   const markRead = useMarkNotificationRead();
   const markAll = useMarkAllNotificationsRead();
   return (
     <>
       <button className={`overlay ${open ? "is-open" : ""}`} aria-label="بستن اعلان‌ها" onClick={() => setOpen(false)} />
-      <aside className={`notification-drawer ${open ? "is-open" : ""}`}>
+      <aside
+        className={`notification-drawer ${open ? "is-open" : ""}`}
+        aria-label="اعلان‌های شما"
+        aria-hidden={!open}
+        inert={!open}
+      >
         <header>
           <div>
             <h2>اعلان‌ها</h2>
@@ -475,48 +623,89 @@ export function NotificationDrawer() {
           </IconButton>
         </header>
         <div className="drawer-filter">
-          <button className="active">همه</button>
-          <button onClick={() => markAll.mutate()} disabled={markAll.isPending}>
+          <button
+            type="button"
+            className={tab === "all" ? "active" : ""}
+            aria-pressed={tab === "all"}
+            onClick={() => setTab("all")}
+          >
+            همه
+          </button>
+          <button
+            type="button"
+            className={tab === "unread" ? "active" : ""}
+            aria-pressed={tab === "unread"}
+            onClick={() => setTab("unread")}
+          >
+            خوانده‌نشده
+          </button>
+          <button
+            onClick={() => markAll.mutate()}
+            disabled={markAll.isPending || isLoading || data.every((item) => item.read)}
+          >
             خواندن همه
           </button>
         </div>
         <div className="notification-list">
+          {isError && (
+            <div role="alert" className="inline-error">
+              دریافت اعلان‌ها انجام نشد.
+              <Button variant="secondary" onClick={() => void refetch()}>
+                تلاش دوباره
+              </Button>
+            </div>
+          )}
           {isLoading ? (
             <Skeleton rows={5} />
-          ) : data.length ? (
-            data.map((item) => {
+          ) : shown.length ? (
+            shown.map((item) => {
               const Icon = notificationIcons[item.type];
               return (
                 <button
                   type="button"
                   key={item.id}
                   className={item.read ? "" : "unread"}
-                  onClick={() => !item.read && markRead.mutate(item.id)}
+                  onClick={() => {
+                    setSelected(item);
+                    setOpen(false);
+                    if (!item.read) markRead.mutate(item.id);
+                  }}
                 >
                   <span className="notification-icon">
                     <Icon size={17} />
                   </span>
                   <div>
                     <strong>{item.title}</strong>
-                    <p>{item.description}</p>
+                    <p>{item.preview ?? item.description}</p>
+                    {(item.entityName || item.projectName) && (
+                      <small className="notification-context">
+                        {[
+                          item.entityName ? `کار: ${item.entityName}` : undefined,
+                          item.projectName ? `پروژه: ${item.projectName}` : undefined,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </small>
+                    )}
                     <time>{persianDate(item.time, { year: "numeric" })}</time>
                   </div>
                   {!item.read && <i />}
                 </button>
               );
             })
-          ) : (
+          ) : !isError ? (
             <EmptyState
               icon={Bell}
-              title="اعلانی ندارید"
-              description="همه‌چیز آرام است؛ اعلان‌های تازه اینجا دیده می‌شوند."
+              title={tab === "unread" ? "اعلان خوانده‌نشده‌ای ندارید" : "اعلانی ندارید"}
+              description="اعلان‌های تازه اینجا دیده می‌شوند."
             />
-          )}
+          ) : null}
         </div>
         <Link to="/inbox" onClick={() => setOpen(false)} className="drawer-all">
           مشاهده همه اعلان‌ها
         </Link>
       </aside>
+      {selected && <NotificationDetails notification={selected} onClose={() => setSelected(undefined)} />}
     </>
   );
 }
@@ -534,25 +723,57 @@ export function CommandPalette() {
   const navigate = useNavigate();
   const { data: projects = [] } = useProjects();
   const { data: issues = [] } = useIssues();
-  const normalizedQuery = query.trim().toLocaleLowerCase("fa");
-  const filtered = commands.filter((item) => item.label.includes(query));
-  const projectResults = normalizedQuery
+  const { data: access } = useWorkspaceAccess();
+  const { data: members = [] } = useMembers(undefined, undefined, open && access?.can("User.View") === true);
+  const { data: roles = [] } = useOrganizationRoles(undefined, open && access?.can("Role.View") === true);
+  const { data: units = [] } = useOrganizationUnits(undefined, open && access?.can("OrganizationUnit.View") === true);
+  const { data: rules = [] } = useTicketRoutingRules(undefined, open && access?.can("Routing.View") === true);
+  const filtered = commands.filter((item) => matchesRecordSearch(query, [item.label]));
+  const projectResults = query.trim()
     ? projects
-        .filter(
-          (project) =>
-            project.name.toLocaleLowerCase("fa").includes(normalizedQuery) ||
-            project.identifier.toLowerCase().includes(normalizedQuery)
-        )
+        .filter((project) => matchesRecordSearch(query, [project.id, project.name, project.identifier]))
         .slice(0, 5)
     : [];
-  const issueResults = normalizedQuery
-    ? issues
-        .filter(
-          (issue) =>
-            issue.name.toLocaleLowerCase("fa").includes(normalizedQuery) ||
-            `${issue.projectIdentifier}-${issue.sequenceId}`.toLowerCase().includes(normalizedQuery)
-        )
-        .slice(0, 5)
+  const issueResults = query.trim()
+    ? issues.filter((issue) => matchesRecordSearch(query, [issue.id, issue.name, issueReference(issue)])).slice(0, 5)
+    : [];
+  const recordResults = query.trim()
+    ? [
+        ...(access?.can("User.View")
+          ? members
+              .filter((member) =>
+                matchesRecordSearch(query, [member.id, member.membershipId, member.displayName, member.email])
+              )
+              .map((member) => ({ id: member.id, name: `کاربر: ${member.displayName}`, path: `/team/${member.id}` }))
+          : []),
+        ...(access?.can("Role.View")
+          ? roles
+              .filter((role) => matchesRecordSearch(query, [role.id, role.name, role.description]))
+              .map((role) => ({
+                id: role.id,
+                name: `نقش: ${role.name}`,
+                path: `/roles?search=${encodeURIComponent(role.id)}`,
+              }))
+          : []),
+        ...(access?.can("OrganizationUnit.View")
+          ? units
+              .filter((unit) => matchesRecordSearch(query, [unit.id, unit.title]))
+              .map((unit) => ({
+                id: unit.id,
+                name: `واحد: ${unit.title}`,
+                path: `/organization?search=${encodeURIComponent(unit.id)}`,
+              }))
+          : []),
+        ...(access?.can("Routing.Manage")
+          ? rules
+              .filter((rule) => matchesRecordSearch(query, [rule.id, rule.name]))
+              .map((rule) => ({
+                id: rule.id,
+                name: `ارجاع: ${rule.name}`,
+                path: `/routing?search=${encodeURIComponent(rule.id)}`,
+              }))
+          : []),
+      ].slice(0, 10)
     : [];
   useEffect(() => {
     if (!open) setQuery("");
@@ -614,14 +835,30 @@ export function CommandPalette() {
             >
               <CircleDot size={18} />
               <span>{issue.name}</span>
-              <kbd>
-                {issue.scope === "workspace" ? "خارج از پروژه" : `${issue.projectIdentifier}-${toFa(issue.sequenceId)}`}
+              <kbd>{issueReference(issue)}</kbd>
+            </button>
+          ))}
+          {recordResults.length > 0 && <small>سازمان</small>}
+          {recordResults.map((record) => (
+            <button
+              key={record.path}
+              onClick={() => {
+                navigate(record.path);
+                setOpen(false);
+              }}
+            >
+              <Search size={18} />
+              <span>{record.name}</span>
+              <kbd dir="ltr" title={record.id}>
+                {record.id}
               </kbd>
             </button>
           ))}
-          {normalizedQuery && !filtered.length && !projectResults.length && !issueResults.length && (
-            <p className="command-empty">نتیجه‌ای در داده‌های فضای کاری پیدا نشد.</p>
-          )}
+          {query.trim() &&
+            !filtered.length &&
+            !projectResults.length &&
+            !issueResults.length &&
+            !recordResults.length && <p className="command-empty">نتیجه‌ای در داده‌های فضای کاری پیدا نشد.</p>}
         </div>
         <footer>
           <span>
@@ -647,7 +884,6 @@ export function CreateModal() {
   const setFormDirty = useUIStore((state) => state.setFormDirty);
   const [kind, setKind] = useState<"project" | "issue">("issue");
   const [name, setName] = useState("");
-  const [identifier, setIdentifier] = useState("");
   const [projectId, setProjectId] = useState("");
   const [priority, setPriority] = useState<Priority>("Medium");
   const [targetDate, setTargetDate] = useState("");
@@ -667,6 +903,7 @@ export function CreateModal() {
   const activeRoutingRules = useMemo(() => routingRules.filter((rule) => rule.isActive), [routingRules]);
   const createProject = useCreateProject(slug);
   const createIssue = useCreateIssue(slug, selectedProjectId);
+  const busy = createProject.isPending || createIssue.isPending;
   useEffect(() => {
     if (open) {
       setKind(createKind);
@@ -676,15 +913,14 @@ export function CreateModal() {
     }
   }, [activeProjects, createKind, open, routeProjectId]);
   useEffect(() => {
-    setFormDirty("quick-create", open && Boolean(name || identifier || targetDate || assigneeId || routingRuleId));
+    setFormDirty("quick-create", open && Boolean(name || targetDate || assigneeId || routingRuleId));
     return () => setFormDirty("quick-create", false);
-  }, [assigneeId, identifier, name, open, routingRuleId, setFormDirty, targetDate]);
+  }, [assigneeId, name, open, routingRuleId, setFormDirty, targetDate]);
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    if (!name.trim()) return;
+    if (busy || !name.trim()) return;
     const done = () => {
       setName("");
-      setIdentifier("");
       setProjectId("");
       setTargetDate("");
       setAssigneeId("");
@@ -692,31 +928,43 @@ export function CreateModal() {
       setPriority("Medium");
       setOpen(false);
     };
-    if (kind === "project") createProject.mutate({ name, identifier, description: "" }, { onSuccess: done });
+    if (kind === "project") createProject.mutate({ name, description: "" }, { onSuccess: done });
     else createIssue.mutate({ name, priority, targetDate, assigneeId, routingRuleId }, { onSuccess: done });
   };
   if (!open || !access?.can(kind === "project" ? "Project.Create" : "Issue.Create")) return null;
   return (
-    <div
-      className="modal-layer"
-      role="presentation"
-      onMouseDown={(event) => event.target === event.currentTarget && setOpen(false)}
+    <ModalCore
+      isOpen
+      className="create-modal"
+      handleClose={() => {
+        if (!busy) setOpen(false);
+      }}
     >
-      <form className="create-modal" onSubmit={submit}>
+      <form className="quick-create-form" onSubmit={submit}>
         <header>
           <div>
             <span className="modal-kicker">ایجاد سریع</span>
-            <h2>{kind === "issue" ? "کار جدید" : "پروژه جدید"}</h2>
+            <DialogTitle as="h2">{kind === "issue" ? "کار جدید" : "پروژه جدید"}</DialogTitle>
           </div>
-          <IconButton label="بستن" onClick={() => setOpen(false)}>
+          <IconButton label="بستن" disabled={busy} onClick={() => setOpen(false)}>
             <X size={19} />
           </IconButton>
         </header>
         <div className="segmented">
-          <button type="button" className={kind === "issue" ? "active" : ""} onClick={() => setKind("issue")}>
+          <button
+            type="button"
+            disabled={busy}
+            className={kind === "issue" ? "active" : ""}
+            onClick={() => setKind("issue")}
+          >
             کار
           </button>
-          <button type="button" className={kind === "project" ? "active" : ""} onClick={() => setKind("project")}>
+          <button
+            type="button"
+            disabled={busy}
+            className={kind === "project" ? "active" : ""}
+            onClick={() => setKind("project")}
+          >
             پروژه
           </button>
         </div>
@@ -724,97 +972,108 @@ export function CreateModal() {
           <span>عنوان</span>
           <input
             value={name}
+            disabled={busy}
             onChange={(event) => setName(event.target.value)}
             placeholder={kind === "issue" ? "مثلاً طراحی صفحه پرداخت" : "مثلاً نسخه جدید محصول"}
           />
         </label>
-        {kind === "project" ? (
-          <label>
-            <span>شناسه پروژه</span>
-            <input
-              dir="ltr"
-              value={identifier}
-              maxLength={12}
-              onChange={(event) => setIdentifier(event.target.value.toUpperCase())}
-              placeholder="NEW"
-              required
-            />
-          </label>
-        ) : (
+        {kind === "issue" && (
           <>
-            <label>
+            <label htmlFor="create-issue-project">
               <span>پروژه</span>
-              <select
+              <SearchableSelect
+                id="create-issue-project"
+                label="پروژه"
+                disabled={busy}
                 value={selectedScope}
-                onChange={(event) => {
-                  setProjectId(event.target.value);
+                onChange={(id) => {
+                  setProjectId(id);
                   setAssigneeId("");
                   setRoutingRuleId("");
                 }}
-              >
-                <option value="workspace">خارج از پروژه (کار مستقل)</option>
-                {activeProjects.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.name}
-                  </option>
-                ))}
-              </select>
+                options={[
+                  { id: "workspace", title: "خارج از پروژه (کار مستقل)" },
+                  ...activeProjects.map((project) => ({ id: project.id, title: project.name })),
+                ]}
+              />
             </label>
             <div className="form-grid">
               <label>
                 <span>اولویت</span>
-                <select value={priority} onChange={(event) => setPriority(event.target.value as Priority)}>
+                <select
+                  disabled={busy}
+                  value={priority}
+                  onChange={(event) => setPriority(event.target.value as Priority)}
+                >
                   <option value="Urgent">فوری</option>
                   <option value="High">زیاد</option>
                   <option value="Medium">متوسط</option>
                   <option value="Low">کم</option>
                 </select>
               </label>
-              <label htmlFor="issue-target-date-day">
+              <label htmlFor="issue-target-date">
                 <span>تاریخ پایان</span>
-                <PersianDateInput id="issue-target-date" value={targetDate} onChange={setTargetDate} />
+                <PersianDateInput
+                  label="تاریخ پایان"
+                  disabled={busy}
+                  id="issue-target-date"
+                  value={targetDate}
+                  onChange={setTargetDate}
+                />
               </label>
-              <label className="wide">
+              <label className="wide" htmlFor="create-issue-assignee">
                 <span>مسئول مستقیم</span>
-                <select
+                <SearchableSelect
+                  id="create-issue-assignee"
+                  label="مسئول مستقیم"
+                  disabled={busy}
                   value={assigneeId}
-                  onChange={(event) => {
-                    setAssigneeId(event.target.value);
-                    if (event.target.value) setRoutingRuleId("");
+                  onChange={(id) => {
+                    setAssigneeId(id);
+                    if (id) setRoutingRuleId("");
                   }}
-                >
-                  <option value="">بدون مسئول</option>
-                  {members.map((member) => (
-                    <option key={member.id} value={member.id}>
-                      {member.displayName}
-                    </option>
-                  ))}
-                </select>
+                  options={[
+                    { id: "", title: "بدون مسئول" },
+                    ...members.map((member) => ({
+                      id: member.id,
+                      title: member.displayName,
+                      description: member.email,
+                      disabled: member.isActive === false,
+                    })),
+                  ]}
+                />
               </label>
               {selectedProjectId && (
-                <label className="wide">
+                <label className="wide" htmlFor="create-issue-routing">
                   <span>یا قانون ارجاع هوشمند</span>
-                  <select
+                  <SearchableSelect
+                    id="create-issue-routing"
+                    label="قانون ارجاع هوشمند"
+                    disabled={busy}
                     value={routingRuleId}
-                    onChange={(event) => {
-                      setRoutingRuleId(event.target.value);
-                      if (event.target.value) setAssigneeId("");
+                    onChange={(id) => {
+                      setRoutingRuleId(id);
+                      if (id) setAssigneeId("");
                     }}
-                  >
-                    <option value="">بدون مسیریابی خودکار</option>
-                    {activeRoutingRules.map((rule) => (
-                      <option key={rule.id} value={rule.id}>
-                        {rule.name} — {rule.unitTitle} / {rule.roleName}
-                      </option>
-                    ))}
-                  </select>
+                    options={[
+                      { id: "", title: "بدون مسیریابی خودکار" },
+                      ...activeRoutingRules.map((rule) => ({
+                        id: rule.id,
+                        title: rule.name,
+                        description: `${rule.unitTitle} / ${rule.roleName}`,
+                      })),
+                    ]}
+                  />
                 </label>
               )}
             </div>
           </>
         )}
+        {(createIssue.isError || createProject.isError) && (
+          <p role="alert">ایجاد انجام نشد. اطلاعات فرم را بررسی کنید و دوباره تلاش کنید.</p>
+        )}
         <footer>
-          <Button variant="secondary" onClick={() => setOpen(false)}>
+          <Button variant="secondary" disabled={busy} onClick={() => setOpen(false)}>
             انصراف
           </Button>
           <Button
@@ -823,7 +1082,6 @@ export function CreateModal() {
             disabled={
               !name.trim() ||
               !slug ||
-              (kind === "project" && !identifier.trim()) ||
               (kind === "issue" && !assigneeId && !routingRuleId) ||
               createIssue.isPending ||
               createProject.isPending
@@ -833,7 +1091,7 @@ export function CreateModal() {
           </Button>
         </footer>
       </form>
-    </div>
+    </ModalCore>
   );
 }
 
@@ -875,110 +1133,29 @@ export function SearchBox({
   );
 }
 
-const persianMonths = [
-  "فروردین",
-  "اردیبهشت",
-  "خرداد",
-  "تیر",
-  "مرداد",
-  "شهریور",
-  "مهر",
-  "آبان",
-  "آذر",
-  "دی",
-  "بهمن",
-  "اسفند",
-];
-
-type JalaliParts = { year: number | ""; month: number | ""; day: number | "" };
-const jalaliPartsFromValue = (value?: string): JalaliParts => {
-  if (!value) return { year: "", month: "", day: "" };
-  const [year, month, day] = value.split("-").map(Number);
-  if (!year || !month || !day) return { year: "", month: "", day: "" };
-  const jalali = toJalaali(year, month, day);
-  return { year: jalali.jy, month: jalali.jm, day: jalali.jd };
-};
-
 export function PersianDateInput({
   id,
   value,
   onChange,
+  disabled,
+  label,
 }: {
   id: string;
   value?: string;
   onChange: (value: string) => void;
+  disabled?: boolean;
+  label?: string;
 }) {
-  const [parts, setParts] = useState<JalaliParts>(() => jalaliPartsFromValue(value));
-  const now = new Date();
-  const currentYear = toJalaali(now.getFullYear(), now.getMonth() + 1, now.getDate()).jy;
-  const years = Array.from({ length: 31 }, (_, index) => currentYear - 10 + index);
-  if (typeof parts.year === "number" && !years.includes(parts.year)) years.push(parts.year);
-  years.sort((a, b) => a - b);
-
-  useEffect(() => setParts(jalaliPartsFromValue(value)), [value]);
-  const update = (next: JalaliParts) => {
-    if (typeof next.year === "number" && typeof next.month === "number" && typeof next.day === "number") {
-      const safeDay = Math.min(next.day, jalaaliMonthLength(next.year, next.month));
-      const gregorian = toGregorian(next.year, next.month, safeDay);
-      const iso = `${gregorian.gy}-${String(gregorian.gm).padStart(2, "0")}-${String(gregorian.gd).padStart(2, "0")}`;
-      setParts({ ...next, day: safeDay });
-      onChange(iso);
-      return;
-    }
-    setParts(next);
-    onChange("");
-  };
-  const dayCount =
-    typeof parts.year === "number" && typeof parts.month === "number"
-      ? jalaaliMonthLength(parts.year, parts.month)
-      : 31;
+  const { data: user } = useCurrentUser();
   return (
-    <div className="persian-date-input" dir="rtl">
-      <select
-        id={`${id}-day`}
-        aria-label="روز"
-        value={parts.day}
-        onChange={(event) => update({ ...parts, day: event.target.value ? Number(event.target.value) : "" })}
-      >
-        <option value="">روز</option>
-        {Array.from({ length: dayCount }, (_, index) => index + 1).map((day) => (
-          <option key={day} value={day}>
-            {toFa(day)}
-          </option>
-        ))}
-      </select>
-      <select
-        id={`${id}-month`}
-        aria-label="ماه"
-        value={parts.month}
-        onChange={(event) => update({ ...parts, month: event.target.value ? Number(event.target.value) : "" })}
-      >
-        <option value="">ماه</option>
-        {persianMonths.map((month, index) => (
-          <option key={month} value={index + 1}>
-            {month}
-          </option>
-        ))}
-      </select>
-      <select
-        id={`${id}-year`}
-        aria-label="سال"
-        value={parts.year}
-        onChange={(event) => update({ ...parts, year: event.target.value ? Number(event.target.value) : "" })}
-      >
-        <option value="">سال</option>
-        {years.map((year) => (
-          <option key={year} value={year}>
-            {toFa(year)}
-          </option>
-        ))}
-      </select>
-      {value && (
-        <button type="button" onClick={() => update({ year: "", month: "", day: "" })}>
-          پاک‌کردن
-        </button>
-      )}
-    </div>
+    <PersianDatePicker
+      label={label}
+      disabled={disabled}
+      id={id}
+      value={value}
+      onChange={onChange}
+      timeZone={user?.timeZone}
+    />
   );
 }
 
@@ -1011,12 +1188,7 @@ export function Breadcrumb() {
 
 export function useFilteredIssues(issues: Issue[], query: string) {
   return useMemo(
-    () =>
-      issues.filter(
-        (issue) =>
-          issue.name.includes(query) ||
-          `${issue.projectIdentifier}-${issue.sequenceId}`.toLowerCase().includes(query.toLowerCase())
-      ),
+    () => issues.filter((issue) => matchesRecordSearch(query, [issue.id, issue.name, issueReference(issue)])),
     [issues, query]
   );
 }

@@ -2,13 +2,13 @@
 
 # category, localized title, actions, delegatable actions
 DEFINITIONS = (
-    ("User", "کاربران", ("View", "Create", "Edit", "Delete", "ChangePassword", "Role.Assign"), ("View",)),
-    ("Role", "نقش‌ها", ("View", "Create", "Edit", "Disable", "Permission.Assign"), ()),
+    ("User", "کاربران / اعضای تیم", ("View", "Create", "Edit", "Delete", "ChangePassword", "Role.Assign"), ("View",)),
+    ("Role", "نقش‌ها", ("View", "Create", "Edit", "Delete", "Disable", "Permission.Assign"), ()),
     ("Permission", "فهرست مجوزها", ("View",), ()),
     (
         "OrganizationUnit",
         "ساختار سازمانی",
-        ("View", "Create", "Edit", "Disable", "Member.Manage", "Manager.Assign", "Delegate.Manage"),
+        ("View", "Create", "Edit", "Delete", "Disable", "Member.Manage", "Manager.Assign", "Delegate.Manage"),
         ("View",),
     ),
     ("Access", "دسترسی کاربران", ("UserException.View", "UserException.Manage", "EffectivePermission.View"), ()),

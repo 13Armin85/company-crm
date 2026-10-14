@@ -26,7 +26,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\start.ps1
 
 همین فرمان بعد از `git pull` هم قابل استفاده است؛ ساخت ایمیج‌ها با کش Docker انجام می‌شود تا آخرین کد اجرا شود. برای استفاده از ایمیج‌های موجود بدون build، `bash start.sh --no-build` یا `.\start.ps1 -NoBuild` را اجرا کنید. برای جلوگیری از نصب بسته‌های سیستم، گزینهٔ `--no-install` را اضافه کنید. روش قبلی `bash setup.sh --docker` همچنان کار می‌کند.
 
-تمام اسکریپت‌ها، Dockerfileها، `docker-compose-dev.yml`، `pnpm-lock.yaml` و **قالب** `.env.dev.example` را همراه کد در Git قرار دهید. فایل واقعی `.env.dev` و داده‌های Docker محلی هستند؛ در کلون تازه خودکار ساخته می‌شوند. نیازی به کپی فایل env، نصب وابستگی روی میزبان یا تکمیل فرم راه‌اندازی God mode نیست.
+تمام اسکریپت‌ها، Dockerfileها، `docker-compose-dev.yml`، `docker-compose-workstation.yml`، `pnpm-lock.yaml` و **قالب** `.env.dev.example` را همراه کد در Git قرار دهید. فایل واقعی `.env.dev` و داده‌های Docker محلی هستند؛ در کلون تازه خودکار ساخته می‌شوند. نیازی به کپی فایل env، نصب وابستگی روی میزبان یا تکمیل فرم راه‌اندازی God mode نیست.
+
+اسکریپت‌های راه‌اندازی در صورت وجود `docker-compose-workstation.yml` آن را خودکار اعمال می‌کنند تا پروژهٔ `company-crm-local` با همان ایمیج‌ها و Volumeهای فعلی اجرا شود. نام پروژه به `plane-dev` تحمیل نمی‌شود؛ در نتیجه محیط دیگری از پوشهٔ قدیمی جایگزین این CRM نخواهد شد. دستورات مستقیم Compose در این راهنما نیز از هر دو فایل استفاده می‌کنند؛ در کلونی که فایل workstation ندارد، بخش `-f docker-compose-workstation.yml` را حذف کنید.
 
 برای همگام‌سازی تغییرات فرانت‌اند هنگام توسعه، ترمینال این فرمان را باز نگه دارید:
 
@@ -51,7 +53,7 @@ bash start.sh --watch
 
 روی لینوکس، `start.sh` سرویس Docker محلی را در صورت نیاز فعال می‌کند. پس از ساخت کانتینرها، سیاست `restart: unless-stopped` سرویس‌ها را با شروع دوبارهٔ Docker بالا می‌آورد؛ سرویس‌هایی که دستی متوقف کرده‌اید با فرمان راه‌اندازی دوباره اجرا می‌شوند.
 
-MinIO نیز از سورس نسخهٔ ثابت upstream داخل Docker ساخته می‌شود؛ راه‌اندازی به ایمیج حذف‌شدهٔ آن در Docker Hub یا Quay وابسته نیست.
+پیکربندی پایه MinIO را از سورس نسخهٔ ثابت upstream داخل Docker می‌سازد. پیکربندی workstation از ایمیج ثابت موجود روی این دستگاه و Volume فعلی فایل‌ها استفاده می‌کند.
 
 رجیستری پیش‌فرض npm مانند `.npmrc` پروژه، `https://registry.npmmirror.com/` است. برای انتخاب رجیستری مورد اعتماد خود، `NPM_REGISTRY` را در `.env.dev` تعیین کنید و با گزینهٔ بازسازی اجرا کنید؛ برای نمونه `NPM_REGISTRY=https://registry.npmjs.org/` و سپس `bash setup.sh --docker --build` (ویندوز: `.\setup-dev.ps1 -Build -NoWatch`).
 
@@ -82,7 +84,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\setup-dev.ps1 -Watch
 | پنل وب دیتابیس، pgAdmin        | http://localhost:5050           | `admin@example.com` | `DatabaseDev!2026` |
 | کنسول فایل‌ها، MinIO           | http://localhost:9090           | `access-key`        | `secret-key`       |
 
-از آدرس‌های `localhost` استفاده کنید؛ نشانی‌های API، احراز هویت و سرویس‌ها برای همین میزبان تنظیم شده‌اند. پورت‌های منتشرشده فقط روی همین کامپیوتر در دسترس هستند. این تنظیمات، رمزها و حالت `DEBUG` مخصوص توسعه‌اند؛ برای انتشار عمومی باید پیکربندی جداگانه داشته باشید.
+نشانی اصلی برنامه `http://localhost:3000` است؛ نشانی‌های API، احراز هویت و سرویس‌ها برای همین میزبان تنظیم شده‌اند. سرور توسعه آدرس `http://127.0.0.1:3000` را خودکار به نشانی اصلی هدایت می‌کند تا درخواست‌های نشست و کوکی ورود روی یک میزبان باشند. پورت‌های منتشرشده فقط روی همین کامپیوتر در دسترس هستند. این تنظیمات، رمزها و حالت `DEBUG` مخصوص توسعه‌اند؛ برای انتشار عمومی باید پیکربندی جداگانه داشته باشید.
 
 ### ورود کاربر عادی
 
@@ -120,7 +122,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\setup-dev.ps1 -Watch
 برای اجرای SQL از ترمینال:
 
 ```powershell
-docker compose --env-file .env.dev -f docker-compose-dev.yml exec plane-db psql -U plane -d plane
+docker compose --env-file .env.dev -f docker-compose-dev.yml -f docker-compose-workstation.yml exec plane-db psql -U plane -d plane
 ```
 
 ## تنظیمات و نگهداری رمزها
@@ -140,7 +142,7 @@ docker compose --env-file .env.dev -f docker-compose-dev.yml exec plane-db psql 
 
 ## محیط توسعه چگونه اجرا می‌شود؟
 
-فایل `docker-compose-dev.yml` پروژهٔ مستقل `plane-dev` را اجرا می‌کند:
+فایل `docker-compose-dev.yml` سرویس‌های زیر را تعریف می‌کند. نام پروژه با پیکربندی workstation برابر `company-crm-local` و بدون آن برابر `plane-dev` است:
 
 | سرویس         | وظیفه                                                                               |
 | ------------- | ----------------------------------------------------------------------------------- |
@@ -201,13 +203,13 @@ bash setup.sh --docker --build
 اگر با `-NoWatch` اجرا کنید یا ترمینال watch را ببندید، تغییرات جدید سورس فرانت‌اند خودکار وارد کانتینر نمی‌شوند؛ برای دریافت آن‌ها دوباره `.\setup-dev.ps1` را اجرا کنید. ساخت با `pnpm` روی ویندوز، فایل‌های داخل کانتینر را به‌روز نمی‌کند. برای اعمال تغییر کد taskهای Celery، workerها را restart کنید:
 
 ```powershell
-docker compose --env-file .env.dev -f docker-compose-dev.yml restart worker beat-worker
+docker compose --env-file .env.dev -f docker-compose-dev.yml -f docker-compose-workstation.yml restart worker beat-worker
 ```
 
 برای اعمال migration جدید در زمان توسعه:
 
 ```powershell
-docker compose --env-file .env.dev -f docker-compose-dev.yml exec api python manage.py migrate
+docker compose --env-file .env.dev -f docker-compose-dev.yml -f docker-compose-workstation.yml exec api python manage.py migrate
 ```
 
 ## اجرای دوباره و خطای قفل watch
@@ -217,7 +219,7 @@ docker compose --env-file .env.dev -f docker-compose-dev.yml exec api python man
 اگر watch را قبلاً مستقیماً با Docker Compose یا نسخهٔ قدیمی اسکریپت اجرا کرده باشید، ممکن است این پیام را ببینید:
 
 ```text
-cannot take exclusive lock for project "plane-dev": process with PID ... is still running
+cannot take exclusive lock for project "company-crm-local": process with PID ... is still running
 ```
 
 در ترمینال watch قبلی `Ctrl+C` بزنید و سپس اسکریپت جدید را اجرا کنید. اگر ترمینال قبلی در دسترس نیست، در Task Manager شمارهٔ PID و خط فرمان پردازش را بررسی کنید و فقط همان پردازش watch مربوط به این پروژه را متوقف کنید. متوقف کردن Docker Desktop، حذف دیتابیس یا پاک کردن volume راه‌حل این قفل نیست.
@@ -232,19 +234,19 @@ cannot take exclusive lock for project "plane-dev": process with PID ... is stil
 
 ```powershell
 # وضعیت همهٔ سرویس‌ها، از جمله migrator
-docker compose --env-file .env.dev -f docker-compose-dev.yml ps -a
+docker compose --env-file .env.dev -f docker-compose-dev.yml -f docker-compose-workstation.yml ps -a
 
 # پاسخ مورد انتظار: JSON شامل instance و config
 Invoke-RestMethod http://localhost:3000/api/instances/
 
 # خطاهای راه‌اندازی و اتصال
-docker compose --env-file .env.dev -f docker-compose-dev.yml logs --tail 100 migrator api frontend
+docker compose --env-file .env.dev -f docker-compose-dev.yml -f docker-compose-workstation.yml logs --tail 100 migrator api frontend
 
 # دنبال کردن لاگ زنده
-docker compose --env-file .env.dev -f docker-compose-dev.yml logs -f api frontend
+docker compose --env-file .env.dev -f docker-compose-dev.yml -f docker-compose-workstation.yml logs -f api frontend
 
 # بررسی کارهای پس‌زمینه
-docker compose --env-file .env.dev -f docker-compose-dev.yml logs --tail 100 worker beat-worker
+docker compose --env-file .env.dev -f docker-compose-dev.yml -f docker-compose-workstation.yml logs --tail 100 worker beat-worker
 ```
 
 اگر API مستقیم روی پورت `8000` پاسخ دارد ولی مسیر API روی پورت `3000` خطا می‌دهد، لاگ `frontend` و تنظیمات proxy را بررسی کنید. اگر پس از جابه‌جایی پوشهٔ پروژه یا تغییر Dockerfile و وابستگی‌ها مشکل دارید، watch را متوقف کرده و `.\setup-dev.ps1 -Build -Watch` را از مسیر جدید اجرا کنید.
@@ -257,10 +259,10 @@ docker compose --env-file .env.dev -f docker-compose-dev.yml logs --tail 100 wor
 
 ```powershell
 # توقف سرویس‌ها و نگه‌داشتن کانتینرها و داده‌ها
-docker compose --env-file .env.dev -f docker-compose-dev.yml stop
+docker compose --env-file .env.dev -f docker-compose-dev.yml -f docker-compose-workstation.yml stop
 
 # حذف کانتینرها و شبکهٔ همین پروژه، با حفظ داده‌های volume
-docker compose --env-file .env.dev -f docker-compose-dev.yml down
+docker compose --env-file .env.dev -f docker-compose-dev.yml -f docker-compose-workstation.yml down
 
 # اجرای مجدد
 .\setup-dev.ps1 -Watch
@@ -268,7 +270,7 @@ docker compose --env-file .env.dev -f docker-compose-dev.yml down
 
 فرمان‌های `docker compose` بالا روی لینوکس و macOS نیز یکسان‌اند؛ برای اجرای مجدد در پس‌زمینه از `bash setup.sh --docker` استفاده کنید. برای انتقال به سیستم جدید، سورس پروژه را کپی یا clone کنید و همین فرمان را اجرا کنید. این کار یک نصب تازه می‌سازد؛ انتقال اطلاعات قبلی نیازمند انتقال دیتابیس و فایل‌های volumeها و حفظ `.env.dev` است.
 
-دیتابیس، فایل‌های بارگذاری‌شده، تنظیمات pgAdmin و داده‌های سرویس‌های زیرساخت در volumeهای نام‌دار پروژهٔ `plane-dev` باقی می‌مانند. گزینهٔ `down -v` این داده‌ها را حذف می‌کند؛ برای توقف عادی از آن استفاده نکنید. فایل `.env.dev` را نیز نگه دارید.
+دیتابیس، فایل‌های بارگذاری‌شده، تنظیمات pgAdmin و داده‌های سرویس‌های زیرساخت در Volumeهای نام‌دار پروژهٔ انتخاب‌شده باقی می‌مانند. گزینهٔ `down -v` این داده‌ها را حذف می‌کند؛ برای توقف عادی از آن استفاده نکنید. فایل `.env.dev` را نیز نگه دارید.
 
 ## فایل‌های مرتبط و مجوز
 

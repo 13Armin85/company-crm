@@ -57,13 +57,18 @@ if [[ ! -f .env.dev ]]; then
     trap - EXIT
 fi
 
-compose=("${docker_command[@]}" compose --project-name plane-dev --env-file .env.dev -f docker-compose-dev.yml)
+compose=("${docker_command[@]}" compose --env-file .env.dev -f docker-compose-dev.yml)
+# Preserve the project name and persistent data used by this checkout.
+if [[ -f docker-compose-workstation.yml ]]; then
+    compose+=(-f docker-compose-workstation.yml)
+fi
 "${compose[@]}" config --quiet
 up_args=(up -d --wait --wait-timeout 900)
 if [[ "$build" == true ]]; then up_args+=(--build); fi
 if ! "${compose[@]}" "${up_args[@]}"; then
     printf 'Docker startup failed. Inspect logs with:\n' >&2
-    printf 'docker compose --env-file .env.dev -f docker-compose-dev.yml logs --tail 100 migrator api frontend\n' >&2
+    printf '%q ' "${compose[@]}" logs --tail 100 migrator api frontend >&2
+    printf '\n' >&2
     exit 1
 fi
 

@@ -33,6 +33,7 @@ import {
   useWorkspaces,
 } from "../api";
 import { useUIStore } from "../store";
+import { AccessModal } from "../access/components";
 import type { ThemeMode } from "../store";
 
 const settingsNav = [
@@ -295,7 +296,6 @@ function ProfileSettings() {
   const signOut = useSignOut();
   const dirtyForms = useUIStore((state) => state.dirtyForms);
   const setFormDirty = useUIStore((state) => state.setFormDirty);
-  const clearDirtyForms = useUIStore((state) => state.clearDirtyForms);
   const [logoutOpen, setLogoutOpen] = useState(false);
   useEffect(() => setDisplayName(user?.displayName ?? ""), [user?.displayName]);
   useEffect(() => {
@@ -304,6 +304,7 @@ function ProfileSettings() {
   }, [displayName, setFormDirty, user]);
   const submit = (event: FormEvent) => {
     event.preventDefault();
+    if (updateProfile.isPending) return;
     if (displayName.trim()) updateProfile.mutate({ display_name: displayName.trim() });
   };
   return (
@@ -335,7 +336,12 @@ function ProfileSettings() {
       <div className="form-grid">
         <label>
           <span>نام نمایشی</span>
-          <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} required />
+          <input
+            disabled={updateProfile.isPending}
+            value={displayName}
+            onChange={(event) => setDisplayName(event.target.value)}
+            required
+          />
         </label>
         <label>
           <span>ایمیل حساب</span>
@@ -349,46 +355,32 @@ function ProfileSettings() {
         خروج از حساب
       </Button>
       {logoutOpen && (
-        <div
-          className="modal-layer"
-          role="presentation"
-          onMouseDown={(event) => event.target === event.currentTarget && setLogoutOpen(false)}
+        <AccessModal
+          title="آیا مطمئن هستید می‌خواهید خارج شوید؟"
+          busy={signOut.isPending}
+          onClose={() => setLogoutOpen(false)}
         >
-          <section
-            className="create-modal logout-modal"
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="logout-title"
-          >
-            <header>
-              <div>
-                <span className="modal-kicker">تأیید خروج</span>
-                <h2 id="logout-title">آیا مطمئن هستید می‌خواهید خارج شوید؟</h2>
-              </div>
-            </header>
-            <p>
-              {dirtyForms.length
-                ? "فرم ذخیره‌نشده دارید. با خروج، تغییرات ذخیره‌نشده از بین می‌رود."
-                : "برای پایان‌دادن به نشست فعلی، خروج را تأیید کنید."}
-            </p>
-            <footer>
-              <Button variant="secondary" onClick={() => setLogoutOpen(false)}>
-                لغو
-              </Button>
-              <Button
-                variant="danger"
-                icon={LogOut}
-                onClick={() => {
-                  clearDirtyForms();
-                  signOut.mutate();
-                }}
-                disabled={signOut.isPending}
-              >
-                خروج
-              </Button>
-            </footer>
-          </section>
-        </div>
+          <p>
+            {dirtyForms.length
+              ? "فرم ذخیره‌نشده دارید. با خروج، تغییرات ذخیره‌نشده از بین می‌رود."
+              : "برای پایان‌دادن به نشست فعلی، خروج را تأیید کنید."}
+          </p>
+          <footer>
+            <Button variant="secondary" disabled={signOut.isPending} onClick={() => setLogoutOpen(false)}>
+              لغو
+            </Button>
+            <Button
+              variant="danger"
+              icon={LogOut}
+              onClick={() => {
+                signOut.mutate();
+              }}
+              disabled={signOut.isPending}
+            >
+              خروج
+            </Button>
+          </footer>
+        </AccessModal>
       )}
     </form>
   );
@@ -405,6 +397,7 @@ function SecuritySettings() {
   }, [newPassword, oldPassword, setFormDirty]);
   const submit = (event: FormEvent) => {
     event.preventDefault();
+    if (changePassword.isPending) return;
     changePassword.mutate(
       { old_password: oldPassword, new_password: newPassword },
       {
@@ -425,12 +418,19 @@ function SecuritySettings() {
       </header>
       <label>
         <span>رمز عبور فعلی</span>
-        <input type="password" value={oldPassword} onChange={(event) => setOldPassword(event.target.value)} required />
+        <input
+          disabled={changePassword.isPending}
+          type="password"
+          value={oldPassword}
+          onChange={(event) => setOldPassword(event.target.value)}
+          required
+        />
       </label>
       <label>
         <span>رمز عبور جدید</span>
         <input
           type="password"
+          disabled={changePassword.isPending}
           minLength={8}
           value={newPassword}
           onChange={(event) => setNewPassword(event.target.value)}

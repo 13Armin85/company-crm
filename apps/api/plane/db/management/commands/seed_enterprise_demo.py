@@ -345,6 +345,7 @@ class Command(BaseCommand):
             ("Backlog", "backlog", "#64748b"),
             ("Todo", "unstarted", "#3b82f6"),
             ("In Progress", "started", "#f59e0b"),
+            ("Review", "started", "#8b5cf6"),
             ("Done", "completed", "#10b981"),
             ("Blocked", "cancelled", "#ef4444"),
         ]
@@ -358,7 +359,7 @@ class Command(BaseCommand):
                     name=name,
                     defaults={"group": group, "color": color, "default": group == "unstarted"},
                 )
-                states[group] = state
+                states.setdefault(group, state)
             if project.default_state_id is None:
                 project.default_state = states["unstarted"]
                 project.save(update_fields=["default_state", "updated_at"])

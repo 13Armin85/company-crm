@@ -18,3 +18,8 @@ export function permissionsForPath(pathname: string): string[] {
   if (!path) return [];
   return path === "/issues" ? ["Issue.View", pagePermissions[path]] : [pagePermissions[path]];
 }
+
+export function canAccessPath(pathname: string, can: (code: string) => boolean): boolean {
+  if (/^\/roles\/[^/]+\/permissions\/?$/.test(pathname)) return can("Role.View") || can("Role.Permission.Assign");
+  return permissionsForPath(pathname).every(can);
+}

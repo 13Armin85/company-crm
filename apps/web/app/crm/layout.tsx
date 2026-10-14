@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { BrandLogo } from "@plane/ui";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { BrandLogo, ModalVisibilityContext } from "@plane/ui";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { Navigate, NavLink, Outlet, useBlocker, useLocation, useNavigate } from "react-router";
 import {
@@ -48,7 +48,7 @@ import {
 } from "./components";
 import { useUIStore } from "./store";
 import { toFa } from "./utils";
-import { permissionsForPath } from "./access/permission-map";
+import { canAccessPath } from "./access/permission-map";
 import {
   hidePrivateContent,
   revealPrivateContent,
@@ -92,7 +92,8 @@ function AppLayout() {
   const updateAppearance = useUpdateAppearance();
   const selectWorkspace = useSelectWorkspace();
   const { data: projects = [] } = useProjects();
-  const { data: notifications = [] } = useNotifications();
+  const { data: notifications = [] } = useNotifications(undefined, true);
+  const unreadCount = notifications.filter((item) => !item.read).length;
   const { data: currentUser } = useCurrentUser();
   const { data: access, error: accessError } = useWorkspaceAccess();
   const canCreate = access?.can("Issue.Create") === true;
@@ -130,7 +131,6 @@ function AppLayout() {
       }
       if (event.key === "Escape") {
         setCommand(false);
-        setCreate(false);
         setNotifications(false);
         setMobileSidebarOpen(false);
       }
@@ -195,7 +195,7 @@ function AppLayout() {
         </div>
         <nav className="main-nav">
           {navItems
-            .filter((item) => permissionsForPath(item.to).every((code) => access?.can(code)))
+            .filter((item) => canAccessPath(item.to, (code) => access?.can(code) === true))
             .map(({ to, label, icon: Icon, end }) => (
               <NavLink
                 to={to}
@@ -314,14 +314,28 @@ function AppLayout() {
               <kbd>Ctrl K</kbd>
             </button>
             {canCreate && (
-              <button className="create-button" onClick={() => setCreate(true, "issue")}>
+              <button className="create-button" aria-label="ایجاد" onClick={() => setCreate(true, "issue")}>
                 <Plus size={17} />
                 <span>ایجاد</span>
                 <ChevronDown size={13} />
               </button>
             )}
-            <IconButton label="اعلان‌ها" className="has-notification" onClick={() => setNotifications(true)}>
+            <IconButton
+              label="اعلان‌ها"
+              className={`notification-button ${unreadCount ? "has-notification" : ""}`}
+              onClick={() => setNotifications(true)}
+            >
               <Bell size={19} />
+              {unreadCount > 0 && (
+                <span
+                  className="notification-badge"
+                  role="status"
+                  aria-live="polite"
+                  aria-label={`${toFa(unreadCount)} اعلان خوانده‌نشده`}
+                >
+                  {unreadCount > 99 ? "۹۹+" : toFa(unreadCount)}
+                </span>
+              )}
             </IconButton>
             <IconButton
               label="تغییر پوسته"
@@ -350,7 +364,7 @@ function AppLayout() {
             <p role="status">عضویت فعالی در یک شرکت ندارید.</p>
           ) : !access ? (
             <div role="status">در حال بررسی دسترسی…</div>
-          ) : permissionsForPath(location.pathname).every((code) => access.can(code)) ? (
+          ) : canAccessPath(location.pathname, access.can) ? (
             <Outlet />
           ) : (
             <section role="alert" className="panel">
@@ -421,6 +435,8 @@ export function AuthenticationBoundary() {
   const { data: user, isLoading, error, refetch } = useCurrentUser();
   const [verifying, setVerifying] = useState(false);
   const [verifiedLocation, setVerifiedLocation] = useState<string>();
+  const [retryVerification, setRetryVerification] = useState(0);
+  const verifiedUserId = useRef<string | undefined>(undefined);
   useEffect(() => {
     let active = true;
     let ended = false;
@@ -443,10 +459,18 @@ export function AuthenticationBoundary() {
       const result = await refetch();
       if (!active || ended || current !== sequence) return;
       if (result.isError) {
+        if ((result.error as { response?: { status?: number } })?.response?.status === 401) {
+          publishSessionEnd();
+          endSession();
+        }
+        return;
+      }
+      if (verifiedUserId.current && verifiedUserId.current !== result.data?.id) {
         publishSessionEnd();
         endSession();
         return;
       }
+      verifiedUserId.current = result.data?.id;
       setVerifiedLocation(location.key);
       revealPrivateContent();
       setVerifying(false);
@@ -477,7 +501,7 @@ export function AuthenticationBoundary() {
       window.removeEventListener("focus", focus);
       document.removeEventListener("visibilitychange", visibility);
     };
-  }, [client, navigate, refetch, location.key]);
+  }, [client, navigate, refetch, location.key, retryVerification]);
   useEffect(() => {
     const interceptor = api.interceptors.response.use(
       (response) => response,
@@ -493,18 +517,30 @@ export function AuthenticationBoundary() {
     );
     return () => api.interceptors.response.eject(interceptor);
   }, [client, navigate]);
-  if (isLoading)
-    return (
-      <main className="access-loading" role="status">
-        در حال بررسی حساب…
-      </main>
-    );
-  if (error || !user) return <Navigate to="/login" replace />;
-  if (isLoading || verifying || verifiedLocation !== location.key)
-    return (
-      <main className="access-loading" role="status">
-        در حال بررسی حساب…
-      </main>
-    );
-  return <AppLayout />;
+  if ((error as { response?: { status?: number } } | null)?.response?.status === 401)
+    return <Navigate to="/login" replace />;
+  if (!user && !isLoading && !error) return <Navigate to="/login" replace />;
+  const pending = isLoading || verifying || verifiedLocation !== location.key || Boolean(error);
+  return (
+    <>
+      {pending &&
+        (error ? (
+          <main className="access-loading">
+            <p role="alert">تأیید نشست انجام نشد؛ اتصال را بررسی و دوباره تلاش کنید.</p>
+            <Button onClick={() => setRetryVerification((value) => value + 1)}>تلاش دوباره</Button>
+          </main>
+        ) : (
+          <main className="access-loading" role="status">
+            در حال بررسی حساب…
+          </main>
+        ))}
+      <div hidden={pending} aria-hidden={pending} inert={pending}>
+        {user && verifiedLocation !== undefined && (
+          <ModalVisibilityContext.Provider value={!pending}>
+            <AppLayout />
+          </ModalVisibilityContext.Provider>
+        )}
+      </div>
+    </>
+  );
 }

@@ -252,7 +252,9 @@ class UserPermissionException(BaseModel):
             if self.ends_at:
                 overlapping = overlapping.filter(Q(starts_at__isnull=True) | Q(starts_at__lt=self.ends_at))
             if overlapping.exists():
-                raise ValidationError({"permission": "An exception with the same effect already covers this period."})
+                raise ValidationError(
+                    {"permission": "این مجوز با همین نوع اثر و بازه قبلاً ثبت شده است؛ رکورد موجود را ویرایش کنید."}
+                )
 
 
 class OrganizationUnitDelegate(BaseModel):

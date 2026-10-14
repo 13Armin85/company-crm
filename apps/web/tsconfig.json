@@ -24,6 +24,7 @@
     "app/crm/**/*.ts",
     "app/crm/**/*.tsx",
     "vite.config.ts",
+    "local-origin.ts",
     "react-router.config.ts",
     ".react-router/types/**/*",
     "**/*.d.ts"

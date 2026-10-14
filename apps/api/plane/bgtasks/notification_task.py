@@ -23,8 +23,9 @@ from plane.db.models import (
     IssueActivity,
     UserNotificationPreference,
     ProjectMember,
+    WorkspaceMember,
 )
-from django.db.models import Subquery
+from django.db.models import Q, Subquery
 
 # Third Party imports
 from celery import shared_task
@@ -227,9 +228,19 @@ def notifications(
             2. From the latest set of mentions, extract the users which are not a subscribers & make them subscribers
             """
 
-            # get the list of active project members
-            project_members = ProjectMember.objects.filter(project_id=project_id, is_active=True).values_list(
-                "member_id", flat=True
+            project = Project.objects.get(pk=project_id)
+            # An assigned workspace member may have arrived through organization routing.
+            project_member_ids = ProjectMember.objects.filter(project_id=project_id, is_active=True).values("member_id")
+            assignee_ids = IssueAssignee.objects.filter(project_id=project_id, issue_id=issue_id).values("assignee_id")
+            project_members = (
+                WorkspaceMember.objects.filter(
+                    workspace_id=project.workspace_id,
+                    is_active=True,
+                    member__is_active=True,
+                    member__is_bot=False,
+                )
+                .filter(Q(member_id__in=project_member_ids) | Q(member_id__in=assignee_ids))
+                .values_list("member_id", flat=True)
             )
 
             # Get new mentions from the newer instance
@@ -297,8 +308,6 @@ def notifications(
                     )
                 except Exception:
                     pass
-
-            project = Project.objects.get(pk=project_id)
 
             issue_assignees = IssueAssignee.objects.filter(
                 issue_id=issue_id,

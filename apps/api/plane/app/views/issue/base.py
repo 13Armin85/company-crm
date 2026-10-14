@@ -443,7 +443,9 @@ class IssueViewSet(BaseViewSet):
             serializer.save()
             routing_decision = None
             if routing_rule is not None:
-                routing_decision = TicketRoutingService.route(serializer.instance, routing_rule)
+                routing_decision = TicketRoutingService.route(
+                    serializer.instance, routing_rule, actor_id=request.user.id
+                )
 
             # Track the issue
             issue_activity.delay(

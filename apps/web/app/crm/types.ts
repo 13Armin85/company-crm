@@ -12,6 +12,7 @@ export interface Member {
   membershipId?: string;
   displayName: string;
   email: string;
+  timeZone?: string;
   initials: string;
   avatarUrl?: string;
   role: string;
@@ -62,7 +63,17 @@ export interface NotificationItem {
   description: string;
   time: string;
   read: boolean;
-  type: "mention" | "assignment" | "update" | "comment";
+  type: "mention" | "assignment" | "update" | "comment" | "security";
+  actor?: string;
+  projectId?: string;
+  entityId?: string;
+  preview?: string;
+  eventLabel?: string;
+  projectName?: string;
+  entityName?: string;
+  changes?: { label: string; value: string }[];
+  actionHref?: string;
+  actionLabel?: string;
 }
 
 export interface ProjectState {
@@ -150,6 +161,7 @@ export interface TicketRoleQueueEntry {
   id: string;
   issueId: string;
   issueName: string;
+  issueIdentifier?: string;
   projectId: string;
   projectName: string;
   ruleId: string;

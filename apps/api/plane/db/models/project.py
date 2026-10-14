@@ -10,13 +10,15 @@ from enum import Enum
 # Django imports
 from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
-from django.db import models
+from django.db import models, router, transaction
 from django.db.models import Q
+from django.utils.http import int_to_base36
 
 # Module imports
 from plane.db.mixins import AuditModel
 
 from .base import BaseModel
+from .identifier import SystemIdentifierCounter
 
 ROLE_CHOICES = ((20, "Admin"), (15, "Member"), (5, "Guest"))
 
@@ -174,6 +176,25 @@ class Project(BaseModel):
         if is_creating and not self.is_timezone_provided:
             workspace = Workspace.objects.get(id=self.workspace_id)
             self.timezone = workspace.timezone
+
+        if is_creating and not self.identifier:
+            using = kwargs.get("using") or router.db_for_write(type(self), instance=self)
+            with transaction.atomic(using=using):
+                counter = SystemIdentifierCounter.locked("project", using)
+                while True:
+                    suffix = int_to_base36(counter.advance()).upper().zfill(6)
+                    if len(suffix) > 9:
+                        raise ValueError("Project identifier counter exhausted")
+                    candidate = f"PRJ{suffix}"
+                    # Reserve names across workspaces, including deleted projects
+                    # and the historical identifier registry.
+                    if not (
+                        Project.all_objects.using(using).filter(identifier__iexact=candidate).exists()
+                        or ProjectIdentifier.all_objects.using(using).filter(name__iexact=candidate).exists()
+                    ):
+                        self.identifier = candidate
+                        break
+                return super().save(*args, **kwargs)
 
         return super().save(*args, **kwargs)
 

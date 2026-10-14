@@ -19,7 +19,7 @@ describe("Persian permission presentation", () => {
   it("keeps identifiers and grants intact while translating catalog categories", () => {
     const source = permission();
     const item = permissionPresentation(source);
-    expect(item.category).toBe("کاربران");
+    expect(item.category).toBe("کاربران / اعضای تیم");
     expect(item.id).toBe(source.id);
     expect(item.code).toBe("User.View");
     expect(item.isDelegatable).toBe(true);
@@ -58,7 +58,7 @@ describe("Persian permission presentation", () => {
       permissionPresentation(permission({ name: "ویرایش کاربران", code: "User.Edit" })),
       permissionPresentation(permission({ id: "role", name: "ویرایش نقش", category: "Role", code: "Role.Edit" })),
     ];
-    expect(filterPermissionCatalog(items, "ويرايش", "کاربران").map((item) => item.id)).toEqual(["view"]);
+    expect(filterPermissionCatalog(items, "ويرايش", "کاربران / اعضای تیم").map((item) => item.id)).toEqual(["view"]);
     expect(filterPermissionCatalog(items, "کاربران", "نقش‌ها")).toEqual([]);
     expect(filterPermissionCatalog(items, "مجوز ناموجود")).toEqual([]);
   });

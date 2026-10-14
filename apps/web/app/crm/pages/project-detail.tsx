@@ -1,3 +1,4 @@
+import { IdentifierBadge, SearchableSelect } from "@plane/ui";
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import {
@@ -33,6 +34,7 @@ import {
   useCycles,
 } from "../api";
 import { Avatar, AvatarStack, Button, EmptyState, IssueRow, PersianDateInput, Skeleton, TabBar } from "../components";
+import { IssueCalendar } from "../issue-calendar";
 import { useUIStore } from "../store";
 import type { Status } from "../types";
 import { persianDate, statusFa, toFa } from "../utils";
@@ -77,6 +79,9 @@ export default function ProjectDetailPage() {
   useEffect(() => {
     if (access && !canManage && tab === "settings") setTab("overview");
   }, [access, canManage, tab]);
+  useEffect(() => {
+    setTab(params.get("tab") || "overview");
+  }, [params]);
 
   if (projectQuery.isLoading) return <Skeleton rows={5} />;
   if (!project) return <EmptyState title="پروژه پیدا نشد" description="پروژه حذف شده یا به آن دسترسی ندارید." />;
@@ -86,7 +91,7 @@ export default function ProjectDetailPage() {
         <div className="project-title">
           <span style={{ background: `${project.color}18`, color: project.color }}>{project.identifier[0]}</span>
           <div>
-            <small>{project.identifier}</small>
+            <IdentifierBadge value={project.identifier} label="شناسه پروژه" />
             <h1>{project.name}</h1>
             <p>{project.description || "برای این پروژه توضیحی ثبت نشده است."}</p>
           </div>
@@ -235,23 +240,13 @@ export default function ProjectDetailPage() {
       {tab === "calendar" && (
         <div className="panel tab-content">
           <h2>موعدهای پروژه</h2>
-          {issues.filter((item) => item.dueDate).length ? (
-            issues
-              .filter((item) => item.dueDate)
-              .map((issue) => (
-                <div className="calendar-agenda-row" key={issue.id}>
-                  <CalendarDays size={17} />
-                  <time>{persianDate(issue.dueDate)}</time>
-                  <IssueRow issue={issue} compact />
-                </div>
-              ))
-          ) : (
-            <EmptyState
-              icon={CalendarDays}
-              title="موعدی ثبت نشده"
-              description="برای کارها تاریخ پایان تعیین کنید تا اینجا نمایش داده شوند."
-            />
-          )}
+          <IssueCalendar
+            issues={issues}
+            projects={[project]}
+            timeZone={currentUser?.timeZone}
+            isLoading={issuesQuery.isLoading}
+            showAgenda
+          />
         </div>
       )}
       {tab === "activity" && (
@@ -429,7 +424,7 @@ function CyclesTab({
   const createCycle = useCreateCycle(slug, projectId);
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    if (name.trim())
+    if (name.trim() && !createCycle.isPending && !(start && end && end <= start))
       createCycle.mutate(
         { name, start_date: start || undefined, end_date: end || undefined },
         {
@@ -448,17 +443,31 @@ function CyclesTab({
           <h2>چرخه جدید</h2>
           <label>
             <span>نام چرخه</span>
-            <input value={name} onChange={(e) => setName(e.target.value)} required />
+            <input disabled={createCycle.isPending} value={name} onChange={(e) => setName(e.target.value)} required />
           </label>
-          <label htmlFor="cycle-start-day">
+          <label htmlFor="cycle-start">
             <span>شروع</span>
-            <PersianDateInput id="cycle-start" value={start} onChange={setStart} />
+            <PersianDateInput
+              label="شروع"
+              disabled={createCycle.isPending}
+              id="cycle-start"
+              value={start}
+              onChange={setStart}
+            />
           </label>
-          <label htmlFor="cycle-end-day">
+          <label htmlFor="cycle-end">
             <span>پایان</span>
-            <PersianDateInput id="cycle-end" value={end} onChange={setEnd} />
+            <PersianDateInput
+              label="پایان"
+              disabled={createCycle.isPending}
+              id="cycle-end"
+              value={end}
+              onChange={setEnd}
+            />
           </label>
-          <Button type="submit" icon={Plus} disabled={createCycle.isPending}>
+          {start && end && end <= start && <p role="alert">پایان چرخه باید بعد از شروع باشد.</p>}
+          {createCycle.isError && <p role="alert">ساخت چرخه انجام نشد. دوباره تلاش کنید.</p>}
+          <Button type="submit" icon={Plus} disabled={createCycle.isPending || Boolean(start && end && end <= start)}>
             ساخت چرخه
           </Button>
         </form>
@@ -499,7 +508,6 @@ function ProjectSettings({
   workspaceMembers: NonNullable<ReturnType<typeof useMembers>["data"]>;
 }) {
   const [name, setName] = useState(project.name),
-    [identifier, setIdentifier] = useState(project.identifier),
     [description, setDescription] = useState(project.description || ""),
     [targetDate, setTargetDate] = useState(project.targetDate || ""),
     [lead, setLead] = useState(project.projectLeadId || "");
@@ -510,14 +518,15 @@ function ProjectSettings({
   const [memberToAdd, setMemberToAdd] = useState("");
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    update.mutate({ name, identifier, description, targetDate, projectLeadId: lead });
+    if (update.isPending) return;
+    update.mutate({ name, description, targetDate, projectLeadId: lead });
   };
   return (
     <form className="panel project-settings-form" onSubmit={submit}>
       <header>
         <div>
           <h2>تنظیمات پروژه</h2>
-          <p>تمام تغییرات مستقیماً در بک‌اند ذخیره می‌شوند.</p>
+          <p>شناسه پروژه ثابت است و برای جست‌وجو و ارجاع استفاده می‌شود.</p>
         </div>
         <Button type="submit" icon={Save} disabled={update.isPending}>
           ذخیره تغییرات
@@ -526,46 +535,65 @@ function ProjectSettings({
       <div className="form-grid">
         <label>
           <span>نام پروژه</span>
-          <input value={name} onChange={(e) => setName(e.target.value)} />
+          <input disabled={update.isPending} value={name} onChange={(e) => setName(e.target.value)} />
         </label>
-        <label>
+        <div className="identifier-field" role="group" aria-label="شناسه پروژه">
           <span>شناسه</span>
-          <input dir="ltr" value={identifier} onChange={(e) => setIdentifier(e.target.value.toUpperCase())} />
-        </label>
+          <IdentifierBadge value={project.identifier} label="شناسه پروژه" />
+        </div>
         <label className="wide">
           <span>توضیحات</span>
-          <textarea value={description} onChange={(e) => setDescription(e.target.value)} />
+          <textarea disabled={update.isPending} value={description} onChange={(e) => setDescription(e.target.value)} />
         </label>
-        <label htmlFor="project-target-date-day">
+        <label htmlFor="project-target-date">
           <span>تاریخ پایان</span>
-          <PersianDateInput id="project-target-date" value={targetDate} onChange={setTargetDate} />
+          <PersianDateInput
+            disabled={update.isPending}
+            id="project-target-date"
+            label="تاریخ پایان"
+            value={targetDate}
+            onChange={setTargetDate}
+          />
         </label>
-        <label>
+        <label htmlFor="crm-project-detail-select-1">
           <span>مدیر پروژه</span>
-          <select value={lead} onChange={(e) => setLead(e.target.value)}>
-            <option value="">تعیین نشده</option>
-            {members.map((member) => (
-              <option key={member.id} value={member.id}>
-                {member.displayName}
-              </option>
-            ))}
-          </select>
+          <SearchableSelect
+            id="crm-project-detail-select-1"
+            label="مدیر پروژه"
+            disabled={update.isPending}
+            value={lead}
+            onChange={setLead}
+            options={[
+              { id: "", title: "تعیین نشده" },
+              ...members.map((member) => ({
+                id: member.id,
+                title: member.displayName,
+                description: member.email,
+                disabled: member.isActive === false,
+              })),
+            ]}
+          />
         </label>
       </div>
+      {update.isError && <p role="alert">ذخیره تنظیمات پروژه انجام نشد. دوباره تلاش کنید.</p>}
       {access?.can("Project.Member.Manage") && (
         <section className="project-member-settings">
           <h3>اعضای پروژه</h3>
           <div className="add-project-member">
-            <select value={memberToAdd} onChange={(event) => setMemberToAdd(event.target.value)}>
-              <option value="">انتخاب عضو فضای کاری</option>
-              {workspaceMembers
+            <SearchableSelect
+              label="انتخاب عضو فضای کاری"
+              disabled={addMember.isPending}
+              value={memberToAdd}
+              onChange={setMemberToAdd}
+              options={workspaceMembers
                 .filter((candidate) => !members.some((member) => member.id === candidate.id))
-                .map((member) => (
-                  <option key={member.id} value={member.id}>
-                    {member.displayName}
-                  </option>
-                ))}
-            </select>
+                .map((member) => ({
+                  id: member.id,
+                  title: member.displayName,
+                  description: member.email,
+                  disabled: member.isActive === false,
+                }))}
+            />
             <Button
               icon={Plus}
               disabled={!memberToAdd || addMember.isPending}
@@ -583,7 +611,7 @@ function ProjectSettings({
                 </span>
                 <button
                   type="button"
-                  disabled={!member.membershipId}
+                  disabled={!member.membershipId || removeMember.isPending}
                   onClick={() =>
                     member.membershipId &&
                     window.confirm(`حذف ${member.displayName} از پروژه؟`) &&

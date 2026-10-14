@@ -38,6 +38,7 @@
     "@plane/utils": "workspace:*",
     "@popperjs/core": "catalog:",
     "clsx": "catalog:",
+    "jalaali-js": "catalog:",
     "lodash-es": "catalog:",
     "lucide-react": "catalog:",
     "react-color": "catalog:",

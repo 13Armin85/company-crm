@@ -1,5 +1,48 @@
+/* Stable record identifiers stay selectable and can be copied independently. */
+.identifier-field {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+}
+.identifier-badge {
+  display: inline-flex;
+  max-width: 100%;
+  vertical-align: middle;
+}
+.identifier-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 3px 5px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.identifier-copy > span {
+  max-width: 15rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: monospace;
+  user-select: text;
+}
+.identifier-copy > svg {
+  flex-shrink: 0;
+}
+.identifier-copy:hover,
+.identifier-copy:focus-visible {
+  background: var(--accent-soft);
+}
+
 /* Shared Hamkar palette. Keep the CRM and instance administration in sync. */
 :root {
+  --crm-control-height: 40px;
   --bg: #f7f8fa;
   --surface: #fff;
   --surface-soft: #f9fafb;
@@ -20,7 +63,8 @@
   --shadow: 0 1px 2px rgb(15 23 42 / 4%), 0 8px 28px rgb(15 23 42 / 4%);
   color-scheme: light;
 }
-:root[data-theme="dark"] {
+:root[data-theme="dark"],
+[data-theme="dark"] {
   --bg: #0f1115;
   --surface: #15181e;
   --surface-soft: #1a1e25;
@@ -73,13 +117,13 @@
   display: grid;
   gap: 16px;
 }
-.access-modal label:not(.selector-options label),
-.user-access-panel label {
+.access-modal label:not(.selector-option):not(.active-toggle),
+.user-access-panel label:not(.selector-option):not(.active-toggle) {
   display: grid;
   gap: 7px;
   min-width: 0;
 }
-.access-modal input:not([type="checkbox"]),
+.access-modal input:not([type="checkbox"]):not([type="radio"]),
 .access-modal select,
 .access-modal textarea,
 .compact-selector input[type="search"] {
@@ -164,19 +208,19 @@
   font-size: 12px;
   opacity: 0.7;
 }
-.selector-options label {
+.selector-option {
   display: flex;
+  flex-direction: row;
   align-items: center;
   gap: 10px;
   padding: 9px 4px;
   cursor: pointer;
 }
 input[type="checkbox"],
-.assignment-card input[type="checkbox"],
-.member-picker input[type="checkbox"] {
-  width: 18px !important;
-  height: 18px !important;
-  min-height: 18px !important;
+input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
   flex: 0 0 18px;
   accent-color: var(--accent);
 }
@@ -192,6 +236,724 @@ fieldset:disabled {
 }
 fieldset:disabled label {
   cursor: default;
+}
+
+.data-filter-dialog {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 32px);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 14px;
+}
+.data-filter-dialog > header,
+.data-filter-dialog > footer {
+  flex: 0 0 auto;
+  padding: 20px;
+}
+.data-filter-dialog > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.data-filter-dialog h2 {
+  margin-bottom: 6px;
+  font-size: 18px;
+  font-weight: 700;
+}
+.data-filter-dialog header p,
+.data-filter-help {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.8;
+}
+.data-filter-dialog header button {
+  display: grid;
+  place-items: center;
+  flex: 0 0 36px;
+  height: 36px;
+  border-radius: 8px;
+}
+.data-filter-body {
+  display: grid;
+  gap: 18px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 20px;
+}
+.data-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 14px;
+}
+.data-filter-field {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.data-filter-field > input {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: inherit;
+}
+.data-filter-deadline,
+.data-filter-progress {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+}
+.data-filter-deadline > legend,
+.data-filter-progress > legend {
+  padding-inline: 6px;
+  font-weight: 600;
+}
+.data-filter-deadline > .searchable-select {
+  margin-bottom: 14px;
+}
+.data-filter-dialog > footer {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid var(--border);
+}
+.data-filter-dialog footer p {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.data-filter-dialog footer .data-filter-error {
+  color: var(--red);
+}
+.data-filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.data-filter-actions button {
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-primary);
+}
+.data-filter-actions button:first-child {
+  margin-inline-end: auto;
+}
+.data-filter-actions .data-filter-apply {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+.data-filter-dialog button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.data-filter-dialog button:focus-visible,
+.data-filter-dialog input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+@media (max-width: 560px) {
+  .data-filter-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .data-filter-dialog > header,
+  .data-filter-dialog > footer,
+  .data-filter-body {
+    padding: 14px;
+  }
+}
+.selector-option > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.selector-trigger,
+.selector-input-row,
+.persian-date-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-width: 0;
+  min-height: var(--crm-control-height);
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-primary);
+  text-align: start;
+  font: inherit;
+}
+.selector-input-row {
+  padding: 0;
+}
+.selector-input-row input {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  padding: 8px 12px;
+}
+.selector-input-row button {
+  padding: 8px 12px;
+  flex-shrink: 0;
+}
+.selector-panel {
+  margin-top: 6px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-primary);
+  box-shadow: var(--shadow);
+  min-width: 0;
+}
+.selector-single-options {
+  --anchor-gap: 6px;
+  --anchor-padding: 12px;
+  z-index: 130;
+  width: var(--input-width);
+  max-width: calc(100vw - 24px);
+  max-height: min(260px, var(--anchor-max-height, 260px));
+  margin: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.selector-single-option {
+  padding: 8px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.selector-single-options-nowrap {
+  width: max-content;
+  min-width: max(var(--input-width), 150px);
+}
+.selector-single-options-nowrap .selector-single-option {
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+.selector-single-option small {
+  display: block;
+  color: var(--text-secondary);
+}
+.selector-single-option[data-focus] {
+  background: var(--accent-soft);
+}
+.selector-single-option[data-disabled] {
+  opacity: 0.5;
+  cursor: default;
+}
+.searchable-select {
+  min-width: 0;
+  width: 100%;
+}
+.persian-date-picker,
+.persian-datetime-picker {
+  min-width: 0;
+  width: 100%;
+}
+.persian-calendar-navigation {
+  container-type: inline-size;
+  flex: 1 1 540px;
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.persian-navigation-heading,
+.persian-navigation-summary,
+.persian-navigation-actions,
+.persian-navigation-arrows {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.persian-navigation-heading {
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+.persian-navigation-summary {
+  min-width: 0;
+}
+.persian-navigation-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 42px;
+  height: 42px;
+  border-radius: 10px;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.persian-navigation-summary h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+.persian-navigation-summary h2 span {
+  color: var(--text-secondary);
+  font-size: 16px;
+  font-weight: 500;
+}
+.persian-navigation-summary p {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.persian-navigation-actions button {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.persian-navigation-actions button:hover:not(:disabled) {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.persian-navigation-actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.persian-navigation-actions button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.persian-navigation-today {
+  padding-inline: 12px;
+  font-size: 12px;
+}
+.persian-navigation-arrows {
+  gap: 4px;
+}
+.persian-navigation-arrows button {
+  width: 40px;
+  padding: 0;
+}
+.persian-navigation-fields {
+  display: grid;
+  grid-template-columns: minmax(100px, 1fr) minmax(90px, 0.75fr) minmax(190px, 1.5fr);
+  gap: 12px;
+}
+.persian-navigation-fields > div {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 7px;
+}
+.persian-navigation-fields > div > span {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.persian-navigation-fields .persian-date-trigger {
+  width: 100%;
+  font-size: 12px;
+}
+.persian-navigation-fields .persian-date-trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.persian-navigation-fields .selector-input-row input {
+  font-size: 13px;
+}
+@container (max-width: 460px) {
+  .persian-navigation-fields {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .persian-navigation-date {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 600px) {
+  .persian-calendar-navigation {
+    flex-basis: auto;
+    width: 100%;
+    padding: 14px;
+  }
+  .persian-navigation-heading {
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .persian-navigation-actions {
+    margin-inline-start: auto;
+  }
+  .persian-navigation-fields {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .persian-navigation-date {
+    grid-column: 1 / -1;
+  }
+}
+.persian-calendar {
+  --anchor-gap: 8px;
+  --anchor-padding: 12px;
+  z-index: 120;
+  width: min(328px, calc(100vw - 24px));
+  max-height: var(--anchor-max-height);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: 0;
+  padding: 14px;
+  border-radius: 16px;
+  box-shadow:
+    0 12px 36px rgb(15 23 42 / 16%),
+    0 2px 8px rgb(15 23 42 / 6%);
+  font: inherit;
+}
+.persian-calendar-header {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) minmax(88px, 1fr) 32px;
+  gap: 6px;
+  align-items: center;
+}
+.persian-calendar-header > button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 38px;
+  padding: 0;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  background: var(--surface-soft);
+  cursor: pointer;
+}
+.persian-calendar-header > select,
+.persian-calendar-header > .searchable-select {
+  width: 100%;
+  min-width: 0;
+}
+.persian-calendar-header .selector-input-row input,
+.persian-calendar-header .selector-input-row button {
+  padding-inline: 6px;
+}
+.persian-calendar-header > select {
+  height: 40px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.persian-calendar-weekdays,
+.persian-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+.persian-calendar-weekdays {
+  margin-top: 12px;
+  padding-block: 6px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-align: center;
+}
+.persian-calendar-grid {
+  margin-block: 8px 12px;
+  grid-auto-rows: 36px;
+}
+.persian-calendar-grid > * {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.persian-calendar-grid button {
+  cursor: pointer;
+  transition:
+    background-color 120ms,
+    color 120ms;
+}
+.persian-calendar-grid button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.persian-calendar-grid button:not(:disabled):hover,
+.persian-calendar-grid button:focus-visible {
+  background: var(--accent-soft);
+}
+.persian-calendar-grid button[aria-pressed="true"],
+.persian-calendar-grid button[aria-pressed="true"]:hover,
+.persian-calendar-grid button[aria-pressed="true"]:focus-visible {
+  background: var(--accent);
+  color: white;
+  font-weight: 700;
+}
+.persian-calendar-grid button[data-today] {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.persian-calendar-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.persian-calendar-footer button {
+  min-height: 34px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  color: var(--accent);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.persian-calendar-footer button:not(:disabled):hover,
+.persian-calendar-header > button:hover {
+  background: var(--accent-soft);
+}
+.persian-calendar-footer button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.persian-date-trigger[data-open],
+.persian-calendar button:focus-visible,
+.persian-calendar select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.persian-date-trigger > svg {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+.persian-time-picker {
+  min-width: 0;
+  margin: 0;
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+.persian-time-heading,
+.persian-time-heading > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.persian-time-heading {
+  justify-content: space-between;
+  margin-bottom: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.persian-time-heading small,
+.persian-time-unit > label,
+.persian-time-presets > span {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 400;
+}
+.persian-time-segments {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 22px;
+}
+.persian-time-unit {
+  min-width: 0;
+  position: relative;
+}
+.persian-time-unit > label {
+  display: block;
+  margin-bottom: 5px;
+  text-align: center;
+}
+.persian-time-colon {
+  position: absolute;
+  left: -15px;
+  top: 29px;
+  color: var(--text-secondary);
+  font-size: 22px;
+}
+.persian-time-control {
+  display: flex;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.persian-time-control:focus-within {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent-soft);
+}
+.persian-time-control input {
+  width: 100%;
+  min-width: 0;
+  height: 46px;
+  padding: 4px;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 24px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.persian-time-steppers {
+  display: grid;
+  flex: 0 0 28px;
+  border-inline-start: 1px solid var(--border);
+}
+.persian-time-steppers button {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+}
+.persian-time-steppers button + button {
+  border-top: 1px solid var(--border);
+}
+.persian-time-presets {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+}
+.persian-time-presets > span {
+  margin-inline-end: auto;
+}
+.persian-time-presets button {
+  min-width: 32px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.persian-time-presets button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.persian-time-picker button:not(:disabled):hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+  cursor: pointer;
+}
+.persian-time-picker button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.persian-time-picker:disabled {
+  opacity: 0.55;
+}
+.persian-time-picker button:disabled,
+.persian-time-picker input:disabled {
+  cursor: default;
+}
+.date-validation-input {
+  position: absolute;
+  width: 1px !important;
+  height: 1px !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  opacity: 0;
+  pointer-events: none;
+}
+.form-grid,
+.form-grid > *,
+.create-modal,
+.create-modal form > * {
+  min-width: 0;
+}
+.crm-date-field {
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.crm-date-field > legend {
+  padding: 0;
+  margin-block: 12px 6px;
+  font-size: 12px;
+  font-weight: 650;
+}
+.form-grid > footer,
+.form-grid > [role="alert"],
+.form-grid > .form-message {
+  grid-column: 1 / -1;
+}
+.form-grid > footer {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.create-modal {
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}
+.create-modal footer {
+  position: sticky;
+  bottom: -18px;
+  background: var(--surface);
+  padding-block: 12px;
+  z-index: 1;
+}
+button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+input[aria-invalid="true"] {
+  border-color: var(--red);
+}
+:root[data-density="compact"] {
+  --crm-control-height: 36px;
+}
+@media (max-width: 767px) {
+  .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .org-node {
+    flex-wrap: wrap;
+    margin-inline-start: 0 !important;
+  }
+  .org-node-actions {
+    flex-wrap: wrap;
+  }
 }
 .role-chips {
   display: flex;

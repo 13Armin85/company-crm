@@ -25,4 +25,13 @@ def user_login(request, user, is_app=False, is_admin=False, is_space=False):
     }
     request.session["device_info"] = device_info
     request.session.save()
+    if is_app:
+        from plane.app.services.crm_notifications import notify_login
+        from plane.utils.exception_logger import log_exception
+
+        try:
+            notify_login(user, request)
+        except Exception as exc:
+            # An optional event must not prevent an otherwise successful sign-in.
+            log_exception(exc)
     return

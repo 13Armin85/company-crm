@@ -27,6 +27,47 @@
     box-sizing: border-box;
   }
 
+  .persian-shared-calendar {
+    --rdp-caption-font-size: 0.875rem;
+    --rdp-caption-navigation-size: 2rem;
+    max-width: 100%;
+    border-radius: 12px;
+  }
+
+  .persian-shared-calendar .rdp-month_caption {
+    display: flex;
+    align-items: center;
+    min-height: 40px;
+    padding-inline-end: 72px;
+    margin-bottom: 8px;
+  }
+
+  .persian-shared-calendar .rdp-dropdowns {
+    gap: 6px;
+  }
+
+  .persian-shared-calendar .rdp-caption_label {
+    min-height: 32px;
+    padding-inline: 6px;
+    border-radius: 8px;
+  }
+
+  .persian-shared-calendar .rdp-nav {
+    top: 16px;
+    gap: 4px;
+    padding: 0;
+  }
+
+  .persian-shared-calendar .rdp-day_button,
+  .persian-shared-calendar .rdp-selected .rdp-day_button {
+    border-radius: 10px;
+  }
+
+  .persian-shared-calendar .rdp-month_grid {
+    border-collapse: separate;
+    border-spacing: 2px;
+  }
+
   /* ---------- */
   /* Day Buttons */
   /* ----------- */

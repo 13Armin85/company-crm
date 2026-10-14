@@ -24,8 +24,7 @@ class DockerSetupTests(unittest.TestCase):
         self.bin.mkdir()
         self.bash_env = self.project / "bash-test-env"
         self.bash_env.write_text(
-            'test_bin=$(cd -- "$(dirname "$BASH_ENV")/bin" && pwd)\n'
-            'export PATH="$test_bin:$PATH"\n',
+            'test_bin=$(cd -- "$(dirname "$BASH_ENV")/bin" && pwd)\nexport PATH="$test_bin:$PATH"\n',
             encoding="utf-8",
         )
         docker = self.bin / "docker"
@@ -47,10 +46,8 @@ class DockerSetupTests(unittest.TestCase):
         for name, script in {
             "uname": 'printf "%s\\n" "${SYSTEM_NAME:-Linux}"\n',
             "sudo": 'printf "sudo %s\\n" "$*" >> "$DOCKER_CALLS"\nexec "$@"\n',
-            "systemctl": 'printf "systemctl %s\\n" "$*" >> "$DOCKER_CALLS"\n'
-            'touch "$READY_STATE_FILE"\n',
-            "open": 'printf "open %s\\n" "$*" >> "$DOCKER_CALLS"\n'
-            'touch "$READY_STATE_FILE"\n',
+            "systemctl": 'printf "systemctl %s\\n" "$*" >> "$DOCKER_CALLS"\ntouch "$READY_STATE_FILE"\n',
+            "open": 'printf "open %s\\n" "$*" >> "$DOCKER_CALLS"\ntouch "$READY_STATE_FILE"\n',
         }.items():
             command = self.bin / name
             command.write_text("#!/usr/bin/env bash\n" + script, encoding="utf-8")
@@ -58,22 +55,19 @@ class DockerSetupTests(unittest.TestCase):
         installer_dir = self.project / "deployments" / "dev"
         installer_dir.mkdir(parents=True)
         (installer_dir / "install-docker.sh").write_text(
-            'printf "install docker\\n" >> "$DOCKER_CALLS"\n'
-            'exit "${INSTALL_EXIT:-0}"\n',
+            'printf "install docker\\n" >> "$DOCKER_CALLS"\nexit "${INSTALL_EXIT:-0}"\n',
             encoding="utf-8",
         )
         # Git Bash lets the same tests run from Windows without requiring WSL.
         self.bash = os.environ.get("BASH_EXECUTABLE") or (
-            r"C:\Program Files\Git\bin\bash.exe"
-            if os.name == "nt"
-            else shutil.which("bash")
+            r"C:\Program Files\Git\bin\bash.exe" if os.name == "nt" else shutil.which("bash")
         )
         if not self.bash or not Path(self.bash).exists():
             self.skipTest("Bash is required for startup script tests")
 
     def run_setup(self, *args, entrypoint="setup.sh", **overrides):
         env = dict(os.environ)
-        for key in ("DOCKER_HOST", "DOCKER_CONTEXT", "PLANE_DOCKER_USE_SUDO"):
+        for key in ("DOCKER_HOST", "DOCKER_CONTEXT", "PLANE_DOCKER_USE_SUDO", "COMPOSE_PROJECT_NAME"):
             env.pop(key, None)
         env.update(
             PATH=str(self.bin) + os.pathsep + env.get("PATH", ""),
@@ -104,7 +98,8 @@ class DockerSetupTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         env = (self.project / ".env.dev").read_text()
         self.assertRegex(env, r"DEV_SECRET_KEY=[a-f0-9]{96}\n")
-        self.assertIn("--project-name plane-dev --env-file .env.dev", self.calls())
+        self.assertIn("compose --env-file .env.dev -f docker-compose-dev.yml", self.calls())
+        self.assertNotIn("--project-name", self.calls())
         self.assertIn("config --quiet", self.calls())
         self.assertIn("up -d --wait --wait-timeout 900\n", self.calls())
         self.assertNotIn("watch --no-up", self.calls())
@@ -118,6 +113,26 @@ class DockerSetupTests(unittest.TestCase):
         result = self.run_setup()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((self.project / ".env.dev").read_text(), settings)
+
+    def test_workstation_stack_is_selected_for_startup_and_watch(self):
+        (self.project / "docker-compose-workstation.yml").write_text("name: company-crm-local\n", encoding="utf-8")
+        result = self.run_setup("--watch", entrypoint="start.sh")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        calls = self.calls().splitlines()
+        compose_calls = [call for call in calls if "compose --env-file" in call]
+        self.assertEqual(len(compose_calls), 3)
+        for call in compose_calls:
+            self.assertIn("-f docker-compose-workstation.yml", call)
+            self.assertNotIn("--project-name plane-dev", call)
+
+    def test_workstation_error_shows_command_for_the_selected_stack(self):
+        (self.project / "docker-compose-workstation.yml").touch()
+        result = self.run_setup(UP_EXIT="1")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "-f docker-compose-workstation.yml logs --tail 100 migrator api frontend",
+            result.stderr,
+        )
 
     def test_clone_entrypoint_builds_current_code_and_needs_no_host_env_files(self):
         result = self.run_setup(entrypoint="start.sh")
@@ -134,33 +149,25 @@ class DockerSetupTests(unittest.TestCase):
         self.assertIn("watch --no-up --prune=false", self.calls())
 
     def test_stopped_local_linux_engine_is_started_before_compose(self):
-        result = self.run_setup(
-            entrypoint="start.sh", INFO_EXIT="1", SYSTEM_NAME="Linux"
-        )
+        result = self.run_setup(entrypoint="start.sh", INFO_EXIT="1", SYSTEM_NAME="Linux")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("systemctl enable --now docker", self.calls())
         self.assertIn("Ready.", result.stdout)
 
     def test_macos_desktop_is_started_when_engine_is_off(self):
-        result = self.run_setup(
-            entrypoint="start.sh", INFO_EXIT="1", SYSTEM_NAME="Darwin"
-        )
+        result = self.run_setup(entrypoint="start.sh", INFO_EXIT="1", SYSTEM_NAME="Darwin")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("open -g -a Docker", self.calls())
 
     def test_remote_engine_failure_never_starts_local_engine(self):
-        result = self.run_setup(
-            entrypoint="start.sh", INFO_EXIT="1", DOCKER_HOST="tcp://remote:2376"
-        )
+        result = self.run_setup(entrypoint="start.sh", INFO_EXIT="1", DOCKER_HOST="tcp://remote:2376")
         self.assertNotEqual(result.returncode, 0)
         self.assertNotIn("systemctl", self.calls())
         self.assertNotIn("sudo", self.calls())
         self.assertNotIn("up -d", self.calls())
 
     def test_installer_failure_stops_before_settings_or_containers(self):
-        result = self.run_setup(
-            entrypoint="start.sh", COMPOSE_EXIT="1", INSTALL_EXIT="7"
-        )
+        result = self.run_setup(entrypoint="start.sh", COMPOSE_EXIT="1", INSTALL_EXIT="7")
         self.assertEqual(result.returncode, 7)
         self.assertIn("install docker", self.calls())
         self.assertFalse((self.project / ".env.dev").exists())
@@ -174,9 +181,7 @@ class DockerSetupTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertIn("Usage:", result.stdout)
 
-    @unittest.skipUnless(
-        os.name == "posix" and shutil.which("flock"), "Linux flock required"
-    )
+    @unittest.skipUnless(os.name == "posix" and shutil.which("flock"), "Linux flock required")
     def test_concurrent_start_does_not_change_settings_or_start_containers(self):
         import fcntl
 
@@ -189,9 +194,7 @@ class DockerSetupTests(unittest.TestCase):
         self.assertNotIn("up -d", self.calls())
 
     def test_windows_line_endings_in_template(self):
-        (self.project / ".env.dev.example").write_bytes(
-            b"DEV_SECRET_KEY=\r\nDEV_USER_EMAIL=custom@example.com\r\n"
-        )
+        (self.project / ".env.dev.example").write_bytes(b"DEV_SECRET_KEY=\r\nDEV_USER_EMAIL=custom@example.com\r\n")
         result = self.run_setup()
         self.assertEqual(result.returncode, 0, result.stderr)
         settings = (self.project / ".env.dev").read_bytes()

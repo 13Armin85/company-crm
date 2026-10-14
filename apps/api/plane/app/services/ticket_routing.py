@@ -1,6 +1,7 @@
 """Deterministic organization-aware ticket routing."""
 
 from django.db import transaction
+from .crm_notifications import notify_role_queue, notify_routed_issue
 
 from plane.db.models import (
     Issue,
@@ -56,7 +57,7 @@ class TicketRoutingService:
 
     @classmethod
     @transaction.atomic
-    def route(cls, issue: Issue, rule: TicketRoutingRule) -> TicketRoutingDecision:
+    def route(cls, issue: Issue, rule: TicketRoutingRule, actor_id=None) -> TicketRoutingDecision:
         if issue.workspace_id != rule.workspace_id:
             raise ValueError("Issue and routing rule must belong to the same workspace.")
         if not rule.is_active:
@@ -80,11 +81,13 @@ class TicketRoutingService:
             unit = unit.parent
 
         if assignee:
-            IssueAssignee.objects.get_or_create(
+            _, created = IssueAssignee.objects.get_or_create(
                 issue=issue,
                 assignee=assignee,
                 defaults={"workspace_id": issue.workspace_id, "project_id": issue.project_id},
             )
+            if created:
+                notify_routed_issue(issue, assignee.id, actor_id or issue.created_by_id)
             TicketRoleQueueEntry.objects.filter(issue=issue, rule=rule, status="open").update(status="closed")
             return TicketRoutingDecision.objects.create(
                 issue=issue,
@@ -94,7 +97,7 @@ class TicketRoutingService:
                 outcome=TicketRoutingDecision.Outcome.ASSIGNED,
             )
 
-        TicketRoleQueueEntry.objects.get_or_create(
+        entry, created = TicketRoleQueueEntry.objects.get_or_create(
             issue=issue,
             rule=rule,
             status=TicketRoleQueueEntry.Status.OPEN,
@@ -102,6 +105,8 @@ class TicketRoutingService:
                 "required_role": rule.required_role,
             },
         )
+        if created:
+            notify_role_queue(entry, actor_id or issue.created_by_id)
         return TicketRoutingDecision.objects.create(
             issue=issue,
             rule=rule,

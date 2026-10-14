@@ -20,6 +20,7 @@ from plane.app.permissions import WorkspaceEntityPermission, allow_permission, R
 from plane.app.permissions.crm import require_permission, require_any_permission
 from plane.app.services.access_control import has_permission, sync_plane_membership
 from plane.app.services.access_mutations import access_transaction, audit_access, remove_workspace_user, sync_user_roles
+from .organization import _sync_user_units
 from plane.db.models import OrganizationRole, UserOrganizationRole
 from django.contrib.auth.password_validation import validate_password
 
@@ -71,6 +72,14 @@ class WorkSpaceMemberViewSet(BaseViewSet):
             return Response({"error": "نقش کاربر نامعتبر است"}, status=status.HTTP_400_BAD_REQUEST)
 
         user = User.objects.filter(email=email).first()
+        if user is not None and not user.is_active:
+            return Response(
+                {"error": "حساب جهانی این کاربر غیرفعال است؛ افزودن به شرکت آن را فعال نمی‌کند."}, status=400
+            )
+        if WorkspaceMember.objects.filter(workspace__slug=slug, member=user, is_active=False).exists():
+            return Response(
+                {"error": "این عضویت غیرفعال است؛ ابتدا از پروفایل کاربر آن را فعال و ذخیره کنید."}, status=400
+            )
         if WorkspaceMember.objects.filter(workspace__slug=slug, member=user, is_active=True).exists():
             return Response({"error": "این کاربر قبلاً عضو فضای کاری است"}, status=status.HTTP_400_BAD_REQUEST)
         if user is None and len(password) < 8:
@@ -88,6 +97,11 @@ class WorkSpaceMemberViewSet(BaseViewSet):
 
         workspace = Workspace.objects.get(slug=slug)
         role_ids = request.data.get("role_ids")
+        unit_ids = request.data.get("unit_ids")
+        if "unit_ids" in request.data and not has_permission(
+            request.user, workspace, "OrganizationUnit.Member.Manage", request=request
+        ):
+            return Response({"error": "مجوز تخصیص واحد سازمانی لازم است."}, status=403)
         if (role_ids is not None or role == ROLE.ADMIN.value) and not has_permission(
             request.user, workspace, "User.Role.Assign", request=request
         ):
@@ -106,6 +120,7 @@ class WorkSpaceMemberViewSet(BaseViewSet):
                         display_name=display_name or email.split("@", 1)[0],
                         is_email_verified=True,
                         is_managed=True,
+                        is_active=True,
                     )
                     user.set_password(password)
                     user.save()
@@ -129,6 +144,8 @@ class WorkSpaceMemberViewSet(BaseViewSet):
                     )
                     sync_user_roles(workspace, user, [initial_role.id])
                 sync_plane_membership(workspace, user)
+                if "unit_ids" in request.data:
+                    _sync_user_units(workspace, user, unit_ids)
                 audit_access(request, workspace, "user.create", user.id)
         except (ValidationError, IntegrityError) as exc:
             return Response(
@@ -173,7 +190,7 @@ class WorkSpaceMemberViewSet(BaseViewSet):
         data = serializer.data
         if isinstance(data, list):
             assignments = UserOrganizationRole.objects.filter(
-                workspace__slug=slug, is_active=True, role__is_active=True
+                workspace__slug=slug, is_active=True, role__is_active=True, role__deleted_at__isnull=True
             ).select_related("role")
             roles_by_user = {}
             for assignment in assignments:

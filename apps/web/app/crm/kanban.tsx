@@ -1,3 +1,4 @@
+import { SearchableSelect } from "@plane/ui";
 import { DndContext, PointerSensor, useDraggable, useDroppable, useSensor, useSensors } from "@dnd-kit/core";
 import type { DragEndEvent, UniqueIdentifier } from "@dnd-kit/core";
 import { GripVertical, Plus } from "lucide-react";
@@ -52,24 +53,26 @@ function KanbanCard({
         ))}
       </div>
       {onAssigneeChange && transferMembers && transferMembers.length > 1 && (
-        <label className="kanban-transfer-control" onPointerDown={(event) => event.stopPropagation()}>
+        <label
+          htmlFor={`kanban-transfer-${issue.id}`}
+          className="kanban-transfer-control"
+          onPointerDown={(event) => event.stopPropagation()}
+        >
           <span>واگذاری به</span>
-          <select
-            aria-label={`واگذاری ${issue.name} به عضو دیگر`}
+          <SearchableSelect
+            id={`kanban-transfer-${issue.id}`}
+            label={`واگذاری ${issue.name} به عضو دیگر`}
             value={issue.assignee?.id ?? ""}
             disabled={transferDisabled}
-            onChange={(event) => {
-              if (event.target.value && event.target.value !== issue.assignee?.id) {
-                onAssigneeChange(issue, event.target.value);
-              }
+            onChange={(id) => {
+              if (id && id !== issue.assignee?.id) onAssigneeChange(issue, id);
             }}
-          >
-            {transferMembers.map((member) => (
-              <option key={member.id} value={member.id}>
-                {member.displayName}
-              </option>
-            ))}
-          </select>
+            options={transferMembers.map((member) => ({
+              id: member.id,
+              title: member.displayName,
+              description: member.email,
+            }))}
+          />
         </label>
       )}
       <footer>

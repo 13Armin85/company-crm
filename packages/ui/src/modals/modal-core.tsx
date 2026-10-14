@@ -5,11 +5,14 @@
  */
 
 import { Dialog, Transition } from "@headlessui/react";
-import React, { Fragment } from "react";
+import React, { createContext, Fragment, useContext } from "react";
 // constants
 import { cn } from "../utils";
 import { EModalPosition, EModalWidth } from "./constants";
 // helpers
+
+// Suspend portals and their focus traps while a retained page verifies its session.
+export const ModalVisibilityContext = createContext(true);
 
 type Props = {
   children: React.ReactNode;
@@ -23,11 +26,13 @@ export function ModalCore(props: Props) {
   const {
     children,
     handleClose,
-    isOpen,
+    isOpen: requestedOpen,
     position = EModalPosition.CENTER,
     width = EModalWidth.XXL,
     className = "",
   } = props;
+  const modalsVisible = useContext(ModalVisibilityContext);
+  const isOpen = requestedOpen && modalsVisible;
 
   return (
     <Transition.Root show={isOpen} as={Fragment}>

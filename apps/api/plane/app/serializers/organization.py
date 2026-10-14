@@ -132,6 +132,7 @@ class TicketRoutingDecisionSerializer(serializers.ModelSerializer):
 class TicketRoleQueueEntrySerializer(serializers.ModelSerializer):
     role_name = serializers.CharField(source="required_role.name", read_only=True)
     issue_name = serializers.CharField(source="issue.name", read_only=True)
+    issue_identifier = serializers.SerializerMethodField()
     project_id = serializers.UUIDField(source="issue.project_id", read_only=True)
     project_name = serializers.CharField(source="issue.project.name", read_only=True)
     rule_name = serializers.CharField(source="rule.name", read_only=True)
@@ -143,6 +144,7 @@ class TicketRoleQueueEntrySerializer(serializers.ModelSerializer):
             "id",
             "issue_id",
             "issue_name",
+            "issue_identifier",
             "project_id",
             "project_name",
             "rule_id",
@@ -155,3 +157,6 @@ class TicketRoleQueueEntrySerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         )
+
+    def get_issue_identifier(self, obj):
+        return f"{obj.issue.project.identifier}-{obj.issue.sequence_id}"

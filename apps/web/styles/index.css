@@ -335,6 +335,26 @@ a {
   border-radius: 50%;
   background: var(--red);
 }
+.notification-button.has-notification::after {
+  display: none;
+}
+.notification-badge {
+  position: absolute;
+  top: -3px;
+  inset-inline-end: -5px;
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding-inline: 4px;
+  border: 2px solid var(--surface);
+  border-radius: 10px;
+  background: var(--red);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+}
 .user-avatar {
   position: relative;
   width: 34px;
@@ -889,6 +909,40 @@ a {
   height: 6px;
   border-radius: 50%;
 }
+.issue-status-control {
+  width: 110px;
+  max-width: 100%;
+  min-width: 0;
+  padding: 0 7px;
+  border-radius: 8px;
+}
+.issue-status-control > i {
+  flex: 0 0 6px;
+}
+.issue-status-control .searchable-select {
+  flex: 1;
+  min-width: 0;
+}
+.issue-status-control .selector-input-row {
+  min-height: 32px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+}
+.issue-status-control .selector-input-row input {
+  padding: 4px 0;
+  color: inherit;
+  font-size: 9px;
+}
+.issue-status-control .selector-input-row button {
+  padding: 4px;
+  color: inherit;
+}
+.issue-status-control:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 .status-todo {
   color: #64748b;
   background: #f1f5f9;
@@ -1168,6 +1222,25 @@ a {
 }
 .select-filter {
   outline: none;
+}
+.filter-button.has-filters {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.filter-button > span {
+  display: grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+}
+.filter-results {
+  margin-bottom: 12px;
+  color: var(--text-secondary);
+  font-size: 11px;
 }
 .view-toggle {
   padding: 3px;
@@ -1619,14 +1692,42 @@ a {
 }
 .calendar-toolbar {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
   margin-bottom: 12px;
+}
+.calendar-toolbar > .calendar-project-filter {
+  display: grid;
+  gap: 7px;
+  width: min(240px, 100%);
+  align-items: start;
+  margin-bottom: 18px;
+}
+.calendar-project-filter label {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.calendar-grid > div.selected-calendar-day {
+  box-shadow: inset 0 0 0 2px var(--accent);
+  background: var(--accent-soft);
+}
+@media (max-width: 600px) {
+  .calendar-toolbar > .calendar-project-filter {
+    width: 100%;
+    margin-bottom: 0;
+  }
 }
 .calendar-toolbar > div {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
+}
+.calendar-toolbar > .searchable-select {
+  display: block;
+  width: min(240px, 100%);
 }
 .calendar-nav {
   display: flex;
@@ -1639,7 +1740,7 @@ a {
   text-align: center;
   font-size: 14px;
 }
-.calendar-nav button {
+.calendar-nav > button {
   width: 30px;
   height: 30px;
   display: grid;
@@ -1650,8 +1751,12 @@ a {
   cursor: pointer;
 }
 .calendar-period-selects {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 95px;
+  width: 235px;
+  min-width: 0;
   gap: 6px;
+  align-items: start;
 }
 .calendar-period-selects select,
 .persian-date-input select {
@@ -1681,11 +1786,36 @@ a {
 .calendar-card {
   overflow: hidden;
 }
+.notification-details {
+  padding: 20px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.notification-details dl {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px 12px;
+  color: var(--text-secondary);
+}
+.notification-details dd {
+  margin: 0;
+}
+.notification-context {
+  display: block;
+  margin: 4px 0;
+  color: var(--text-secondary);
+  font-size: 9px;
+  overflow-wrap: anywhere;
+}
+.notification-message {
+  white-space: pre-wrap;
+  line-height: 2;
+}
 .weekdays,
 .calendar-grid {
   display: grid;
-  grid-template-columns: repeat(7, minmax(110px, 1fr));
-  min-width: 800px;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  min-width: 0;
 }
 .weekdays span {
   padding: 10px;
@@ -1693,9 +1823,11 @@ a {
   color: var(--text-muted);
   background: var(--surface-soft);
   border-left: 1px solid var(--border);
-  font-size: 9px;
+  font-size: 12px;
+  font-weight: 600;
 }
 .calendar-grid > div {
+  min-width: 0;
   min-height: 112px;
   padding: 8px;
   border-top: 1px solid var(--border);
@@ -1707,12 +1839,12 @@ a {
   opacity: 0.55;
 }
 .calendar-grid > div > span {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   display: grid;
   place-items: center;
   border-radius: 7px;
-  font-size: 9px;
+  font-size: 12px;
 }
 .calendar-grid > div.today > span {
   color: white;
@@ -1732,7 +1864,7 @@ a {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 7px;
+  font-size: 11px;
 }
 .calendar-grid article small {
   margin-top: 2px;
@@ -1915,29 +2047,30 @@ a {
   grid-template-columns: 1fr 1fr;
   gap: 13px;
 }
-.form-grid label,
-.create-modal label {
+.form-grid label:not(.selector-option):not(.active-toggle),
+.create-modal label:not(.selector-option):not(.active-toggle) {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
-.form-grid label > span,
-.create-modal label > span {
-  font-size: 9px;
+.form-grid label:not(.selector-option) > span,
+.create-modal label:not(.selector-option) > span {
+  font-size: 12px;
   font-weight: 650;
 }
-.form-grid input,
+.form-grid input:not([type="checkbox"]):not([type="radio"]),
 .form-grid select,
-.create-modal input,
+.create-modal input:not([type="checkbox"]):not([type="radio"]),
 .create-modal select {
   width: 100%;
-  height: 37px;
+  min-width: 0;
+  height: var(--crm-control-height, 40px);
   padding: 0 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
   outline: 0;
   background: var(--surface);
-  font-size: 10px;
+  font-size: 13px;
 }
 .form-grid input:focus,
 .form-grid select:focus,
@@ -1956,6 +2089,353 @@ a {
 }
 .management-section + .management-section {
   margin-top: 24px;
+}
+.role-queue {
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+}
+.role-queue-heading,
+.role-queue-intro,
+.role-queue-results,
+.role-queue-card-top,
+.role-queue-card footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.role-queue-intro {
+  justify-content: flex-start;
+  min-width: 0;
+}
+.role-queue-symbol {
+  display: grid;
+  place-items: center;
+  flex: 0 0 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.role-queue-heading h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.role-queue-heading p,
+.role-queue-help,
+.role-queue-permission {
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.9;
+}
+.role-queue-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 24px 0;
+  padding-block: 18px;
+  border-block: 1px solid var(--border);
+}
+.role-queue-summary > div {
+  padding-inline: 18px;
+}
+.role-queue-summary > div:first-child {
+  padding-inline-start: 0;
+}
+.role-queue-summary > div + div {
+  border-inline-start: 1px solid var(--border);
+}
+.role-queue-summary dt,
+.role-queue-metadata dt,
+.role-queue-role,
+.role-queue-wait,
+.role-queue-permission {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.role-queue-summary dt {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.role-queue-summary dd {
+  margin: 8px 0 0;
+  font-size: 27px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+.role-queue-summary dd small {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 400;
+}
+.role-queue-summary .role-queue-wait-stat {
+  font-size: 21px;
+}
+.role-queue-toolbar {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.6fr) repeat(3, minmax(130px, 1fr));
+  align-items: end;
+  gap: 12px;
+}
+.role-queue-field,
+.role-queue-search {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.role-queue-search > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding-inline: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.role-queue-search input {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  color: var(--text-primary);
+  background: transparent;
+  font-size: 12px;
+}
+.role-queue-field select {
+  min-width: 0;
+  width: 100%;
+  height: 40px;
+  padding-inline: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 12px;
+}
+.role-queue-search:focus-within > div,
+.role-queue-field select:focus-visible {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent-soft);
+  outline-offset: 2px;
+}
+.role-queue-results {
+  margin-block: 18px 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.role-queue-results p {
+  margin: 0;
+}
+.role-queue-results button {
+  border: 0;
+  padding: 6px 0;
+  color: var(--accent);
+  background: transparent;
+  cursor: pointer;
+}
+.role-queue-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.role-queue-grid > li {
+  min-width: 0;
+}
+.role-queue-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+.role-queue-card-top {
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+}
+.role-queue-role {
+  max-width: 100%;
+  padding: 5px 8px;
+  border-radius: 6px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.role-queue-aged {
+  padding-block: 5px;
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+.role-queue-card h3 {
+  margin: 16px 0;
+  color: var(--text-primary);
+  font-size: 15px;
+  line-height: 1.9;
+  overflow-wrap: anywhere;
+}
+.role-queue-metadata {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 18px;
+  font-size: 12px;
+}
+.role-queue-metadata > div {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+.role-queue-metadata dt {
+  color: var(--text-secondary);
+}
+.role-queue-metadata dd {
+  margin: 0;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.role-queue-metadata a:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.role-queue svg {
+  flex-shrink: 0;
+}
+.role-queue-card footer {
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.role-queue-wait {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+.role-queue .button {
+  min-height: 40px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.role-queue-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 12px;
+  border: 1px solid var(--red);
+  border-radius: 8px;
+  font-size: 12px;
+}
+.role-queue-error p {
+  margin: 0;
+}
+.role-queue-claim-error {
+  margin: 10px 0 0;
+  color: var(--red);
+  font-size: 12px;
+}
+.role-queue-help,
+.role-queue-permission {
+  margin-block: 14px 0;
+}
+.role-queue .empty-state h3 {
+  font-size: 15px;
+}
+.role-queue .empty-state p {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.9;
+}
+.role-queue-permission {
+  margin-block: 0 14px;
+}
+.role-queue-spin {
+  animation: role-queue-spin 1s linear infinite;
+}
+@keyframes role-queue-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .role-queue-spin {
+    animation: none;
+  }
+}
+@media (max-width: 1000px) {
+  .role-queue-toolbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .role-queue-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 600px) {
+  .role-queue {
+    padding: 16px;
+    border-radius: 12px;
+  }
+  .role-queue-heading {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .role-queue-heading h2 {
+    font-size: 16px;
+  }
+  .role-queue-symbol {
+    flex-basis: 40px;
+    height: 40px;
+  }
+  .role-queue-summary {
+    gap: 12px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .role-queue-summary > div {
+    padding-inline: 0;
+  }
+  .role-queue-summary > div + div {
+    border: 0;
+  }
+  .role-queue-summary > div:last-child {
+    grid-column: 1 / -1;
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+  }
+  .role-queue-toolbar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .role-queue-card {
+    padding: 14px;
+  }
+  .role-queue-card footer {
+    flex-wrap: wrap;
+  }
+  .role-queue-card footer .button {
+    width: 100%;
+    justify-content: center;
+  }
+  .role-queue-metadata > div {
+    grid-template-columns: 84px minmax(0, 1fr);
+  }
+  .role-queue-error {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .role-queue .empty-state {
+    padding-inline: 0;
+  }
 }
 .section-heading {
   display: flex;
@@ -2036,6 +2516,24 @@ a {
   color: var(--text-secondary);
   background: var(--surface);
   cursor: pointer;
+}
+.org-node-actions .unit-action.is-danger {
+  color: var(--red);
+}
+.org-node-actions .unit-action.is-enable {
+  color: var(--green);
+}
+.org-node-actions button:not(:disabled):hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.org-node-actions button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.org-node-actions button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .state-pill {
   display: inline-flex;
@@ -2468,7 +2966,8 @@ a {
   width: min(480px, calc(100vw - 28px));
   padding: 18px;
 }
-.create-modal > header {
+.create-modal > header,
+.quick-create-form > header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -2504,10 +3003,11 @@ a {
   box-shadow: var(--shadow);
   font-weight: 700;
 }
-.create-modal label {
+.create-modal label:not(.selector-option) {
   margin-top: 12px;
 }
-.create-modal > footer {
+.create-modal > footer,
+.quick-create-form > footer {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
@@ -2928,9 +3428,6 @@ a {
   .team-stats {
     grid-template-columns: 1fr 1fr;
   }
-  .topbar .icon-button:nth-of-type(2) {
-    display: none;
-  }
   .workspace-switcher {
     border: 0;
     background: transparent;
@@ -3204,15 +3701,15 @@ a {
   gap: 14px;
   align-self: start;
 }
-.cycle-form label,
-.invite-form label,
-.project-settings-form label {
+.cycle-form label:not(.selector-option),
+.invite-form label:not(.selector-option),
+.project-settings-form label:not(.selector-option) {
   display: grid;
   gap: 6px;
 }
-.cycle-form input,
-.invite-form input,
-.project-settings-form input,
+.cycle-form input:not([type="checkbox"]):not([type="radio"]),
+.invite-form input:not([type="checkbox"]):not([type="radio"]),
+.project-settings-form input:not([type="checkbox"]):not([type="radio"]),
 .project-settings-form textarea,
 .project-settings-form select,
 .role-select {
@@ -3222,6 +3719,8 @@ a {
   color: var(--text-primary);
   background: var(--surface);
   font: inherit;
+  min-width: 0;
+  min-height: var(--crm-control-height, 40px);
 }
 .cycle-card {
   display: flex;
@@ -4115,10 +4614,12 @@ canvas {
     padding: 3px;
   }
   .calendar-grid article b {
-    display: none;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    font-size: 10px;
   }
   .calendar-grid article small {
-    font-size: 6px;
+    font-size: 9px;
   }
   .inbox-card {
     margin-inline: 0;
@@ -4321,6 +4822,16 @@ canvas {
   }
   .calendar-period-selects {
     min-width: 0;
+    width: 100%;
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+  .calendar-nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .calendar-nav > button:last-child {
+    justify-self: end;
   }
   .calendar-period-selects select {
     min-width: 0;
@@ -4330,14 +4841,10 @@ canvas {
     min-height: 62px;
   }
   .calendar-grid article {
-    height: 5px;
-    padding: 0;
-    border: 0;
-    border-radius: 999px;
-    background: var(--event-color);
+    padding: 3px;
   }
   .calendar-grid article :is(b, small) {
-    display: none;
+    display: block;
   }
   .profile-avatar-editor,
   .workspace-profile {

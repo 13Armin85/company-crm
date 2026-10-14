@@ -1,7 +1,7 @@
 import type { OrganizationPermission } from "../types";
 
 const categories: Record<string, string> = {
-  User: "کاربران",
+  User: "کاربران / اعضای تیم",
   Role: "نقش‌ها",
   Permission: "فهرست مجوزها",
   OrganizationUnit: "ساختار سازمانی",

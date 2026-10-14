@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { QueryClient } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
-import { clearClientSession } from "../api";
+import { api, clearClientSession } from "../api";
 import { useUIStore } from "../store";
 import { LoginForm } from "../pages/auth";
 import { PasswordInput } from "@plane/ui";
@@ -14,6 +14,73 @@ import {
 } from "./session-events";
 
 describe("CRM authentication", () => {
+  it("verifies requests without AbortSignal.any and releases listeners on completion", async () => {
+    vi.stubGlobal("AbortSignal", Object.assign(Object.create(AbortSignal), { any: undefined }));
+    try {
+      const request = new AbortController();
+      const remove = vi.spyOn(request.signal, "removeEventListener");
+      const response = await api.get("/api/users/me/", {
+        signal: request.signal,
+        adapter: async (config) => ({
+          data: { id: "current-user" },
+          status: 200,
+          statusText: "OK",
+          headers: {},
+          config,
+        }),
+      });
+      expect(response.data).toEqual({ id: "current-user" });
+      expect(remove).toHaveBeenCalledOnce();
+    } finally {
+      vi.restoreAllMocks();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("releases fallback listeners on a failed network request", async () => {
+    vi.stubGlobal("AbortSignal", Object.assign(Object.create(AbortSignal), { any: undefined }));
+    try {
+      const request = new AbortController();
+      const remove = vi.spyOn(request.signal, "removeEventListener");
+      const failed = await api
+        .get("/api/users/me/", {
+          signal: request.signal,
+          adapter: async (config) => {
+            throw Object.assign(new Error("Network unavailable"), { config });
+          },
+        })
+        .catch((error: unknown) => error);
+      expect(failed).toBeInstanceOf(Error);
+      expect(remove).toHaveBeenCalledOnce();
+    } finally {
+      vi.restoreAllMocks();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("rejects a late response from the previous session even if its adapter ignores abort", async () => {
+    const client = new QueryClient();
+    let resolveResponse: ((value: unknown) => void) | undefined;
+    let started: (() => void) | undefined;
+    const ready = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const request = api.get("/api/test-delayed/", {
+      adapter: (config) => {
+        started?.();
+        return new Promise((resolve) => {
+          resolveResponse = (data) => resolve({ data, status: 200, statusText: "OK", headers: {}, config });
+        });
+      },
+    });
+    const rejected = expect(request).rejects.toMatchObject({ code: "ERR_CANCELED" });
+    await ready;
+    await clearClientSession(client);
+    resolveResponse?.({ id: "previous-account" });
+    await rejected;
+    expect(client.getQueryCache().getAll()).toHaveLength(0);
+  });
+
   it("renders a login form with username support and no signup action", () => {
     const html = renderToStaticMarkup(<LoginForm csrf="csrf-test" />);
     expect(html).toContain('action="/auth/sign-in/"');

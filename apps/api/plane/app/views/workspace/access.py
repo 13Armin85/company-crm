@@ -31,7 +31,9 @@ from plane.db.models import (
 
 def workspace_user(slug, user_id):
     workspace = get_object_or_404(Workspace, slug=slug)
-    user = get_object_or_404(User, id=user_id, member_workspace__workspace=workspace)
+    user = get_object_or_404(
+        User, id=user_id, member_workspace__workspace=workspace, member_workspace__deleted_at__isnull=True
+    )
     return workspace, user
 
 
@@ -103,10 +105,24 @@ class OrganizationRemoveUserEndpoint(BaseAPIView):
 
 class ExceptionSerializer(serializers.ModelSerializer):
     permission_code = serializers.CharField(source="permission.code", read_only=True)
+    permission_name = serializers.CharField(source="permission.name", read_only=True)
+    permission_category = serializers.CharField(source="permission.category", read_only=True)
+    permission_description = serializers.CharField(source="permission.description", read_only=True)
 
     class Meta:
         model = UserPermissionException
-        fields = ("id", "permission", "permission_code", "effect", "starts_at", "ends_at", "is_active")
+        fields = (
+            "id",
+            "permission",
+            "permission_code",
+            "permission_name",
+            "permission_category",
+            "permission_description",
+            "effect",
+            "starts_at",
+            "ends_at",
+            "is_active",
+        )
         read_only_fields = ("id",)
 
 

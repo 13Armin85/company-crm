@@ -1,20 +1,21 @@
+import { DialogTitle } from "@headlessui/react";
+import { IdentifierBadge, ModalCore, SearchableSelect } from "@plane/ui";
 import { useEffect, useState } from "react";
-import { Edit3, GitBranch, Inbox, Plus, UserCheck, XCircle } from "lucide-react";
+import { Edit3, GitBranch, Inbox, Plus, XCircle } from "lucide-react";
 import {
-  useClaimTicketRoleQueue,
   useDeactivateTicketRoutingRule,
   useOrganizationRoles,
   useOrganizationUnits,
   useSaveTicketRoutingRule,
-  useTicketRoleQueue,
   useTicketRoutingRules,
   useWorkspaceAccess,
 } from "../api";
-import { Button, EmptyState, PageHeader, Skeleton } from "../components";
+import { Button, EmptyState, PageHeader, SearchBox, Skeleton } from "../components";
 import { useUIStore } from "../store";
 import type { TicketRoutingRule } from "../types";
-import { persianDate } from "../utils";
-import { Navigate } from "react-router";
+import { RoleQueue } from "../role-queue";
+import { Navigate, useSearchParams } from "react-router";
+import { matchesRecordSearch } from "../identifiers";
 
 type RuleForm = Pick<TicketRoutingRule, "name" | "unitId" | "requiredRoleId" | "isActive"> & {
   id?: string;
@@ -29,16 +30,18 @@ export default function RoutingPage() {
     undefined,
     access?.can("Routing.View") ?? false
   );
-  const { data: queue = [], isLoading: queueLoading } = useTicketRoleQueue(
-    undefined,
-    access?.can("Routing.Queue.View") ?? false
-  );
   const { data: units = [] } = useOrganizationUnits(undefined, canManage);
   const { data: roles = [] } = useOrganizationRoles(undefined, canManage);
   const saveRule = useSaveTicketRoutingRule(slug);
   const deactivateRule = useDeactivateTicketRoutingRule(slug);
-  const claimQueue = useClaimTicketRoleQueue(slug);
   const [editing, setEditing] = useState<RuleForm>();
+  const [query, setQuery] = useState("");
+  const [params] = useSearchParams();
+  const searchParam = params.get("search") ?? "";
+  useEffect(() => setQuery(searchParam), [searchParam]);
+  const visibleRules = rules.filter((rule) =>
+    matchesRecordSearch(query, [rule.id, rule.unitId, rule.requiredRoleId, rule.name, rule.unitTitle, rule.roleName])
+  );
 
   useEffect(() => {
     setFormDirty("ticket-routing-rule", Boolean(editing));
@@ -52,8 +55,8 @@ export default function RoutingPage() {
     <div>
       <PageHeader
         eyebrow="گردش کار سازمانی"
-        title="ارجاع هوشمند تیکت"
-        description="ابتدا مدیر یا جانشین فعال واحد بررسی می‌شود؛ در صورت نبود نقش لازم، مسیر تا والد ادامه می‌یابد و سپس تیکت وارد صف نقش می‌شود."
+        title="صف کارها و ارجاع"
+        description="کارهای منتظر پذیرش را پیدا کنید و مسئولیت کار مرتبط با نقش خود را بپذیرید."
         actions={
           canManage ? (
             <Button
@@ -66,38 +69,49 @@ export default function RoutingPage() {
         }
       />
 
+      <RoleQueue
+        canClaim={access.can("Routing.Queue.Claim")}
+        canViewAll={access.can("Routing.Queue.ViewAll")}
+        canViewProject={access.can("Project.View")}
+      />
+
       {canManage && (
         <section className="management-section">
           <header className="section-heading">
             <div>
-              <h2>Routing Rules</h2>
+              <h2>قانون‌های ارجاع</h2>
               <p>قانون‌های قابل انتخاب هنگام ساخت تیکت پروژه.</p>
             </div>
           </header>
+          <SearchBox value={query} onChange={setQuery} placeholder="جستجوی شناسه یا نام قانون ارجاع…" />
           <div className="table-card organization-table">
             {rulesLoading ? (
               <Skeleton rows={4} />
-            ) : !rules.length ? (
-              <EmptyState title="قانونی تعریف نشده" description="برای اتصال واحد و نقش یک قانون بسازید." />
+            ) : !visibleRules.length ? (
+              <EmptyState
+                title={rules.length ? "قانونی پیدا نشد" : "قانونی تعریف نشده"}
+                description={rules.length ? "عبارت جست‌وجو را بررسی کنید." : "برای اتصال واحد و نقش یک قانون بسازید."}
+              />
             ) : (
               <table>
                 <thead>
                   <tr>
                     <th>نام</th>
                     <th>واحد شروع</th>
-                    <th>Role مورد نیاز</th>
+                    <th>نقش مورد نیاز</th>
                     <th>وضعیت</th>
                     <th>عملیات</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {rules.map((rule) => (
+                  {visibleRules.map((rule) => (
                     <tr key={rule.id}>
                       <td>
                         <span className="role-title">
                           <GitBranch size={17} />
                           {rule.name}
                         </span>
+                        <IdentifierBadge value={rule.id} label="شناسه قانون ارجاع" />
                       </td>
                       <td>{rule.unitTitle}</td>
                       <td>{rule.roleName}</td>
@@ -125,72 +139,25 @@ export default function RoutingPage() {
         </section>
       )}
 
-      <section className="management-section">
-        <header className="section-heading">
-          <div>
-            <h2>Role Queue</h2>
-            <p>{canManage ? "تیکت‌های بدون مدیر واجد شرایط" : "تیکت‌هایی که با نقش فعال شما قابل دریافت‌اند"}</p>
-          </div>
-        </header>
-        <div className="table-card organization-table">
-          {queueLoading ? (
-            <Skeleton rows={4} />
-          ) : !queue.length ? (
-            <EmptyState title="صف نقش خالی است" description="همه تیکت‌ها مدیر واجد شرایط دارند یا قبلاً دریافت شده‌اند." />
-          ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>تیکت</th>
-                  <th>پروژه</th>
-                  <th>قانون</th>
-                  <th>زمان ورود</th>
-                  <th>عملیات</th>
-                </tr>
-              </thead>
-              <tbody>
-                {queue.map((entry) => (
-                  <tr key={entry.id}>
-                    <td>{entry.issueName}</td>
-                    <td>{entry.projectName}</td>
-                    <td>{entry.ruleName}</td>
-                    <td>{entry.roleName}</td>
-                    <td>{entry.createdAt ? persianDate(entry.createdAt) : "—"}</td>
-                    <td>
-                      <Button
-                        icon={UserCheck}
-                        variant="secondary"
-                        disabled={claimQueue.isPending}
-                        onClick={() => claimQueue.mutate(entry.id)}
-                      >
-                        دریافت
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </section>
-
       {editing && (
-        <div
-          className="modal-layer"
-          role="presentation"
-          onMouseDown={(event) => event.target === event.currentTarget && setEditing(undefined)}
+        <ModalCore
+          isOpen
+          className="create-modal organization-modal"
+          handleClose={() => {
+            if (!saveRule.isPending) setEditing(undefined);
+          }}
         >
           <form
-            className="create-modal organization-modal"
             onSubmit={(event) => {
               event.preventDefault();
+              if (saveRule.isPending) return;
               saveRule.mutate(editing, { onSuccess: () => setEditing(undefined) });
             }}
           >
             <header>
               <div>
-                <span className="modal-kicker">Ticket Routing</span>
-                <h2>{editing.id ? "ویرایش قانون" : "قانون جدید"}</h2>
+                <span className="modal-kicker">ارجاع کارها</span>
+                <DialogTitle as="h2">{editing.id ? "ویرایش قانون" : "قانون جدید"}</DialogTitle>
               </div>
               <Inbox size={22} />
             </header>
@@ -200,57 +167,48 @@ export default function RoutingPage() {
                 value={editing.name}
                 onChange={(event) => setEditing({ ...editing, name: event.target.value })}
                 required
+                disabled={saveRule.isPending}
               />
             </label>
-            <label>
+            <label htmlFor="crm-routing-select-1">
               <span>واحد شروع</span>
-              <select
+              <SearchableSelect
+                id="crm-routing-select-1"
+                label="واحد شروع"
                 value={editing.unitId}
-                onChange={(event) => setEditing({ ...editing, unitId: event.target.value })}
-                required
-              >
-                <option value="">انتخاب واحد</option>
-                {units
-                  .filter((unit) => unit.isActive || unit.id === editing.unitId)
-                  .map((unit) => (
-                    <option key={unit.id} value={unit.id}>
-                      {unit.title}
-                    </option>
-                  ))}
-              </select>
+                onChange={(unitId) => setEditing({ ...editing, unitId })}
+                disabled={saveRule.isPending}
+                options={units.map((unit) => ({ id: unit.id, title: unit.title, disabled: !unit.isActive }))}
+              />
             </label>
-            <label>
-              <span>Role مورد نیاز</span>
-              <select
+            <label htmlFor="crm-routing-select-2">
+              <span>نقش مورد نیاز</span>
+              <SearchableSelect
+                id="crm-routing-select-2"
+                label="نقش مورد نیاز"
                 value={editing.requiredRoleId}
-                onChange={(event) => {
-                  setEditing({
-                    ...editing,
-                    requiredRoleId: event.target.value,
-                  });
-                }}
-                required
-              >
-                <option value="">انتخاب Role</option>
-                {roles
-                  .filter((role) => role.isActive || role.id === editing.requiredRoleId)
-                  .map((role) => (
-                    <option key={role.id} value={role.id}>
-                      {role.name}
-                    </option>
-                  ))}
-              </select>
+                onChange={(requiredRoleId) => setEditing({ ...editing, requiredRoleId })}
+                disabled={saveRule.isPending}
+                options={roles.map((role) => ({
+                  id: role.id,
+                  title: role.name,
+                  description: role.description,
+                  disabled: !role.isActive,
+                }))}
+              />
             </label>
             <label className="active-toggle">
               <input
                 type="checkbox"
+                disabled={saveRule.isPending}
                 checked={editing.isActive}
                 onChange={(event) => setEditing({ ...editing, isActive: event.target.checked })}
               />
               <span>قانون فعال باشد</span>
             </label>
+            {saveRule.isError && <p role="alert">ذخیره قانون انجام نشد. اطلاعات را بررسی کنید و دوباره تلاش کنید.</p>}
             <footer>
-              <Button variant="secondary" onClick={() => setEditing(undefined)}>
+              <Button variant="secondary" disabled={saveRule.isPending} onClick={() => setEditing(undefined)}>
                 انصراف
               </Button>
               <Button
@@ -261,7 +219,7 @@ export default function RoutingPage() {
               </Button>
             </footer>
           </form>
-        </div>
+        </ModalCore>
       )}
     </div>
   );

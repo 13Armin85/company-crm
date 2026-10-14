@@ -1,7 +1,11 @@
 param([switch]$Watch = $true, [switch]$Build, [switch]$NoWatch)
 
 $ErrorActionPreference = 'Stop'
-$composeArgs = @('compose', '--project-name', 'plane-dev', '--env-file', '.env.dev', '-f', 'docker-compose-dev.yml')
+$composeArgs = @('compose', '--env-file', '.env.dev', '-f', 'docker-compose-dev.yml')
+# Use the same project, images and volumes as this checkout's workstation stack.
+if (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'docker-compose-workstation.yml')) {
+    $composeArgs += @('-f', 'docker-compose-workstation.yml')
+}
 # Hold one lock across startup and watch. Windows releases it even if the terminal closes.
 $hash = [Security.Cryptography.SHA256]::Create()
 try {
@@ -34,12 +38,12 @@ try {
         [IO.File]::WriteAllText((Join-Path $PSScriptRoot '.env.dev'), $envText)
     }
     & docker @composeArgs config --quiet
-    if ($LASTEXITCODE -ne 0) { throw 'Docker configuration is invalid. Check .env.dev and docker-compose-dev.yml.' }
+    if ($LASTEXITCODE -ne 0) { throw 'Docker configuration is invalid. Check .env.dev and the selected Compose files.' }
     $upArgs = @('up', '-d', '--wait', '--wait-timeout', '900')
     if ($Build) { $upArgs += '--build' }
     & docker @composeArgs @upArgs
     if ($LASTEXITCODE -ne 0) {
-        throw 'Docker startup failed. Run: docker compose --env-file .env.dev -f docker-compose-dev.yml logs --tail 100 migrator api frontend'
+        throw "Docker startup failed. Run: docker $($composeArgs -join ' ') logs --tail 100 migrator api frontend"
     }
     # Validate the same API route used by the browser, not just the HTML server.
     $ready = $false

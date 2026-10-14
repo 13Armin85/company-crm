@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, errorMessage } from "../api";
+import { api, errorMessage, invalidateOrganizationAccess } from "../api";
 import { useUIStore } from "../store";
 import type { Absence, EffectiveAccess, PermissionException } from "./types";
 
@@ -63,22 +63,9 @@ export const useAccessMutation = () => {
       method?: "post" | "put" | "patch" | "delete";
       body?: unknown;
     }) => api.request({ url: `/api/workspaces/${slug}/organization/${path}`, method, data: body }),
-    onSuccess: () => {
-      for (const key of [
-        "workspace-access",
-        "user-effective-access",
-        "user-exceptions",
-        "organization-units",
-        "absences",
-        "delegates",
-        "members",
-        "organization-user-profile",
-        "projects",
-        "issues",
-        "ticket-role-queue",
-      ])
-        void client.invalidateQueries({ queryKey: [key, slug] });
-      useUIStore.getState().toast("تغییرات ذخیره شد");
+    onSuccess: async () => {
+      await invalidateOrganizationAccess(client, slug);
+      useUIStore.getState().toast("تغییرات با موفقیت انجام شد");
     },
     onError: (error) => useUIStore.getState().toast(errorMessage(error, "ذخیره تغییرات انجام نشد"), "error"),
   });

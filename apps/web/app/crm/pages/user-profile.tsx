@@ -13,6 +13,7 @@ import { UserAccessPanel } from "../access/user-access";
 import { Button, PageHeader, Skeleton } from "../components";
 import { useUIStore } from "../store";
 import type { OrganizationUserProfile } from "../types";
+import { IdentifierBadge } from "@plane/ui";
 
 export default function UserProfilePage() {
   const { userId = "" } = useParams();
@@ -28,8 +29,8 @@ export default function UserProfilePage() {
   const update = useUpdateOrganizationUserProfile(slug, userId);
   const [form, setForm] = useState<OrganizationUserProfile>();
   useEffect(() => {
-    if (profile) setForm(profile);
-  }, [profile]);
+    if (profile) setForm((current) => (!current || current.id !== profile.id ? profile : current));
+  }, [profile, form?.id]);
   const isDirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(profile), [form, profile]);
   useEffect(() => {
     setFormDirty("organization-user-profile", isDirty);
@@ -53,32 +54,35 @@ export default function UserProfilePage() {
               icon={Save}
               disabled={update.isPending || !isDirty}
               onClick={() =>
-                update.mutate({
-                  ...(canEdit
-                    ? {
-                        first_name: form.firstName,
-                        last_name: form.lastName,
-                        display_name: form.displayName,
-                        username: form.username,
-                        email: form.email,
-                        is_active: form.isActive,
-                      }
-                    : {}),
-                  role_ids:
-                    access.can("User.Role.Assign") &&
-                    form.isActive &&
-                    profile?.isActive &&
-                    JSON.stringify(form.roleIds) !== JSON.stringify(profile.roleIds)
-                      ? form.roleIds
-                      : undefined,
-                  unit_ids:
-                    access.can("OrganizationUnit.Member.Manage") &&
-                    form.isActive &&
-                    profile?.isActive &&
-                    JSON.stringify(form.unitIds) !== JSON.stringify(profile.unitIds)
-                      ? form.unitIds
-                      : undefined,
-                })
+                update.mutate(
+                  {
+                    ...(canEdit
+                      ? {
+                          first_name: form.firstName,
+                          last_name: form.lastName,
+                          display_name: form.displayName,
+                          username: form.username,
+                          email: form.email,
+                          is_active: form.isActive,
+                        }
+                      : {}),
+                    role_ids:
+                      access.can("User.Role.Assign") &&
+                      form.isActive &&
+                      profile?.isActive &&
+                      JSON.stringify(form.roleIds) !== JSON.stringify(profile.roleIds)
+                        ? form.roleIds
+                        : undefined,
+                    unit_ids:
+                      access.can("OrganizationUnit.Member.Manage") &&
+                      form.isActive &&
+                      profile?.isActive &&
+                      JSON.stringify(form.unitIds) !== JSON.stringify(profile.unitIds)
+                        ? form.unitIds
+                        : undefined,
+                  },
+                  { onSuccess: () => setForm(undefined) }
+                )
               }
             >
               ذخیره تغییرات
@@ -87,6 +91,7 @@ export default function UserProfilePage() {
         }
       />
       <section className="panel user-profile-admin">
+        <IdentifierBadge value={form.id} label="شناسه کاربر" />
         <header>
           <UserRound size={24} />
           <h2>اطلاعات حساب</h2>
@@ -157,7 +162,9 @@ export default function UserProfilePage() {
           <h2>واحدهای سازمانی</h2>
           <MultiSelector
             label="واحدها"
-            disabled={update.isPending || !access.can("OrganizationUnit.Member.Manage") || !form.isActive}
+            disabled={
+              update.isPending || !access.can("OrganizationUnit.Member.Manage") || !form.isActive || !profile?.isActive
+            }
             selected={form.unitIds}
             onChange={(unitIds) => setForm({ ...form, unitIds })}
             options={units.map((unit) => ({

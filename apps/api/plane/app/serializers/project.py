@@ -34,7 +34,7 @@ class ProjectSerializer(BaseSerializer):
     class Meta:
         model = Project
         fields = "__all__"
-        read_only_fields = ["workspace", "deleted_at"]
+        read_only_fields = ["id", "identifier", "workspace", "deleted_at"]
 
     def validate_name(self, name):
         project_id = self.instance.id if self.instance else None
@@ -54,25 +54,6 @@ class ProjectSerializer(BaseSerializer):
             )
 
         return name
-
-    def validate_identifier(self, identifier):
-        project_id = self.instance.id if self.instance else None
-        workspace_id = self.context["workspace_id"]
-
-        if re.match(Project.FORBIDDEN_IDENTIFIER_CHARS_PATTERN, identifier):
-            raise serializers.ValidationError(detail="PROJECT_IDENTIFIER_CANNOT_CONTAIN_SPECIAL_CHARACTERS")
-
-        project = Project.objects.filter(identifier=identifier, workspace_id=workspace_id)
-
-        if project_id:
-            project = project.exclude(id=project_id)
-
-        if project.exists():
-            raise serializers.ValidationError(
-                detail="PROJECT_IDENTIFIER_ALREADY_EXIST",
-            )
-
-        return identifier
 
     def validate(self, data):
         # Validate description content for security

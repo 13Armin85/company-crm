@@ -41,3 +41,14 @@ export const Members: Story = {
   },
 };
 export const Empty: Story = { args: { options: [] } };
+export const ManyOptions: Story = {
+  args: {
+    selected: ["1", "2", "3", "80"],
+    options: Array.from({ length: 80 }, (_, index) => ({
+      id: String(index + 1),
+      title: `عضو ${index + 1}`,
+      description: `member-${index + 1}@example.com`,
+    })),
+  },
+};
+export const ExpandedPermissions: Story = { args: { expanded: true } };

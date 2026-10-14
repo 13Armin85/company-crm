@@ -6,6 +6,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.response import Response
 
@@ -36,6 +37,7 @@ from plane.db.models import (
     OrganizationRole,
     OrganizationUnit,
     OrganizationUnitMember,
+    OrganizationUnitDelegate,
     TicketRoleQueueEntry,
     TicketRoutingRule,
     User,
@@ -60,7 +62,7 @@ def _sync_user_units(workspace, user, unit_ids):
         validate_workspace_user(workspace.id, user.id)
     units = list(OrganizationUnit.objects.filter(workspace=workspace, id__in=unit_ids, is_active=True))
     if len(units) != len(set(unit_ids)):
-        raise ValidationError({"unit_ids": "One or more teams are invalid or inactive."})
+        raise ValidationError({"unit_ids": "یک یا چند واحد انتخاب‌شده متعلق به این شرکت نیست، حذف شده یا غیرفعال است."})
     OrganizationUnitMember.objects.filter(unit__workspace=workspace, user=user).exclude(unit_id__in=unit_ids).update(
         is_active=False
     )
@@ -83,12 +85,16 @@ def _user_profile_data(workspace, user):
         "email": user.email,
         "is_active": user.is_active and membership.is_active,
         "role_ids": list(
-            UserOrganizationRole.objects.filter(workspace=workspace, user=user, is_active=True, role__is_active=True)
+            UserOrganizationRole.objects.filter(
+                workspace=workspace, user=user, is_active=True, role__is_active=True, role__deleted_at__isnull=True
+            )
             .order_by("role__name")
             .values_list("role_id", flat=True)
         ),
         "unit_ids": list(
-            OrganizationUnitMember.objects.filter(unit__workspace=workspace, user=user, is_active=True)
+            OrganizationUnitMember.objects.filter(
+                unit__workspace=workspace, unit__deleted_at__isnull=True, user=user, is_active=True
+            )
             .order_by("unit__title")
             .values_list("unit_id", flat=True)
         ),
@@ -96,7 +102,7 @@ def _user_profile_data(workspace, user):
 
 
 class OrganizationPermissionListEndpoint(BaseAPIView):
-    @require_permission("Permission.View")
+    @require_any_permission("Permission.View", "Role.View", "Role.Permission.Assign", "Access.UserException.Manage")
     def get(self, request, slug):
         rows = OrganizationPermission.objects.filter(workspace__slug=slug, is_active=True).order_by("category", "code")
         return Response(OrganizationPermissionSerializer(rows, many=True).data)
@@ -140,7 +146,10 @@ class OrganizationRoleListEndpoint(BaseAPIView):
             return Response(_validation_error(exc), status=400)
         permissions = OrganizationPermission.objects.filter(workspace=workspace, id__in=permission_ids, is_active=True)
         if permissions.count() != len(set(permission_ids)):
-            return Response({"permission_ids": ["Invalid permission selection."]}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"permission_ids": ["یک یا چند مجوز انتخاب‌شده معتبر و فعال در این شرکت نیست."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         try:
             with access_transaction(workspace):
                 role = serializer.save(workspace=workspace)
@@ -161,6 +170,19 @@ class OrganizationRoleListEndpoint(BaseAPIView):
 
 
 class OrganizationRoleDetailEndpoint(BaseAPIView):
+    @require_any_permission("Role.View", "Role.Permission.Assign")
+    def get(self, request, slug, role_id):
+        role = get_object_or_404(
+            OrganizationRole.objects.prefetch_related("permissions").annotate(
+                user_count=Count(
+                    "user_roles", filter=Q(user_roles__is_active=True, user_roles__deleted_at__isnull=True)
+                )
+            ),
+            workspace__slug=slug,
+            id=role_id,
+        )
+        return Response(OrganizationRoleSerializer(role).data)
+
     @require_any_permission("Role.Edit", "Role.Disable", "Role.Permission.Assign")
     def patch(self, request, slug, role_id):
         role = get_object_or_404(OrganizationRole, workspace__slug=slug, id=role_id)
@@ -172,14 +194,21 @@ class OrganizationRoleDetailEndpoint(BaseAPIView):
         serializer.is_valid(raise_exception=True)
         try:
             with access_transaction(role.workspace):
+                role = OrganizationRole.objects.select_for_update().get(pk=role.pk)
+                serializer.instance = role
                 role = serializer.save()
                 if "permission_ids" in request.data:
                     ids = normalize_ids(request.data.get("permission_ids", []), "permission_ids")
-                    permissions = OrganizationPermission.objects.filter(
-                        workspace=role.workspace, id__in=ids, is_active=True
+                    # Preserve existing inactive historical grants in a full
+                    # selection payload; assigning a new inactive code is forbidden.
+                    existing_inactive = role.permissions.filter(is_active=False).values_list("id", flat=True)
+                    permissions = OrganizationPermission.objects.filter(workspace=role.workspace, id__in=ids).filter(
+                        Q(is_active=True) | Q(id__in=existing_inactive)
                     )
                     if permissions.count() != len(set(ids)):
-                        raise ValidationError({"permission_ids": "Invalid permission selection."})
+                        raise ValidationError(
+                            {"permission_ids": "یک یا چند مجوز انتخاب‌شده معتبر و فعال در این شرکت نیست."}
+                        )
                     role.permissions.set(permissions)
                 if "is_active" in request.data:
                     for assignment in UserOrganizationRole.objects.filter(role=role).select_related("user"):
@@ -198,16 +227,36 @@ class OrganizationRoleDetailEndpoint(BaseAPIView):
             return Response(_validation_error(exc), status=status.HTTP_400_BAD_REQUEST)
         return Response(OrganizationRoleSerializer(role).data)
 
-    @require_permission("Role.Disable")
+    @require_permission("Role.Delete")
     def delete(self, request, slug, role_id):
         role = get_object_or_404(OrganizationRole, workspace__slug=slug, id=role_id)
         try:
             with access_transaction(role.workspace):
+                role = OrganizationRole.objects.select_for_update().get(pk=role.pk)
+                if role.system_key:
+                    raise ValidationError(
+                        {"role": "نقش سیستمی مدیر/عضو قابل حذف نیست؛ سازگاری دسترسی به آن وابسته است."}
+                    )
+                rules = list(
+                    TicketRoutingRule.objects.filter(required_role=role, is_active=True).values_list("name", flat=True)
+                )
+                if rules or TicketRoleQueueEntry.objects.filter(required_role=role, status="open").exists():
+                    raise ValidationError(
+                        {"role": f"ابتدا قانون‌های مسیریابی ({'، '.join(rules)}) و صف باز این نقش را تعیین تکلیف کنید."}
+                    )
+                users = list(
+                    User.objects.filter(
+                        organization_roles__role=role, organization_roles__deleted_at__isnull=True
+                    ).distinct()
+                )
+                now = timezone.now()
+                UserOrganizationRole.objects.filter(role=role).update(is_active=False, deleted_at=now, updated_at=now)
                 role.is_active = False
-                role.save(update_fields=["is_active", "updated_at"])
-                for assignment in UserOrganizationRole.objects.filter(role=role).select_related("user"):
-                    sync_plane_membership(role.workspace, assignment.user)
-                audit_access(request, role.workspace, "role.disable", role.id)
+                role.deleted_at = now
+                role.save(update_fields=["is_active", "deleted_at", "updated_at"])
+                for user in users:
+                    sync_plane_membership(role.workspace, user)
+                audit_access(request, role.workspace, "role.delete", role.id)
         except ValidationError as exc:
             return Response(_validation_error(exc), status=400)
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -252,10 +301,14 @@ class OrganizationUnitListEndpoint(BaseAPIView):
 def _sync_unit_members(unit, member_ids):
     member_ids = normalize_ids(member_ids, "member_ids")
     users = User.objects.filter(
-        id__in=member_ids, is_active=True, member_workspace__workspace=unit.workspace, member_workspace__is_active=True
+        id__in=member_ids,
+        is_active=True,
+        member_workspace__workspace=unit.workspace,
+        member_workspace__is_active=True,
+        member_workspace__deleted_at__isnull=True,
     )
     if users.count() != len(set(member_ids)):
-        raise ValidationError({"member_ids": "Members must be active in this workspace."})
+        raise ValidationError({"member_ids": "اعضای انتخاب‌شده باید عضویت فعال در همین شرکت داشته باشند."})
     OrganizationUnitMember.objects.filter(unit=unit).exclude(user_id__in=member_ids).update(is_active=False)
     for user in users:
         relation, _ = OrganizationUnitMember.objects.get_or_create(unit=unit, user=user)
@@ -280,12 +333,13 @@ class OrganizationUnitDetailEndpoint(BaseAPIView):
         require_field_permission(request, unit.workspace, "is_active", "OrganizationUnit.Disable")
         serializer = OrganizationUnitSerializer(unit, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        for field in ("title", "parent", "manager", "is_active"):
-            if field in serializer.validated_data:
-                setattr(unit, field, serializer.validated_data[field])
         try:
             with transaction.atomic():
                 Workspace.objects.select_for_update().get(pk=unit.workspace_id)
+                unit = OrganizationUnit.objects.select_for_update().get(pk=unit.pk)
+                for field in ("title", "parent", "manager", "is_active"):
+                    if field in serializer.validated_data:
+                        setattr(unit, field, serializer.validated_data[field])
                 unit.full_clean(exclude=["created_by", "updated_by"])
                 unit.save()
                 if "member_ids" in request.data:
@@ -295,12 +349,34 @@ class OrganizationUnitDetailEndpoint(BaseAPIView):
             return Response(_validation_error(exc), status=status.HTTP_400_BAD_REQUEST)
         return Response(OrganizationUnitSerializer(unit).data)
 
-    @require_permission("OrganizationUnit.Disable")
+    @require_permission("OrganizationUnit.Delete")
     def delete(self, request, slug, unit_id):
         unit = get_object_or_404(OrganizationUnit, workspace__slug=slug, id=unit_id)
-        unit.is_active = False
-        unit.save(update_fields=["is_active", "updated_at"])
-        audit_access(request, unit.workspace, "unit.disable", unit.id)
+        try:
+            with access_transaction(unit.workspace):
+                unit = OrganizationUnit.objects.select_for_update().get(pk=unit.pk)
+                children = list(OrganizationUnit.objects.filter(parent=unit).values_list("title", flat=True))
+                rules = list(TicketRoutingRule.objects.filter(unit=unit, is_active=True).values_list("name", flat=True))
+                if children or rules:
+                    raise ValidationError(
+                        {
+                            "unit": (
+                                f"ابتدا زیرواحدها ({'، '.join(children)}) یا قانون‌های فعال "
+                                f"({'، '.join(rules)}) را منتقل یا حذف کنید."
+                            )
+                        }
+                    )
+                now = timezone.now()
+                OrganizationUnitMember.objects.filter(unit=unit).update(is_active=False, deleted_at=now, updated_at=now)
+                OrganizationUnitDelegate.objects.filter(unit=unit).update(
+                    is_active=False, deleted_at=now, updated_at=now
+                )
+                unit.is_active = False
+                unit.deleted_at = now
+                unit.save(update_fields=["is_active", "deleted_at", "updated_at"])
+                audit_access(request, unit.workspace, "unit.delete", unit.id)
+        except ValidationError as exc:
+            return Response(_validation_error(exc), status=400)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -308,13 +384,17 @@ class OrganizationUserProfileEndpoint(BaseAPIView):
     @require_permission("User.View")
     def get(self, request, slug, user_id):
         workspace = get_object_or_404(Workspace, slug=slug)
-        user = get_object_or_404(User, id=user_id, member_workspace__workspace=workspace)
+        user = get_object_or_404(
+            User, id=user_id, member_workspace__workspace=workspace, member_workspace__deleted_at__isnull=True
+        )
         return Response(_user_profile_data(workspace, user))
 
     @require_any_permission("User.Edit", "User.Role.Assign", "OrganizationUnit.Member.Manage")
     def patch(self, request, slug, user_id):
         workspace = get_object_or_404(Workspace, slug=slug)
-        user = get_object_or_404(User, id=user_id, member_workspace__workspace=workspace)
+        user = get_object_or_404(
+            User, id=user_id, member_workspace__workspace=workspace, member_workspace__deleted_at__isnull=True
+        )
         for field in ("first_name", "last_name", "display_name", "username", "email", "is_active"):
             require_field_permission(request, workspace, field, "User.Edit")
         if (
@@ -323,7 +403,14 @@ class OrganizationUserProfileEndpoint(BaseAPIView):
                 workspace=workspace, member=user, is_active=True, member__is_active=True
             ).exists()
         ):
-            return Response({"role_ids": ["Activate and save the membership before assigning roles."]}, status=400)
+            return Response(
+                {
+                    "role_ids": [
+                        "برای تخصیص نقش، ابتدا عضویت کاربر را فعال و ذخیره کنید؛ حساب جهانی نیز باید فعال باشد."
+                    ]
+                },
+                status=400,
+            )
         username = str(request.data.get("username", user.username)).strip().lower()
         email = str(request.data.get("email", user.email)).strip().lower()
         if "username" in request.data and not re.fullmatch(r"[a-z0-9_.-]{3,32}", username):
@@ -448,7 +535,7 @@ class TicketRouteEndpoint(BaseAPIView):
         issue = get_object_or_404(Issue, id=issue_id, workspace__slug=slug)
         rule = get_object_or_404(TicketRoutingRule, id=request.data.get("rule_id"), workspace__slug=slug)
         try:
-            decision = TicketRoutingService.route(issue, rule)
+            decision = TicketRoutingService.route(issue, rule, actor_id=request.user.id)
         except ValueError as exc:
             return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(TicketRoutingDecisionSerializer(decision).data, status=status.HTTP_201_CREATED)
@@ -517,4 +604,7 @@ class TicketRoleQueueClaimEndpoint(BaseAPIView):
         entry.claimed_by = request.user
         entry.status = TicketRoleQueueEntry.Status.CLAIMED
         entry.save(update_fields=["claimed_by", "status", "updated_at"])
+        from plane.app.services.crm_notifications import notify_queue_claim
+
+        notify_queue_claim(entry, request.user.id)
         return Response(TicketRoleQueueEntrySerializer(entry).data)

@@ -1,46 +1,55 @@
 import { useMemo, useState } from "react";
-import { Filter, Grid2X2, List, MoreHorizontal, Plus } from "lucide-react";
+import { Grid2X2, List, MoreHorizontal, Plus } from "lucide-react";
 import { Link } from "react-router";
-import { useIssues, useMembers, useProjects, useWorkspaceAccess } from "../api";
+import { IdentifierBadge, zonedDateTime } from "@plane/ui";
+import { useCurrentUser, useIssues, useMembers, useProjects, useWorkspaceAccess } from "../api";
 import { AvatarStack, Button, EmptyState, PageHeader, ProjectCard, SearchBox, Skeleton } from "../components";
+import { DataFilterButton, ProjectFilterDialog } from "../filter-controls";
+import { emptyProjectFilters, filterProjects, matchesProjectTab, projectFilterCount } from "../filter-rules";
+import type { ProjectTab } from "../filter-rules";
 import { useUIStore } from "../store";
 import { persianDate, toFa } from "../utils";
+
+const tabs: { id: ProjectTab; label: string }[] = [
+  { id: "all", label: "همه پروژه‌ها" },
+  { id: "active", label: "فعال" },
+  { id: "completed", label: "تکمیل‌شده" },
+  { id: "archived", label: "بایگانی‌شده" },
+];
 
 export default function ProjectsPage() {
   const [view, setView] = useState<"grid" | "list">("grid");
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState("همه پروژه‌ها");
+  const [tab, setTab] = useState<ProjectTab>("all");
+  const [filters, setFilters] = useState(emptyProjectFilters);
+  const [filterOpen, setFilterOpen] = useState(false);
   const { data: projects = [], isLoading } = useProjects();
   const { data: issues = [], isLoading: issuesLoading } = useIssues();
   const { data: members = [], isLoading: membersLoading } = useMembers();
   const { data: access } = useWorkspaceAccess();
+  const { data: currentUser } = useCurrentUser();
   const canManage = access?.can("Project.Create") === true;
   const setCreate = useUIStore((state) => state.setCreateOpen);
-  const filtered = useMemo(
+  const enrichedProjects = useMemo(
     () =>
-      projects
-        .map((project) => {
-          const projectIssues = issues.filter((issue) => issue.projectId === project.id);
-          const completedIssues = projectIssues.filter((issue) => issue.status === "Done").length;
-          return Object.assign({}, project, {
-            members: members.filter((member) => project.memberIds?.includes(member.id)),
-            totalIssues: projectIssues.length,
-            completedIssues,
-            progress: projectIssues.length ? Math.round((completedIssues / projectIssues.length) * 100) : 0,
-          });
-        })
-        .filter((project) => {
-          const matchesQuery =
-            project.name.includes(query) || project.identifier.toLowerCase().includes(query.toLowerCase());
-          const matchesFilter =
-            (filter === "همه پروژه‌ها" && !project.archivedAt) ||
-            (filter === "فعال" && !project.archivedAt && (project.progress ?? 0) < 100) ||
-            (filter === "تکمیل‌شده" && (project.progress ?? 0) === 100) ||
-            (filter === "بایگانی‌شده" && Boolean(project.archivedAt));
-          return matchesQuery && matchesFilter;
-        }),
-    [filter, issues, members, projects, query]
+      projects.map((project) => {
+        const projectIssues = issues.filter((issue) => issue.projectId === project.id);
+        const completedIssues = projectIssues.filter((issue) => issue.status === "Done").length;
+        return Object.assign({}, project, {
+          members: members.filter((member) => project.memberIds?.includes(member.id)),
+          totalIssues: projectIssues.length,
+          completedIssues,
+          progress: projectIssues.length ? Math.round((completedIssues / projectIssues.length) * 100) : 0,
+        });
+      }),
+    [issues, members, projects]
   );
+  const today = zonedDateTime(new Date(), currentUser?.timeZone)!.date;
+  const filtered = useMemo(
+    () => filterProjects(enrichedProjects, filters, query, tab, today, currentUser?.timeZone),
+    [enrichedProjects, filters, query, tab, today, currentUser?.timeZone]
+  );
+  const loading = isLoading || issuesLoading || membersLoading;
   return (
     <div>
       <PageHeader
@@ -57,35 +66,61 @@ export default function ProjectsPage() {
       />
       <div className="content-toolbar">
         <div className="filter-tabs">
-          {["همه پروژه‌ها", "فعال", "تکمیل‌شده", "بایگانی‌شده"].map((item) => (
-            <button className={filter === item ? "active" : ""} key={item} onClick={() => setFilter(item)}>
-              {item}
-              {item === "همه پروژه‌ها" && <span>{toFa(projects.length)}</span>}
+          {tabs.map((item) => (
+            <button className={tab === item.id ? "active" : ""} key={item.id} onClick={() => setTab(item.id)}>
+              {item.label}
+              {item.id === "all" && (
+                <span>{toFa(enrichedProjects.filter((project) => matchesProjectTab(project, "all")).length)}</span>
+              )}
             </button>
           ))}
         </div>
         <div className="toolbar-actions">
           <SearchBox value={query} onChange={setQuery} placeholder="جستجوی پروژه..." />
-          <button
-            className="filter-button"
-            onClick={() => {
-              setQuery("");
-              setFilter("همه پروژه‌ها");
-            }}
-          >
-            <Filter size={16} /> پاک‌کردن فیلتر
-          </button>
+          <DataFilterButton count={projectFilterCount(filters)} open={filterOpen} onClick={() => setFilterOpen(true)} />
           <div className="view-toggle">
-            <button className={view === "grid" ? "active" : ""} onClick={() => setView("grid")}>
+            <button
+              aria-label="نمای کارت پروژه‌ها"
+              className={view === "grid" ? "active" : ""}
+              onClick={() => setView("grid")}
+            >
               <Grid2X2 size={17} />
             </button>
-            <button className={view === "list" ? "active" : ""} onClick={() => setView("list")}>
+            <button
+              aria-label="نمای لیست پروژه‌ها"
+              className={view === "list" ? "active" : ""}
+              onClick={() => setView("list")}
+            >
               <List size={18} />
             </button>
           </div>
         </div>
       </div>
-      {isLoading || issuesLoading || membersLoading ? (
+      {!loading && (
+        <p className="filter-results" role="status">
+          {toFa(filtered.length)} از{" "}
+          {toFa(enrichedProjects.filter((project) => matchesProjectTab(project, tab)).length)} پروژه در این تب
+        </p>
+      )}
+      {filterOpen && (
+        <ProjectFilterDialog
+          filters={filters}
+          projects={enrichedProjects}
+          members={members}
+          query={query}
+          tab={tab}
+          tabLabel={tabs.find((item) => item.id === tab)!.label}
+          today={today}
+          timeZone={currentUser?.timeZone}
+          loading={loading}
+          onClose={() => setFilterOpen(false)}
+          onApply={(next) => {
+            setFilters(next);
+            setFilterOpen(false);
+          }}
+        />
+      )}
+      {loading ? (
         <Skeleton rows={6} cards={view === "grid"} />
       ) : !filtered.length ? (
         <EmptyState
@@ -131,6 +166,7 @@ export default function ProjectsPage() {
                         <small>{project.identifier}</small>
                       </div>
                     </Link>
+                    <IdentifierBadge value={project.identifier} label="شناسه پروژه" />
                   </td>
                   <td>
                     <div className="table-progress">

@@ -3,6 +3,8 @@
 # See the LICENSE file for details.
 
 # Django imports
+import logging
+
 from django.views import View
 from django.contrib.auth import logout
 from django.http import HttpResponseRedirect
@@ -12,17 +14,20 @@ from django.utils import timezone
 from plane.authentication.utils.host import user_ip, base_host
 from plane.db.models import User
 
+logger = logging.getLogger(__name__)
+
 
 class SignOutAuthEndpoint(View):
     def post(self, request):
-        # Get user
+        # End the session even when recording optional logout metadata fails.
         try:
-            user = User.objects.get(pk=request.user.id)
-            user.last_logout_ip = user_ip(request=request)
-            user.last_logout_time = timezone.now()
-            user.save()
-            # Log the user out
-            logout(request)
-            return HttpResponseRedirect(base_host(request=request, is_app=True))
+            if request.user.is_authenticated:
+                User.objects.filter(pk=request.user.id).update(
+                    last_logout_ip=user_ip(request=request),
+                    last_logout_time=timezone.now(),
+                )
         except Exception:
-            return HttpResponseRedirect(base_host(request=request, is_app=True))
+            logger.exception("Unable to record logout metadata")
+        finally:
+            logout(request)
+        return HttpResponseRedirect(base_host(request=request, is_app=True))

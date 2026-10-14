@@ -66,6 +66,7 @@ class IssueFlatSerializer(BaseSerializer):
             "sort_order",
             "is_draft",
         ]
+        read_only_fields = ["id", "sequence_id"]
 
 
 class IssueProjectLiteSerializer(BaseSerializer):
@@ -104,6 +105,8 @@ class IssueCreateSerializer(BaseSerializer):
         model = Issue
         fields = "__all__"
         read_only_fields = [
+            "id",
+            "sequence_id",
             "workspace",
             "project",
             "created_by",

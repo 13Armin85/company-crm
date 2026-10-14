@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useEffect, useRef } from "react";
 import { DialogTitle } from "@headlessui/react";
 import { ModalCore } from "@plane/ui";
 import { X } from "lucide-react";
@@ -16,6 +17,23 @@ export function AccessModal({
   onClose: () => void;
   busy?: boolean;
 }) {
+  const closeButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    // Menus restore their trigger on the next frame. Mobile Dialogs focus their
+    // container, so establish control focus after that restoration has finished.
+    let focusFrame = 0;
+    const menuFrame = requestAnimationFrame(() => {
+      focusFrame = requestAnimationFrame(() => {
+        const button = closeButton.current;
+        if (button && !button.closest('[role="dialog"]')?.contains(document.activeElement))
+          button.focus({ preventScroll: true });
+      });
+    });
+    return () => {
+      cancelAnimationFrame(menuFrame);
+      cancelAnimationFrame(focusFrame);
+    };
+  }, []);
   return (
     <ModalCore
       isOpen
@@ -26,7 +44,14 @@ export function AccessModal({
     >
       <header>
         <DialogTitle as="h2">{title}</DialogTitle>
-        <button type="button" className="plain-icon" aria-label="بستن" disabled={busy} onClick={onClose}>
+        <button
+          ref={closeButton}
+          type="button"
+          className="plain-icon"
+          aria-label="بستن"
+          disabled={busy}
+          onClick={onClose}
+        >
           <X size={20} />
         </button>
       </header>

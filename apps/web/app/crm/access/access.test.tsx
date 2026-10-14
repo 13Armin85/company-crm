@@ -14,6 +14,7 @@ import { PermissionGate, PermissionRoute } from "./permission-gate";
 import { usePermission, useAnyPermission, useAllPermissions } from "./use-permission";
 import { MultiSelector, passwordError } from "./components";
 import { useUIStore } from "../store";
+import { canAccessPath } from "./permission-map";
 
 function PermissionProbe() {
   const single = usePermission("User.Edit");
@@ -22,7 +23,15 @@ function PermissionProbe() {
   return <span>{`${single}/${any}/${all}`}</span>;
 }
 
+const canAssignRolePermission = (code: string) => code === "Role.Permission.Assign";
+
 describe("effective permission UI", () => {
+  it("allows independent role permission assignment without metadata editing or role list access", () => {
+    expect(canAccessPath("/roles/role-id/permissions", canAssignRolePermission)).toBe(true);
+    expect(canAccessPath("/roles", canAssignRolePermission)).toBe(false);
+    expect(canAccessPath("/roles/role-id/permissions", () => false)).toBe(false);
+    expect(canAccessPath("/roles/role-id/permissions", (code) => code === "Role.View")).toBe(true);
+  });
   it("uses only backend permission codes and fails closed", () => {
     state.permissions = [];
     expect(renderToStaticMarkup(<PermissionProbe />)).toContain("false/false/false");
@@ -84,8 +93,9 @@ describe("effective permission UI", () => {
       />
     );
     expect(html).toContain('fieldset class="compact-selector" disabled=""');
-    expect(html).toContain('type="checkbox"');
-    expect(html).toContain('checked=""');
+    expect(html).not.toContain('type="checkbox"');
+    expect(html).toContain('aria-expanded="false" disabled=""');
+    expect(html).toContain("Manager");
   });
 
   it("requires matching passwords before submitting", () => {

@@ -1,23 +1,22 @@
+import { IdentifierBadge, PersianDateTimePicker, SearchableSelect } from "@plane/ui";
 import { useState } from "react";
 import { Navigate } from "react-router";
-import { useMembers, useWorkspaceAccess } from "../api";
+import { errorMessage, useCurrentUser, useMembers, useWorkspaceAccess } from "../api";
 import { useAbsences, useAccessMutation } from "../access/api";
 import { AccessModal } from "../access/components";
 import type { Absence } from "../access/types";
-import { Button, PageHeader, Skeleton } from "../components";
+import { Button, PageHeader, SearchBox, Skeleton } from "../components";
 import { persianDate } from "../utils";
+import { matchesRecordSearch } from "../identifiers";
 
 const statusNames = { active: "فعال", upcoming: "آینده", ended: "پایان‌یافته", cancelled: "لغوشده" };
-const localDate = (value: string) => {
-  const date = new Date(value);
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
-};
-
 export default function AbsencesPage() {
+  const { data: currentUser } = useCurrentUser();
   const { data: access, isLoading: accessLoading } = useWorkspaceAccess();
   const { data, isLoading, error } = useAbsences(access?.can("Absence.View") ?? false);
   const { data: members = [] } = useMembers();
   const mutation = useAccessMutation();
+  const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<{
     id?: string;
     user: string;
@@ -29,8 +28,8 @@ export default function AbsencesPage() {
     setEditing({
       id: row.id,
       user: row.user,
-      startsAt: localDate(row.starts_at),
-      endsAt: localDate(row.ends_at),
+      startsAt: row.starts_at,
+      endsAt: row.ends_at,
       reason: row.reason,
     });
   if (accessLoading) return <Skeleton rows={5} />;
@@ -48,6 +47,7 @@ export default function AbsencesPage() {
         }
       />
       {error && <p role="alert">دریافت عدم حضورها انجام نشد.</p>}
+      <SearchBox value={query} onChange={setQuery} placeholder="جستجوی شناسه، کاربر یا علت عدم حضور…" />
       {isLoading ? (
         <Skeleton rows={5} />
       ) : (
@@ -63,49 +63,53 @@ export default function AbsencesPage() {
               </tr>
             </thead>
             <tbody>
-              {data?.absences.map((row) => (
-                <tr key={row.id}>
-                  <td>{row.user_name}</td>
-                  <td>
-                    {persianDate(row.starts_at, { year: "numeric" })} — {persianDate(row.ends_at, { year: "numeric" })}
-                  </td>
-                  <td>{row.reason}</td>
-                  <td>{statusNames[row.current_status]}</td>
-                  <td className="row-actions">
-                    {row.can_edit && (
-                      <Button variant="secondary" onClick={() => edit(row)}>
-                        ویرایش
-                      </Button>
-                    )}
-                    {row.can_end && (
-                      <Button
-                        variant="secondary"
-                        disabled={mutation.isPending}
-                        onClick={() => mutation.mutate({ path: `absences/${row.id}/`, method: "delete" })}
-                      >
-                        پایان عدم حضور
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+              {data?.absences
+                .filter((row) => matchesRecordSearch(query, [row.id, row.user, row.user_name, row.reason]))
+                .map((row) => (
+                  <tr key={row.id}>
+                    <td>
+                      {row.user_name}
+                      <IdentifierBadge value={row.id} label="شناسه عدم حضور" />
+                    </td>
+                    <td>
+                      {persianDate(row.starts_at, {
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        timeZone: currentUser?.timeZone,
+                      })}{" "}
+                      —{" "}
+                      {persianDate(row.ends_at, {
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        timeZone: currentUser?.timeZone,
+                      })}
+                    </td>
+                    <td>{row.reason}</td>
+                    <td>{statusNames[row.current_status]}</td>
+                    <td className="row-actions">
+                      {row.can_edit && (
+                        <Button variant="secondary" onClick={() => edit(row)}>
+                          ویرایش
+                        </Button>
+                      )}
+                      {row.can_end && (
+                        <Button
+                          variant="secondary"
+                          disabled={mutation.isPending}
+                          onClick={() => mutation.mutate({ path: `absences/${row.id}/`, method: "delete" })}
+                        >
+                          پایان عدم حضور
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>
       )}
-      <section className="panel">
-        <h2>جانشینی‌های فعال</h2>
-        {data?.delegations.length ? (
-          data.delegations.map((row) => (
-            <p key={row.unit_id}>
-              {row.user_name}، جانشین {row.manager_name} در {row.unit_name} · {row.reason} · تا{" "}
-              {persianDate(row.ends_at, { year: "numeric" })}
-            </p>
-          ))
-        ) : (
-          <p>جانشینی فعالی وجود ندارد.</p>
-        )}
-      </section>
       {editing && (
         <AccessModal
           title={editing.id ? "ویرایش عدم حضور" : "ثبت عدم حضور"}
@@ -115,7 +119,14 @@ export default function AbsencesPage() {
           <form
             onSubmit={(event) => {
               event.preventDefault();
-              if (editing.endsAt <= editing.startsAt) return;
+              if (
+                mutation.isPending ||
+                !editing.user ||
+                !Number.isFinite(Date.parse(editing.startsAt)) ||
+                !Number.isFinite(Date.parse(editing.endsAt)) ||
+                Date.parse(editing.endsAt) <= Date.parse(editing.startsAt)
+              )
+                return;
               mutation.mutate(
                 {
                   path: editing.id ? `absences/${editing.id}/` : "absences/",
@@ -131,62 +142,65 @@ export default function AbsencesPage() {
               );
             }}
           >
-            <label>
+            <label htmlFor="crm-absences-select-1">
               <span>کاربر</span>
-              <select
-                required
-                disabled={Boolean(editing.id)}
+              <SearchableSelect
+                id="crm-absences-select-1"
+                label="کاربر"
+                disabled={Boolean(editing.id) || mutation.isPending}
                 value={editing.user}
-                onChange={(event) => setEditing({ ...editing, user: event.target.value })}
-              >
-                <option value="">انتخاب کاربر</option>
-                {members
+                onChange={(user) => setEditing({ ...editing, user })}
+                options={members
                   .filter(
                     (row) =>
                       row.id === editing.user || (row.isActive !== false && data?.manageable_user_ids.includes(row.id))
                   )
-                  .map((row) => (
-                    <option key={row.id} value={row.id}>
-                      {row.displayName}
-                    </option>
-                  ))}
-              </select>
+                  .map((row) => ({ id: row.id, title: row.displayName, description: row.email }))}
+              />
             </label>
-            <label>
-              <span>شروع</span>
-              <input
-                type="datetime-local"
-                dir="ltr"
+            <fieldset className="crm-date-field">
+              <legend>شروع</legend>
+              <PersianDateTimePicker
+                timeZone={currentUser?.timeZone}
+                label="شروع"
                 required
+                disabled={mutation.isPending}
                 value={editing.startsAt}
-                onChange={(event) => setEditing({ ...editing, startsAt: event.target.value })}
+                onChange={(startsAt) => setEditing({ ...editing, startsAt })}
               />
-            </label>
-            <label>
-              <span>پایان</span>
-              <input
-                type="datetime-local"
-                dir="ltr"
+            </fieldset>
+            <fieldset className="crm-date-field">
+              <legend>پایان</legend>
+              <PersianDateTimePicker
+                timeZone={currentUser?.timeZone}
+                label="پایان"
                 required
+                disabled={mutation.isPending}
                 value={editing.endsAt}
-                onChange={(event) => setEditing({ ...editing, endsAt: event.target.value })}
+                onChange={(endsAt) => setEditing({ ...editing, endsAt })}
               />
-            </label>
+            </fieldset>
             <label>
               <span>علت</span>
               <textarea
+                disabled={mutation.isPending}
                 value={editing.reason}
                 onChange={(event) => setEditing({ ...editing, reason: event.target.value })}
               />
             </label>
-            {editing.startsAt && editing.endsAt && editing.endsAt <= editing.startsAt && (
+            {editing.startsAt && editing.endsAt && Date.parse(editing.endsAt) <= Date.parse(editing.startsAt) && (
               <p role="alert">پایان باید بعد از شروع باشد.</p>
             )}
+            {mutation.isError && <p role="alert">{errorMessage(mutation.error, "ذخیره عدم حضور انجام نشد.")}</p>}
             <footer>
               <Button
                 type="submit"
                 disabled={
-                  mutation.isPending || !editing.startsAt || !editing.endsAt || editing.endsAt <= editing.startsAt
+                  mutation.isPending ||
+                  !editing.user ||
+                  !editing.startsAt ||
+                  !editing.endsAt ||
+                  Date.parse(editing.endsAt) <= Date.parse(editing.startsAt)
                 }
               >
                 ذخیره

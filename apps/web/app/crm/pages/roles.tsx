@@ -1,56 +1,55 @@
-import { useState } from "react";
-import { Plus } from "lucide-react";
-import { Navigate } from "react-router";
-import { PermissionCatalog } from "@plane/ui";
+import { useEffect, useState } from "react";
+import { Link, Navigate, useSearchParams } from "react-router";
+import { IdentifierBadge } from "@plane/ui";
 import {
-  useOrganizationPermissions,
   useOrganizationRoles,
   useSaveOrganizationRole,
-  useDeactivateOrganizationRole,
+  useDeleteOrganizationObject,
   useWorkspaceAccess,
+  errorMessage,
 } from "../api";
 import { Button, PageHeader, SearchBox, Skeleton } from "../components";
-import { AccessModal, MultiSelector } from "../access/components";
-import { permissionPresentation } from "../access/permission-labels";
+import { AccessModal } from "../access/components";
 import { useUIStore } from "../store";
 import type { OrganizationRole } from "../types";
+import { matchesRecordSearch } from "../identifiers";
 
 export default function RolesPage() {
   const slug = useUIStore((state) => state.workspaceSlug) ?? "";
   const { data: access, isLoading: accessLoading } = useWorkspaceAccess();
   const { data: roles = [], isLoading, error } = useOrganizationRoles(undefined, access?.can("Role.View") ?? false);
-  const {
-    data: permissions = [],
-    isLoading: permissionsLoading,
-    error: permissionsError,
-  } = useOrganizationPermissions(undefined, access?.can("Permission.View") ?? false);
   const save = useSaveOrganizationRole(slug);
-  const deactivate = useDeactivateOrganizationRole(slug);
+  const remove = useDeleteOrganizationObject(slug, "roles");
   const [editing, setEditing] = useState<OrganizationRole>();
-  const [roleQuery, setRoleQuery] = useState("");
-  const presentedPermissions = permissions.map(permissionPresentation);
-  const canEdit = access?.can("Role.Edit") || access?.can("Role.Permission.Assign");
+  const [deleting, setDeleting] = useState<OrganizationRole>();
+  const [query, setQuery] = useState("");
+  const [params] = useSearchParams();
+  const searchParam = params.get("search") ?? "";
+  useEffect(() => setQuery(searchParam), [searchParam]);
   if (accessLoading) return <Skeleton rows={5} />;
   if (!access?.can("Role.View")) return <Navigate to="/my-work" replace />;
   return (
     <div>
       <PageHeader
         eyebrow="مدیریت سازمان"
-        title="نقش‌ها و مجوزها"
-        description="هر نقش مجموعه‌ای از مجوزهاست. کاربران می‌توانند چند نقش فعال داشته باشند."
+        title="نقش‌های سازمانی"
+        description="اطلاعات نقش و مجوزهای آن در فرم‌های مستقل مدیریت می‌شوند."
         actions={
           access.can("Role.Create") && (
             <Button
-              icon={Plus}
-              onClick={() => setEditing({ id: "", name: "", description: "", permissionIds: [], isActive: true })}
+              onClick={() => {
+                save.reset();
+                setEditing({ id: "", name: "", description: "", permissionIds: [], isActive: true });
+              }}
             >
               نقش جدید
             </Button>
           )
         }
       />
-      <SearchBox value={roleQuery} onChange={setRoleQuery} placeholder="جستجوی نام یا توضیح نقش…" />
+      <SearchBox value={query} onChange={setQuery} placeholder="جستجوی شناسه، نام یا توضیح نقش…" />
       {error && <p role="alert">دریافت نقش‌ها انجام نشد.</p>}
+      {save.error && !editing && <p role="alert">{errorMessage(save.error, "تغییر وضعیت انجام نشد.")}</p>}
       {isLoading ? (
         <Skeleton rows={5} />
       ) : (
@@ -68,36 +67,51 @@ export default function RolesPage() {
             </thead>
             <tbody>
               {roles
-                .filter((role) => `${role.name} ${role.description}`.toLowerCase().includes(roleQuery.toLowerCase()))
+                .filter((role) => matchesRecordSearch(query, [role.id, role.name, role.description]))
                 .map((role) => (
                   <tr key={role.id}>
                     <td>
-                      {role.name} {role.systemKey && <small>پیش‌فرض</small>}
+                      {role.name}
+                      <IdentifierBadge value={role.id} label="شناسه نقش" />
+                      {role.systemKey && <small>سیستمی؛ قابل حذف نیست</small>}
                     </td>
                     <td>{role.description}</td>
                     <td>{role.isActive ? "فعال" : "غیرفعال"}</td>
                     <td>{role.permissionIds.length.toLocaleString("fa-IR")}</td>
                     <td>{(role.userCount ?? 0).toLocaleString("fa-IR")}</td>
                     <td className="row-actions">
-                      {!canEdit && (
-                        <Button variant="secondary" onClick={() => setEditing(role)}>
-                          مشاهده مجوزها
+                      {access.can("Role.Edit") && (
+                        <Button
+                          variant="secondary"
+                          onClick={() => {
+                            save.reset();
+                            setEditing(role);
+                          }}
+                        >
+                          ویرایش اطلاعات
                         </Button>
                       )}
-                      {(access.can("Role.Edit") || access.can("Role.Permission.Assign")) && (
-                        <Button variant="secondary" onClick={() => setEditing(role)}>
-                          {access.can("Role.Edit") ? "ویرایش" : "ویرایش مجوزها"}
-                        </Button>
-                      )}
+                      <Link className="button button-secondary" to={`/roles/${role.id}/permissions`}>
+                        {access.can("Role.Permission.Assign") ? "مدیریت مجوزها" : "مشاهده مجوزها"}
+                      </Link>
                       {access.can("Role.Disable") && (
                         <Button
                           variant="secondary"
-                          disabled={deactivate.isPending || save.isPending}
-                          onClick={() =>
-                            role.isActive ? deactivate.mutate(role.id) : save.mutate({ id: role.id, isActive: true })
-                          }
+                          disabled={save.isPending}
+                          onClick={() => save.mutate({ id: role.id, isActive: !role.isActive })}
                         >
                           {role.isActive ? "غیرفعال کردن" : "فعال کردن"}
+                        </Button>
+                      )}
+                      {!role.systemKey && access.can("Role.Delete") && (
+                        <Button
+                          variant="danger"
+                          onClick={() => {
+                            remove.reset();
+                            setDeleting(role);
+                          }}
+                        >
+                          حذف نقش
                         </Button>
                       )}
                     </td>
@@ -107,41 +121,18 @@ export default function RolesPage() {
           </table>
         </div>
       )}
-      {access.can("Permission.View") && (
-        <PermissionCatalog
-          items={presentedPermissions}
-          isLoading={permissionsLoading}
-          hasError={Boolean(permissionsError)}
-        />
-      )}
       {editing && (
         <AccessModal
-          title={editing.id ? (canEdit ? "ویرایش نقش" : "مشاهده نقش") : "نقش جدید"}
+          title={editing.id ? "ویرایش اطلاعات نقش" : "نقش جدید"}
           busy={save.isPending}
           onClose={() => setEditing(undefined)}
         >
           <form
             onSubmit={(event) => {
               event.preventDefault();
-              const original = roles.find((role) => role.id === editing.id);
-              const originalPermissions = [...(original?.permissionIds ?? [])];
-              const editedPermissions = [...editing.permissionIds];
-              originalPermissions.sort();
-              editedPermissions.sort();
-              const permissionsChanged =
-                !original || JSON.stringify(originalPermissions) !== JSON.stringify(editedPermissions);
+              if (save.isPending) return;
               save.mutate(
-                {
-                  name: !editing.id || access.can("Role.Edit") ? editing.name : undefined,
-                  description: !editing.id || access.can("Role.Edit") ? editing.description : undefined,
-                  id: editing.id || undefined,
-                  permissionIds:
-                    access.can("Role.Permission.Assign") && permissionsChanged
-                      ? editing.permissionIds.filter((id) =>
-                          permissions.some((permission) => permission.id === id && permission.isActive)
-                        )
-                      : undefined,
-                },
+                { id: editing.id || undefined, name: editing.name, description: editing.description },
                 { onSuccess: () => setEditing(undefined) }
               );
             }}
@@ -149,44 +140,51 @@ export default function RolesPage() {
             <label>
               <span>نام نقش</span>
               <input
-                disabled={Boolean(editing.id) && !access.can("Role.Edit")}
+                required
+                disabled={save.isPending}
                 value={editing.name}
                 onChange={(event) => setEditing({ ...editing, name: event.target.value })}
-                required
               />
             </label>
             <label>
               <span>توضیح</span>
               <textarea
-                disabled={Boolean(editing.id) && !access.can("Role.Edit")}
+                disabled={save.isPending}
                 value={editing.description}
                 onChange={(event) => setEditing({ ...editing, description: event.target.value })}
               />
             </label>
-            <MultiSelector
-              label="مجوزهای نقش"
-              disabled={!access.can("Role.Permission.Assign")}
-              selected={editing.permissionIds}
-              onChange={(permissionIds) => setEditing({ ...editing, permissionIds })}
-              options={presentedPermissions.map((permission) => ({
-                id: permission.id,
-                title: permission.name,
-                description: permission.description,
-                category: permission.category,
-                disabled: !permission.isActive,
-              }))}
-            />
+            {save.error && <p role="alert">{errorMessage(save.error, "ذخیره نقش انجام نشد.")}</p>}
             <footer>
               <Button variant="secondary" disabled={save.isPending} onClick={() => setEditing(undefined)}>
                 انصراف
               </Button>
-              {(!editing.id || canEdit) && (
-                <Button type="submit" disabled={save.isPending || !editing.name.trim()}>
-                  ذخیره نقش
-                </Button>
-              )}
+              <Button type="submit" disabled={save.isPending || !editing.name.trim()}>
+                ذخیره نقش
+              </Button>
             </footer>
           </form>
+        </AccessModal>
+      )}
+      {deleting && (
+        <AccessModal title="حذف نقش" busy={remove.isPending} onClose={() => setDeleting(undefined)}>
+          <p>
+            نقش «{deleting.name}» حذف می‌شود و مجوزهای آن از {(deleting.userCount ?? 0).toLocaleString("fa-IR")} کاربر
+            گرفته می‌شود. مجوزهای نقش‌های دیگر و دسترسی‌های مستقیم حفظ می‌شوند.
+          </p>
+          {remove.error && <p role="alert">{errorMessage(remove.error, "حذف نقش انجام نشد.")}</p>}
+          <footer>
+            <Button variant="secondary" disabled={remove.isPending} onClick={() => setDeleting(undefined)}>
+              انصراف
+            </Button>
+            <Button
+              variant="danger"
+              disabled={remove.isPending}
+              onClick={() => remove.mutate(deleting.id, { onSuccess: () => setDeleting(undefined) })}
+            >
+              حذف نقش
+            </Button>
+          </footer>
         </AccessModal>
       )}
     </div>

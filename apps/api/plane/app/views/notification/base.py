@@ -3,8 +3,9 @@
 # See the LICENSE file for details.
 
 # Django imports
-from django.db.models import Exists, OuterRef, Q, Case, When, BooleanField
+from django.db.models import Exists, OuterRef, Q, Case, When, BooleanField, CharField, Subquery, Value
 from django.utils import timezone
+from django.shortcuts import get_object_or_404
 
 # Third party imports
 from rest_framework import status
@@ -21,6 +22,7 @@ from plane.db.models import (
     Notification,
     UserNotificationPreference,
     WorkspaceMember,
+    WorkspaceTask,
 )
 from plane.utils.paginator import BasePaginator
 from plane.utils.order_queryset import NOTIFICATION_ORDER_BY_ALLOWLIST, sanitize_order_by
@@ -28,6 +30,28 @@ from plane.app.permissions import allow_permission, ROLE
 
 # Module imports
 from ..base import BaseAPIView, BaseViewSet
+
+
+def notification_entity_title():
+    issue_name = Issue.objects.filter(
+        pk=OuterRef("entity_identifier"),
+        workspace_id=OuterRef("workspace_id"),
+        project_id=OuterRef("project_id"),
+    ).values("name")[:1]
+    return Case(
+        When(entity_name="issue", then=Subquery(issue_name)),
+        When(
+            entity_name="workspace_task",
+            then=Subquery(
+                WorkspaceTask.objects.filter(
+                    pk=OuterRef("entity_identifier"),
+                    workspace_id=OuterRef("workspace_id"),
+                ).values("name")[:1]
+            ),
+        ),
+        default=Value(None),
+        output_field=CharField(),
+    )
 
 
 class NotificationViewSet(BaseViewSet, BasePaginator):
@@ -43,6 +67,7 @@ class NotificationViewSet(BaseViewSet, BasePaginator):
                 receiver_id=self.request.user.id,
             )
             .select_related("workspace", "project", "triggered_by", "receiver")
+            .annotate(entity_title=notification_entity_title())
         )
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
@@ -53,6 +78,7 @@ class NotificationViewSet(BaseViewSet, BasePaginator):
         read = request.GET.get("read", None)
         type = request.GET.get("type", "all")
         mentioned = request.GET.get("mentioned", False)
+        all_notifications = request.GET.get("all_notifications", "false").lower() == "true"
         q_filters = Q()
 
         intake_issue = Issue.objects.filter(
@@ -63,8 +89,8 @@ class NotificationViewSet(BaseViewSet, BasePaginator):
 
         notifications = (
             Notification.objects.filter(workspace__slug=slug, receiver_id=request.user.id)
-            .filter(entity_name="issue")
             .annotate(is_inbox_issue=Exists(intake_issue))
+            .annotate(entity_title=notification_entity_title())
             .annotate(is_intake_issue=Exists(intake_issue))
             .annotate(
                 is_mentioned_notification=Case(
@@ -76,6 +102,10 @@ class NotificationViewSet(BaseViewSet, BasePaginator):
             .select_related("workspace", "project", "triggered_by", "receiver")
             .order_by("snoozed_till", "-created_at")
         )
+        if not all_notifications:
+            notifications = notifications.filter(entity_name="issue")
+        else:
+            notifications = notifications.order_by("-created_at", "-id")
 
         # Filters based on query parameters
         snoozed_filters = {
@@ -83,14 +113,16 @@ class NotificationViewSet(BaseViewSet, BasePaginator):
             "false": Q(snoozed_till__gte=timezone.now()) | Q(snoozed_till__isnull=True),
         }
 
-        notifications = notifications.filter(snoozed_filters[snoozed])
+        if not all_notifications:
+            notifications = notifications.filter(snoozed_filters[snoozed])
 
         archived_filters = {
             "true": Q(archived_at__isnull=False),
             "false": Q(archived_at__isnull=True),
         }
 
-        notifications = notifications.filter(archived_filters[archived])
+        if not all_notifications:
+            notifications = notifications.filter(archived_filters[archived])
 
         if read == "false":
             notifications = notifications.filter(read_at__isnull=True)
@@ -98,10 +130,11 @@ class NotificationViewSet(BaseViewSet, BasePaginator):
         if read == "true":
             notifications = notifications.filter(read_at__isnull=False)
 
-        if mentioned:
-            notifications = notifications.filter(sender__icontains="mentioned")
-        else:
-            notifications = notifications.exclude(sender__icontains="mentioned")
+        if not all_notifications:
+            if mentioned:
+                notifications = notifications.filter(sender__icontains="mentioned")
+            else:
+                notifications = notifications.exclude(sender__icontains="mentioned")
 
         type = type.split(",")
         # Subscribed issues
@@ -167,7 +200,7 @@ class NotificationViewSet(BaseViewSet, BasePaginator):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def mark_read(self, request, slug, pk):
-        notification = Notification.objects.get(receiver=request.user, workspace__slug=slug, pk=pk)
+        notification = get_object_or_404(Notification, receiver=request.user, workspace__slug=slug, pk=pk)
         notification.read_at = timezone.now()
         notification.save()
         serializer = NotificationSerializer(notification)
@@ -246,6 +279,11 @@ class MarkAllReadNotificationViewSet(BaseViewSet):
             .select_related("workspace", "project", "triggered_by", "receiver")
             .order_by("snoozed_till", "-created_at")
         )
+        if request.data.get("all_notifications") is True:
+            updated_count = notifications.update(read_at=timezone.now())
+            return Response(
+                {"message": "همه اعلان‌ها خوانده شدند", "updated_count": updated_count}, status=status.HTTP_200_OK
+            )
 
         # Filter for snoozed notifications
         if snoozed:

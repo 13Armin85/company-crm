@@ -1,18 +1,21 @@
+import { IdentifierBadge, SearchableSelect } from "@plane/ui";
 import { useEffect, useMemo, useState } from "react";
-import { Building2, ChevronDown, ChevronLeft, Edit3, Plus, UsersRound, XCircle } from "lucide-react";
-import { Navigate } from "react-router";
+import { Building2, ChevronDown, ChevronLeft, Edit3, Plus, Power, Trash2, UsersRound } from "lucide-react";
+import { Navigate, useSearchParams } from "react-router";
 import {
-  useDeactivateOrganizationUnit,
+  useDeleteOrganizationObject,
+  errorMessage,
   useMembers,
   useOrganizationUnits,
   useSaveOrganizationUnit,
   useWorkspaceAccess,
 } from "../api";
-import { Button, EmptyState, PageHeader, Skeleton } from "../components";
+import { Button, EmptyState, PageHeader, SearchBox, Skeleton } from "../components";
 import { useUIStore } from "../store";
 import type { OrganizationUnit } from "../types";
 import { AccessModal, MultiSelector } from "../access/components";
 import { DelegateManager } from "../access/delegate-manager";
+import { organizationSearchIds } from "../identifiers";
 
 type UnitForm = { id?: string; title: string; parentId?: string; managerId?: string; memberIds: string[] };
 const emptyForm: UnitForm = { title: "", memberIds: [] };
@@ -27,24 +30,35 @@ export default function OrganizationPage() {
   );
   const { data: members = [] } = useMembers();
   const saveUnit = useSaveOrganizationUnit(slug);
-  const deactivateUnit = useDeactivateOrganizationUnit(slug);
+  const remove = useDeleteOrganizationObject(slug, "units");
+  const [deleting, setDeleting] = useState<OrganizationUnit>();
   const [form, setForm] = useState<UnitForm>();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [draggedId, setDraggedId] = useState<string>();
   const [delegateUnit, setDelegateUnit] = useState<OrganizationUnit>();
-  const roots = useMemo(() => units.filter((unit) => !unit.parentId), [units]);
+  const [query, setQuery] = useState("");
+  const [params] = useSearchParams();
+  const searchParam = params.get("search") ?? "";
+  useEffect(() => setQuery(searchParam), [searchParam]);
+  const visibleIds = useMemo(() => organizationSearchIds(units, query), [units, query]);
+  const roots = useMemo(() => units.filter((unit) => !unit.parentId && visibleIds.has(unit.id)), [units, visibleIds]);
   useEffect(() => {
     setFormDirty("organization-unit", Boolean(form));
     return () => setFormDirty("organization-unit", false);
   }, [form, setFormDirty]);
   if (accessLoading) return <Skeleton rows={6} />;
   if (!access?.can("OrganizationUnit.View")) return <Navigate to="/my-work" replace />;
+  const canEditStructure = access.can("OrganizationUnit.Edit");
+  const canManageUnit =
+    canEditStructure || access.can("OrganizationUnit.Manager.Assign") || access.can("OrganizationUnit.Member.Manage");
 
   const submit = () => {
-    if (!form?.title.trim()) return;
+    if (saveUnit.isPending || !form?.title.trim()) return;
     saveUnit.mutate(
       {
-        ...form,
+        id: form.id,
+        title: !form.id || canEditStructure ? form.title : undefined,
+        parentId: !form.id || canEditStructure ? form.parentId : undefined,
         managerId: access.can("OrganizationUnit.Manager.Assign") ? (form.managerId ?? "") : undefined,
         memberIds: access.can("OrganizationUnit.Member.Manage") ? form.memberIds : undefined,
       },
@@ -52,16 +66,16 @@ export default function OrganizationPage() {
     );
   };
   const moveUnit = (unit: OrganizationUnit, parentId?: string) => {
-    if (!access.can("OrganizationUnit.Edit") || unit.id === parentId || unit.parentId === parentId) return;
+    if (saveUnit.isPending || !canEditStructure || unit.id === parentId || unit.parentId === parentId) return;
     saveUnit.mutate({
       id: unit.id,
       title: unit.title,
-      parentId,
+      parentId: parentId ?? "",
     });
   };
   const renderUnit = (unit: OrganizationUnit, depth = 0) => {
-    const children = units.filter((item) => item.parentId === unit.id);
-    const isCollapsed = collapsed.has(unit.id);
+    const children = units.filter((item) => item.parentId === unit.id && visibleIds.has(item.id));
+    const isCollapsed = collapsed.has(unit.id) && !query.trim();
     return (
       <div key={unit.id} className="org-branch">
         <div
@@ -96,6 +110,7 @@ export default function OrganizationPage() {
           </span>
           <div>
             <b>{unit.title}</b>
+            <IdentifierBadge value={unit.id} label="شناسه واحد" />
             <small>
               {unit.managerName ? `مدیر: ${unit.managerName}` : "بدون مدیر"} · {unit.memberIds.length} عضو
             </small>
@@ -116,7 +131,7 @@ export default function OrganizationPage() {
                 <Plus size={15} />
               </button>
             )}
-            {access.can("OrganizationUnit.Edit") && (
+            {canManageUnit && (
               <button
                 onClick={() =>
                   setForm({
@@ -132,9 +147,31 @@ export default function OrganizationPage() {
                 <Edit3 size={15} />
               </button>
             )}
-            {unit.isActive && access.can("OrganizationUnit.Disable") && (
-              <button onClick={() => deactivateUnit.mutate(unit.id)} title="غیرفعال‌کردن">
-                <XCircle size={15} />
+            {access.can("OrganizationUnit.Disable") && (
+              <button
+                type="button"
+                className={`unit-action ${unit.isActive ? "" : "is-enable"}`}
+                title={unit.isActive ? "غیرفعال کردن" : "فعال کردن"}
+                aria-label={unit.isActive ? "غیرفعال کردن" : "فعال کردن"}
+                disabled={saveUnit.isPending}
+                onClick={() => saveUnit.mutate({ id: unit.id, isActive: !unit.isActive })}
+              >
+                <Power size={16} aria-hidden="true" />
+              </button>
+            )}
+            {access.can("OrganizationUnit.Delete") && (
+              <button
+                type="button"
+                className="unit-action is-danger"
+                title="حذف واحد"
+                aria-label="حذف واحد"
+                disabled={remove.isPending}
+                onClick={() => {
+                  remove.reset();
+                  setDeleting(unit);
+                }}
+              >
+                <Trash2 size={16} aria-hidden="true" />
               </button>
             )}
           </div>
@@ -158,6 +195,7 @@ export default function OrganizationPage() {
           )
         }
       />
+      <SearchBox value={query} onChange={setQuery} placeholder="جستجوی شناسه، عنوان یا مدیر واحد…" />
       <section
         className="organization-tree panel"
         onDragOver={(event) => event.preventDefault()}
@@ -173,7 +211,10 @@ export default function OrganizationPage() {
         ) : roots.length ? (
           roots.map((root) => renderUnit(root))
         ) : (
-          <EmptyState title="ساختار سازمانی خالی است" description="اولین واحد سازمانی را ایجاد کنید." />
+          <EmptyState
+            title={query.trim() ? "واحدی پیدا نشد" : "ساختار سازمانی خالی است"}
+            description={query.trim() ? "شناسه یا عبارت جست‌وجو را بررسی کنید." : "اولین واحد سازمانی را ایجاد کنید."}
+          />
         )}
       </section>
       {delegateUnit && (
@@ -185,72 +226,114 @@ export default function OrganizationPage() {
           onClose={() => setDelegateUnit(undefined)}
         />
       )}
+      {deleting && (
+        <AccessModal title="حذف واحد سازمانی" busy={remove.isPending} onClose={() => setDeleting(undefined)}>
+          <p>
+            واحد «{deleting.title}» حذف می‌شود و اعضا و جانشینان از این واحد دسترسی نمی‌گیرند. واحد دارای زیرواحد یا قانون
+            فعال ابتدا باید تعیین تکلیف شود.
+          </p>
+          {remove.error && <p role="alert">{errorMessage(remove.error, "حذف واحد انجام نشد.")}</p>}
+          <footer>
+            <Button variant="secondary" disabled={remove.isPending} onClick={() => setDeleting(undefined)}>
+              انصراف
+            </Button>
+            <Button
+              variant="danger"
+              disabled={remove.isPending}
+              onClick={() => remove.mutate(deleting.id, { onSuccess: () => setDeleting(undefined) })}
+            >
+              حذف واحد
+            </Button>
+          </footer>
+        </AccessModal>
+      )}
+      {saveUnit.error && <p role="alert">{errorMessage(saveUnit.error, "ذخیره واحد انجام نشد.")}</p>}
       {form && (
         <AccessModal
           title={form.id ? "ویرایش واحد" : "افزودن واحد"}
           busy={saveUnit.isPending}
           onClose={() => setForm(undefined)}
         >
-          <section className="organization-modal">
-            <label>
+          <form
+            className="organization-modal"
+            onSubmit={(event) => {
+              event.preventDefault();
+              submit();
+            }}
+          >
+            <label htmlFor="crm-unit-title">
               <span>عنوان واحد</span>
-              <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+              <input
+                id="crm-unit-title"
+                required
+                disabled={saveUnit.isPending || Boolean(form.id && !canEditStructure)}
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+              />
             </label>
-            <label>
+            <label htmlFor="crm-organization-select-1">
               <span>واحد بالادستی</span>
-              <select
+              <SearchableSelect
+                id="crm-organization-select-1"
+                label="واحد بالادستی"
+                disabled={saveUnit.isPending || Boolean(form.id && !canEditStructure)}
                 value={form.parentId ?? ""}
-                onChange={(e) => setForm({ ...form, parentId: e.target.value || undefined })}
-              >
-                <option value="">ریشه سازمان</option>
-                {units
-                  .filter((unit) => unit.id !== form.id && unit.isActive)
-                  .map((unit) => (
-                    <option key={unit.id} value={unit.id}>
-                      {unit.title}
-                    </option>
-                  ))}
-              </select>
+                onChange={(parentId) => setForm({ ...form, parentId })}
+                options={[
+                  { id: "", title: "ریشه سازمان" },
+                  ...units
+                    .filter((unit) => unit.id !== form.id)
+                    .map((unit) => ({
+                      id: unit.id,
+                      title: unit.title,
+                      description: unit.isActive ? undefined : "واحد غیرفعال؛ وضعیت فرزندان مستقل است.",
+                    })),
+                ]}
+              />
             </label>
-            <label>
+            <label htmlFor="crm-organization-select-2">
               <span>مدیر فعلی</span>
-              <select
-                disabled={!access.can("OrganizationUnit.Manager.Assign")}
+              <SearchableSelect
+                id="crm-organization-select-2"
+                label="مدیر فعلی"
+                disabled={saveUnit.isPending || !access.can("OrganizationUnit.Manager.Assign")}
                 value={form.managerId ?? ""}
-                onChange={(e) => setForm({ ...form, managerId: e.target.value || undefined })}
-              >
-                <option value="">بدون مدیر</option>
-                {members.map((member) => (
-                  <option key={member.id} value={member.id}>
-                    {member.displayName}
-                  </option>
-                ))}
-              </select>
+                onChange={(managerId) => setForm({ ...form, managerId })}
+                options={[
+                  { id: "", title: "بدون مدیر" },
+                  ...members.map((member) => ({
+                    id: member.id,
+                    title: member.displayName,
+                    description: member.email,
+                    disabled: member.isActive === false,
+                  })),
+                ]}
+              />
             </label>
             <MultiSelector
               label="اعضای واحد"
               selected={form.memberIds}
               onChange={(memberIds) => setForm({ ...form, memberIds })}
-              disabled={!access.can("OrganizationUnit.Member.Manage")}
-              options={members
-                .filter((member) => member.isActive !== false)
-                .map((member) => ({
-                  id: member.id,
-                  title: member.displayName,
-                  description: member.email,
-                  initials: member.initials,
-                  avatarUrl: member.avatarUrl,
-                }))}
+              disabled={saveUnit.isPending || !access.can("OrganizationUnit.Member.Manage")}
+              options={members.map((member) => ({
+                id: member.id,
+                title: member.displayName,
+                description: member.email,
+                initials: member.initials,
+                avatarUrl: member.avatarUrl,
+                disabled: member.isActive === false,
+              }))}
             />
+            {saveUnit.error && <p role="alert">{errorMessage(saveUnit.error, "ذخیره واحد انجام نشد.")}</p>}
             <footer>
-              <Button variant="secondary" onClick={() => setForm(undefined)}>
+              <Button variant="secondary" disabled={saveUnit.isPending} onClick={() => setForm(undefined)}>
                 انصراف
               </Button>
-              <Button onClick={submit} disabled={!form.title.trim() || saveUnit.isPending}>
+              <Button type="submit" disabled={!form.title.trim() || saveUnit.isPending}>
                 ذخیره واحد
               </Button>
             </footer>
-          </section>
+          </form>
         </AccessModal>
       )}
     </div>

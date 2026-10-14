@@ -2,15 +2,16 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 from django.db import transaction
-from django.db.models import Max
 from rest_framework import status
 from rest_framework.response import Response
 
 from plane.app.permissions.crm import require_permission
 from plane.app.services.access_control import has_permission
 from plane.app.serializers import WorkspaceTaskSerializer
+from plane.app.services.crm_notifications import notify_workspace_task, task_snapshot
 from plane.app.views.base import BaseAPIView
 from plane.db.models import Workspace, WorkspaceTask
+from plane.utils.issue_search import search_workspace_tasks
 
 
 class WorkspaceTaskListEndpoint(BaseAPIView):
@@ -19,34 +20,38 @@ class WorkspaceTaskListEndpoint(BaseAPIView):
         tasks = WorkspaceTask.objects.filter(workspace__slug=slug).select_related("assignee")
         if not has_permission(request.user, slug, "Issue.ViewAll", request=request):
             tasks = tasks.filter(assignee=request.user)
+        tasks = search_workspace_tasks(request.query_params.get("search", ""), tasks)
         return Response(WorkspaceTaskSerializer(tasks, many=True).data, status=status.HTTP_200_OK)
 
     @require_permission("Issue.Create")
     def post(self, request, slug):
         with transaction.atomic():
-            workspace = Workspace.objects.select_for_update().get(slug=slug)
-            next_sequence = (
-                WorkspaceTask.all_objects.filter(workspace=workspace).aggregate(value=Max("sequence_id"))["value"] or 0
-            ) + 1
+            workspace = Workspace.objects.get(slug=slug)
             serializer = WorkspaceTaskSerializer(
                 data=request.data,
                 context={"workspace_id": workspace.id},
             )
             serializer.is_valid(raise_exception=True)
-            serializer.save(workspace=workspace, sequence_id=next_sequence)
+            serializer.save(workspace=workspace)
+            notify_workspace_task(serializer.instance, request.user.id)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 class WorkspaceTaskDetailEndpoint(BaseAPIView):
-    def _task(self, slug, task_id):
-        return WorkspaceTask.objects.select_related("assignee").get(
+    def _task(self, slug, task_id, lock=False):
+        queryset = WorkspaceTask.objects.select_related("assignee")
+        if lock:
+            queryset = queryset.select_for_update()
+        return queryset.get(
             workspace__slug=slug,
             id=task_id,
         )
 
     @require_permission("Issue.View")
+    @transaction.atomic
     def patch(self, request, slug, task_id):
-        task = self._task(slug, task_id)
+        task = self._task(slug, task_id, lock=True)
+        previous = task_snapshot(task)
         is_admin = has_permission(request.user, slug, "Issue.Edit", request=request)
         requested_fields = set(request.data.keys())
         if "status" in requested_fields and not has_permission(
@@ -79,6 +84,7 @@ class WorkspaceTaskDetailEndpoint(BaseAPIView):
         )
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        notify_workspace_task(serializer.instance, request.user.id, previous)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @require_permission("Issue.Delete")

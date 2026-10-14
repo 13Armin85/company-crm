@@ -19,6 +19,7 @@ vi.mock("../api", () => ({
     ],
     isLoading: false,
   }),
+  useOrganizationRole: () => ({ data: { id: "support", name: "پشتیبانی", permissionIds: ["permission", "legacy"] } }),
   useOrganizationPermissions: () => ({
     data: [
       {
@@ -33,6 +34,7 @@ vi.mock("../api", () => ({
   }),
   useSaveOrganizationRole: () => ({ isPending: false }),
   useDeactivateOrganizationRole: () => ({ isPending: false }),
+  useDeleteOrganizationObject: () => ({ isPending: false }),
   useOrganizationUnits: () => ({
     data: [{ id: "sales-unit", title: "واحد فروش", memberIds: [], isActive: true }],
     isLoading: false,
@@ -116,6 +118,7 @@ vi.mock("../components", () => ({
 }));
 
 import RolesPage from "../pages/roles";
+import RolePermissionsPage from "../pages/role-permissions";
 import OrganizationPage from "../pages/organization";
 import { UserAccessPanel } from "./user-access";
 import TeamPage, { UserActionItems } from "../pages/team";
@@ -142,9 +145,9 @@ describe("CRM access pages", () => {
   it("keeps the technical catalog read only and hides role mutation controls", () => {
     state.permissions = ["Role.View", "Permission.View"];
     const html = renderPage(<RolesPage />);
-    expect(html).toContain("کاربران");
+    expect(html).toContain("مشاهده مجوزها");
     expect(html).not.toContain("User.View");
-    expect(html).toContain("فقط خواندنی");
+    expect(html).not.toContain("کاتالوگ");
     expect(html).not.toContain("نقش جدید");
     expect(html).not.toContain("غیرفعال کردن");
     expect(html).not.toContain('type="number"');
@@ -160,6 +163,20 @@ describe("CRM access pages", () => {
     expect(button).not.toContain(">جانشینان<");
   });
 
+  it.each([
+    ["OrganizationUnit.Disable", "غیرفعال کردن"],
+    ["OrganizationUnit.Delete", "حذف واحد"],
+  ])("renders an icon with a Persian accessible name for %s", (permission, label) => {
+    state.permissions = ["OrganizationUnit.View", permission];
+    const html = renderPage(<OrganizationPage />);
+    const button = html.match(new RegExp(`<button[^>]*aria-label="${label}"[^>]*>[\\s\\S]*?<\\/button>`))?.[0];
+    expect(button).toBeDefined();
+    expect(button).toContain("<svg");
+    expect(button).toContain(`title="${label}"`);
+    expect(button).not.toContain(`>${label}<`);
+    expect(html).not.toContain(`aria-label="${label === "حذف واحد" ? "غیرفعال کردن" : "حذف واحد"}"`);
+  });
+
   it("shows multiple custom role chips and inactive membership status", () => {
     state.permissions = ["User.View"];
     const html = renderPage(<TeamPage />);
@@ -170,12 +187,37 @@ describe("CRM access pages", () => {
     expect(html).not.toContain("ساخت کاربر جدید");
   });
 
+  it("allows unit manager editing independently of structure editing", () => {
+    state.permissions = ["OrganizationUnit.View", "OrganizationUnit.Manager.Assign"];
+    const html = renderPage(<OrganizationPage />);
+    expect(html).toContain('title="ویرایش"');
+    expect(html).not.toContain("واحد جدید");
+    expect(html).not.toContain("غیرفعال کردن");
+    expect(html).not.toContain("حذف واحد");
+  });
+
+  it("keeps the separate role permission page read only with Role.View", () => {
+    state.permissions = ["Role.View"];
+    const html = renderPage(<RolePermissionsPage />);
+    expect(html).toContain("مشاهده کاربران");
+    expect(html).toContain("مجوز قدیمی یا غیرفعال");
+    expect(html).toMatch(/<fieldset[^>]*disabled=""/);
+    expect(html).not.toContain("ذخیره مجوزها");
+  });
+
+  it("allows role permission assignment without role identity editing or Role.View", () => {
+    state.permissions = ["Role.Permission.Assign"];
+    const html = renderPage(<RolePermissionsPage />);
+    expect(html).toContain("ذخیره مجوزها");
+    expect(html).not.toMatch(/<fieldset[^>]*disabled=""/);
+  });
+
   it("shows scoped role membership counts and independent role/catalog searches", () => {
     state.permissions = ["Role.View", "Permission.View"];
     const html = renderPage(<RolesPage />);
     expect(html).toContain("کاربران دارای نقش");
     expect(html).toContain("۳");
-    expect(html.match(/type="search"/g)).toHaveLength(2);
+    expect(html.match(/type="search"/g)).toHaveLength(1);
     expect(html).toContain("مشاهده مجوزها");
   });
 
@@ -183,15 +225,15 @@ describe("CRM access pages", () => {
     state.permissions = ["Access.UserException.View", "Access.EffectivePermission.View"];
     const readonly = renderPage(<UserAccessPanel userId="user" />);
     expect(readonly).toContain("تعارض اجازه و منع؛ منع اولویت دارد.");
-    expect(readonly).not.toContain("ویرایش استثنا");
+    expect(readonly).not.toContain("ویرایش دسترسی");
     state.permissions.push("Access.UserException.Manage");
-    expect(renderPage(<UserAccessPanel userId="user" />)).toContain("ویرایش استثنا");
+    expect(renderPage(<UserAccessPanel userId="user" />)).toContain("ویرایش دسترسی");
   });
 
   it("allows editing role grants independently of editing role identity", () => {
     state.permissions = ["Role.View", "Role.Permission.Assign", "Permission.View"];
     const html = renderPage(<RolesPage />);
-    expect(html).toContain("ویرایش مجوزها");
+    expect(html).toContain("مدیریت مجوزها");
     expect(html).not.toContain("غیرفعال کردن");
     expect(html).not.toContain("نقش جدید");
   });

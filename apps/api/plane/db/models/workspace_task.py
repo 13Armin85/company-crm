@@ -2,10 +2,11 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 from django.conf import settings
-from django.db import models
+from django.db import models, router, transaction
 from django.utils import timezone
 
 from .base import BaseModel
+from .identifier import SystemIdentifierCounter
 
 
 class WorkspaceTask(BaseModel):
@@ -57,5 +58,17 @@ class WorkspaceTask(BaseModel):
             self.completed_at = timezone.now()
         elif self.status != self.Status.DONE:
             self.completed_at = None
-        super().save(*args, **kwargs)
-
+        if self._state.adding and self.sequence_id is None:
+            using = kwargs.get("using") or router.db_for_write(type(self), instance=self)
+            with transaction.atomic(using=using):
+                counter = SystemIdentifierCounter.locked(f"workspace-task:{self.workspace_id}", using)
+                largest = (
+                    type(self)
+                    .all_objects.using(using)
+                    .filter(workspace_id=self.workspace_id)
+                    .aggregate(value=models.Max("sequence_id"))["value"]
+                    or 0
+                )
+                self.sequence_id = counter.advance(minimum=largest)
+                return super().save(*args, **kwargs)
+        return super().save(*args, **kwargs)

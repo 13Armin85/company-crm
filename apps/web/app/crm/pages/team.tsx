@@ -1,15 +1,23 @@
 import { useMemo, useState } from "react";
-import { PasswordInput } from "@plane/ui";
+import { IdentifierBadge, PasswordInput } from "@plane/ui";
 import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import { MoreHorizontal, UserPlus } from "lucide-react";
 import { Link, Navigate } from "react-router";
-import { useCreateWorkspaceUser, useMembers, useOrganizationRoles, useWorkspaceAccess, errorMessage } from "../api";
+import {
+  useCreateWorkspaceUser,
+  useMembers,
+  useOrganizationRoles,
+  useOrganizationUnits,
+  useWorkspaceAccess,
+  errorMessage,
+} from "../api";
 import { useAccessMutation } from "../access/api";
 import { AccessModal, MultiSelector, passwordError } from "../access/components";
 import { Avatar, Button, EmptyState, PageHeader, SearchBox, Skeleton } from "../components";
 import { useUIStore } from "../store";
 import type { Member } from "../types";
 import { toFa } from "../utils";
+import { matchesRecordSearch } from "../identifiers";
 
 export function UserActionItems({
   member,
@@ -52,6 +60,7 @@ export default function TeamPage() {
     username: "",
     password: "",
     role_ids: [] as string[],
+    unit_ids: [] as string[],
   });
   const [passwordUser, setPasswordUser] = useState<Member>();
   const [removeUser, setRemoveUser] = useState<Member>();
@@ -61,11 +70,14 @@ export default function TeamPage() {
   const { data: access, isLoading: accessLoading } = useWorkspaceAccess();
   const { data: members = [], isLoading, error } = useMembers();
   const { data: roles = [] } = useOrganizationRoles(undefined, access?.can("User.Role.Assign") ?? false);
+  const { data: units = [] } = useOrganizationUnits(undefined, access?.can("OrganizationUnit.Member.Manage") ?? false);
   const createUser = useCreateWorkspaceUser(slug);
   const mutation = useAccessMutation();
   const filtered = useMemo(
     () =>
-      members.filter((member) => `${member.displayName} ${member.email}`.toLowerCase().includes(query.toLowerCase())),
+      members.filter((member) =>
+        matchesRecordSearch(query, [member.id, member.membershipId, member.displayName, member.email])
+      ),
     [members, query]
   );
   const closePassword = () => {
@@ -94,7 +106,7 @@ export default function TeamPage() {
       <div className="table-card team-table">
         <div className="table-toolbar">
           <h2>فهرست اعضا</h2>
-          <SearchBox value={query} onChange={setQuery} placeholder="جستجوی نام یا ایمیل…" />
+          <SearchBox value={query} onChange={setQuery} placeholder="جستجوی شناسه، نام یا ایمیل…" />
         </div>
         {isLoading ? (
           <Skeleton rows={5} />
@@ -119,6 +131,7 @@ export default function TeamPage() {
                       <div>
                         <Link to={`/team/${member.id}`}>{member.displayName}</Link>
                         <small dir="ltr">{member.email}</small>
+                        <IdentifierBadge value={member.id} label="شناسه کاربر" />
                       </div>
                     </div>
                   </td>
@@ -168,21 +181,23 @@ export default function TeamPage() {
           busy={createUser.isPending}
           onClose={() => {
             setCreateOpen(false);
-            setForm({ email: "", username: "", display_name: "", password: "", role_ids: [] });
+            setForm({ email: "", username: "", display_name: "", password: "", role_ids: [], unit_ids: [] });
           }}
         >
           <form
             onSubmit={(event) => {
               event.preventDefault();
+              if (createUser.isPending) return;
               createUser.mutate(
                 {
                   ...form,
+                  unit_ids: access.can("OrganizationUnit.Member.Manage") ? form.unit_ids : undefined,
                   role_ids: access.can("User.Role.Assign") && form.role_ids.length ? form.role_ids : undefined,
                 },
                 {
                   onSuccess: () => {
                     setCreateOpen(false);
-                    setForm({ email: "", username: "", display_name: "", password: "", role_ids: [] });
+                    setForm({ email: "", username: "", display_name: "", password: "", role_ids: [], unit_ids: [] });
                   },
                 }
               );
@@ -192,6 +207,7 @@ export default function TeamPage() {
               <span>نام نمایشی</span>
               <input
                 required
+                disabled={createUser.isPending}
                 value={form.display_name}
                 onChange={(event) => setForm({ ...form, display_name: event.target.value })}
               />
@@ -200,6 +216,7 @@ export default function TeamPage() {
               <span>ایمیل</span>
               <input
                 required
+                disabled={createUser.isPending}
                 type="email"
                 dir="ltr"
                 value={form.email}
@@ -210,6 +227,7 @@ export default function TeamPage() {
               <span>نام کاربری</span>
               <input
                 required
+                disabled={createUser.isPending}
                 dir="ltr"
                 minLength={3}
                 maxLength={32}
@@ -222,6 +240,7 @@ export default function TeamPage() {
               <span>رمز عبور اولیه</span>
               <input
                 required
+                disabled={createUser.isPending}
                 type="password"
                 dir="ltr"
                 minLength={8}
@@ -232,13 +251,25 @@ export default function TeamPage() {
             </label>
             <MultiSelector
               label="نقش‌ها"
-              disabled={!access.can("User.Role.Assign")}
+              disabled={createUser.isPending || !access.can("User.Role.Assign")}
               selected={form.role_ids}
               onChange={(role_ids) => setForm({ ...form, role_ids })}
               options={roles
                 .filter((role) => role.isActive)
                 .map((role) => ({ id: role.id, title: role.name, description: role.description }))}
             />
+            {access.can("OrganizationUnit.Member.Manage") && (
+              <MultiSelector
+                label="واحدهای سازمانی"
+                disabled={createUser.isPending}
+                selected={form.unit_ids}
+                onChange={(unit_ids) => setForm({ ...form, unit_ids })}
+                options={units
+                  .filter((unit) => unit.isActive)
+                  .map((unit) => ({ id: unit.id, title: unit.title, description: unit.managerName }))}
+              />
+            )}
+            {createUser.error && <p role="alert">{errorMessage(createUser.error, "ساخت حساب انجام نشد.")}</p>}
             <footer>
               <Button type="submit" disabled={createUser.isPending}>
                 ساخت حساب
@@ -312,7 +343,10 @@ export default function TeamPage() {
       )}
       {removeUser && (
         <AccessModal title="حذف کاربر از شرکت" busy={mutation.isPending} onClose={() => setRemoveUser(undefined)}>
-          <p>عضویت {removeUser.displayName} در این شرکت غیرفعال می‌شود. سوابق کارها حفظ خواهند شد.</p>
+          <p>
+            عضویت {removeUser.displayName} از این شرکت حذف می‌شود و دسترسی‌هایش در همین شرکت لغو می‌شوند؛ حساب جهانی و
+            عضویت شرکت‌های دیگر باقی می‌مانند. سوابق کارها حفظ خواهند شد.
+          </p>
           <footer>
             <Button variant="secondary" disabled={mutation.isPending} onClick={() => setRemoveUser(undefined)}>
               انصراف

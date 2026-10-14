@@ -49,6 +49,7 @@ class ProjectViewSet(BaseViewSet):
     serializer_class = ProjectListSerializer
     model = Project
     webhook_event = "project"
+    search_fields = ["name", "identifier", "id"]
     use_read_replica = True
 
     def get_queryset(self):
@@ -128,7 +129,7 @@ class ProjectViewSet(BaseViewSet):
             )
 
         projects = ProjectListSerializer(projects, many=True, fields=fields if fields else None).data
-        return Response(projects, status=status.HTTP_200_OK)
+        return Response(self.filter_queryset(projects), status=status.HTTP_200_OK)
 
     @require_permission("Project.View")
     def list(self, request, slug):

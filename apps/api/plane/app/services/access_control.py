@@ -101,17 +101,22 @@ def get_effective_permissions(user, workspace, *, now=None, include_delegation=T
         or not user.is_active
         or not WorkspaceMember.objects.filter(workspace_id=workspace_id, member=user, is_active=True).exists()
     ):
-        return {"permissions": [], "explanations": []}
+        return {"permissions": [], "explanations": [], "role_grants": []}
     catalog = list(
         OrganizationPermission.objects.filter(
             workspace_id=workspace_id, is_active=True, code__in=PERMISSION_REGISTRY
-        ).values("id", "code", "name", "category")
+        ).values("id", "code", "name", "category", "description")
     )
     sources = {}
     for row in role_permissions(user.id, workspace_id):
         entry = sources.setdefault(row["permission__code"], {"source": "role", "role_ids": []})
         entry["role_ids"].append(str(row["role_id"]))
         entry.setdefault("role_names", []).append(row["role__name"])
+    # Snapshot permanent provenance before delegation and direct exceptions
+    # replace the effective source. DENY must not erase the role grant.
+    role_grants = [
+        {**permission, **sources[permission["code"]]} for permission in catalog if permission["code"] in sources
+    ]
     if include_delegation:
         contexts = [item for item in delegation_context(workspace_id, now).values() if item["user_id"] == user.id]
         manager_ids = {item["manager_id"] for item in contexts}
@@ -178,7 +183,11 @@ def get_effective_permissions(user, workspace, *, now=None, include_delegation=T
         }
         for permission in catalog
     ]
-    return {"permissions": sorted(row["code"] for row in explanations if row["granted"]), "explanations": explanations}
+    return {
+        "permissions": sorted(row["code"] for row in explanations if row["granted"]),
+        "explanations": explanations,
+        "role_grants": role_grants,
+    }
 
 
 def has_permission(user, workspace, permission_code, *, request=None):

@@ -28,6 +28,7 @@ export default [
     route("team/:userId", "./crm/pages/user-profile.tsx"),
     route("organization", "./crm/pages/organization.tsx"),
     route("roles", "./crm/pages/roles.tsx"),
+    route("roles/:roleId/permissions", "./crm/pages/role-permissions.tsx"),
     route("routing", "./crm/pages/routing.tsx"),
     route("absences", "./crm/pages/absences.tsx"),
     route("settings", "./crm/pages/settings.tsx"),
