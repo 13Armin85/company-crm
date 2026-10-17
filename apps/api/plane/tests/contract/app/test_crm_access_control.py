@@ -393,12 +393,17 @@ def test_absence_hierarchy_overlap_and_delegate_validation(session_client, works
 
 
 def test_api_key_cannot_bypass_workspace_permission_deny(api_key_client, workspace, create_user):
-    exception(workspace, create_user, "Project.Create", "DENY")
+    from plane.db.models import APIToken
+    actor = member(workspace, "api-deny-member")
+    grant_role(workspace, actor, ["Project.View", "Project.Create"])
+    token = APIToken.objects.create(user=actor, label="Member scope", token="member-deny-token")
+    api_key_client.credentials(HTTP_X_API_KEY=token.token)
+    exception(workspace, actor, "Project.Create", "DENY")
     response = api_key_client.post(
         f"/api/v1/workspaces/{workspace.slug}/projects/", {"name": "Denied project", "identifier": "DEN"}, format="json"
     )
     assert response.status_code == 403
-    exception(workspace, create_user, "Project.View", "DENY")
+    exception(workspace, actor, "Project.View", "DENY")
     assert api_key_client.get(f"/api/v1/workspaces/{workspace.slug}/projects/").status_code == 403
 
 
@@ -423,8 +428,7 @@ def test_invitation_cannot_bypass_user_creation_or_role_assignment(session_clien
     sender.assert_called_once()
     invitation = WorkspaceMemberInvite.objects.get(workspace=workspace, email="invite-member@example.com")
     assert session_client.patch(f"{path}{invitation.id}/", {"role": 20}, format="json").status_code == 403
-    session_client.force_authenticate(user=create_user)
-    exception(workspace, create_user, "User.Create", "DENY")
+    exception(workspace, actor, "User.Create", "DENY")
     assert (
         session_client.post(path, {"emails": [{"email": "blocked@example.com", "role": 15}]}, format="json").status_code
         == 403
@@ -436,6 +440,8 @@ def test_permission_cache_is_request_scoped_and_new_requests_observe_revocation(
 ):
     from types import SimpleNamespace
 
+    create_user = member(workspace, "cache-member")
+    grant_role(workspace, create_user, ["User.View", "Role.View"])
     request = SimpleNamespace()
     assert has_permission(create_user, workspace.slug, "User.View", request=request)
     with django_assert_num_queries(0):
@@ -446,7 +452,7 @@ def test_permission_cache_is_request_scoped_and_new_requests_observe_revocation(
 
 
 def test_api_issue_field_permissions_and_assignee_scope(api_key_client, workspace, create_user, mocker):
-    from plane.db.models import Issue, IssueAssignee, Project, ProjectMember, State
+    from plane.db.models import APIToken, Issue, IssueAssignee, Project, ProjectMember, State
     from plane.api.views.issue import IssueDetailAPIEndpoint
     from rest_framework.test import APIRequestFactory, force_authenticate
 
@@ -459,6 +465,10 @@ def test_api_issue_field_permissions_and_assignee_scope(api_key_client, workspac
 
     mocker.patch("plane.api.views.issue.issue_activity.delay")
     mocker.patch("plane.api.views.issue.model_activity.delay")
+    create_user = member(workspace, "api-field-member")
+    grant_role(workspace, create_user, ["Issue.View", "Issue.Create", "Issue.Edit", "Issue.Status.Edit", "Issue.Assign"])
+    token = APIToken.objects.create(user=create_user, label="Field scope", token="member-field-token")
+    api_key_client.credentials(HTTP_X_API_KEY=token.token)
     project = Project.objects.create(workspace=workspace, name="Scoped API", identifier="SAP")
     ProjectMember.objects.create(workspace=workspace, project=project, member=create_user, role=20)
     state = State.objects.create(workspace=workspace, project=project, name="Open", group="unstarted")

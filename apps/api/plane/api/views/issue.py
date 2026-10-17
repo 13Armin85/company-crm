@@ -10,7 +10,7 @@ import re
 # Django imports
 from django.core.serializers.json import DjangoJSONEncoder
 from django.http import HttpResponseRedirect
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db.models import (
     Case,
     CharField,
@@ -41,6 +41,9 @@ from drf_spectacular.utils import (
 )
 
 # Module imports
+from plane.app.services.task_policy import other_assignees_only, validate_creation_assignees
+from plane.app.services.project_assignment import is_project_assignment_manager, validate_project_transfer
+from plane.app.services.task_visibility import visible_issues
 from plane.app.permissions.crm import require_permission, require_any_permission, ProjectScopePermission
 from plane.app.services.access_control import has_permission
 from plane.app.services.access_mutations import require_field_permission
@@ -197,7 +200,7 @@ class WorkspaceIssueAPIEndpoint(BaseAPIView):
         return self.kwargs.get("project_identifier", None)
 
     def get_queryset(self):
-        return (
+        queryset = (
             Issue.issue_objects.annotate(
                 sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
                 .order_by()
@@ -214,6 +217,7 @@ class WorkspaceIssueAPIEndpoint(BaseAPIView):
             .prefetch_related("labels")
             .order_by(self.kwargs.get("order_by", "-created_at"))
         ).distinct()
+        return visible_issues(queryset, self.request.user, self.kwargs["slug"], request=self.request)
 
     @extend_schema(
         operation_id="get_workspace_work_item",
@@ -242,12 +246,7 @@ class WorkspaceIssueAPIEndpoint(BaseAPIView):
         This endpoint provides workspace-level access to work items.
         """
         if issue_identifier and project_identifier:
-            issue = Issue.issue_objects.annotate(
-                sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
-                .order_by()
-                .annotate(count=Func(F("id"), function="Count"))
-                .values("count")
-            ).get(
+            issue = self.get_queryset().get(
                 workspace__slug=slug,
                 project__identifier=project_identifier,
                 sequence_id=issue_identifier,
@@ -270,7 +269,7 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
     use_read_replica = True
 
     def get_queryset(self):
-        return (
+        queryset = (
             Issue.issue_objects.annotate(
                 sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
                 .order_by()
@@ -287,6 +286,7 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
             .prefetch_related("labels")
             .order_by(self.kwargs.get("order_by", "-created_at"))
         ).distinct()
+        return visible_issues(queryset, self.request.user, self.kwargs["slug"], request=self.request)
 
     @work_item_docs(
         operation_id="list_work_items",
@@ -386,7 +386,7 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
             )
         )
 
-        total_issue_queryset = Issue.issue_objects.filter(project_id=project_id, workspace__slug=slug)
+        total_issue_queryset = visible_issues(Issue.issue_objects.filter(project_id=project_id, workspace__slug=slug), request.user, slug, request=request)
 
         # Priority Ordering
         if order_by_param == "priority" or order_by_param == "-priority":
@@ -453,6 +453,8 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
         },
     )
     @require_permission("Issue.Create")
+    @other_assignees_only(creating=True, assignee_field="assignees")
+    @transaction.atomic
     def post(self, request, slug, project_id):
         """Create work item
 
@@ -467,6 +469,7 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
                 "project_id": project_id,
                 "workspace_id": project.workspace_id,
                 "default_assignee_id": project.default_assignee_id,
+                "actor_id": request.user.id,
             },
         )
 
@@ -539,7 +542,7 @@ class IssueDetailAPIEndpoint(BaseAPIView):
     use_read_replica = True
 
     def get_queryset(self):
-        return (
+        queryset = (
             Issue.issue_objects.annotate(
                 sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
                 .order_by()
@@ -556,6 +559,7 @@ class IssueDetailAPIEndpoint(BaseAPIView):
             .prefetch_related("labels")
             .order_by(self.kwargs.get("order_by", "-created_at"))
         ).distinct()
+        return visible_issues(queryset, self.request.user, self.kwargs["slug"], request=self.request)
 
     @work_item_docs(
         operation_id="retrieve_work_item",
@@ -587,12 +591,7 @@ class IssueDetailAPIEndpoint(BaseAPIView):
         Supports filtering, ordering, and field selection through query parameters.
         """
 
-        issue = Issue.issue_objects.annotate(
-            sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
-            .order_by()
-            .annotate(count=Func(F("id"), function="Count"))
-            .values("count")
-        ).get(workspace__slug=slug, project_id=project_id, pk=pk)
+        issue = self.get_queryset().get(workspace__slug=slug, project_id=project_id, pk=pk)
         return Response(
             IssueSerializer(issue, fields=self.fields, expand=self.expand).data,
             status=status.HTTP_200_OK,
@@ -622,6 +621,8 @@ class IssueDetailAPIEndpoint(BaseAPIView):
         },
     )
     @require_permission("Issue.Edit", "Issue.Create")
+    @other_assignees_only()
+    @transaction.atomic
     def put(self, request, slug, project_id):
         """Update or create work item
 
@@ -699,6 +700,9 @@ class IssueDetailAPIEndpoint(BaseAPIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             except Issue.DoesNotExist:
+                validate_creation_assignees(
+                    request.user, slug, request.data, project_id=project_id, assignee_field="assignees",
+                )
                 # If the issue does not exist, a new record needs to be created
                 # for the requested data.
                 # Serialize the data with the context of the project and
@@ -709,6 +713,7 @@ class IssueDetailAPIEndpoint(BaseAPIView):
                         "project_id": project_id,
                         "workspace_id": project.workspace_id,
                         "default_assignee_id": project.default_assignee_id,
+                        "actor_id": request.user.id,
                     },
                 )
 
@@ -783,12 +788,15 @@ class IssueDetailAPIEndpoint(BaseAPIView):
     )
     @require_permission("Issue.View")
     @require_any_permission("Issue.Edit", "Issue.Status.Edit", "Issue.Assign")
+    @other_assignees_only()
+    @transaction.atomic
     def patch(self, request, slug, project_id, pk):
         for field in ("state", "state_id"):
             require_field_permission(request, slug, field, "Issue.Status.Edit")
         for field in ("assignees", "assignee_ids"):
             require_field_permission(request, slug, field, "Issue.Assign")
-        if not has_permission(request.user, slug, "Issue.Edit", request=request):
+        manages_assignments = set(request.data) == {"assignees"} and is_project_assignment_manager(request.user, slug, project_id)
+        if not has_permission(request.user, slug, "Issue.Edit", request=request) and not manages_assignments:
             if (
                 set(request.data) - {"state", "state_id", "assignees", "assignee_ids"}
                 or not IssueAssignee.objects.filter(
@@ -796,6 +804,8 @@ class IssueDetailAPIEndpoint(BaseAPIView):
                 ).exists()
             ):
                 return Response({"error": "Editing permission or an assigned issue is required."}, status=403)
+        if "assignees" in request.data:
+            validate_project_transfer(slug, project_id, request.data["assignees"])
         """Update work item
 
         Partially update an existing work item with the provided fields.
@@ -808,7 +818,7 @@ class IssueDetailAPIEndpoint(BaseAPIView):
         serializer = IssueSerializer(
             issue,
             data=request.data,
-            context={"project_id": project_id, "workspace_id": project.workspace_id},
+            context={"project_id": project_id, "workspace_id": project.workspace_id, "actor_id": request.user.id},
             partial=True,
         )
         if serializer.is_valid():

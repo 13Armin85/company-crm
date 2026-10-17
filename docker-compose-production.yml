@@ -9,7 +9,7 @@ x-runtime: &runtime
       max-file: "3"
 
 x-frontend-args: &frontend-args
-  VITE_API_BASE_URL: ${PUBLIC_URL:?Run deployments/debian/init-env.sh first}
+  VITE_API_BASE_URL: ${PUBLIC_URL:?Set PUBLIC_URL in .env.production first}
   VITE_WEB_BASE_URL: ${PUBLIC_URL}
   VITE_ADMIN_BASE_URL: ${PUBLIC_URL}
   VITE_ADMIN_BASE_PATH: /god-mode
@@ -114,7 +114,7 @@ services:
     image: company-crm-minio:production
     build:
       context: .
-      dockerfile: deployments/dev/Dockerfile.minio
+      dockerfile: docker/dev/Dockerfile.minio
     environment:
       MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID}
       MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY}

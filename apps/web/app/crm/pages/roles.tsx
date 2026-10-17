@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { Link, Navigate, useSearchParams } from "react-router";
-import { IdentifierBadge } from "@plane/ui";
 import {
   useOrganizationRoles,
   useSaveOrganizationRole,
@@ -47,8 +46,8 @@ export default function RolesPage() {
           )
         }
       />
-      <SearchBox value={query} onChange={setQuery} placeholder="جستجوی شناسه، نام یا توضیح نقش…" />
-      {error && <p role="alert">دریافت نقش‌ها انجام نشد.</p>}
+      <SearchBox value={query} onChange={setQuery} placeholder="جستجوی نام یا توضیح نقش…" />
+      {error && <p role="alert">عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید.</p>}
       {save.error && !editing && <p role="alert">{errorMessage(save.error, "تغییر وضعیت انجام نشد.")}</p>}
       {isLoading ? (
         <Skeleton rows={5} />
@@ -72,7 +71,6 @@ export default function RolesPage() {
                   <tr key={role.id}>
                     <td>
                       {role.name}
-                      <IdentifierBadge value={role.id} label="شناسه نقش" />
                       {role.systemKey && <small>سیستمی؛ قابل حذف نیست</small>}
                     </td>
                     <td>{role.description}</td>

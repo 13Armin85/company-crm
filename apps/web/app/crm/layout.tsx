@@ -96,7 +96,7 @@ function AppLayout() {
   const unreadCount = notifications.filter((item) => !item.read).length;
   const { data: currentUser } = useCurrentUser();
   const { data: access, error: accessError } = useWorkspaceAccess();
-  const canCreate = access?.can("Issue.Create") === true;
+  const canCreate = access?.can("Issue.Create") === true && location.pathname.replace(/\/+$/, "") !== "/my-work";
   const [gPressed, setGPressed] = useState(false);
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -359,7 +359,7 @@ function AppLayout() {
         </header>
         <main className="page-content">
           {workspaceError || accessError ? (
-            <p role="alert">دریافت فضای کاری یا دسترسی انجام نشد. صفحه را دوباره بارگذاری کنید.</p>
+            <p role="alert">عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید.</p>
           ) : !workspaces.length ? (
             <p role="status">عضویت فعالی در یک شرکت ندارید.</p>
           ) : !access ? (
@@ -526,7 +526,7 @@ export function AuthenticationBoundary() {
       {pending &&
         (error ? (
           <main className="access-loading">
-            <p role="alert">تأیید نشست انجام نشد؛ اتصال را بررسی و دوباره تلاش کنید.</p>
+            <p role="alert">عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید.</p>
             <Button onClick={() => setRetryVerification((value) => value + 1)}>تلاش دوباره</Button>
           </main>
         ) : (

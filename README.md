@@ -2,7 +2,7 @@
 
 این پروژه نسخهٔ متن‌باز Plane برای مدیریت پروژه، کارها، چرخه‌های کاری و همکاری تیمی است. این راهنما اجرای کامل محیط توسعه روی لینوکس، macOS و ویندوز را توضیح می‌دهد؛ رابط کاربری، پنل مدیریت، API، سرویس‌های پس‌زمینه و پنل وب دیتابیس همگی داخل Docker اجرا می‌شوند.
 
-برای **انتشار روی Ubuntu از طریق SSH**، [راهنمای Ubuntu](./deployments/ubuntu/README.fa.md) و برای جزئیات نصب، دامنه و backup، [راهنمای کامل استقرار سرور](./deployments/debian/README.fa.md) را بخوانید. این مسیر از `docker-compose-production.yml` و `.env.production` جداگانه استفاده می‌کند و همه سرویس‌های برنامه را از سورس همین مخزن می‌سازد.
+اطلاعات اختصاصی سرور، گزارش‌های انتشار، فایل‌های محیطی و نسخه‌های پشتیبان در Git نگهداری نمی‌شوند. فایل‌های عمومی لازم برای ساخت Docker در مسیر `docker/dev` قرار دارند؛ تنظیمات خصوصی هر محیط باید روی همان سیستم نگهداری شوند.
 
 ## شروع سریع
 
@@ -278,7 +278,7 @@ docker compose --env-file .env.dev -f docker-compose-dev.yml -f docker-compose-w
 - [اسکریپت اجرای ویندوز](./setup-dev.ps1)
 - [اسکریپت اجرای لینوکس و macOS](./setup-dev.sh)
 - [نمونهٔ متغیرهای محیطی](./.env.dev.example)
-- [Dockerfile فرانت‌اند توسعه](./deployments/dev/Dockerfile.frontend)
+- [Dockerfile فرانت‌اند توسعه](./docker/dev/Dockerfile.frontend)
 - [ساخت حساب‌های توسعه](./apps/api/plane/db/management/commands/bootstrap_dev.py)
 - [راهنمای مشارکت](./CONTRIBUTING.md)
 

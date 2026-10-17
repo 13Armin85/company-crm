@@ -81,6 +81,10 @@ class TicketRoutingService:
             unit = unit.parent
 
         if assignee:
+            if actor_id:
+                from plane.db.models import User
+                from .task_policy import validate_other_assignees
+                validate_other_assignees(User.objects.get(pk=actor_id), issue.workspace_id, [assignee.id])
             _, created = IssueAssignee.objects.get_or_create(
                 issue=issue,
                 assignee=assignee,

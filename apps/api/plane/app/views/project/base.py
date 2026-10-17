@@ -17,7 +17,9 @@ from rest_framework.response import Response
 
 # Module imports
 from plane.app.permissions import ROLE, ProjectMemberPermission, allow_permission
-from plane.app.permissions.crm import require_permission
+from plane.app.permissions.crm import require_permission, ProjectScopePermission
+from plane.app.services.project_visibility import visible_projects
+from plane.app.services.task_policy import is_workspace_administrator
 from plane.app.services.access_control import has_permission
 from plane.app.serializers import (
     DeployBoardSerializer,
@@ -46,6 +48,7 @@ from plane.utils.order_queryset import PROJECT_ORDER_BY_ALLOWLIST, sanitize_orde
 
 
 class ProjectViewSet(BaseViewSet):
+    permission_classes = [ProjectScopePermission]
     serializer_class = ProjectListSerializer
     model = Project
     webhook_event = "project"
@@ -58,7 +61,7 @@ class ProjectViewSet(BaseViewSet):
             project_id=OuterRef("pk"),
             workspace__slug=self.kwargs.get("slug"),
         ).values("sort_order")
-        return self.filter_queryset(
+        queryset = self.filter_queryset(
             super()
             .get_queryset()
             .filter(workspace__slug=self.kwargs.get("slug"))
@@ -99,23 +102,12 @@ class ProjectViewSet(BaseViewSet):
             )
             .distinct()
         )
+        return visible_projects(queryset, self.request.user, self.kwargs["slug"])
 
     @require_permission("Project.View")
     def list_detail(self, request, slug):
         fields = [field for field in request.GET.get("fields", "").split(",") if field]
         projects = self.get_queryset().order_by("sort_order", "name")
-        if not has_permission(request.user, slug, "Project.ViewAll", request=request):
-            projects = projects.filter(
-                project_projectmember__member=self.request.user,
-                project_projectmember__is_active=True,
-            )
-
-        if not has_permission(request.user, slug, "Project.ViewAll", request=request):
-            projects = projects.filter(
-                project_projectmember__member=self.request.user,
-                project_projectmember__is_active=True,
-            )
-
         if request.GET.get("per_page", False) and request.GET.get("cursor", False):
             return self.paginate(
                 order_by=sanitize_order_by(
@@ -184,19 +176,7 @@ class ProjectViewSet(BaseViewSet):
             "created_by",
             "updated_by",
         )
-
-        if not has_permission(request.user, slug, "Project.ViewAll", request=request):
-            projects = projects.filter(
-                project_projectmember__member=self.request.user,
-                project_projectmember__is_active=True,
-            )
-
-        if not has_permission(request.user, slug, "Project.ViewAll", request=request):
-            projects = projects.filter(
-                project_projectmember__member=self.request.user,
-                project_projectmember__is_active=True,
-            )
-        return Response(projects, status=status.HTTP_200_OK)
+        return Response(visible_projects(projects, request.user, slug), status=status.HTTP_200_OK)
 
     @require_permission("Project.View")
     def retrieve(self, request, slug, pk):
@@ -207,7 +187,7 @@ class ProjectViewSet(BaseViewSet):
 
         member_ids = [str(project_member.member_id) for project_member in project.members_list]
 
-        is_workspace_admin = has_permission(request.user, slug, "Project.ViewAll", request=request)
+        is_workspace_admin = is_workspace_administrator(request.user, slug)
         if not is_workspace_admin and str(request.user.id) not in member_ids:
             if project.network == ProjectNetwork.SECRET.value:
                 return Response(
@@ -400,7 +380,10 @@ class ProjectIdentifierEndpoint(BaseAPIView):
         if name == "":
             return Response({"error": "نام الزامی است"}, status=status.HTTP_400_BAD_REQUEST)
 
-        exists = ProjectIdentifier.objects.filter(name=name, workspace__slug=slug).values("id", "name", "project")
+        exists = ProjectIdentifier.objects.filter(
+            name=name, workspace__slug=slug,
+            project__in=visible_projects(Project.objects.filter(workspace__slug=slug), request.user, slug),
+        ).values("id", "name", "project")
 
         return Response({"exists": len(exists), "identifiers": exists}, status=status.HTTP_200_OK)
 

@@ -3,6 +3,7 @@
 # See the LICENSE file for details.
 
 from django.urls import path
+from plane.app.views.workspace.task_history import TaskHistoryEndpoint
 from plane.app.views.workspace.access import (
     AccessMeEndpoint,
     EffectivePermissionsEndpoint,
@@ -146,6 +147,11 @@ urlpatterns = [
         "workspaces/<str:slug>/tasks/",
         WorkspaceTaskListEndpoint.as_view(),
         name="workspace-tasks",
+    ),
+    path(
+        "workspaces/<str:slug>/tasks/history/",
+        TaskHistoryEndpoint.as_view(),
+        name="personal-task-history",
     ),
     path(
         "workspaces/<str:slug>/tasks/<uuid:task_id>/",

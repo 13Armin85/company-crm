@@ -206,7 +206,7 @@ export default function RoutingPage() {
               />
               <span>قانون فعال باشد</span>
             </label>
-            {saveRule.isError && <p role="alert">ذخیره قانون انجام نشد. اطلاعات را بررسی کنید و دوباره تلاش کنید.</p>}
+            {saveRule.isError && <p role="alert">عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید.</p>}
             <footer>
               <Button variant="secondary" disabled={saveRule.isPending} onClick={() => setEditing(undefined)}>
                 انصراف

@@ -104,7 +104,7 @@ export function MemberDirectory({
           </p>
         ) : hasError ? (
           <div className="crm-member-directory-empty" role="alert">
-            <p>دریافت فهرست اعضا انجام نشد.</p>
+            <p>فهرست اعضای تیم دریافت نشد.</p>
             {onRetry && (
               <button type="button" onClick={onRetry}>
                 تلاش دوباره

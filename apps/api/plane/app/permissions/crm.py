@@ -2,9 +2,10 @@ from functools import wraps
 
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.exceptions import PermissionDenied
-from rest_framework.permissions import BasePermission, SAFE_METHODS
+from rest_framework.permissions import BasePermission
 
 from plane.app.services.access_control import has_permission
+from plane.app.services.task_policy import is_workspace_administrator
 from plane.authentication.session import BaseSessionAuthentication
 from plane.db.models import WorkspaceMember, ProjectMember, Project
 
@@ -40,19 +41,14 @@ class ProjectScopePermission(WorkspaceScopePermission):
                 return False
         if not project_id:
             return True
-        if getattr(view, "allow_workspace_project_access", False) and has_permission(
-            request.user, slug, "Project.ViewAll", request=request
-        ):
+        if is_workspace_administrator(request.user, slug):
             return Project.objects.filter(workspace__slug=slug, id=project_id).exists()
         if ProjectMember.objects.filter(
-            workspace__slug=slug, project_id=project_id, member=request.user, is_active=True
+            workspace__slug=slug, project_id=project_id, member=request.user, is_active=True,
+            project__deleted_at__isnull=True,
         ).exists():
             return True
-        return (
-            getattr(view, "allow_public_project_access", False)
-            and request.method in SAFE_METHODS
-            and Project.objects.filter(workspace__slug=slug, id=project_id, network=2).exists()
-        )
+        return False
 
 
 def require_permission(*codes):

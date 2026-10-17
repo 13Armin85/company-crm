@@ -62,9 +62,9 @@ export function AccessModal({
 
 export const passwordError = (password: string, confirmation: string) =>
   !password || !confirmation
-    ? "هر دو رمز عبور الزامی است."
+    ? "وارد کردن رمز عبور و تکرار آن الزامی است."
     : password !== confirmation
-      ? "رمز عبور و تأیید آن یکسان نیستند."
+      ? "رمز عبور و تکرار آن یکسان نیستند."
       : password.length < 8
         ? "رمز عبور باید حداقل ۸ نویسه باشد."
         : "";

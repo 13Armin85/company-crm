@@ -69,7 +69,7 @@ class IssueSerializer(BaseSerializer):
 
     class Meta:
         model = Issue
-        read_only_fields = ["id", "sequence_id", "workspace", "project", "updated_by", "updated_at", "completed_at"]
+        read_only_fields = ["id", "sequence_id", "workspace", "project", "created_by", "updated_by", "updated_at", "completed_at"]
         exclude = ["description_json", "description_stripped"]
 
     def validate(self, data):
@@ -177,7 +177,8 @@ class IssueSerializer(BaseSerializer):
             issue_type = IssueType.objects.filter(project_issue_types__project_id=project_id, is_default=True).first()
             issue_type = issue_type
 
-        issue = Issue.objects.create(**validated_data, project_id=project_id, type=issue_type)
+        issue = Issue(**validated_data, project_id=project_id, type=issue_type)
+        issue.save(created_by_id=self.context.get("actor_id"))
 
         # Issue Audit Users
         created_by_id = issue.created_by_id
@@ -299,7 +300,11 @@ class IssueSerializer(BaseSerializer):
 
         # Time updation occues even when other related models are updated
         instance.updated_at = timezone.now()
-        return super().update(instance, validated_data)
+        for field, value in validated_data.items():
+            setattr(instance, field, value)
+        instance.updated_by_id = self.context.get("actor_id", updated_by_id)
+        instance.save(disable_auto_set_user=True)
+        return instance
 
     def to_representation(self, instance):
         data = super().to_representation(instance)

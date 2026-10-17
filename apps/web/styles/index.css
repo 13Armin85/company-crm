@@ -4903,3 +4903,20 @@ canvas {
     animation-iteration-count: 1 !important;
   }
 }
+
+:root[data-density="compact"] .kanban-card {
+  padding: 8px;
+}
+:root[data-density="compact"] .kanban-column > div {
+  gap: 5px;
+}
+:root[data-density="compact"] .issue-row {
+  padding-block: 4px;
+  min-height: 40px;
+}
+:root[data-density="compact"] .project-grid {
+  gap: 10px;
+}
+:root[data-density="compact"] .settings-section {
+  padding: 18px;
+}

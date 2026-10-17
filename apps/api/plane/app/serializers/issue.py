@@ -208,7 +208,8 @@ class IssueCreateSerializer(BaseSerializer):
         default_assignee_id = self.context["default_assignee_id"]
 
         # Create Issue
-        issue = Issue.objects.create(**validated_data, project_id=project_id)
+        issue = Issue(**validated_data, project_id=project_id)
+        issue.save(created_by_id=self.context.get("actor_id"))
 
         # Issue Audit Users
         created_by_id = issue.created_by_id
@@ -771,6 +772,7 @@ class IssueIntakeSerializer(DynamicBaseSerializer):
 
 
 class IssueSerializer(DynamicBaseSerializer):
+    created_by_detail = UserLiteSerializer(read_only=True, source="created_by")
     # ids
     cycle_id = serializers.PrimaryKeyRelatedField(read_only=True)
     module_ids = serializers.ListField(child=serializers.UUIDField(), required=False)
@@ -807,6 +809,7 @@ class IssueSerializer(DynamicBaseSerializer):
             "created_at",
             "updated_at",
             "created_by",
+            "created_by_detail",
             "updated_by",
             "attachment_count",
             "link_count",

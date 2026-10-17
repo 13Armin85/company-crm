@@ -6,7 +6,7 @@ export const pagePermissions: Record<string, string> = {
   "/organization": "OrganizationUnit.View",
   "/roles": "Role.View",
   "/absences": "Absence.View",
-  "/issues": "Issue.ViewAll",
+  "/issues": "Issue.View",
   "/routing": "Routing.Queue.View",
   "/projects": "Project.View",
 };

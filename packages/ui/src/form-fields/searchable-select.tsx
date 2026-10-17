@@ -21,6 +21,8 @@ export function SearchableSelect({
   error,
   id,
   wrapOptions = true,
+  optionClassName = "",
+  selectedLabel,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -32,13 +34,18 @@ export function SearchableSelect({
   error?: string;
   id?: string;
   wrapOptions?: boolean;
+  optionClassName?: string;
+  selectedLabel?: string;
 }) {
   const [query, setQuery] = useState("");
   const filtered = options.filter((option) =>
     normalizePersianSearch(`${option.title} ${option.description ?? ""}`).includes(normalizePersianSearch(query))
   );
   return (
-    <div className="searchable-select">
+    <div
+      className="searchable-select"
+      data-transfer-field={optionClassName === "member-transfer-options" ? "" : undefined}
+    >
       <Combobox
         value={value}
         onChange={(next: string | null) => {
@@ -49,11 +56,14 @@ export function SearchableSelect({
       >
         <div className="selector-input-row">
           <ComboboxInput
+            defaultValue={selectedLabel}
             id={id}
             aria-label={label}
             aria-invalid={Boolean(error)}
             placeholder={loading ? "در حال دریافت…" : placeholder}
-            displayValue={(current: string) => options.find((option) => option.id === current)?.title ?? ""}
+            displayValue={(current: string) =>
+              options.find((option) => option.id === current)?.title ?? selectedLabel ?? ""
+            }
             onChange={(event) => setQuery(event.target.value)}
           />
           <ComboboxButton type="button" aria-label={`باز کردن ${label}`}>
@@ -61,7 +71,8 @@ export function SearchableSelect({
           </ComboboxButton>
         </div>
         <ComboboxOptions
-          className={`selector-panel selector-single-options${wrapOptions ? "" : " selector-single-options-nowrap"}`}
+          data-transfer-options={optionClassName === "member-transfer-options" ? "" : undefined}
+          className={`selector-panel selector-single-options${wrapOptions ? "" : " selector-single-options-nowrap"} ${optionClassName}`}
           anchor="bottom start"
           modal={false}
           dir="rtl"

@@ -83,7 +83,7 @@ export function RoleQueue({
 
       {isError && (
         <div className="role-queue-error" role="alert">
-          <p>دریافت صف کارها انجام نشد. {entries.length ? "اطلاعات قبلی نمایش داده می‌شود." : "اتصال را بررسی کنید."}</p>
+          <p>صف کارها دریافت نشد. {entries.length ? "نتایج قبلی نمایش داده می‌شود." : "اتصال خود را بررسی کنید."}</p>
           <Button variant="secondary" disabled={isFetching} onClick={() => void refetch()}>
             تلاش دوباره
           </Button>
@@ -285,7 +285,7 @@ export function RoleQueue({
                         </footer>
                         {claim.isError && claim.variables === entry.id && (
                           <p className="role-queue-claim-error" role="alert">
-                            دریافت کار انجام نشد. دوباره تلاش کنید.
+                            دریافت کار انجام نشد؛ دوباره تلاش کنید.
                           </p>
                         )}
                       </article>

@@ -65,7 +65,7 @@ def notify_workspace_task(task, actor_id, previous=None):
     current = task_snapshot(task)
     base = {"issue": {"name": task.name}, "crm_event": {"kind": "workspace_task"}}
 
-    def emit(receivers, field, old_value, new_value, **identifiers):
+    def emit(receivers, field, old_value, new_value, *, include_actor=False, **identifiers):
         notify_members(
             task.workspace_id,
             receivers,
@@ -74,6 +74,7 @@ def notify_workspace_task(task, actor_id, previous=None):
             entity_name="workspace_task",
             entity_id=task.id,
             title="به‌روزرسانی کار",
+            include_actor=include_actor,
             data={
                 **base,
                 "issue_activity": {
@@ -95,6 +96,7 @@ def notify_workspace_task(task, actor_id, previous=None):
                 previous["assignee_name"],
                 "",
                 old_identifier=previous["assignee_id"],
+                include_actor=True,
             )
     if previous is not None:
         receivers = [task.assignee_id]

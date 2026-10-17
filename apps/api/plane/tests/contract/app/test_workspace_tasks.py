@@ -46,7 +46,7 @@ def test_workspace_admin_creates_standalone_task_and_assignee_sees_it(session_cl
 
 
 @pytest.mark.django_db
-def test_normal_member_cannot_create_but_can_transfer_own_standalone_task(session_client, workspace):
+def test_normal_member_can_create_and_transfer_standalone_tasks(session_client, workspace):
     first_assignee = add_member(workspace, "first-assignee@example.com")
     next_assignee = add_member(workspace, "next-assignee@example.com")
     task = WorkspaceTask.objects.create(
@@ -62,7 +62,14 @@ def test_normal_member_cannot_create_but_can_transfer_own_standalone_task(sessio
         {"name": "Not allowed", "assignee_id": str(first_assignee.id)},
         format="json",
     )
-    assert create_response.status_code == 403
+    assert create_response.status_code == 400
+    create_response = session_client.post(
+        f"/api/workspaces/{workspace.slug}/tasks/",
+        {"name": "Send to teammate", "assignee_id": str(next_assignee.id)}, format="json",
+    )
+    assert create_response.status_code == 201
+    created = WorkspaceTask.objects.get(id=create_response.data["id"])
+    assert created.created_by_id == first_assignee.id
 
     transfer_response = session_client.patch(
         f"/api/workspaces/{workspace.slug}/tasks/{task.id}/",
@@ -73,9 +80,9 @@ def test_normal_member_cannot_create_but_can_transfer_own_standalone_task(sessio
     task.refresh_from_db()
     assert task.assignee == next_assignee
 
-    assert session_client.get(f"/api/workspaces/{workspace.slug}/tasks/").data == []
+    assert {str(row["id"]) for row in session_client.get(f"/api/workspaces/{workspace.slug}/tasks/").data} == {str(created.id)}
     session_client.force_authenticate(user=next_assignee)
-    assert len(session_client.get(f"/api/workspaces/{workspace.slug}/tasks/").data) == 1
+    assert len(session_client.get(f"/api/workspaces/{workspace.slug}/tasks/").data) == 2
 
     status_response = session_client.patch(
         f"/api/workspaces/{workspace.slug}/tasks/{task.id}/",

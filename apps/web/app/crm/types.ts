@@ -37,6 +37,7 @@ export interface Project {
   archivedAt?: string;
   projectLead?: Member;
   projectLeadId?: string;
+  createdById?: string;
   createdAt?: string;
 }
 export interface Issue {
@@ -51,6 +52,10 @@ export interface Issue {
   stateId?: string;
   priority: Priority;
   assignee?: Member;
+  sender?: Member;
+  senderId?: string;
+  wasAssignedToMe?: boolean;
+  archived?: boolean;
   dueDate?: string;
   completedAt?: string;
   createdAt?: string;

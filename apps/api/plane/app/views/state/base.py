@@ -17,30 +17,35 @@ from rest_framework import status
 from .. import BaseViewSet, BaseAPIView
 from plane.app.serializers import StateSerializer
 from plane.app.permissions import ROLE, allow_permission
+from plane.app.permissions.crm import ProjectScopePermission
+from plane.app.services.project_visibility import visible_projects
+from plane.db.models import Project
 from plane.db.models import State, Issue
 from plane.utils.cache import invalidate_cache
 
 
 class StateViewSet(BaseViewSet):
+    permission_classes = [ProjectScopePermission]
     serializer_class = StateSerializer
     model = State
 
     def get_queryset(self):
-        return self.filter_queryset(
+        queryset = self.filter_queryset(
             super()
             .get_queryset()
             .filter(workspace__slug=self.kwargs.get("slug"))
             .filter(project_id=self.kwargs.get("project_id"))
-            .filter(
-                project__project_projectmember__member=self.request.user,
-                project__project_projectmember__is_active=True,
-                project__archived_at__isnull=True,
-            )
+            .filter(project__archived_at__isnull=True)
             .filter(is_triage=False)
             .select_related("project")
             .select_related("workspace")
             .distinct()
         )
+        queryset = queryset.filter(project_id__in=visible_projects(
+            Project.objects.filter(workspace__slug=self.kwargs["slug"]),
+            self.request.user, self.kwargs["slug"],
+        ).values("id"))
+        return queryset
 
     @invalidate_cache(path="workspaces/:slug/states/", url_params=True, user=False)
     @allow_permission([ROLE.ADMIN])

@@ -46,7 +46,7 @@ export default function AbsencesPage() {
           )
         }
       />
-      {error && <p role="alert">دریافت عدم حضورها انجام نشد.</p>}
+      {error && <p role="alert">عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید.</p>}
       <SearchBox value={query} onChange={setQuery} placeholder="جستجوی شناسه، کاربر یا علت عدم حضور…" />
       {isLoading ? (
         <Skeleton rows={5} />
@@ -189,7 +189,7 @@ export default function AbsencesPage() {
               />
             </label>
             {editing.startsAt && editing.endsAt && Date.parse(editing.endsAt) <= Date.parse(editing.startsAt) && (
-              <p role="alert">پایان باید بعد از شروع باشد.</p>
+              <p role="alert">عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید.</p>
             )}
             {mutation.isError && <p role="alert">{errorMessage(mutation.error, "ذخیره عدم حضور انجام نشد.")}</p>}
             <footer>

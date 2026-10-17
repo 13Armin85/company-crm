@@ -45,6 +45,7 @@ from plane.db.models import (
     Workspace,
     WorkspaceMember,
     ProjectMember,
+    Project,
 )
 
 
@@ -420,7 +421,7 @@ class OrganizationUserProfileEndpoint(BaseAPIView):
         if "username" in request.data and User.objects.exclude(id=user.id).filter(username__iexact=username).exists():
             return Response({"username": ["This username is already in use."]}, status=400)
         if "email" in request.data and User.objects.exclude(id=user.id).filter(email__iexact=email).exists():
-            return Response({"email": ["This email is already in use."]}, status=400)
+            return Response({"email": ["این ایمیل ثبت شده است"]}, status=400)
         if "password" in request.data:
             return Response({"password": ["Use the dedicated password endpoint."]}, status=400)
         require_field_permission(request, workspace, "role_ids", "User.Role.Assign")
@@ -544,8 +545,13 @@ class TicketRouteEndpoint(BaseAPIView):
 class TicketRoleQueueEndpoint(BaseAPIView):
     @require_permission("Routing.Queue.View")
     def get(self, request, slug):
+        from plane.app.services.project_visibility import visible_projects
+
         rows = TicketRoleQueueEntry.objects.filter(
-            issue__workspace__slug=slug, status=TicketRoleQueueEntry.Status.OPEN
+            issue__workspace__slug=slug, status=TicketRoleQueueEntry.Status.OPEN,
+            issue__project_id__in=visible_projects(
+                Project.objects.filter(workspace__slug=slug), request.user, slug,
+            ).values("id"),
         ).select_related("issue", "issue__project", "rule", "required_role", "claimed_by")
         if not has_permission(request.user, slug, "Routing.Queue.ViewAll", request=request):
             active_roles = UserOrganizationRole.objects.filter(
@@ -564,13 +570,21 @@ class TicketRoleQueueClaimEndpoint(BaseAPIView):
     @require_permission("Routing.Queue.Claim")
     @transaction.atomic
     def post(self, request, slug, queue_id):
+        from plane.app.services.project_visibility import visible_projects
+
         entry = get_object_or_404(
             TicketRoleQueueEntry.objects.select_for_update().select_related("issue", "required_role"),
             id=queue_id,
             issue__workspace__slug=slug,
+            issue__project_id__in=visible_projects(
+                Project.objects.filter(workspace__slug=slug), request.user, slug,
+            ).values("id"),
         )
         if entry.status != TicketRoleQueueEntry.Status.OPEN:
             return Response({"error": "Queue entry is no longer open."}, status=status.HTTP_409_CONFLICT)
+        if entry.issue.created_by_id == request.user.id:
+            from plane.app.services.task_policy import validate_other_assignees
+            validate_other_assignees(request.user, slug, [request.user.id])
 
         is_active_member = WorkspaceMember.objects.filter(
             workspace__slug=slug,

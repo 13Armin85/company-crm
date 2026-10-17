@@ -107,7 +107,7 @@ export function UserAccessPanel({ userId }: { userId: string }) {
             <input type="search" value={roleQuery} onChange={(event) => setRoleQuery(event.target.value)} />
           </label>
           {effectiveQuery.error ? (
-            <p role="alert">دریافت مجوزهای نقش انجام نشد.</p>
+            <p role="alert">عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید.</p>
           ) : effectiveQuery.isLoading ? (
             <Skeleton rows={4} />
           ) : !visibleGrants.length ? (
@@ -167,15 +167,15 @@ export function UserAccessPanel({ userId }: { userId: string }) {
                   row.ends_at === originalEnd
               )
             ) {
-              setFormError("این مجوز با همین نوع اثر و بازه قبلاً ثبت شده است؛ رکورد موجود را ویرایش کنید.");
+              setFormError("این دسترسی و بازه زمانی قبلاً ثبت شده است؛ همان مورد را ویرایش کنید.");
               return;
             }
             if (originalStart && originalEnd && Date.parse(originalEnd) <= Date.parse(originalStart)) {
-              setFormError("پایان باید بعد از شروع باشد.");
+              setFormError("زمان پایان باید بعد از زمان شروع باشد.");
               return;
             }
             if (conflicting && !conflictConfirmed) {
-              setFormError("برای ثبت منع، پیام تعارض را تأیید کنید.");
+              setFormError("پیش از ذخیره این محدودیت، تداخل دسترسی را تأیید کنید.");
               return;
             }
             mutation.mutate(
@@ -195,7 +195,7 @@ export function UserAccessPanel({ userId }: { userId: string }) {
               id="direct-permission"
               label="مجوز"
               loading={permissionsLoading}
-              error={permissionsError ? "دریافت گزینه‌ها انجام نشد." : undefined}
+              error={permissionsError ? "فهرست دسترسی‌ها دریافت نشد." : undefined}
               value={permission}
               disabled={mutation.isPending}
               onChange={(id) => {
@@ -300,7 +300,7 @@ export function UserAccessPanel({ userId }: { userId: string }) {
             <input type="search" value={directQuery} onChange={(event) => setDirectQuery(event.target.value)} />
           </label>
           {exceptionQuery.error ? (
-            <p role="alert">دریافت دسترسی‌های مستقیم انجام نشد.</p>
+            <p role="alert">عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید.</p>
           ) : exceptionQuery.isLoading ? (
             <Skeleton rows={4} />
           ) : !direct.length ? (

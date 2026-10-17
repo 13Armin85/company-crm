@@ -1,3 +1,4 @@
+import { useDismissMenu } from "./use-dismiss-menu";
 import { IdentifierBadge, ModalCore, PersianDatePicker, SearchableSelect } from "@plane/ui";
 import { DialogTitle } from "@headlessui/react";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
@@ -48,6 +49,7 @@ import { useUIStore } from "./store";
 import type { Issue, Member, NotificationItem, Priority, Project, Status } from "./types";
 import { persianDate, priorityFa, statusFa, toFa } from "./utils";
 import { issueReference, matchesRecordSearch } from "./identifiers";
+import { canTransferIssue } from "./task-access";
 
 export function IconButton({
   children,
@@ -176,10 +178,16 @@ export function IssueRow({
   issue,
   compact = false,
   table = false,
+  readOnly = false,
+  allowTransfer = false,
+  inlineTransfer = false,
 }: {
   issue: Issue;
   compact?: boolean;
   table?: boolean;
+  readOnly?: boolean;
+  allowTransfer?: boolean;
+  inlineTransfer?: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuContainerRef = useRef<HTMLDivElement>(null);
@@ -187,6 +195,7 @@ export function IssueRow({
   const slug = useUIStore((state) => state.workspaceSlug) ?? "";
   const { data: access } = useWorkspaceAccess();
   const { data: currentUser } = useCurrentUser();
+  const { data: transferProjects = [] } = useProjects();
   const updateStatus = useUpdateIssueStatus(slug);
   const deleteIssue = useDeleteIssue(slug);
   const reassignIssue = useReassignIssue(slug);
@@ -194,17 +203,53 @@ export function IssueRow({
   const { data: projectMembers = [] } = useMembers(undefined, issue.scope === "project" ? issue.projectId : undefined);
   const navigate = useNavigate();
   const canEdit = access?.can("Issue.Edit") === true;
-  const eligibleMembers = canEdit && issue.scope === "project" ? projectMembers : teamMembers;
+  const eligibleMembers = issue.scope === "project" ? projectMembers : teamMembers;
   const ownsIssue = Boolean(currentUser?.id) && issue.assignee?.id === currentUser?.id;
-  const canChangeStatus = access?.can("Issue.Status.Edit") === true && (canEdit || ownsIssue);
-  const canTransfer = access?.can("Issue.Assign") === true && (canEdit || ownsIssue);
+  const canChangeStatus = !readOnly && access?.can("Issue.Status.Edit") === true && (canEdit || ownsIssue);
+  const canTransfer =
+    (!readOnly || allowTransfer) &&
+    canTransferIssue(issue, currentUser?.id, (code) => access?.can(code) === true, transferProjects);
+  const hasActions = canChangeStatus || (canTransfer && !inlineTransfer);
   const statusOptions: Status[] = ["Todo", "In Progress", "Review", "Done", "Blocked"];
+  const transferOptions = eligibleMembers
+    .filter((member) => access?.is_admin || member.id !== currentUser?.id)
+    .map((member) => ({
+      id: member.id,
+      title: member.displayName,
+      description: member.email,
+      disabled: member.isActive === false || member.id === issue.assignee?.id,
+    }));
+  const transferControl = canTransfer && (inlineTransfer || eligibleMembers.length > 1) && (
+    <div className="issue-transfer-control">
+      <label htmlFor={`issue-transfer-${issue.id}`}>انتقال به شخص دیگر</label>
+      <SearchableSelect
+        id={`issue-transfer-${issue.id}`}
+        label="انتقال به عضو دیگر"
+        optionClassName="member-transfer-options"
+        value={issue.assignee?.id ?? ""}
+        selectedLabel={issue.assignee?.displayName ?? "بدون مسئول"}
+        placeholder="نام شخص را جستجو کنید"
+        disabled={reassignIssue.isPending || !transferOptions.some((option) => !option.disabled)}
+        onChange={(id) => {
+          if (id && id !== issue.assignee?.id && !reassignIssue.isPending) {
+            reassignIssue.mutate({ issue, assigneeId: id });
+            setMenuOpen(false);
+          }
+        }}
+        options={transferOptions}
+      />
+    </div>
+  );
 
   useEffect(() => {
     if (!menuOpen) return;
 
     const handlePointerDown = (event: PointerEvent) => {
-      if (event.target instanceof Node && !menuContainerRef.current?.contains(event.target)) {
+      if (
+        event.target instanceof Node &&
+        !menuContainerRef.current?.contains(event.target) &&
+        !(event.target instanceof Element && event.target.closest("[data-transfer-options]"))
+      ) {
         setMenuOpen(false);
       }
     };
@@ -224,7 +269,7 @@ export function IssueRow({
 
   return (
     <div
-      className={`issue-row ${compact ? "is-compact" : ""} ${table ? "is-table" : ""} ${menuOpen ? "has-open-menu" : ""}`}
+      className={`issue-row ${compact ? "is-compact" : ""} ${table ? "is-table" : ""} ${menuOpen ? "has-open-menu" : ""} ${inlineTransfer && canTransfer ? "has-inline-transfer" : ""}`}
     >
       <button
         className="issue-check"
@@ -237,10 +282,14 @@ export function IssueRow({
       <button
         type="button"
         className={`issue-main issue-main-button ${issue.scope === "project" ? "is-clickable" : ""}`}
-        disabled={!issue.projectId}
+        disabled={readOnly || !issue.projectId}
         onClick={() => issue.projectId && navigate(`/projects/${issue.projectId}?tab=issues`)}
       >
         <strong>{issue.name}</strong>
+        <span className="issue-people">
+          فرستنده: {issue.sender?.displayName || "نامشخص"} · مسئول: {issue.assignee?.displayName || "بدون مسئول"}
+        </span>
+        {readOnly && issue.createdAt && <span className="issue-people">تاریخ ثبت: {persianDate(issue.createdAt)}</span>}
         {!table && (
           <span className="issue-code" dir="ltr">
             {issueReference(issue)}
@@ -299,7 +348,7 @@ export function IssueRow({
           <Avatar member={issue.assignee} size="sm" />
           {table && <span>{issue.assignee?.displayName || "بدون مسئول"}</span>}
         </span>
-        {canChangeStatus && (
+        {hasActions && (
           <button
             ref={menuButtonRef}
             className="plain-icon"
@@ -311,44 +360,24 @@ export function IssueRow({
             <MoreHorizontal size={16} />
           </button>
         )}
-        {canChangeStatus && menuOpen && (
+        {hasActions && menuOpen && (
           <div className="action-menu issue-action-menu" role="menu">
-            <small>تغییر وضعیت</small>
-            {statusOptions.map((status) => (
-              <button
-                key={status}
-                disabled={status === issue.status || updateStatus.isPending}
-                onClick={() => {
-                  updateStatus.mutate({ issue, status });
-                  setMenuOpen(false);
-                }}
-              >
-                {statusFa[status]}
-              </button>
-            ))}
-            {canTransfer && eligibleMembers.length > 1 && (
-              <label className="issue-transfer-control" htmlFor={`issue-transfer-${issue.id}`}>
-                <small>انتقال به عضو دیگر</small>
-                <SearchableSelect
-                  id={`issue-transfer-${issue.id}`}
-                  label="انتقال به عضو دیگر"
-                  value={issue.assignee?.id ?? ""}
-                  disabled={reassignIssue.isPending}
-                  onChange={(id) => {
-                    if (id && id !== issue.assignee?.id) {
-                      reassignIssue.mutate({ issue, assigneeId: id });
-                      setMenuOpen(false);
-                    }
+            {canChangeStatus && <small>تغییر وضعیت</small>}
+            {canChangeStatus &&
+              statusOptions.map((status) => (
+                <button
+                  key={status}
+                  disabled={status === issue.status || updateStatus.isPending}
+                  onClick={() => {
+                    updateStatus.mutate({ issue, status });
+                    setMenuOpen(false);
                   }}
-                  options={eligibleMembers.map((member) => ({
-                    id: member.id,
-                    title: member.displayName,
-                    description: member.email,
-                  }))}
-                />
-              </label>
-            )}
-            {access?.can("Issue.Delete") && (
+                >
+                  {statusFa[status]}
+                </button>
+              ))}
+            {!inlineTransfer && transferControl}
+            {!readOnly && access?.can("Issue.Delete") && (
               <button
                 className="danger-action"
                 onClick={() => {
@@ -362,12 +391,14 @@ export function IssueRow({
           </div>
         )}
       </div>
+      {inlineTransfer && transferControl}
     </div>
   );
 }
 
 export function ProjectCard({ project }: { project: Project }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useDismissMenu(menuOpen, () => setMenuOpen(false));
   const slug = useUIStore((state) => state.workspaceSlug) ?? "";
   const { data: access } = useWorkspaceAccess();
   const canEdit = access?.can("Project.Edit") === true;
@@ -380,40 +411,48 @@ export function ProjectCard({ project }: { project: Project }) {
         <span className="project-symbol" style={{ background: `${project.color}18`, color: project.color }}>
           {project.identifier.slice(0, 1)}
         </span>
-        {(canEdit || canDelete) && (
-          <button className="plain-icon" aria-label="منوی پروژه" onClick={() => setMenuOpen((value) => !value)}>
-            •••
-          </button>
-        )}
-        {(canEdit || canDelete) && menuOpen && (
-          <div className="action-menu">
-            {canEdit && !project.archivedAt && <Link to={`/projects/${project.id}?tab=settings`}>ویرایش پروژه</Link>}
-            {canEdit && (
-              <button
-                onClick={() => {
-                  archiveProject.mutate();
-                  setMenuOpen(false);
-                }}
-              >
-                {project.archivedAt ? "خروج از بایگانی" : "بایگانی پروژه"}
-              </button>
-            )}
-            {canDelete && (
-              <button
-                className="danger-action"
-                disabled={deleteProject.isPending}
-                onClick={() => {
-                  if (window.confirm(`پروژه «${project.name}» و همه اطلاعات وابسته به آن حذف شود؟`)) {
-                    deleteProject.mutate();
-                  }
-                  setMenuOpen(false);
-                }}
-              >
-                <Trash2 size={15} /> حذف پروژه
-              </button>
-            )}
-          </div>
-        )}
+        <div className="menu-anchor" ref={menuRef}>
+          {(canEdit || canDelete) && (
+            <button
+              className="plain-icon"
+              aria-label="منوی پروژه"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((value) => !value)}
+            >
+              •••
+            </button>
+          )}
+          {(canEdit || canDelete) && menuOpen && (
+            <div className="action-menu">
+              {canEdit && !project.archivedAt && <Link to={`/projects/${project.id}?tab=settings`}>ویرایش پروژه</Link>}
+              {canEdit && (
+                <button
+                  onClick={() => {
+                    archiveProject.mutate();
+                    setMenuOpen(false);
+                  }}
+                >
+                  {project.archivedAt ? "خروج از بایگانی" : "بایگانی پروژه"}
+                </button>
+              )}
+              {canDelete && (
+                <button
+                  className="danger-action"
+                  disabled={deleteProject.isPending}
+                  onClick={() => {
+                    if (window.confirm(`پروژه «${project.name}» و همه اطلاعات وابسته به آن حذف شود؟`)) {
+                      deleteProject.mutate();
+                    }
+                    setMenuOpen(false);
+                  }}
+                >
+                  <Trash2 size={15} /> حذف پروژه
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
       <Link to={project.archivedAt ? "/projects" : `/projects/${project.id}`} className="project-card-link">
         <h3>{project.name}</h3>
@@ -555,7 +594,7 @@ export function NotificationDetails({
         {notification.isLoading && <p role="status">در حال دریافت متن کامل…</p>}
         {notification.isError && (
           <div role="alert" className="inline-error">
-            دریافت جزئیات کامل انجام نشد.
+            جزئیات اعلان دریافت نشد.
             <Button variant="secondary" onClick={() => void notification.refetch()}>
               تلاش دوباره
             </Button>
@@ -649,7 +688,7 @@ export function NotificationDrawer() {
         <div className="notification-list">
           {isError && (
             <div role="alert" className="inline-error">
-              دریافت اعلان‌ها انجام نشد.
+              اعلان‌ها دریافت نشدند.
               <Button variant="secondary" onClick={() => void refetch()}>
                 تلاش دوباره
               </Button>
@@ -891,6 +930,7 @@ export function CreateModal() {
   const [routingRuleId, setRoutingRuleId] = useState("");
   const slug = useUIStore((state) => state.workspaceSlug) ?? "";
   const { data: access } = useWorkspaceAccess();
+  const { data: currentUser } = useCurrentUser();
   const { data: projects = [] } = useProjects();
   const activeProjects = useMemo(() => projects.filter((project) => !project.archivedAt), [projects]);
   const routeProjectId = location.pathname.match(/^\/projects\/([^/]+)/)?.[1];
@@ -904,6 +944,8 @@ export function CreateModal() {
   const createProject = useCreateProject(slug);
   const createIssue = useCreateIssue(slug, selectedProjectId);
   const busy = createProject.isPending || createIssue.isPending;
+  const canCreateTaskHere =
+    access?.can("Issue.Create") === true && location.pathname.replace(/\/+$/, "") !== "/my-work";
   useEffect(() => {
     if (open) {
       setKind(createKind);
@@ -918,7 +960,8 @@ export function CreateModal() {
   }, [assigneeId, name, open, routingRuleId, setFormDirty, targetDate]);
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    if (busy || !name.trim()) return;
+    if (busy || !name.trim() || (kind === "issue" && !canCreateTaskHere)) return;
+    if (kind === "issue" && !access?.is_admin && assigneeId === currentUser?.id) return;
     const done = () => {
       setName("");
       setProjectId("");
@@ -931,7 +974,12 @@ export function CreateModal() {
     if (kind === "project") createProject.mutate({ name, description: "" }, { onSuccess: done });
     else createIssue.mutate({ name, priority, targetDate, assigneeId, routingRuleId }, { onSuccess: done });
   };
-  if (!open || !access?.can(kind === "project" ? "Project.Create" : "Issue.Create")) return null;
+  if (
+    !open ||
+    !access?.can(kind === "project" ? "Project.Create" : "Issue.Create") ||
+    (kind === "issue" && !canCreateTaskHere)
+  )
+    return null;
   return (
     <ModalCore
       isOpen
@@ -951,19 +999,22 @@ export function CreateModal() {
           </IconButton>
         </header>
         <div className="segmented">
-          <button
-            type="button"
-            disabled={busy}
-            className={kind === "issue" ? "active" : ""}
-            onClick={() => setKind("issue")}
-          >
-            کار
-          </button>
+          {canCreateTaskHere && (
+            <button
+              type="button"
+              disabled={busy}
+              className={kind === "issue" ? "active" : ""}
+              onClick={() => setKind("issue")}
+            >
+              کار
+            </button>
+          )}
           <button
             type="button"
             disabled={busy}
             className={kind === "project" ? "active" : ""}
-            onClick={() => setKind("project")}
+            aria-disabled={!access.can("Project.Create")}
+            onClick={() => access.can("Project.Create") && setKind("project")}
           >
             پروژه
           </button>
@@ -1034,12 +1085,14 @@ export function CreateModal() {
                   }}
                   options={[
                     { id: "", title: "بدون مسئول" },
-                    ...members.map((member) => ({
-                      id: member.id,
-                      title: member.displayName,
-                      description: member.email,
-                      disabled: member.isActive === false,
-                    })),
+                    ...members
+                      .filter((member) => access.is_admin || member.id !== currentUser?.id)
+                      .map((member) => ({
+                        id: member.id,
+                        title: member.displayName,
+                        description: member.email,
+                        disabled: member.isActive === false,
+                      })),
                   ]}
                 />
               </label>
@@ -1070,7 +1123,7 @@ export function CreateModal() {
           </>
         )}
         {(createIssue.isError || createProject.isError) && (
-          <p role="alert">ایجاد انجام نشد. اطلاعات فرم را بررسی کنید و دوباره تلاش کنید.</p>
+          <p role="alert">عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید.</p>
         )}
         <footer>
           <Button variant="secondary" disabled={busy} onClick={() => setOpen(false)}>
@@ -1083,6 +1136,7 @@ export function CreateModal() {
               !name.trim() ||
               !slug ||
               (kind === "issue" && !assigneeId && !routingRuleId) ||
+              (kind === "issue" && !access.is_admin && assigneeId === currentUser?.id) ||
               createIssue.isPending ||
               createProject.isPending
             }

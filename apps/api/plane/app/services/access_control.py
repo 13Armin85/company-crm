@@ -93,7 +93,7 @@ def delegation_context(workspace, now=None):
     return result
 
 
-def get_effective_permissions(user, workspace, *, now=None, include_delegation=True):
+def get_effective_permissions(user, workspace, *, now=None, include_delegation=True, admin_override=True):
     workspace_id = getattr(workspace, "id", workspace)
     now = now or timezone.now()
     if (
@@ -101,13 +101,25 @@ def get_effective_permissions(user, workspace, *, now=None, include_delegation=T
         or not user.is_active
         or not WorkspaceMember.objects.filter(workspace_id=workspace_id, member=user, is_active=True).exists()
     ):
-        return {"permissions": [], "explanations": [], "role_grants": []}
+        return {"permissions": [], "explanations": [], "role_grants": [], "is_admin": False}
     catalog = list(
         OrganizationPermission.objects.filter(
             workspace_id=workspace_id, is_active=True, code__in=PERMISSION_REGISTRY
         ).values("id", "code", "name", "category", "description")
     )
+    system_roles = set(UserOrganizationRole.objects.filter(
+        workspace_id=workspace_id, user=user, is_active=True,
+        role__is_active=True, role__deleted_at__isnull=True,
+    ).values_list("role__system_key", flat=True))
+    # Built-in administrators retain full access in their own workspace.
+    if admin_override and "admin" in system_roles:
+        explanations = [{**permission, "source": "role", "granted": True} for permission in catalog]
+        return {"permissions": sorted(PERMISSION_REGISTRY), "explanations": explanations,
+                "role_grants": explanations, "is_admin": True}
     sources = {}
+    # This built-in capability also applies to existing member roles without a data migration.
+    if "member" in system_roles:
+        sources["Issue.Create"] = {"source": "role", "role_ids": [], "role_names": ["Member"]}
     for row in role_permissions(user.id, workspace_id):
         entry = sources.setdefault(row["permission__code"], {"source": "role", "role_ids": []})
         entry["role_ids"].append(str(row["role_id"]))
@@ -187,6 +199,7 @@ def get_effective_permissions(user, workspace, *, now=None, include_delegation=T
         "permissions": sorted(row["code"] for row in explanations if row["granted"]),
         "explanations": explanations,
         "role_grants": role_grants,
+        "is_admin": "admin" in system_roles,
     }
 
 
@@ -289,7 +302,9 @@ def ensure_admin_available(workspace, *, excluding_user_id=None):
     for boundary in sorted(boundaries):
         if not any(
             ADMIN_REQUIRED.issubset(
-                get_effective_permissions(row.member, workspace, now=boundary, include_delegation=False)["permissions"]
+                get_effective_permissions(
+                    row.member, workspace, now=boundary, include_delegation=False, admin_override=False
+                )["permissions"]
             )
             for row in admins
         ):

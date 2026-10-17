@@ -28,6 +28,7 @@ import {
   useMembers,
   useProject,
   useRemoveProjectMember,
+  useReassignIssue,
   useUpdateIssueStatus,
   useUpdateProject,
   useWorkspaceAccess,
@@ -36,8 +37,9 @@ import {
 import { Avatar, AvatarStack, Button, EmptyState, IssueRow, PersianDateInput, Skeleton, TabBar } from "../components";
 import { IssueCalendar } from "../issue-calendar";
 import { useUIStore } from "../store";
-import type { Status } from "../types";
-import { persianDate, statusFa, toFa } from "../utils";
+import { IssueKanbanBoard } from "../kanban";
+import { useDismissMenu } from "../use-dismiss-menu";
+import { persianDate, toFa } from "../utils";
 
 const tabs = [
   { id: "overview", label: "نمای کلی" },
@@ -48,7 +50,6 @@ const tabs = [
   { id: "activity", label: "فعالیت" },
   { id: "settings", label: "تنظیمات" },
 ];
-const statuses: Status[] = ["Todo", "In Progress", "Review", "Done", "Blocked"];
 
 export default function ProjectDetailPage() {
   const { id = "" } = useParams();
@@ -56,6 +57,7 @@ export default function ProjectDetailPage() {
   const [params] = useSearchParams();
   const [tab, setTab] = useState(params.get("tab") || "overview");
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useDismissMenu(menuOpen, () => setMenuOpen(false));
   const slug = useUIStore((state) => state.workspaceSlug) ?? "";
   const setCreate = useUIStore((state) => state.setCreateOpen);
   const projectQuery = useProject(id);
@@ -66,11 +68,12 @@ export default function ProjectDetailPage() {
   const { data: currentUser } = useCurrentUser();
   const canManage = access?.can("Project.Edit") === true;
   const cyclesQuery = useCycles(id);
-  const project = projectQuery.data;
+  const project = projectQuery.isError ? undefined : projectQuery.data;
   const issues = issuesQuery.data ?? [];
   const members = membersQuery.data ?? [];
   const activityQuery = useActivities(id, issues);
   const updateStatus = useUpdateIssueStatus(slug);
+  const reassign = useReassignIssue(slug);
   const archive = useArchiveProject(slug, id);
   const deleteProject = useDeleteProject(slug, id);
   const complete = issues.filter((item) => item.status === "Done").length;
@@ -106,7 +109,7 @@ export default function ProjectDetailPage() {
             </Button>
           )}
           {canManage && (
-            <div className="menu-anchor">
+            <div className="menu-anchor" ref={menuRef}>
               <button className="icon-button" aria-label="منوی پروژه" onClick={() => setMenuOpen((value) => !value)}>
                 <MoreHorizontal size={19} />
               </button>
@@ -189,44 +192,14 @@ export default function ProjectDetailPage() {
         </div>
       )}
       {tab === "board" && (
-        <div className="project-board">
-          {statuses.map((status) => (
-            <section className="kanban-column" key={status}>
-              <header>
-                <span>
-                  <i />
-                  {statusFa[status]} <b>{toFa(issues.filter((i) => i.status === status).length)}</b>
-                </span>
-              </header>
-              <div>
-                {issues
-                  .filter((i) => i.status === status)
-                  .map((issue) => (
-                    <article className="kanban-card" key={issue.id}>
-                      <h3>{issue.name}</h3>
-                      <small dir="ltr">
-                        {project.identifier}-{issue.sequenceId}
-                      </small>
-                      <select
-                        value={issue.status}
-                        disabled={
-                          !access?.can("Issue.Status.Edit") ||
-                          (!access?.can("Issue.Edit") && issue.assignee?.id !== currentUser?.id)
-                        }
-                        onChange={(event) => updateStatus.mutate({ issue, status: event.target.value as Status })}
-                      >
-                        {statuses.map((value) => (
-                          <option key={value} value={value}>
-                            {statusFa[value]}
-                          </option>
-                        ))}
-                      </select>
-                    </article>
-                  ))}
-              </div>
-            </section>
-          ))}
-        </div>
+        <IssueKanbanBoard
+          issues={issues}
+          onStatusChange={(issue, status) => updateStatus.mutate({ issue, status })}
+          onCreate={access?.can("Issue.Create") ? () => setCreate(true, "issue") : undefined}
+          transferMembers={members}
+          transferDisabled={reassign.isPending}
+          onAssigneeChange={(issue, assigneeId) => reassign.mutate({ issue, assigneeId })}
+        />
       )}
       {tab === "cycles" && (
         <CyclesTab
@@ -465,8 +438,8 @@ function CyclesTab({
               onChange={setEnd}
             />
           </label>
-          {start && end && end <= start && <p role="alert">پایان چرخه باید بعد از شروع باشد.</p>}
-          {createCycle.isError && <p role="alert">ساخت چرخه انجام نشد. دوباره تلاش کنید.</p>}
+          {start && end && end <= start && <p role="alert">پایان چرخه باید بعد از شروع آن باشد.</p>}
+          {createCycle.isError && <p role="alert">عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید.</p>}
           <Button type="submit" icon={Plus} disabled={createCycle.isPending || Boolean(start && end && end <= start)}>
             ساخت چرخه
           </Button>
@@ -575,7 +548,7 @@ function ProjectSettings({
           />
         </label>
       </div>
-      {update.isError && <p role="alert">ذخیره تنظیمات پروژه انجام نشد. دوباره تلاش کنید.</p>}
+      {update.isError && <p role="alert">عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید.</p>}
       {access?.can("Project.Member.Manage") && (
         <section className="project-member-settings">
           <h3>اعضای پروژه</h3>

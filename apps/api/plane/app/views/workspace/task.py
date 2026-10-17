@@ -2,11 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 from django.db import transaction
+from django.db.models import Q
 from rest_framework import status
 from rest_framework.response import Response
 
 from plane.app.permissions.crm import require_permission
 from plane.app.services.access_control import has_permission
+from plane.app.services.task_policy import other_assignees_only
 from plane.app.serializers import WorkspaceTaskSerializer
 from plane.app.services.crm_notifications import notify_workspace_task, task_snapshot
 from plane.app.views.base import BaseAPIView
@@ -17,13 +19,14 @@ from plane.utils.issue_search import search_workspace_tasks
 class WorkspaceTaskListEndpoint(BaseAPIView):
     @require_permission("Issue.View")
     def get(self, request, slug):
-        tasks = WorkspaceTask.objects.filter(workspace__slug=slug).select_related("assignee")
+        tasks = WorkspaceTask.objects.filter(workspace__slug=slug).select_related("assignee", "created_by")
         if not has_permission(request.user, slug, "Issue.ViewAll", request=request):
-            tasks = tasks.filter(assignee=request.user)
+            tasks = tasks.filter(Q(assignee=request.user) | Q(created_by=request.user))
         tasks = search_workspace_tasks(request.query_params.get("search", ""), tasks)
         return Response(WorkspaceTaskSerializer(tasks, many=True).data, status=status.HTTP_200_OK)
 
     @require_permission("Issue.Create")
+    @other_assignees_only(creating=True, assignee_field="assignee_id")
     def post(self, request, slug):
         with transaction.atomic():
             workspace = Workspace.objects.get(slug=slug)
@@ -32,22 +35,23 @@ class WorkspaceTaskListEndpoint(BaseAPIView):
                 context={"workspace_id": workspace.id},
             )
             serializer.is_valid(raise_exception=True)
-            serializer.save(workspace=workspace)
+            serializer.save(workspace=workspace, created_by_id=request.user.id)
             notify_workspace_task(serializer.instance, request.user.id)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 class WorkspaceTaskDetailEndpoint(BaseAPIView):
     def _task(self, slug, task_id, lock=False):
-        queryset = WorkspaceTask.objects.select_related("assignee")
+        queryset = WorkspaceTask.objects.select_related("assignee", "created_by")
         if lock:
-            queryset = queryset.select_for_update()
+            queryset = queryset.select_for_update(of=("self",))
         return queryset.get(
             workspace__slug=slug,
             id=task_id,
         )
 
     @require_permission("Issue.View")
+    @other_assignees_only()
     @transaction.atomic
     def patch(self, request, slug, task_id):
         task = self._task(slug, task_id, lock=True)

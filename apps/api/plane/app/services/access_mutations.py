@@ -100,3 +100,7 @@ def remove_workspace_user(workspace, user):
     UserAbsence.objects.filter(workspace=workspace, user=user, status="scheduled").update(
         status="cancelled", updated_at=now
     )
+    from .user_identity import can_release_username, release_username
+
+    if can_release_username(user):
+        release_username(user)

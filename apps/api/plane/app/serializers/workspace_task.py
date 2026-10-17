@@ -13,6 +13,9 @@ class WorkspaceTaskSerializer(BaseSerializer):
     assignee_id = serializers.UUIDField()
     assignee_detail = UserLiteSerializer(source="assignee", read_only=True)
 
+    created_by_detail = UserLiteSerializer(source="created_by", read_only=True)
+    was_assigned_to_me = serializers.BooleanField(read_only=True)
+
     class Meta:
         model = WorkspaceTask
         fields = [
@@ -28,6 +31,8 @@ class WorkspaceTaskSerializer(BaseSerializer):
             "created_at",
             "updated_at",
             "created_by",
+            "created_by_detail",
+            "was_assigned_to_me",
         ]
         read_only_fields = [
             "id",
@@ -36,6 +41,7 @@ class WorkspaceTaskSerializer(BaseSerializer):
             "created_at",
             "updated_at",
             "created_by",
+            "created_by_detail",
         ]
 
     def validate_assignee_id(self, value):

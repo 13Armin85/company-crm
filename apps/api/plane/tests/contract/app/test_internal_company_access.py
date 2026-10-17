@@ -38,10 +38,12 @@ def test_workspace_admin_can_retrieve_project_without_project_membership(session
 
 
 @pytest.mark.django_db
-def test_normal_member_cannot_create_project_or_issue(session_client, workspace):
+def test_normal_member_can_create_issue_but_not_project(session_client, workspace):
     member = create_company_member(workspace, "no-create")
     project = Project.objects.create(name="Member project", identifier="MEM", workspace=workspace)
     ProjectMember.objects.create(project=project, member=member, role=15, is_active=True)
+    recipient = create_company_member(workspace, "issue-recipient")
+    ProjectMember.objects.create(project=project, member=recipient, role=15, is_active=True)
     session_client.force_authenticate(user=member)
 
     project_response = session_client.post(
@@ -51,12 +53,12 @@ def test_normal_member_cannot_create_project_or_issue(session_client, workspace)
     )
     issue_response = session_client.post(
         f"/api/workspaces/{workspace.slug}/projects/{project.id}/issues/",
-        {"name": "Forbidden issue"},
+        {"name": "Task for teammate", "assignee_ids": [str(recipient.id)]},
         format="json",
     )
 
     assert project_response.status_code == status.HTTP_403_FORBIDDEN
-    assert issue_response.status_code == status.HTTP_403_FORBIDDEN
+    assert issue_response.status_code == status.HTTP_201_CREATED
 
 
 @pytest.mark.django_db
@@ -90,13 +92,13 @@ def test_normal_member_only_updates_status_of_own_assigned_issue(session_client,
 
     assert status_response.status_code == status.HTTP_204_NO_CONTENT
     assert field_response.status_code == status.HTTP_403_FORBIDDEN
-    assert other_response.status_code == status.HTTP_403_FORBIDDEN
+    assert other_response.status_code == status.HTTP_404_NOT_FOUND
     own_issue.refresh_from_db()
     assert own_issue.state_id == done.id
 
 
 @pytest.mark.django_db
-def test_normal_member_directory_only_contains_project_teammates(session_client, workspace):
+def test_normal_member_directory_includes_recipients_for_task_assignment(session_client, workspace):
     requester = create_company_member(workspace, "requester")
     teammate = create_company_member(workspace, "teammate")
     outsider = create_company_member(workspace, "outsider")
@@ -111,7 +113,7 @@ def test_normal_member_directory_only_contains_project_teammates(session_client,
     visible_ids = {str(item["member"]["id"]) for item in response.json()}
     assert str(requester.id) in visible_ids
     assert str(teammate.id) in visible_ids
-    assert str(outsider.id) not in visible_ids
+    assert str(outsider.id) in visible_ids
 
 
 @pytest.mark.django_db

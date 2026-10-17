@@ -19,6 +19,8 @@ from rest_framework.response import Response
 from plane.app.permissions import WorkspaceEntityPermission, allow_permission, ROLE
 from plane.app.permissions.crm import require_permission, require_any_permission
 from plane.app.services.access_control import has_permission, sync_plane_membership
+from plane.app.services.user_identity import can_release_username, reserve_username
+from plane.app.services.project_visibility import visible_projects
 from plane.app.services.access_mutations import access_transaction, audit_access, remove_workspace_user, sync_user_roles
 from .organization import _sync_user_units
 from plane.db.models import OrganizationRole, UserOrganizationRole
@@ -71,7 +73,7 @@ class WorkSpaceMemberViewSet(BaseViewSet):
         if role not in [ROLE.MEMBER.value, ROLE.ADMIN.value]:
             return Response({"error": "نقش کاربر نامعتبر است"}, status=status.HTTP_400_BAD_REQUEST)
 
-        user = User.objects.filter(email=email).first()
+        user = User.objects.filter(email__iexact=email).first()
         if user is not None and not user.is_active:
             return Response(
                 {"error": "حساب جهانی این کاربر غیرفعال است؛ افزودن به شرکت آن را فعال نمی‌کند."}, status=400
@@ -81,7 +83,7 @@ class WorkSpaceMemberViewSet(BaseViewSet):
                 {"error": "این عضویت غیرفعال است؛ ابتدا از پروفایل کاربر آن را فعال و ذخیره کنید."}, status=400
             )
         if WorkspaceMember.objects.filter(workspace__slug=slug, member=user, is_active=True).exists():
-            return Response({"error": "این کاربر قبلاً عضو فضای کاری است"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "این ایمیل ثبت شده است"}, status=status.HTTP_400_BAD_REQUEST)
         if user is None and len(password) < 8:
             return Response(
                 {"error": "رمز عبور حساب جدید باید حداقل ۸ نویسه باشد"},
@@ -92,8 +94,10 @@ class WorkSpaceMemberViewSet(BaseViewSet):
                 {"error": "نام کاربری باید ۳ تا ۳۲ نویسه و فقط شامل حروف انگلیسی، عدد، نقطه، خط تیره یا زیرخط باشد"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        if user is None and username and User.objects.filter(username__iexact=username).exists():
-            return Response({"error": "این نام کاربری قبلاً انتخاب شده است"}, status=status.HTTP_400_BAD_REQUEST)
+        if user is None and username:
+            previous = User.objects.filter(username__iexact=username).first()
+            if previous is not None and not can_release_username(previous):
+                return Response({"error": "This username is already in use."}, status=status.HTTP_400_BAD_REQUEST)
 
         workspace = Workspace.objects.get(slug=slug)
         role_ids = request.data.get("role_ids")
@@ -114,6 +118,7 @@ class WorkSpaceMemberViewSet(BaseViewSet):
         try:
             with access_transaction(workspace):
                 if user is None:
+                    reserve_username(username)
                     user = User(
                         email=email,
                         username=username or f"u-{uuid.uuid4().hex[:24]}",
@@ -339,14 +344,9 @@ class WorkspaceProjectMemberEndpoint(BaseAPIView):
     permission_classes = [WorkspaceEntityPermission]
 
     def get(self, request, slug):
-        is_workspace_admin = has_permission(request.user, slug, "Project.ViewAll", request=request)
-        project_ids = (
-            Project.objects.filter(workspace__slug=slug).values_list("id", flat=True)
-            if is_workspace_admin
-            else ProjectMember.objects.filter(workspace__slug=slug, member=request.user, is_active=True)
-            .values_list("project_id", flat=True)
-            .distinct()
-        )
+        project_ids = visible_projects(
+            Project.objects.filter(workspace__slug=slug), request.user, slug,
+        ).values_list("id", flat=True)
 
         # Get all the project members in which the user is involved
         project_members = ProjectMember.objects.filter(

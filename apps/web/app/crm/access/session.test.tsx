@@ -94,6 +94,14 @@ describe("CRM authentication", () => {
     const html = renderToStaticMarkup(<LoginForm csrf="" errorKey="AUTHENTICATION_FAILED_SIGN_IN" />);
     expect(html).toContain('disabled=""');
     expect(html).toContain('role="alert"');
+    expect(html).toContain("نام کاربری یا رمز عبور اشتباه است.");
+  });
+
+  it("keeps unknown login failures and connection errors in Persian", () => {
+    const html = renderToStaticMarkup(<LoginForm csrf="" errorKey="UNKNOWN_SERVER_ERROR" failed />);
+    expect(html).toContain("ورود انجام نشد؛ دوباره تلاش کنید.");
+    expect(html).toContain("اتصال به سرور برقرار نشد");
+    expect(html).not.toContain("UNKNOWN_SERVER_ERROR");
   });
 
   it("cancels and removes all cached permissions and user data on logout", async () => {

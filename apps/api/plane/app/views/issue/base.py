@@ -5,6 +5,7 @@
 # Python imports
 import copy
 import json
+from django.db import transaction
 
 # Django imports
 from django.contrib.postgres.aggregates import ArrayAgg
@@ -33,8 +34,11 @@ from rest_framework.response import Response
 
 # Module imports
 from plane.app.permissions import ROLE, allow_permission
-from plane.app.permissions.crm import require_permission
+from plane.app.permissions.crm import require_permission, ProjectScopePermission
 from plane.app.services.access_control import has_permission
+from plane.app.services.task_visibility import visible_issues
+from plane.app.services.task_policy import other_assignees_only
+from plane.app.services.project_assignment import is_project_assignment_manager, validate_project_transfer
 from plane.app.services import TicketRoutingService
 from plane.app.serializers import (
     IssueCreateSerializer,
@@ -97,6 +101,7 @@ class IssueListEndpoint(BaseAPIView):
 
         # Base queryset with basic filters
         queryset = Issue.issue_objects.filter(workspace__slug=slug, project_id=project_id, pk__in=issue_ids)
+        queryset = visible_issues(queryset, request.user, slug, request=request)
 
         # Restrict guests without full feature access to issues they created,
         # mirroring IssueViewSet.list.
@@ -211,6 +216,7 @@ class IssueListEndpoint(BaseAPIView):
 
 
 class IssueViewSet(BaseViewSet):
+    permission_classes = [ProjectScopePermission]
     model = Issue
     webhook_event = "issue"
     search_fields = ["name"]
@@ -225,8 +231,7 @@ class IssueViewSet(BaseViewSet):
             project_id=self.kwargs.get("project_id"),
             workspace__slug=self.kwargs.get("slug"),
         ).distinct()
-
-        return issues
+        return visible_issues(issues, self.request.user, self.kwargs["slug"], request=self.request)
 
     def apply_annotations(self, issues):
         issues = (
@@ -408,6 +413,8 @@ class IssueViewSet(BaseViewSet):
             )
 
     @require_permission("Issue.Create")
+    @other_assignees_only(creating=True, allow_routing=True)
+    @transaction.atomic
     def create(self, request, slug, project_id):
         project = Project.objects.get(pk=project_id, workspace__slug=slug)
 
@@ -435,7 +442,8 @@ class IssueViewSet(BaseViewSet):
             context={
                 "project_id": project_id,
                 "workspace_id": project.workspace_id,
-                "default_assignee_id": project.default_assignee_id,
+                "default_assignee_id": None if routing_rule is not None else project.default_assignee_id,
+                "actor_id": request.user.id,
             },
         )
 
@@ -667,6 +675,8 @@ class IssueViewSet(BaseViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @require_permission("Issue.View")
+    @other_assignees_only()
+    @transaction.atomic
     def partial_update(self, request, slug, project_id, pk=None):
         queryset = self.get_queryset()
         queryset = self.apply_annotations(queryset)
@@ -717,6 +727,8 @@ class IssueViewSet(BaseViewSet):
             return Response({"error": "کار یافت نشد."}, status=status.HTTP_404_NOT_FOUND)
 
         is_workspace_admin = has_permission(request.user, slug, "Issue.Edit", request=request)
+        assignment_only = set(request.data) == {"assignee_ids"}
+        manages_assignments = assignment_only and is_project_assignment_manager(request.user, slug, project_id)
         if "state_id" in request.data and not has_permission(request.user, slug, "Issue.Status.Edit", request=request):
             return Response({"error": "Status permission is required."}, status=403)
         if "assignee_ids" in request.data and not has_permission(request.user, slug, "Issue.Assign", request=request):
@@ -728,7 +740,7 @@ class IssueViewSet(BaseViewSet):
                     {"error": "کاربر عادی فقط می‌تواند وضعیت یا مسئول کار خودش را تغییر دهد."},
                     status=status.HTTP_403_FORBIDDEN,
                 )
-            if not IssueAssignee.objects.filter(
+            if not manages_assignments and not IssueAssignee.objects.filter(
                 issue=issue,
                 assignee=request.user,
                 deleted_at__isnull=True,
@@ -737,53 +749,8 @@ class IssueViewSet(BaseViewSet):
                     {"error": "این کار به شما واگذار نشده است."},
                     status=status.HTTP_403_FORBIDDEN,
                 )
-            if "assignee_ids" in request.data:
-                assignee_ids = request.data.get("assignee_ids")
-                if not isinstance(assignee_ids, list) or len(assignee_ids) != 1:
-                    return Response(
-                        {"error": "برای انتقال کار دقیقاً یک عضو دیگر تیم را انتخاب کنید."},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-                if str(assignee_ids[0]) == str(request.user.id):
-                    return Response(
-                        {"error": "برای انتقال کار، یک عضو دیگر تیم را انتخاب کنید."},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-                target_workspace_member = WorkspaceMember.objects.filter(
-                    workspace__slug=slug,
-                    member_id=assignee_ids[0],
-                    role__gte=ROLE.MEMBER.value,
-                    is_active=True,
-                    member__is_bot=False,
-                ).first()
-                if not target_workspace_member:
-                    return Response(
-                        {"error": "مسئول جدید باید عضو فعال تیم باشد."},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-
-                target_project_member = ProjectMember.objects.filter(
-                    project_id=project_id,
-                    member_id=target_workspace_member.member_id,
-                ).first()
-                if target_project_member:
-                    fields_to_update = []
-                    if not target_project_member.is_active:
-                        target_project_member.is_active = True
-                        fields_to_update.append("is_active")
-                    if target_project_member.role != target_workspace_member.role:
-                        target_project_member.role = target_workspace_member.role
-                        fields_to_update.append("role")
-                    if fields_to_update:
-                        target_project_member.save(update_fields=[*fields_to_update, "updated_at"])
-                else:
-                    ProjectMember.objects.create(
-                        workspace_id=issue.workspace_id,
-                        project_id=project_id,
-                        member_id=target_workspace_member.member_id,
-                        role=target_workspace_member.role,
-                        is_active=True,
-                    )
+        if "assignee_ids" in request.data:
+            validate_project_transfer(slug, project_id, request.data["assignee_ids"])
 
         current_instance = json.dumps(IssueDetailSerializer(issue).data, cls=DjangoJSONEncoder)
 

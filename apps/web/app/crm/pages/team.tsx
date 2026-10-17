@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { IdentifierBadge, PasswordInput } from "@plane/ui";
+import { PasswordInput } from "@plane/ui";
 import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import { MoreHorizontal, UserPlus } from "lucide-react";
 import { Link, Navigate } from "react-router";
@@ -102,11 +102,11 @@ export default function TeamPage() {
           )
         }
       />
-      {error && <p role="alert">دریافت اعضا انجام نشد.</p>}
+      {error && <p role="alert">عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید.</p>}
       <div className="table-card team-table">
         <div className="table-toolbar">
           <h2>فهرست اعضا</h2>
-          <SearchBox value={query} onChange={setQuery} placeholder="جستجوی شناسه، نام یا ایمیل…" />
+          <SearchBox value={query} onChange={setQuery} placeholder="جستجوی نام یا ایمیل…" />
         </div>
         {isLoading ? (
           <Skeleton rows={5} />
@@ -131,7 +131,6 @@ export default function TeamPage() {
                       <div>
                         <Link to={`/team/${member.id}`}>{member.displayName}</Link>
                         <small dir="ltr">{member.email}</small>
-                        <IdentifierBadge value={member.id} label="شناسه کاربر" />
                       </div>
                     </div>
                   </td>

@@ -164,14 +164,14 @@ describe("role queue presentation and permissions", () => {
   });
   it("keeps previously loaded cards visible during refresh failures", () => {
     state.error = true;
-    expect(render()).toContain("اطلاعات قبلی نمایش داده می‌شود");
+    expect(render()).toContain("نتایج قبلی نمایش داده می‌شود.");
     expect(render().match(/<article/g)).toHaveLength(3);
   });
   it("retains the failed claim and explains that the user can retry", () => {
     state.claimError = true;
     state.claimId = "entry-2";
     const html = render();
-    expect(html).toContain("دریافت کار انجام نشد. دوباره تلاش کنید.");
+    expect(html).toContain("دریافت کار انجام نشد؛ دوباره تلاش کنید.");
     expect(html.match(/<article/g)).toHaveLength(3);
     expect(html).not.toContain('aria-busy="true"');
   });

@@ -1,3 +1,5 @@
+import { useCurrentUser, useWorkspaceAccess, useProjects, useMembers } from "./api";
+import { canChangeIssueStatus, canTransferIssue } from "./task-access";
 import { SearchableSelect } from "@plane/ui";
 import { DndContext, PointerSensor, useDraggable, useDroppable, useSensor, useSensors } from "@dnd-kit/core";
 import type { DragEndEvent, UniqueIdentifier } from "@dnd-kit/core";
@@ -22,23 +24,37 @@ function KanbanCard({
   transferMembers,
   transferDisabled,
   onAssigneeChange,
+  readOnly = false,
+  allowTransfer = false,
 }: {
   issue: Issue;
   transferMembers?: Member[];
   transferDisabled?: boolean;
   onAssigneeChange?: (issue: Issue, assigneeId: string) => void;
+  readOnly?: boolean;
+  allowTransfer?: boolean;
 }) {
+  const { data: user } = useCurrentUser();
+  const { data: access } = useWorkspaceAccess();
+  const { data: projects = [] } = useProjects();
+  const { data: projectMembers = [] } = useMembers(undefined, issue.scope === "project" ? issue.projectId : undefined);
+  const eligibleMembers = issue.scope === "project" ? projectMembers : transferMembers;
+  const canChangeStatus = !readOnly && canChangeIssueStatus(issue, user?.id, (code) => access?.can(code) === true);
+  const canTransfer =
+    (!readOnly || allowTransfer) && canTransferIssue(issue, user?.id, (code) => access?.can(code) === true, projects);
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: issue.id,
+    disabled: !canChangeStatus,
     data: { issue },
   });
+  const cardAttributes = { ...attributes, "aria-disabled": !canChangeStatus && !canTransfer };
   return (
     <article
       ref={setNodeRef}
       className={`kanban-card ${isDragging ? "dragging" : ""}`}
       style={{ transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined }}
       {...listeners}
-      {...attributes}
+      {...cardAttributes}
     >
       <div className="kanban-card-top">
         <span dir="ltr">
@@ -47,33 +63,40 @@ function KanbanCard({
         <GripVertical size={16} />
       </div>
       <h3>{issue.name}</h3>
+      <p className="issue-people">
+        فرستنده: {issue.sender?.displayName || "نامشخص"}
+        <br />
+        مسئول: {issue.assignee?.displayName || "بدون مسئول"}
+      </p>
       <div className="label-row">
         {issue.labels?.map((label) => (
           <span key={label}>{label}</span>
         ))}
       </div>
-      {onAssigneeChange && transferMembers && transferMembers.length > 1 && (
-        <label
-          htmlFor={`kanban-transfer-${issue.id}`}
-          className="kanban-transfer-control"
-          onPointerDown={(event) => event.stopPropagation()}
-        >
-          <span>واگذاری به</span>
+      {canTransfer && onAssigneeChange && eligibleMembers && eligibleMembers.length > 1 && (
+        <div className="kanban-transfer-control" onPointerDown={(event) => event.stopPropagation()}>
+          <label htmlFor={`kanban-transfer-${issue.id}`}>انتقال به شخص دیگر</label>
           <SearchableSelect
             id={`kanban-transfer-${issue.id}`}
             label={`واگذاری ${issue.name} به عضو دیگر`}
+            optionClassName="member-transfer-options"
             value={issue.assignee?.id ?? ""}
+            selectedLabel={issue.assignee?.displayName ?? "بدون مسئول"}
+            placeholder="نام شخص را جستجو کنید"
             disabled={transferDisabled}
             onChange={(id) => {
               if (id && id !== issue.assignee?.id) onAssigneeChange(issue, id);
             }}
-            options={transferMembers.map((member) => ({
-              id: member.id,
-              title: member.displayName,
-              description: member.email,
-            }))}
+            options={eligibleMembers
+              .filter((member) => access?.is_admin || member.id !== user?.id)
+              .map((member) => ({
+                id: member.id,
+                title: member.displayName,
+                description: member.email,
+                disabled: member.isActive === false || member.id === issue.assignee?.id,
+              }))}
           />
-        </label>
+        </div>
       )}
       <footer>
         <PriorityBadge priority={issue.priority} />
@@ -91,6 +114,8 @@ function KanbanColumn({
   transferMembers,
   transferDisabled,
   onAssigneeChange,
+  readOnly = false,
+  allowTransfer = false,
 }: {
   id: Status;
   color: string;
@@ -99,6 +124,8 @@ function KanbanColumn({
   transferMembers?: Member[];
   transferDisabled?: boolean;
   onAssigneeChange?: (issue: Issue, assigneeId: string) => void;
+  readOnly?: boolean;
+  allowTransfer?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
   return (
@@ -122,9 +149,11 @@ function KanbanColumn({
             transferMembers={transferMembers}
             transferDisabled={transferDisabled}
             onAssigneeChange={onAssigneeChange}
+            readOnly={readOnly}
+            allowTransfer={allowTransfer}
           />
         ))}
-        {!issues.length && <p className="column-empty">کار را اینجا رها کنید</p>}
+        {!issues.length && <p className="column-empty">{readOnly ? "کاری وجود ندارد" : "کار را اینجا رها کنید"}</p>}
       </div>
     </section>
   );
@@ -137,6 +166,8 @@ export function IssueKanbanBoard({
   transferMembers,
   transferDisabled,
   onAssigneeChange,
+  readOnly = false,
+  allowTransfer = false,
 }: {
   issues: Issue[];
   onStatusChange: (issue: Issue, status: Status) => void;
@@ -144,12 +175,23 @@ export function IssueKanbanBoard({
   transferMembers?: Member[];
   transferDisabled?: boolean;
   onAssigneeChange?: (issue: Issue, assigneeId: string) => void;
+  readOnly?: boolean;
+  allowTransfer?: boolean;
 }) {
+  const { data: user } = useCurrentUser();
+  const { data: access } = useWorkspaceAccess();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const dragEnd = ({ active, over }: DragEndEvent) => {
     const issue = active.data.current?.issue as Issue | undefined;
     const status = statusFromDropTarget(over?.id);
-    if (issue && status && issue.status !== status) onStatusChange(issue, status);
+    if (
+      !readOnly &&
+      issue &&
+      status &&
+      issue.status !== status &&
+      canChangeIssueStatus(issue, user?.id, (code) => access?.can(code) === true)
+    )
+      onStatusChange(issue, status);
   };
 
   return (
@@ -160,10 +202,12 @@ export function IssueKanbanBoard({
             key={column.id}
             {...column}
             issues={issues.filter((issue) => issue.status === column.id)}
-            onCreate={onCreate}
+            onCreate={readOnly ? undefined : onCreate}
             transferMembers={transferMembers}
             transferDisabled={transferDisabled}
             onAssigneeChange={onAssigneeChange}
+            readOnly={readOnly}
+            allowTransfer={allowTransfer}
           />
         ))}
       </div>

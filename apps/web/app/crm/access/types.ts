@@ -24,6 +24,7 @@ export interface PermissionExplanation {
 }
 
 export interface EffectiveAccess {
+  is_admin?: boolean;
   permissions: string[];
   explanations: PermissionExplanation[];
   role_grants?: Omit<PermissionExplanation, "granted">[];

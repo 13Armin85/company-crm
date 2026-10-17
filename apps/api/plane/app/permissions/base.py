@@ -50,16 +50,15 @@ def allow_permission(allowed_roles, level="PROJECT", creator=False, model=None):
                 ).exists():
                     return view_func(instance, request, *args, **kwargs)
             else:
-                # Workspace administrators manage every project in their company. They
-                # do not need a redundant ProjectMember row to administer it.
+                from plane.db.models import UserOrganizationRole
+
                 if WorkspaceMember.objects.filter(
-                    member=request.user,
-                    workspace__slug=kwargs["slug"],
-                    role=ROLE.ADMIN.value,
-                    is_active=True,
+                    member=request.user, workspace__slug=kwargs["slug"], is_active=True
+                ).exists() and UserOrganizationRole.objects.filter(
+                    user=request.user, workspace__slug=kwargs["slug"], is_active=True,
+                    role__system_key="admin", role__is_active=True, role__deleted_at__isnull=True,
                 ).exists():
                     return view_func(instance, request, *args, **kwargs)
-
                 is_user_has_allowed_role = ProjectMember.objects.filter(
                     member=request.user,
                     workspace__slug=kwargs["slug"],

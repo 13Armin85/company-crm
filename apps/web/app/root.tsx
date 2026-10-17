@@ -1,4 +1,7 @@
 import type { ReactNode } from "react";
+import { useEffect } from "react";
+import { localizeError } from "./crm/error-messages";
+import { clearFieldValidation, localizeInvalidField } from "./crm/form-validation";
 import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
 import type { LinksFunction, MetaFunction } from "react-router";
 import appStyles from "@/styles/index.css?url";
@@ -26,6 +29,16 @@ export const meta: MetaFunction = () => [
 ];
 
 export function Layout({ children }: { children: ReactNode }) {
+  useEffect(() => {
+    document.addEventListener("invalid", localizeInvalidField, true);
+    document.addEventListener("input", clearFieldValidation, true);
+    document.addEventListener("change", clearFieldValidation, true);
+    return () => {
+      document.removeEventListener("invalid", localizeInvalidField, true);
+      document.removeEventListener("input", clearFieldValidation, true);
+      document.removeEventListener("change", clearFieldValidation, true);
+    };
+  }, []);
   return (
     <html lang="fa" dir="rtl" suppressHydrationWarning>
       <head>
@@ -48,7 +61,7 @@ export default function Root() {
 }
 
 export function ErrorBoundary({ error }: { error: unknown }) {
-  const message = error instanceof Error ? error.message : "خطای پیش‌بینی‌نشده‌ای رخ داد.";
+  const message = localizeError(error instanceof Error ? error.message : "", "خطای پیش‌بینی‌نشده‌ای رخ داد.");
   return (
     <main className="fatal-error">
       <span>!</span>

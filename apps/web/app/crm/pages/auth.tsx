@@ -5,11 +5,11 @@ import { BrandLogo } from "@plane/ui";
 
 const authErrors: Record<string, string> = {
   USER_DOES_NOT_EXIST: "حساب کاربری پیدا نشد.",
-  AUTHENTICATION_FAILED_SIGN_IN: "نام کاربری یا رمز عبور درست نیست.",
-  INVALID_EMAIL_SIGN_IN: "شناسه ورود معتبر وارد کنید.",
-  REQUIRED_EMAIL_PASSWORD_SIGN_IN: "شناسه ورود و رمز عبور الزامی است.",
+  AUTHENTICATION_FAILED_SIGN_IN: "نام کاربری یا رمز عبور اشتباه است.",
+  INVALID_EMAIL_SIGN_IN: "ایمیل یا نام کاربری معتبر وارد کنید.",
+  REQUIRED_EMAIL_PASSWORD_SIGN_IN: "وارد کردن نام کاربری و رمز عبور الزامی است.",
   EMAIL_PASSWORD_AUTHENTICATION_DISABLED: "ورود با رمز عبور غیرفعال است.",
-  RATE_LIMIT_EXCEEDED: "تعداد تلاش‌ها زیاد است؛ کمی بعد دوباره امتحان کنید.",
+  RATE_LIMIT_EXCEEDED: "تعداد تلاش‌ها زیاد است؛ کمی بعد دوباره تلاش کنید.",
 };
 
 export default function AuthPage() {
@@ -92,12 +92,12 @@ export function LoginForm({
       </header>
       {errorKey && (
         <div className="auth-message error" role="alert">
-          {authErrors[errorKey] ?? "ورود انجام نشد."}
+          {authErrors[errorKey] ?? "ورود انجام نشد؛ دوباره تلاش کنید."}
         </div>
       )}
       {failed && (
         <div className="auth-message error" role="alert">
-          اتصال به سامانه برقرار نشد. صفحه را دوباره بارگذاری کنید.
+          اتصال به سرور برقرار نشد؛ صفحه را دوباره بارگذاری کنید.
         </div>
       )}
       <label>

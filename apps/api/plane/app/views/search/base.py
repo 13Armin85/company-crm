@@ -72,6 +72,7 @@ class GlobalSearchEndpoint(BaseAPIView):
                 q,
                 project_projectmember__member=self.request.user,
                 project_projectmember__is_active=True,
+                project_projectmember__deleted_at__isnull=True,
                 archived_at__isnull=True,
                 workspace__slug=slug,
             )

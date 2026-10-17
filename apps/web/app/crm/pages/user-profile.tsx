@@ -13,7 +13,6 @@ import { UserAccessPanel } from "../access/user-access";
 import { Button, PageHeader, Skeleton } from "../components";
 import { useUIStore } from "../store";
 import type { OrganizationUserProfile } from "../types";
-import { IdentifierBadge } from "@plane/ui";
 
 export default function UserProfilePage() {
   const { userId = "" } = useParams();
@@ -38,7 +37,7 @@ export default function UserProfilePage() {
   }, [isDirty, setFormDirty]);
   if (accessLoading) return <Skeleton rows={6} />;
   if (!access?.can("User.View")) return <Navigate to="/my-work" replace />;
-  if (error) return <p role="alert">دریافت پروفایل انجام نشد.</p>;
+  if (error) return <p role="alert">عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید.</p>;
   if (isLoading || !form) return <Skeleton rows={7} />;
   const canEdit = access.can("User.Edit");
   const canSave = canEdit || access.can("User.Role.Assign") || access.can("OrganizationUnit.Member.Manage");
@@ -91,7 +90,6 @@ export default function UserProfilePage() {
         }
       />
       <section className="panel user-profile-admin">
-        <IdentifierBadge value={form.id} label="شناسه کاربر" />
         <header>
           <UserRound size={24} />
           <h2>اطلاعات حساب</h2>

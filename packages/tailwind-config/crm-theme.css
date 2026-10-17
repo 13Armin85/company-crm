@@ -943,6 +943,180 @@ input[aria-invalid="true"] {
 :root[data-density="compact"] {
   --crm-control-height: 36px;
 }
+:root[data-density="compact"] .issue-row {
+  min-height: 44px;
+  padding-block: 6px;
+  gap: 8px;
+}
+:root[data-density="compact"] .project-card,
+:root[data-density="compact"] .kanban-card {
+  padding: 12px;
+}
+:root[data-density="compact"] .kanban-column > div {
+  gap: 8px;
+}
+:root[data-density="compact"] .page-content {
+  padding: 18px;
+}
+:root[data-density="compact"] .settings-section {
+  padding: 18px;
+}
+.issue-people {
+  display: block;
+  margin-block: 4px;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+  white-space: normal;
+}
+.issue-transfer-control,
+.kanban-transfer-control {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  padding: 10px;
+  border-top: 1px solid var(--border);
+}
+.issue-transfer-control > label,
+.kanban-transfer-control > label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+}
+.my-work-list .issue-row.has-inline-transfer {
+  grid-template-columns: 20px minmax(120px, 1fr) auto auto auto auto;
+}
+.my-work-list .issue-row.has-inline-transfer > .issue-main {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: start;
+  opacity: 1;
+}
+.my-work-list .issue-row.has-inline-transfer > .issue-main strong {
+  width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.my-work-list .issue-row.has-inline-transfer > .issue-transfer-control {
+  grid-column: 1 / -1;
+  justify-self: start;
+  width: min(100%, 360px);
+  padding: 12px 0 2px;
+}
+@media (max-width: 900px) {
+  .my-work-list .issue-row.has-inline-transfer {
+    grid-template-columns: 20px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "check main actions"
+      ". status priority"
+      ". date date"
+      ". transfer transfer";
+  }
+  .my-work-list .issue-row.has-inline-transfer > .issue-check {
+    grid-area: check;
+  }
+  .my-work-list .issue-row.has-inline-transfer > .issue-main {
+    grid-area: main;
+  }
+  .my-work-list .issue-row.has-inline-transfer > .issue-actions {
+    grid-area: actions;
+  }
+  .my-work-list .issue-row.has-inline-transfer > .status {
+    grid-area: status;
+  }
+  .my-work-list .issue-row.has-inline-transfer > .priority {
+    display: inline-flex;
+    grid-area: priority;
+  }
+  .my-work-list .issue-row.has-inline-transfer > .issue-date {
+    display: inline-flex;
+    grid-area: date;
+  }
+  .my-work-list .issue-row.has-inline-transfer > .issue-transfer-control {
+    grid-area: transfer;
+  }
+}
+[data-transfer-field] .selector-input-row {
+  gap: 6px;
+  min-height: 44px;
+  padding: 4px 8px;
+  border-radius: 10px;
+  background: var(--surface);
+  transition:
+    border-color 150ms,
+    box-shadow 150ms;
+}
+[data-transfer-field] .selector-input-row:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+[data-transfer-field] .selector-input-row input {
+  flex: 1 1 0%;
+  width: 0;
+  min-width: 0;
+  min-height: 32px;
+  padding: 6px 2px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.6;
+  text-align: start;
+  text-overflow: ellipsis;
+  outline: none;
+  box-shadow: none;
+}
+[data-transfer-field] .selector-input-row button {
+  display: grid;
+  place-items: center;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 18px;
+  line-height: 1;
+}
+[data-transfer-field] .selector-input-row button:hover {
+  background: var(--surface-hover, var(--surface));
+  color: var(--text-primary);
+}
+[data-transfer-field] .selector-input-row:has(input:disabled) {
+  opacity: 0.6;
+}
+.member-transfer-options {
+  width: max(280px, var(--input-width));
+  padding: 6px;
+  z-index: 160;
+}
+.member-transfer-options .selector-single-option {
+  padding: 10px 12px;
+  border-radius: 7px;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+.member-transfer-options .selector-single-option small {
+  font-size: 12px;
+  font-weight: 400;
+}
+.kanban-card[aria-disabled="true"] {
+  cursor: default;
+}
 @media (max-width: 767px) {
   .form-grid {
     grid-template-columns: minmax(0, 1fr);

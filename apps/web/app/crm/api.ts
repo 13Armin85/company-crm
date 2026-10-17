@@ -7,6 +7,7 @@ import { publishSessionEnd } from "./access/session-events";
 import { combineRequestSignals } from "./access/request-signals";
 import { presentNotification } from "./notification-presentation";
 import { issueStatusFromState } from "./issue-status";
+import { firstError, localizeError } from "./error-messages";
 import type {
   ActivityItem,
   Cycle,
@@ -200,6 +201,7 @@ const mapProject = (item: Record<string, unknown>): Project => {
     updatedAt: item.updated_at ? String(item.updated_at) : undefined,
     projectLead: lead,
     projectLeadId: lead?.id ?? (item.project_lead ? String(item.project_lead) : undefined),
+    createdById: item.created_by ? String(item.created_by) : undefined,
     memberIds: Array.isArray(item.members) ? item.members.map(String) : [],
   };
 };
@@ -258,6 +260,15 @@ const mapIssue = (
       assigneeRaw && typeof assigneeRaw === "object"
         ? mapMember(assigneeRaw as Record<string, unknown>)
         : members.find((member) => member.id === assigneeId),
+    senderId: item.created_by
+      ? String(typeof item.created_by === "object" ? (item.created_by as { id?: string }).id : item.created_by)
+      : undefined,
+    sender:
+      item.created_by_detail && typeof item.created_by_detail === "object"
+        ? mapMember(item.created_by_detail as Record<string, unknown>)
+        : members.find((member) => member.id === String(item.created_by)),
+    wasAssignedToMe: item.was_assigned_to_me === true,
+    archived: item.archived === true,
     dueDate: item.target_date ? String(item.target_date) : undefined,
     completedAt: item.completed_at ? String(item.completed_at) : undefined,
     createdAt: item.created_at ? String(item.created_at) : undefined,
@@ -292,6 +303,15 @@ const mapWorkspaceTask = (item: Record<string, unknown>, members: Member[]): Iss
       assigneeRaw && typeof assigneeRaw === "object"
         ? mapMember(assigneeRaw as Record<string, unknown>)
         : members.find((member) => member.id === assigneeId),
+    senderId: item.created_by
+      ? String(typeof item.created_by === "object" ? (item.created_by as { id?: string }).id : item.created_by)
+      : undefined,
+    sender:
+      item.created_by_detail && typeof item.created_by_detail === "object"
+        ? mapMember(item.created_by_detail as Record<string, unknown>)
+        : members.find((member) => member.id === String(item.created_by)),
+    wasAssignedToMe: item.was_assigned_to_me === true,
+    archived: item.archived === true,
     dueDate: item.target_date ? String(item.target_date) : undefined,
     completedAt: item.completed_at ? String(item.completed_at) : undefined,
     createdAt: item.created_at ? String(item.created_at) : undefined,
@@ -300,10 +320,9 @@ const mapWorkspaceTask = (item: Record<string, unknown>, members: Member[]): Iss
   };
 };
 export const errorMessage = (error: unknown, fallback: string) => {
-  if (error instanceof Error && !(error as AxiosError).response) return error.message || fallback;
+  if (error instanceof Error && !(error as AxiosError).response) return localizeError(error.message, fallback);
   const data = (error as AxiosError<Record<string, unknown>>)?.response?.data;
-  const value = data?.error ?? data?.detail ?? (data ? Object.values(data)[0] : undefined);
-  return Array.isArray(value) ? String(value[0]) : String(value ?? fallback);
+  return localizeError(firstError(data) ?? fallback, fallback);
 };
 const useSlug = (provided?: string) => useUIStore((state) => provided || state.workspaceSlug);
 
@@ -375,8 +394,8 @@ export const useUploadAvatar = () => {
   const client = useQueryClient();
   return useMutation({
     mutationFn: async (file: File) => {
-      if (!file.type.startsWith("image/")) throw new Error("فقط فایل تصویری مجاز است");
-      if (file.size > 5 * 1024 * 1024) throw new Error("حجم تصویر نباید بیشتر از ۵ مگابایت باشد");
+      if (!file.type.startsWith("image/")) throw new Error("The operation failed. Please try again.");
+      if (file.size > 5 * 1024 * 1024) throw new Error("The operation failed. Please try again.");
       const response = await api.post<{
         asset_id: string;
         asset_url: string;
@@ -393,7 +412,7 @@ export const useUploadAvatar = () => {
       const uploaded = await fetch(response.data.upload_data.url, { method: "POST", body: formData });
       if (!uploaded.ok) {
         await api.delete(`/api/assets/v2/user-assets/${response.data.asset_id}/`);
-        throw new Error("بارگذاری تصویر در فضای ذخیره‌سازی انجام نشد");
+        throw new Error("The operation failed. Please try again.");
       }
       await api.patch(`/api/assets/v2/user-assets/${response.data.asset_id}/`, {});
       return response.data.asset_url;
@@ -537,6 +556,7 @@ export const useProjects = (providedSlug?: string) => {
   return useQuery({
     queryKey: ["projects", slug],
     enabled: Boolean(slug),
+    refetchInterval: 15_000,
     queryFn: async (): Promise<Project[]> =>
       unwrap<Record<string, unknown>[]>((await api.get(`/api/workspaces/${slug}/projects/details/`)).data).map(
         mapProject
@@ -548,6 +568,7 @@ export const useProject = (projectId: string, providedSlug?: string) => {
   return useQuery({
     queryKey: ["project", slug, projectId],
     enabled: Boolean(slug && projectId),
+    refetchInterval: 15_000,
     queryFn: async () => mapProject((await api.get(`/api/workspaces/${slug}/projects/${projectId}/`)).data),
   });
 };
@@ -562,12 +583,12 @@ export const useStates = (projectId?: string, providedSlug?: string) => {
       ).map(mapState),
   });
 };
-export const useIssues = (providedSlug?: string, projectId?: string) => {
+export const useIssues = (providedSlug?: string, projectId?: string, enabled = true) => {
   const slug = useSlug(providedSlug),
     projectsQuery = useProjects(slug);
   return useQuery({
     queryKey: ["issues", slug, projectId ?? "all", projectsQuery.data?.map((p) => p.id).join(",")],
-    enabled: Boolean(slug && (projectId || projectsQuery.data)),
+    enabled: enabled && Boolean(slug && (projectId || projectsQuery.data)),
     queryFn: async (): Promise<Issue[]> => {
       const [memberResponse, workspaceTaskResponse] = await Promise.all([
         api.get(`/api/workspaces/${slug}/members/`),
@@ -596,6 +617,29 @@ export const useIssues = (providedSlug?: string, projectId?: string) => {
     },
   });
 };
+export const useTaskHistory = (enabled = true) => {
+  const slug = useSlug();
+  return useQuery({
+    queryKey: ["task-history", slug],
+    enabled: enabled && Boolean(slug),
+    refetchInterval: 15_000,
+    queryFn: async (): Promise<Issue[]> => {
+      const { data } = await api.get<{
+        project_issues: Record<string, unknown>[];
+        workspace_tasks: Record<string, unknown>[];
+      }>(`/api/workspaces/${slug}/tasks/history/`);
+      return [
+        ...data.project_issues.map((item) => mapIssue(item, String(item.project_id))),
+        ...data.workspace_tasks.map((item) => mapWorkspaceTask(item, [])),
+        // The supported TypeScript target predates Array.toSorted; this array is newly allocated.
+        // eslint-disable-next-line unicorn/no-array-sort
+      ].sort(
+        (left, right) => (right.createdAt ?? "").localeCompare(left.createdAt ?? "") || left.id.localeCompare(right.id)
+      );
+    },
+  });
+};
+
 export const useMembers = (providedSlug?: string, projectId?: string, enabled = true) => {
   const slug = useSlug(providedSlug);
   return useQuery({
@@ -748,6 +792,7 @@ export const useDeleteProject = (slug: string, projectId: string) => {
       client.removeQueries({ queryKey: ["project", slug, projectId] });
       client.invalidateQueries({ queryKey: ["projects", slug] });
       client.invalidateQueries({ queryKey: ["issues", slug] });
+      client.invalidateQueries({ queryKey: ["task-history", slug] });
       useUIStore.getState().toast("پروژه حذف شد");
     },
     onError: (error) => useUIStore.getState().toast(errorMessage(error, "حذف پروژه انجام نشد"), "error"),
@@ -788,6 +833,7 @@ export const useCreateIssue = (slug: string, projectId?: string) => {
     },
     onSuccess: () => {
       client.invalidateQueries({ queryKey: ["issues", slug] });
+      client.invalidateQueries({ queryKey: ["task-history", slug] });
       useUIStore.getState().toast("تغییرات با موفقیت انجام شد");
       client.invalidateQueries({ queryKey: ["notifications", slug] });
     },
@@ -813,7 +859,7 @@ export const useUpdateIssueStatus = (slug: string) => {
         (await api.get(`/api/workspaces/${slug}/projects/${issue.projectId}/states/`)).data
       ).map(mapState);
       const target = states.find((state) => state.status === status);
-      if (!target) throw new Error("وضعیت متناظر در این پروژه تعریف نشده است");
+      if (!target) throw new Error("The operation failed. Please try again.");
       await api.patch(`/api/workspaces/${slug}/projects/${issue.projectId}/issues/${issue.id}/`, {
         state_id: target.id,
       });
@@ -833,8 +879,11 @@ export const useUpdateIssueStatus = (slug: string) => {
     },
     onSuccess: () => useUIStore.getState().toast("تغییرات با موفقیت انجام شد"),
     onSettled: () => {
-      client.invalidateQueries({ queryKey: ["notifications", slug] });
-      return client.invalidateQueries({ queryKey: ["issues", slug] });
+      return Promise.all([
+        client.invalidateQueries({ queryKey: ["notifications", slug] }),
+        client.invalidateQueries({ queryKey: ["issues", slug] }),
+        client.invalidateQueries({ queryKey: ["task-history", slug] }),
+      ]);
     },
   });
 };
@@ -847,6 +896,7 @@ export const useDeleteIssue = (slug: string) => {
         : api.delete(`/api/workspaces/${slug}/projects/${issue.projectId}/issues/${issue.id}/`),
     onSuccess: () => {
       client.invalidateQueries({ queryKey: ["issues", slug] });
+      client.invalidateQueries({ queryKey: ["task-history", slug] });
       useUIStore.getState().toast("کار حذف شد");
     },
     onError: (error) => useUIStore.getState().toast(errorMessage(error, "حذف کار انجام نشد"), "error"),
@@ -863,6 +913,7 @@ export const useReassignIssue = (slug: string) => {
           }),
     onSuccess: () => {
       client.invalidateQueries({ queryKey: ["issues", slug] });
+      client.invalidateQueries({ queryKey: ["task-history", slug] });
       useUIStore.getState().toast("مسئول کار تغییر کرد");
       client.invalidateQueries({ queryKey: ["notifications", slug] });
     },
@@ -1238,6 +1289,7 @@ export const useClaimTicketRoleQueue = (slug: string) => {
       );
       client.invalidateQueries({ queryKey: ["ticket-role-queue", slug] });
       client.invalidateQueries({ queryKey: ["issues", slug] });
+      client.invalidateQueries({ queryKey: ["task-history", slug] });
       useUIStore.getState().toast("تیکت به شما واگذار شد");
       client.invalidateQueries({ queryKey: ["notifications", slug] });
     },

@@ -74,6 +74,7 @@ PERMISSION_REGISTRY = {
     for action in actions
 }
 MEMBER_PERMISSIONS = {
+    "Issue.Create",
     "Project.View",
     "Issue.View",
     "Issue.Status.Edit",

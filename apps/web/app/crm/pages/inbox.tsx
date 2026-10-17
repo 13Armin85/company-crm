@@ -72,7 +72,7 @@ export default function InboxPage() {
         />
         {isError ? (
           <div role="alert" className="inline-error">
-            دریافت اعلان‌ها انجام نشد.
+            اعلان‌ها دریافت نشدند.
             <Button variant="secondary" onClick={() => void refetch()}>
               تلاش دوباره
             </Button>

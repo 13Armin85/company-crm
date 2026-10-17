@@ -193,7 +193,7 @@ export function PersianDatePicker({
           onInvalid={() => document.getElementById(controlId)?.focus()}
         />
       )}
-      {(error || (value && !chosen)) && <p role="alert">{error || "تاریخ نامعتبر است."}</p>}
+      {(error || (value && !chosen)) && <p role="alert">{error || "تاریخ واردشده معتبر نیست."}</p>}
     </div>
   );
 }
@@ -223,7 +223,7 @@ export function PersianDateTimePicker({ value, onChange, timeZone, min, max, ...
     setError(invalid ? "زمان انتخاب‌شده معتبر یا در بازهٔ مجاز نیست." : "");
     if (!invalid) onChange(result);
   };
-  const validationError = error || (value && !parts ? "زمان نامعتبر است." : props.error);
+  const validationError = error || (value && !parts ? "زمان واردشده معتبر نیست." : props.error);
   return (
     <div className="persian-datetime-picker">
       <PersianDatePicker

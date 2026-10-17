@@ -17,7 +17,7 @@ export function PermissionGate({
 
 export function PermissionRoute({ permission, children }: { permission: string; children: ReactNode }) {
   const { data, isLoading, error } = useAccess();
-  if (error) return <p role="alert">دریافت دسترسی انجام نشد. صفحه را دوباره بارگذاری کنید.</p>;
+  if (error) return <p role="alert">عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید.</p>;
   if (isLoading || !data)
     return (
       <div role="status" className="access-loading">

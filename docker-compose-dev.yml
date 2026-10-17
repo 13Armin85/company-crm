@@ -83,7 +83,7 @@ services:
 
   plane-minio:
     build:
-      context: ./deployments/dev
+      context: ./docker/dev
       dockerfile: Dockerfile.minio
       args:
         GOPROXY: ${GO_PROXY:-https://proxy.golang.org|https://goproxy.io|direct}
@@ -175,7 +175,7 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: deployments/dev/Dockerfile.frontend
+      dockerfile: docker/dev/Dockerfile.frontend
       args:
         NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com/}
     restart: unless-stopped
@@ -267,7 +267,7 @@ services:
       - "127.0.0.1:5050:80"
     volumes:
       - pgadmin_data:/var/lib/pgadmin
-      - ./deployments/dev/pgadmin-servers.json:/pgadmin4/servers.json:ro
+      - ./docker/dev/pgadmin-servers.json:/pgadmin4/servers.json:ro
     depends_on:
       plane-db:
         condition: service_healthy

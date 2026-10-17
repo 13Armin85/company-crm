@@ -151,6 +151,9 @@ describe("CRM access pages", () => {
     expect(html).not.toContain("نقش جدید");
     expect(html).not.toContain("غیرفعال کردن");
     expect(html).not.toContain('type="number"');
+    expect(html).not.toContain("identifier-badge");
+    expect(html).not.toContain("شناسه نقش");
+    expect(html).toContain('href="/roles/support/permissions"');
   });
 
   it("renders an accessible icon for delegates in the organization tree", () => {
@@ -161,6 +164,8 @@ describe("CRM access pages", () => {
     expect(button).toContain("<svg");
     expect(button).toContain('aria-expanded="false"');
     expect(button).not.toContain(">جانشینان<");
+    expect(html).not.toContain("identifier-badge");
+    expect(html).not.toContain("شناسه واحد");
   });
 
   it.each([
@@ -185,6 +190,9 @@ describe("CRM access pages", () => {
     expect(html).toContain("غیرفعال");
     expect(html).not.toContain('type="password"');
     expect(html).not.toContain("ساخت کاربر جدید");
+    expect(html).not.toContain("identifier-badge");
+    expect(html).not.toContain("شناسه کاربر");
+    expect(html).toContain('href="/team/user"');
   });
 
   it("allows unit manager editing independently of structure editing", () => {

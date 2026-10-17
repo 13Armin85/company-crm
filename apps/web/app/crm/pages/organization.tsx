@@ -1,4 +1,4 @@
-import { IdentifierBadge, SearchableSelect } from "@plane/ui";
+import { SearchableSelect } from "@plane/ui";
 import { useEffect, useMemo, useState } from "react";
 import { Building2, ChevronDown, ChevronLeft, Edit3, Plus, Power, Trash2, UsersRound } from "lucide-react";
 import { Navigate, useSearchParams } from "react-router";
@@ -110,7 +110,6 @@ export default function OrganizationPage() {
           </span>
           <div>
             <b>{unit.title}</b>
-            <IdentifierBadge value={unit.id} label="شناسه واحد" />
             <small>
               {unit.managerName ? `مدیر: ${unit.managerName}` : "بدون مدیر"} · {unit.memberIds.length} عضو
             </small>
@@ -195,7 +194,7 @@ export default function OrganizationPage() {
           )
         }
       />
-      <SearchBox value={query} onChange={setQuery} placeholder="جستجوی شناسه، عنوان یا مدیر واحد…" />
+      <SearchBox value={query} onChange={setQuery} placeholder="جستجوی عنوان یا مدیر واحد…" />
       <section
         className="organization-tree panel"
         onDragOver={(event) => event.preventDefault()}
@@ -213,7 +212,7 @@ export default function OrganizationPage() {
         ) : (
           <EmptyState
             title={query.trim() ? "واحدی پیدا نشد" : "ساختار سازمانی خالی است"}
-            description={query.trim() ? "شناسه یا عبارت جست‌وجو را بررسی کنید." : "اولین واحد سازمانی را ایجاد کنید."}
+            description={query.trim() ? "عبارت جست‌وجو را بررسی کنید." : "اولین واحد سازمانی را ایجاد کنید."}
           />
         )}
       </section>

@@ -17,7 +17,7 @@ from plane.app.serializers import (
 )
 
 from plane.app.permissions import WorkspaceUserPermission
-from plane.app.permissions.crm import require_permission
+from plane.app.permissions.crm import require_permission, ProjectScopePermission
 
 from plane.db.models import Project, ProjectMember, ProjectUserProperty, WorkspaceMember
 from plane.bgtasks.project_add_user_email_task import project_add_user_email
@@ -26,6 +26,7 @@ from plane.app.permissions.base import allow_permission, ROLE
 
 
 class ProjectMemberViewSet(BaseViewSet):
+    permission_classes = [ProjectScopePermission]
     serializer_class = ProjectMemberAdminSerializer
     model = ProjectMember
 

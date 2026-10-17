@@ -22,6 +22,7 @@ from drf_spectacular.types import OpenApiTypes
 
 # Module imports
 from plane.app.permissions.crm import require_permission, ProjectScopePermission
+from plane.app.services.project_visibility import visible_projects
 from plane.db.models import (
     Cycle,
     Intake,
@@ -82,18 +83,13 @@ class ProjectListCreateAPIEndpoint(BaseAPIView):
     webhook_event = "project"
     permission_classes = [ProjectScopePermission]
     allow_workspace_project_access = True
-    allow_public_project_access = True
     use_read_replica = True
 
     def get_queryset(self):
         return (
-            Project.objects.filter(workspace__slug=self.kwargs.get("slug"))
-            .filter(
-                Q(
-                    project_projectmember__member=self.request.user,
-                    project_projectmember__is_active=True,
-                )
-                | Q(network=2)
+            visible_projects(
+                Project.objects.filter(workspace__slug=self.kwargs.get("slug")),
+                self.request.user, self.kwargs["slug"],
             )
             .select_related("project_lead")
             .annotate(
@@ -350,20 +346,14 @@ class ProjectListLiteAPIEndpoint(BaseAPIView):
     model = Project
     permission_classes = [ProjectScopePermission]
     allow_workspace_project_access = True
-    allow_public_project_access = True
     use_read_replica = True
 
     def get_queryset(self):
-        # Projects the user can access: those they are an active member of, plus
-        # public (network=2) ones.
+        # Membership scope is shared with the app; only administrators bypass it.
         return (
-            Project.objects.filter(workspace__slug=self.kwargs.get("slug"))
-            .filter(
-                Q(
-                    project_projectmember__member=self.request.user,
-                    project_projectmember__is_active=True,
-                )
-                | Q(network=2)
+            visible_projects(
+                Project.objects.filter(workspace__slug=self.kwargs.get("slug")),
+                self.request.user, self.kwargs["slug"],
             )
             .distinct()
         )
@@ -402,7 +392,7 @@ class ProjectListLiteAPIEndpoint(BaseAPIView):
         """List projects (lite)
 
         Retrieve a paginated, lightweight list of projects the user can access in
-        the workspace (projects they are an active member of, plus public projects),
+        the workspace, restricted to active memberships for ordinary users,
         optimized for pickers and references.
         """
         if not Workspace.objects.filter(slug=slug).exists():
@@ -443,18 +433,13 @@ class ProjectDetailAPIEndpoint(BaseAPIView):
 
     permission_classes = [ProjectScopePermission]
     allow_workspace_project_access = True
-    allow_public_project_access = True
     use_read_replica = True
 
     def get_queryset(self):
         return (
-            Project.objects.filter(workspace__slug=self.kwargs.get("slug"))
-            .filter(
-                Q(
-                    project_projectmember__member=self.request.user,
-                    project_projectmember__is_active=True,
-                )
-                | Q(network=2)
+            visible_projects(
+                Project.objects.filter(workspace__slug=self.kwargs.get("slug")),
+                self.request.user, self.kwargs["slug"],
             )
             .select_related("workspace", "workspace__owner", "default_assignee", "project_lead")
             .annotate(
@@ -663,7 +648,6 @@ class ProjectArchiveUnarchiveAPIEndpoint(BaseAPIView):
 
     permission_classes = [ProjectScopePermission]
     allow_workspace_project_access = True
-    allow_public_project_access = True
 
     @project_docs(
         operation_id="archive_project",

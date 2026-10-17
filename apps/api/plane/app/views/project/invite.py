@@ -24,6 +24,7 @@ from plane.app.serializers import (
     ProjectMemberInvitePublicSerializer,
 )
 from plane.app.permissions import allow_permission, ROLE
+from plane.app.services.task_policy import is_workspace_administrator
 from plane.db.models import (
     ProjectMember,
     Workspace,
@@ -131,6 +132,8 @@ class UserProjectInvitationsViewset(BaseViewSet):
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     def create(self, request, slug):
         project_ids = request.data.get("project_ids", [])
+        if not is_workspace_administrator(request.user, slug):
+            return Response({"error": "An administrator must add you to the project."}, status=403)
 
         # Get the workspace user role
         workspace_member = WorkspaceMember.objects.get(member=request.user, workspace__slug=slug, is_active=True)

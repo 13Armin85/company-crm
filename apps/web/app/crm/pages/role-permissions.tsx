@@ -40,7 +40,7 @@ export default function RolePermissionsPage() {
   if (accessLoading || isLoading) return <Skeleton rows={6} />;
   if (!access || (!access.can("Role.View") && !access.can("Role.Permission.Assign")))
     return <Navigate to="/my-work" replace />;
-  if (error || !role) return <p role="alert">نقش یافت نشد یا دریافت آن انجام نشد.</p>;
+  if (error || !role) return <p role="alert">عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید.</p>;
   const canEdit = access.can("Role.Permission.Assign");
   return (
     <div>
@@ -55,7 +55,7 @@ export default function RolePermissionsPage() {
         }
       />
       {permissionsError ? (
-        <p role="alert">دریافت مجوزها انجام نشد.</p>
+        <p role="alert">عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید.</p>
       ) : loadingPermissions ? (
         <Skeleton rows={6} />
       ) : (

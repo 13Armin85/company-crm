@@ -102,11 +102,11 @@ describe("delegate member directory", () => {
     state.loading = false;
     state.membersError = true;
     const html = renderManager();
-    expect(html).toContain("دریافت فهرست اعضا انجام نشد");
+    expect(html).toContain("فهرست اعضای تیم دریافت نشد.");
     expect(html).toContain("تلاش دوباره");
     expect(html).not.toContain("عضو دیگری برای افزودن وجود ندارد");
     state.delegatesError = true;
-    expect(renderManager()).toContain("دریافت جانشینان انجام نشد");
+    expect(renderManager()).toContain("فهرست جانشین‌ها دریافت نشد");
   });
 
   it("searches complete names, email and role with Arabic letter variants and multiple terms", () => {

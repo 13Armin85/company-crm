@@ -57,7 +57,7 @@ export function DelegateManager({
       </header>
       {error && (
         <p className="delegate-notice" role="alert">
-          دریافت جانشینان انجام نشد. لطفاً دوباره این بخش را باز کنید.
+          فهرست جانشین‌ها دریافت نشد؛ این بخش را دوباره باز کنید.
         </p>
       )}
       {data?.active_delegation && (
