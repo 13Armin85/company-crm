@@ -1,4 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { filterMemberDirectory, MemberDirectory } from "@plane/ui";
 
@@ -55,7 +56,11 @@ vi.mock("./api", () => ({
 import { DelegateManager } from "./delegate-manager";
 
 const renderManager = () =>
-  renderToStaticMarkup(<DelegateManager unitId="finance" unitTitle="صف بررسی مالی" managerId="manager" />);
+  renderToStaticMarkup(
+    <QueryClientProvider client={new QueryClient()}>
+      <DelegateManager unitId="finance" unitTitle="صف بررسی مالی" managerId="manager" />
+    </QueryClientProvider>
+  );
 
 describe("delegate member directory", () => {
   beforeEach(() => {

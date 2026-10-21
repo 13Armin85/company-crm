@@ -1,6 +1,9 @@
 @import "@plane/tailwind-config/index.css";
 
 @import "@plane/tailwind-config/crm-theme.css";
+@import "./engine.css";
+@import "./page-studio.css";
+@import "./my-work.css";
 * {
   box-sizing: border-box;
 }
@@ -779,7 +782,7 @@ a {
 .issue-row {
   min-height: 52px;
   display: grid;
-  grid-template-columns: 20px minmax(180px, 1fr) 100px 82px 100px 30px;
+  grid-template-columns: 20px minmax(180px, 1fr) 100px 82px 100px max-content;
   align-items: center;
   gap: 10px;
   padding: 8px 13px;
@@ -793,7 +796,7 @@ a {
   background: var(--surface-soft);
 }
 .issue-row.is-compact {
-  grid-template-columns: 20px minmax(150px, 1fr) 95px 80px 90px 28px;
+  grid-template-columns: 20px minmax(150px, 1fr) 95px 80px 90px max-content;
   padding-inline: 2px;
 }
 .issue-row.is-table,
@@ -1293,6 +1296,14 @@ a {
 }
 .table-card tbody tr:hover {
   background: var(--surface-soft);
+}
+.role-name-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.role-name-cell small {
+  color: var(--text-muted);
 }
 .project-name-cell,
 .member-cell {
@@ -2815,13 +2826,15 @@ a {
   pointer-events: auto;
 }
 .notification-drawer {
+  display: none;
+  visibility: hidden;
+  pointer-events: none;
   position: fixed;
   z-index: 60;
   top: 0;
   bottom: 0;
   left: 0;
   width: 360px;
-  display: flex;
   flex-direction: column;
   transform: translateX(-102%);
   background: var(--surface);
@@ -2829,6 +2842,9 @@ a {
   transition: transform 0.25s ease;
 }
 .notification-drawer.is-open {
+  display: flex;
+  visibility: visible;
+  pointer-events: auto;
   transform: translateX(0);
 }
 .notification-drawer > header {
@@ -3408,7 +3424,7 @@ a {
   }
   .issue-row,
   .issue-row.is-compact {
-    grid-template-columns: 20px minmax(140px, 1fr) 85px 26px;
+    grid-template-columns: 20px minmax(140px, 1fr) 85px max-content;
   }
   .issue-row .priority,
   .issue-row .issue-date {
@@ -4084,7 +4100,16 @@ a {
   gap: 3px;
 }
 .issue-action-menu {
-  inset-block-start: 34px;
+  --anchor-gap: 6px;
+  --anchor-padding: 12px;
+  inset-block-start: auto;
+  inset-inline-end: auto;
+  z-index: 160;
+  width: min(300px, calc(100vw - 24px));
+  min-width: 0;
+  max-height: min(520px, var(--anchor-max-height, 520px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .issue-action-menu > small {
   display: block;
@@ -4098,7 +4123,7 @@ a {
 .issue-transfer-control {
   display: grid;
   gap: 5px;
-  min-width: 210px;
+  min-width: 0;
   padding: 8px 9px;
   border-top: 1px solid var(--border);
 }
@@ -4272,6 +4297,9 @@ canvas {
 @media (max-width: 760px) {
   .app-shell .sidebar,
   .app-shell.sidebar-collapsed .sidebar {
+    display: none;
+    visibility: hidden;
+    pointer-events: none;
     z-index: 70;
     width: min(82vw, 300px);
     padding-inline: 12px;
@@ -4281,6 +4309,9 @@ canvas {
     box-shadow: -20px 0 55px rgb(2 6 23 / 22%);
   }
   .app-shell.mobile-sidebar-open .sidebar {
+    display: flex;
+    visibility: visible;
+    pointer-events: auto;
     transform: translateX(0);
   }
   .app-shell .app-area,

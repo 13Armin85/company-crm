@@ -141,6 +141,9 @@ def issue_export_task(
     """
     try:
         exporter_instance = ExporterHistory.objects.get(token=token_id)
+        from plane.app.services.entity_legacy import ensure_legacy_export_access
+        from plane.app.services.task_visibility import visible_issues
+        ensure_legacy_export_access(exporter_instance.workspace, exporter_instance.initiated_by)
         exporter_instance.status = "processing"
         exporter_instance.save(update_fields=["status"])
 
@@ -189,6 +192,8 @@ def issue_export_task(
             )
         )
 
+        workspace_issues = visible_issues(workspace_issues, exporter_instance.initiated_by, slug)
+
         # Create exporter for the specified format
         try:
             exporter = DataExporter(IssueExportSerializer, format_type=provider)
@@ -215,6 +220,7 @@ def issue_export_task(
             files.append((filename, content))
 
         zip_buffer = create_zip_file(files)
+        ensure_legacy_export_access(exporter_instance.workspace, exporter_instance.initiated_by)
         upload_to_s3(zip_buffer, workspace_id, token_id, slug)
 
     except Exception as e:

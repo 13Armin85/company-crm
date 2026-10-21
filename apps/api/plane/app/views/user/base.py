@@ -38,6 +38,7 @@ from plane.app.serializers import (
 from plane.app.views.base import BaseAPIView, BaseViewSet
 from plane.db.models import (
     Account,
+    FileAsset,
     IssueActivity,
     Profile,
     ProjectMember,
@@ -95,6 +96,18 @@ class UserEndpoint(BaseViewSet):
 
     def partial_update(self, request, *args, **kwargs):
         return super().partial_update(request, *args, **kwargs)
+
+    @transaction.atomic
+    def remove_avatar(self, request):
+        user = User.objects.select_for_update().get(id=request.user.id)
+        asset_id = user.avatar_asset_id
+        user.avatar, user.avatar_asset_id = "", None
+        user.save(update_fields=["avatar", "avatar_asset", "updated_at"])
+        if asset_id:
+            FileAsset.objects.filter(id=asset_id, user_id=user.id, entity_type="USER_AVATAR").update(
+                is_deleted=True, deleted_at=timezone.now()
+            )
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     def _validate_new_email(self, user, new_email):
         """

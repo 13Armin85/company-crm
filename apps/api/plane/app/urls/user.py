@@ -45,6 +45,7 @@ urlpatterns = [
         name="user-email-update",
     ),
     # Profile
+    path("users/me/avatar/", UserEndpoint.as_view({"delete": "remove_avatar"}), name="user-avatar-remove"),
     path("users/me/profile/", ProfileEndpoint.as_view(), name="accounts"),
     # End profile
     # Accounts

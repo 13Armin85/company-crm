@@ -39,3 +39,6 @@ export * from "./form-fields/persian-date-picker";
 export * from "./form-fields/persian-time-picker";
 export * from "./form-fields/persian-date-utils";
 export * from "./form-fields/persian-calendar-navigation";
+export * from "./schema-form";
+export { SchemaDataGrid } from "./tables/schema-data-grid";
+export type { SchemaGridColumn, SchemaDataGridProps } from "./tables/schema-data-grid";

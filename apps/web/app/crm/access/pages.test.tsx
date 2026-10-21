@@ -9,13 +9,22 @@ const state = vi.hoisted(() => ({
   permissions: [] as string[],
   authenticated: false,
   loading: false,
+  systemRole: false,
   projects: vi.fn(),
 }));
 vi.mock("../api", () => ({
   useWorkspaceAccess: () => ({ data: { can: (code: string) => state.permissions.includes(code) }, isLoading: false }),
   useOrganizationRoles: () => ({
     data: [
-      { id: "support", name: "پشتیبانی", description: "نقش سازمانی", isActive: false, permissionIds: [], userCount: 3 },
+      {
+        id: "support",
+        name: "پشتیبانی",
+        description: "نقش سازمانی",
+        isActive: false,
+        permissionIds: [],
+        userCount: 3,
+        systemKey: state.systemRole ? "team_manager" : undefined,
+      },
     ],
     isLoading: false,
   }),
@@ -75,6 +84,25 @@ vi.mock("../api", () => ({
   api: { interceptors: { response: { use: vi.fn(), eject: vi.fn() } } },
 }));
 vi.mock("./api", () => ({
+  useAbsences: () => ({
+    data: {
+      absences: [
+        {
+          id: "hidden-absence-id",
+          user: "hidden-user-id",
+          user_name: "کاربر آزمایشی",
+          starts_at: "2026-10-18T06:00:00Z",
+          ends_at: "2026-10-18T14:00:00Z",
+          reason: "مرخصی",
+          current_status: "active",
+          can_edit: true,
+          can_end: true,
+        },
+      ],
+      manageable_user_ids: [],
+    },
+    isLoading: false,
+  }),
   useAccessMutation: () => ({ isPending: false }),
   useUserAccess: () => ({
     data: {
@@ -105,7 +133,7 @@ vi.mock("../components", () => ({
     </header>
   ),
   Button: ({ children }: { children?: ReactNode }) => <button>{children}</button>,
-  SearchBox: () => <input type="search" />,
+  SearchBox: ({ placeholder }: { placeholder?: string }) => <input type="search" placeholder={placeholder} />,
   Skeleton: () => <span>Loading</span>,
   Avatar: () => <span>Avatar</span>,
   EmptyState: () => <span>Empty</span>,
@@ -118,6 +146,7 @@ vi.mock("../components", () => ({
 }));
 
 import RolesPage from "../pages/roles";
+import AbsencesPage from "../pages/absences";
 import RolePermissionsPage from "../pages/role-permissions";
 import OrganizationPage from "../pages/organization";
 import { UserAccessPanel } from "./user-access";
@@ -139,6 +168,7 @@ describe("CRM access pages", () => {
     state.permissions = [];
     state.authenticated = false;
     state.loading = false;
+    state.systemRole = false;
     state.projects.mockClear();
   });
 
@@ -154,6 +184,34 @@ describe("CRM access pages", () => {
     expect(html).not.toContain("identifier-badge");
     expect(html).not.toContain("شناسه نقش");
     expect(html).toContain('href="/roles/support/permissions"');
+  });
+
+  it("separates the system role notice from its name and keeps system roles protected", () => {
+    state.permissions = ["Role.View", "Role.Delete"];
+    state.systemRole = true;
+    const html = renderPage(<RolesPage />);
+    expect(html).toContain(
+      '<div class="role-name-cell"><span>پشتیبانی</span><small>سیستمی؛ قابل حذف نیست</small></div>'
+    );
+    expect(html).not.toContain("حذف نقش");
+    state.systemRole = false;
+    const customRole = renderPage(<RolesPage />);
+    expect(customRole).not.toContain("سیستمی؛ قابل حذف نیست");
+    expect(customRole).toContain("حذف نقش");
+  });
+
+  it("shows absence details and actions without displaying record identifiers", () => {
+    state.permissions = ["Absence.View"];
+    const html = renderPage(<AbsencesPage />);
+    expect(html).toContain("کاربر آزمایشی");
+    expect(html).toContain("مرخصی");
+    expect(html).toContain("ویرایش");
+    expect(html).toContain("پایان عدم حضور");
+    expect(html).toContain("جستجوی نام کاربر یا علت عدم حضور…");
+    expect(html).not.toContain("identifier-badge");
+    expect(html).not.toContain("hidden-absence-id");
+    expect(html).not.toContain("hidden-user-id");
+    expect(html).not.toContain("شناسه");
   });
 
   it("renders an accessible icon for delegates in the organization tree", () => {

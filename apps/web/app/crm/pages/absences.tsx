@@ -1,7 +1,7 @@
-import { IdentifierBadge, PersianDateTimePicker, SearchableSelect } from "@plane/ui";
+import { EngineRecordForm } from "../engine/record-form";
 import { useState } from "react";
 import { Navigate } from "react-router";
-import { errorMessage, useCurrentUser, useMembers, useWorkspaceAccess } from "../api";
+import { useCurrentUser, useWorkspaceAccess } from "../api";
 import { useAbsences, useAccessMutation } from "../access/api";
 import { AccessModal } from "../access/components";
 import type { Absence } from "../access/types";
@@ -14,7 +14,6 @@ export default function AbsencesPage() {
   const { data: currentUser } = useCurrentUser();
   const { data: access, isLoading: accessLoading } = useWorkspaceAccess();
   const { data, isLoading, error } = useAbsences(access?.can("Absence.View") ?? false);
-  const { data: members = [] } = useMembers();
   const mutation = useAccessMutation();
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<{
@@ -47,12 +46,12 @@ export default function AbsencesPage() {
         }
       />
       {error && <p role="alert">عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید.</p>}
-      <SearchBox value={query} onChange={setQuery} placeholder="جستجوی شناسه، کاربر یا علت عدم حضور…" />
+      <SearchBox value={query} onChange={setQuery} placeholder="جستجوی نام کاربر یا علت عدم حضور…" />
       {isLoading ? (
         <Skeleton rows={5} />
       ) : (
         <div className="table-card">
-          <table>
+          <SurfaceTable code="leave">
             <thead>
               <tr>
                 <th>کاربر</th>
@@ -67,10 +66,7 @@ export default function AbsencesPage() {
                 .filter((row) => matchesRecordSearch(query, [row.id, row.user, row.user_name, row.reason]))
                 .map((row) => (
                   <tr key={row.id}>
-                    <td>
-                      {row.user_name}
-                      <IdentifierBadge value={row.id} label="شناسه عدم حضور" />
-                    </td>
+                    <td>{row.user_name}</td>
                     <td>
                       {persianDate(row.starts_at, {
                         year: "numeric",
@@ -107,7 +103,7 @@ export default function AbsencesPage() {
                   </tr>
                 ))}
             </tbody>
-          </table>
+          </SurfaceTable>
         </div>
       )}
       {editing && (
@@ -116,99 +112,15 @@ export default function AbsencesPage() {
           busy={mutation.isPending}
           onClose={() => setEditing(undefined)}
         >
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (
-                mutation.isPending ||
-                !editing.user ||
-                !Number.isFinite(Date.parse(editing.startsAt)) ||
-                !Number.isFinite(Date.parse(editing.endsAt)) ||
-                Date.parse(editing.endsAt) <= Date.parse(editing.startsAt)
-              )
-                return;
-              mutation.mutate(
-                {
-                  path: editing.id ? `absences/${editing.id}/` : "absences/",
-                  method: editing.id ? "patch" : "post",
-                  body: {
-                    ...(editing.id ? {} : { user: editing.user }),
-                    starts_at: new Date(editing.startsAt).toISOString(),
-                    ends_at: new Date(editing.endsAt).toISOString(),
-                    reason: editing.reason,
-                  },
-                },
-                { onSuccess: () => setEditing(undefined) }
-              );
-            }}
-          >
-            <label htmlFor="crm-absences-select-1">
-              <span>کاربر</span>
-              <SearchableSelect
-                id="crm-absences-select-1"
-                label="کاربر"
-                disabled={Boolean(editing.id) || mutation.isPending}
-                value={editing.user}
-                onChange={(user) => setEditing({ ...editing, user })}
-                options={members
-                  .filter(
-                    (row) =>
-                      row.id === editing.user || (row.isActive !== false && data?.manageable_user_ids.includes(row.id))
-                  )
-                  .map((row) => ({ id: row.id, title: row.displayName, description: row.email }))}
-              />
-            </label>
-            <fieldset className="crm-date-field">
-              <legend>شروع</legend>
-              <PersianDateTimePicker
-                timeZone={currentUser?.timeZone}
-                label="شروع"
-                required
-                disabled={mutation.isPending}
-                value={editing.startsAt}
-                onChange={(startsAt) => setEditing({ ...editing, startsAt })}
-              />
-            </fieldset>
-            <fieldset className="crm-date-field">
-              <legend>پایان</legend>
-              <PersianDateTimePicker
-                timeZone={currentUser?.timeZone}
-                label="پایان"
-                required
-                disabled={mutation.isPending}
-                value={editing.endsAt}
-                onChange={(endsAt) => setEditing({ ...editing, endsAt })}
-              />
-            </fieldset>
-            <label>
-              <span>علت</span>
-              <textarea
-                disabled={mutation.isPending}
-                value={editing.reason}
-                onChange={(event) => setEditing({ ...editing, reason: event.target.value })}
-              />
-            </label>
-            {editing.startsAt && editing.endsAt && Date.parse(editing.endsAt) <= Date.parse(editing.startsAt) && (
-              <p role="alert">عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید.</p>
-            )}
-            {mutation.isError && <p role="alert">{errorMessage(mutation.error, "ذخیره عدم حضور انجام نشد.")}</p>}
-            <footer>
-              <Button
-                type="submit"
-                disabled={
-                  mutation.isPending ||
-                  !editing.user ||
-                  !editing.startsAt ||
-                  !editing.endsAt ||
-                  Date.parse(editing.endsAt) <= Date.parse(editing.startsAt)
-                }
-              >
-                ذخیره
-              </Button>
-            </footer>
-          </form>
+          <EngineRecordForm
+            code="leave"
+            id={editing.id || ""}
+            onSaved={() => setEditing(undefined)}
+            onCancel={() => setEditing(undefined)}
+          />
         </AccessModal>
       )}
     </div>
   );
 }
+import { SurfaceTable } from "../engine/surface";

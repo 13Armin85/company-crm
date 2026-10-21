@@ -1,6 +1,14 @@
 import type { OrganizationPermission } from "../types";
 
 const categories: Record<string, string> = {
+  EntityType: "موجودیت‌ها",
+  Lookup: "لیست‌های پایه",
+  Field: "کتابخانه فیلدها",
+  FormLayout: "فرم‌ساز",
+  Config: "پیکربندی موتور",
+  View: "نماها",
+  ConditionalFormat: "رنگ‌بندی شرطی",
+  Export: "خروجی داده",
   User: "کاربران / اعضای تیم",
   Role: "نقش‌ها",
   Permission: "فهرست مجوزها",
@@ -14,6 +22,13 @@ const categories: Record<string, string> = {
   Workspace: "شرکت",
 };
 const actions: Record<string, string> = {
+  "Create.Personal": "ساخت نمای شخصی",
+  "Create.Shared": "ساخت نمای اشتراکی",
+  "Manage.All": "مدیریت همه نماها",
+  Data: "خروجی داده",
+  Publish: "انتشار",
+  Export: "خروجی پیکربندی",
+  Import: "ورود پیکربندی",
   View: "مشاهده",
   ViewAll: "مشاهده همه",
   Create: "ایجاد",

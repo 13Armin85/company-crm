@@ -142,7 +142,7 @@ export default function ProjectsPage() {
         </div>
       ) : (
         <div className="table-card project-table">
-          <table>
+          <SurfaceTable code="project">
             <thead>
               <tr>
                 <th>نام پروژه</th>
@@ -195,9 +195,10 @@ export default function ProjectsPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </SurfaceTable>
         </div>
       )}
     </div>
   );
 }
+import { SurfaceTable } from "../engine/surface";

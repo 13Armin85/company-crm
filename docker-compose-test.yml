@@ -63,6 +63,8 @@ services:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-plane}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-plane}
       RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-plane}
+    tmpfs:
+      - /var/lib/rabbitmq:uid=100,gid=101,mode=0770
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
@@ -78,15 +80,16 @@ services:
     environment:
       MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID:-access-key}
       MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY:-secret-key}
-    entrypoint: >
-      /bin/sh -c "
-      mkdir -p /export/${AWS_S3_BUCKET_NAME:-uploads} &&
-      minio server /export --console-address ':9090' &
-      sleep 3 &&
-      mc alias set local http://localhost:9000 ${AWS_ACCESS_KEY_ID:-access-key} ${AWS_SECRET_ACCESS_KEY:-secret-key} &&
-      mc mb local/${AWS_S3_BUCKET_NAME:-uploads} -p || true &&
-      tail -f /dev/null
-      "
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        mkdir -p "/export/$${AWS_S3_BUCKET_NAME:-uploads}"
+        minio server /export --console-address ':9090' &
+        minio_pid=$$!
+        until mc alias set local http://127.0.0.1:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}" >/dev/null 2>&1; do sleep 1; done
+        mc mb --ignore-existing "local/$${AWS_S3_BUCKET_NAME:-uploads}"
+        wait "$$minio_pid"
     tmpfs:
       - /export
     healthcheck:
@@ -113,6 +116,7 @@ services:
       REDIS_HOST: test-redis
       REDIS_URL: redis://test-redis:6379/
       RABBITMQ_HOST: test-mq
+      AMQP_URL: amqp://${RABBITMQ_USER:-plane}:${RABBITMQ_PASSWORD:-plane}@test-mq:5672/${RABBITMQ_VHOST:-plane}
       AWS_S3_ENDPOINT_URL: http://test-minio:9000
       # Magic-link tests mock the celery delay but the view first checks that
       # EMAIL_HOST is configured. Set a placeholder so the check passes.

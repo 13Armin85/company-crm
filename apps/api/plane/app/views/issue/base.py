@@ -840,11 +840,21 @@ class ProjectUserDisplayPropertyEndpoint(BaseAPIView):
 
 class BulkDeleteIssuesEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN])
+    @transaction.atomic
     def delete(self, request, slug, project_id):
         issue_ids = request.data.get("issue_ids", [])
 
         if not len(issue_ids):
             return Response({"error": "شماره مسئولیت‌ها الزامی هستند"}, status=status.HTTP_400_BAD_REQUEST)
+
+        from plane.app.services.entity_legacy import native_entity
+        entity = native_entity((slug, "ticket", None, project_id))
+        if entity:
+            from plane.app.services.entity_records import delete_record
+            for identifier in dict.fromkeys(issue_ids):
+                delete_record(entity, request.user, identifier, request,
+                    confirm=request.data.get("confirm_relations") is True)
+            return Response({"message": "کارها با موفقیت حذف شدند"})
 
         issues = Issue.issue_objects.filter(workspace__slug=slug, project_id=project_id, pk__in=issue_ids)
 
@@ -1192,8 +1202,25 @@ class IssueBulkUpdateDateEndpoint(BaseAPIView):
         return True
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
+    @transaction.atomic
     def post(self, request, slug, project_id):
         updates = request.data.get("updates", [])
+
+        from plane.app.services.entity_legacy import native_entity
+        entity = native_entity((slug, "ticket", None, project_id))
+        if entity:
+            from rest_framework.exceptions import PermissionDenied
+            from plane.app.services.entity_records import native_queryset, get_record, save_record
+            from plane.app.services.entity_schema import schema_fields
+            _, fields = schema_fields(entity)
+            target = next((code for code, field in fields.items() if field["binding"].get("source") == "target_date"), None)
+            for update in updates:
+                if not native_queryset(entity, request.user, request).filter(id=update.get("id"), project_id=project_id).exists():
+                    raise PermissionDenied("یکی از کارهای انتخاب‌شده در دامنه مجاز شما نیست.")
+                row, _ = get_record(entity, request.user, update["id"], request)
+                save_record(entity, request.user, {"revision": row.revision if row else 0,
+                    "values": {target: update["target_date"]} if target and "target_date" in update else {}},
+                    request, update["id"])
 
         issue_ids = [update["id"] for update in updates]
         epoch = int(timezone.now().timestamp())

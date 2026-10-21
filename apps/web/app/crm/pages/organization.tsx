@@ -16,6 +16,8 @@ import type { OrganizationUnit } from "../types";
 import { AccessModal, MultiSelector } from "../access/components";
 import { DelegateManager } from "../access/delegate-manager";
 import { organizationSearchIds } from "../identifiers";
+import { SurfaceForm } from "../engine/surface";
+import type { FormValues } from "@plane/ui";
 
 type UnitForm = { id?: string; title: string; parentId?: string; managerId?: string; memberIds: string[] };
 const emptyForm: UnitForm = { title: "", memberIds: [] };
@@ -52,11 +54,12 @@ export default function OrganizationPage() {
   const canManageUnit =
     canEditStructure || access.can("OrganizationUnit.Manager.Assign") || access.can("OrganizationUnit.Member.Manage");
 
-  const submit = () => {
+  const submit = (custom_values: FormValues) => {
     if (saveUnit.isPending || !form?.title.trim()) return;
     saveUnit.mutate(
       {
         id: form.id,
+        custom_values,
         title: !form.id || canEditStructure ? form.title : undefined,
         parentId: !form.id || canEditStructure ? form.parentId : undefined,
         managerId: access.can("OrganizationUnit.Manager.Assign") ? (form.managerId ?? "") : undefined,
@@ -253,11 +256,13 @@ export default function OrganizationPage() {
           busy={saveUnit.isPending}
           onClose={() => setForm(undefined)}
         >
-          <form
+          <SurfaceForm
+            code="units"
+            recordId={form.id}
             className="organization-modal"
-            onSubmit={(event) => {
+            onSubmit={(event, custom_values) => {
               event.preventDefault();
-              submit();
+              submit(custom_values);
             }}
           >
             <label htmlFor="crm-unit-title">
@@ -332,7 +337,7 @@ export default function OrganizationPage() {
                 ذخیره واحد
               </Button>
             </footer>
-          </form>
+          </SurfaceForm>
         </AccessModal>
       )}
     </div>

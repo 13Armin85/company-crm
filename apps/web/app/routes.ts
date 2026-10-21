@@ -32,6 +32,8 @@ export default [
     route("routing", "./crm/pages/routing.tsx"),
     route("absences", "./crm/pages/absences.tsx"),
     route("settings", "./crm/pages/settings.tsx"),
+    route("settings/engine", "./crm/engine/settings-page.tsx"),
+    route("edit/:code/:recordId", "./crm/engine/native-form-page.tsx"),
     route("*", "./crm/pages/not-found.tsx"),
   ]),
 ] satisfies RouteConfig;

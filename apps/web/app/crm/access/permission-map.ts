@@ -20,6 +20,7 @@ export function permissionsForPath(pathname: string): string[] {
 }
 
 export function canAccessPath(pathname: string, can: (code: string) => boolean): boolean {
+  if (pathname.startsWith("/settings/engine")) return can("FormLayout.Edit");
   if (/^\/roles\/[^/]+\/permissions\/?$/.test(pathname)) return can("Role.View") || can("Role.Permission.Assign");
   return permissionsForPath(pathname).every(can);
 }

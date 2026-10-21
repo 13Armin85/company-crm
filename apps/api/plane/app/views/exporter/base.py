@@ -23,6 +23,8 @@ class ExportIssuesEndpoint(BaseAPIView):
     def post(self, request, slug):
         # Get the workspace
         workspace = Workspace.objects.get(slug=slug)
+        from plane.app.services.entity_legacy import ensure_legacy_export_access
+        ensure_legacy_export_access(workspace, request.user)
 
         provider = request.data.get("provider", False)
         multiple = request.data.get("multiple", False)
@@ -66,7 +68,9 @@ class ExportIssuesEndpoint(BaseAPIView):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     def get(self, request, slug):
-        exporter_history = ExporterHistory.objects.filter(workspace__slug=slug, type="issue_exports").select_related(
+        from plane.app.services.entity_legacy import ensure_legacy_export_access
+        ensure_legacy_export_access(Workspace.objects.get(slug=slug), request.user)
+        exporter_history = ExporterHistory.objects.filter(workspace__slug=slug, type="issue_exports", initiated_by=request.user).select_related(
             "workspace", "initiated_by"
         )
 

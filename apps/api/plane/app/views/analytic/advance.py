@@ -193,7 +193,9 @@ class AdvanceAnalyticsChartEndpoint(AdvanceAnalyticsBaseView):
             workspace__slug=self._workspace_slug, is_active=True, **date_filter
         ).count()
         total_pages = ProjectPage.objects.filter(**self.filters["base_filters"], **date_filter).count()
-        total_views = IssueView.objects.filter(**self.filters["base_filters"], **date_filter).count()
+        total_views = IssueView.objects.filter(
+            engine_entity__isnull=True, **self.filters["base_filters"], **date_filter
+        ).count()
 
         data = {
             "work_items": total_work_items,

@@ -12,6 +12,7 @@ import {
   Save,
   Shield,
   Sun,
+  Trash2,
   UserCircle,
   Users,
 } from "lucide-react";
@@ -29,12 +30,15 @@ import {
   useUpdateUserProfile,
   useUpdateWorkspace,
   useUploadAvatar,
+  useRemoveAvatar,
   useWorkspaceAccess,
   useWorkspaces,
 } from "../api";
 import { useUIStore } from "../store";
 import { AccessModal } from "../access/components";
 import type { ThemeMode } from "../store";
+import type { FormValues } from "@plane/ui";
+import { SurfaceForm, SurfaceFields } from "../engine/surface";
 
 const settingsNav = [
   { id: "profile", label: "پروفایل من", icon: UserCircle },
@@ -60,6 +64,10 @@ export default function SettingsPage() {
   const { data: workspaces = [] } = useWorkspaces();
   const workspace = workspaces.find((item) => item.slug === workspaceSlug);
   const [workspaceName, setWorkspaceName] = useState("");
+  const [workspaceExtra, setWorkspaceExtra] = useState<FormValues>();
+  const [notificationExtra, setNotificationExtra] = useState<FormValues>();
+  const [appearanceExtra, setAppearanceExtra] = useState<FormValues>();
+  const { data: currentUser } = useCurrentUser();
   const updateWorkspace = useUpdateWorkspace(workspaceSlug);
   const { data: access } = useWorkspaceAccess();
   const canManage = access?.can("User.View") === true;
@@ -92,7 +100,9 @@ export default function SettingsPage() {
           access?.can("Workspace.Edit") ? (
             <Button
               icon={Save}
-              onClick={() => workspaceName.trim() && updateWorkspace.mutate({ name: workspaceName })}
+              onClick={() =>
+                workspaceName.trim() && updateWorkspace.mutate({ name: workspaceName, custom_values: workspaceExtra })
+              }
               disabled={!workspaceSlug || updateWorkspace.isPending}
             >
               ذخیره تغییرات
@@ -102,6 +112,13 @@ export default function SettingsPage() {
       />
       <div className="settings-layout">
         <aside className="settings-nav">
+          {["EntityType.View", "Lookup.View", "Field.View", "FormLayout.Edit", "Config.Import", "Config.Export"].some(
+            (code) => access?.can(code)
+          ) && (
+            <Link className="button button-secondary" to="/settings/engine">
+              طراحی فرم‌ها و جدول‌ها
+            </Link>
+          )}
           {settingsNav
             .filter((item) => item.id !== "members" || canManage)
             .map(({ id, label, icon: Icon }) => (
@@ -134,27 +151,47 @@ export default function SettingsPage() {
                   <p>این انتخاب‌ها در پایگاه داده حساب شما ذخیره می‌شوند.</p>
                 </div>
               </header>
-              <div className="notification-preferences">
-                {notificationPreferences &&
-                  (
-                    [
-                      ["property_change", "تغییر مشخصات کار"],
-                      ["state_change", "تغییر وضعیت"],
-                      ["comment", "دیدگاه‌ها"],
-                      ["mention", "اشاره به شما"],
-                      ["issue_completed", "تکمیل کار"],
-                    ] as const
-                  ).map(([key, label]) => (
-                    <label key={key}>
-                      <span>{label}</span>
-                      <input
-                        type="checkbox"
-                        checked={notificationPreferences[key]}
-                        onChange={(event) => updateNotifications.mutate({ [key]: event.target.checked })}
-                      />
-                    </label>
-                  ))}
-              </div>
+              <SurfaceFields
+                code="notifications"
+                recordId={currentUser?.id || ""}
+                onChange={setNotificationExtra}
+                disabled={updateNotifications.isPending}
+              >
+                <div className="notification-preferences">
+                  {notificationPreferences &&
+                    (
+                      [
+                        ["property_change", "تغییر مشخصات کار"],
+                        ["state_change", "تغییر وضعیت"],
+                        ["comment", "دیدگاه‌ها"],
+                        ["mention", "اشاره به شما"],
+                        ["issue_completed", "تکمیل کار"],
+                      ] as const
+                    ).map(([key, label]) => (
+                      <label key={key}>
+                        <span>{label}</span>
+                        <input
+                          type="checkbox"
+                          checked={notificationPreferences[key]}
+                          onChange={(event) => updateNotifications.mutate({ [key]: event.target.checked })}
+                        />
+                      </label>
+                    ))}
+                </div>
+              </SurfaceFields>
+              {notificationExtra && (
+                <Button
+                  disabled={updateNotifications.isPending}
+                  onClick={() =>
+                    updateNotifications.mutate(
+                      { custom_values: notificationExtra },
+                      { onSuccess: () => setNotificationExtra(undefined) }
+                    )
+                  }
+                >
+                  ذخیره اطلاعات تکمیلی
+                </Button>
+              )}
             </section>
           ) : section === "security" ? (
             <SecuritySettings />
@@ -170,23 +207,30 @@ export default function SettingsPage() {
                 <div className="workspace-profile">
                   <span className="workspace-logo">{workspace?.name.slice(0, 1) ?? "هـ"}</span>
                 </div>
-                <div className="form-grid">
-                  <label>
-                    <span>نام فضای کاری</span>
-                    <input
-                      value={workspaceName}
-                      readOnly={!access?.can("Workspace.Edit")}
-                      onChange={(event) => setWorkspaceName(event.target.value)}
-                    />
-                  </label>
-                  <label>
-                    <span>آدرس فضای کاری</span>
-                    <div className="slug-input">
-                      <span>app.hamkar.ir/</span>
-                      <input dir="ltr" value={workspace?.slug ?? ""} readOnly />
-                    </div>
-                  </label>
-                </div>
+                <SurfaceFields
+                  code="workspace"
+                  recordId={workspace?.id || ""}
+                  onChange={setWorkspaceExtra}
+                  disabled={!access?.can("Workspace.Edit") || updateWorkspace.isPending}
+                >
+                  <div className="form-grid">
+                    <label>
+                      <span>نام فضای کاری</span>
+                      <input
+                        value={workspaceName}
+                        readOnly={!access?.can("Workspace.Edit")}
+                        onChange={(event) => setWorkspaceName(event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      <span>آدرس فضای کاری</span>
+                      <div className="slug-input">
+                        <span>app.hamkar.ir/</span>
+                        <input dir="ltr" value={workspace?.slug ?? ""} readOnly />
+                      </div>
+                    </label>
+                  </div>
+                </SurfaceFields>
               </section>
               <section className="settings-section appearance-section">
                 <header>
@@ -279,6 +323,25 @@ export default function SettingsPage() {
                     {density === "compact" && <Check size={17} />}
                   </button>
                 </div>
+                <SurfaceFields
+                  code="appearance"
+                  recordId={currentUser?.id || ""}
+                  onChange={setAppearanceExtra}
+                  disabled={updateAppearance.isPending}
+                />
+                {appearanceExtra && (
+                  <Button
+                    disabled={updateAppearance.isPending}
+                    onClick={() =>
+                      updateAppearance.mutate(
+                        { custom_values: appearanceExtra },
+                        { onSuccess: () => setAppearanceExtra(undefined) }
+                      )
+                    }
+                  >
+                    ذخیره اطلاعات تکمیلی
+                  </Button>
+                )}
               </section>
             </>
           )}
@@ -288,11 +351,12 @@ export default function SettingsPage() {
   );
 }
 
-function ProfileSettings() {
+export function ProfileSettings() {
   const { data: user } = useCurrentUser();
   const [displayName, setDisplayName] = useState("");
   const updateProfile = useUpdateUserProfile();
   const uploadAvatar = useUploadAvatar();
+  const removeAvatar = useRemoveAvatar();
   const signOut = useSignOut();
   const dirtyForms = useUIStore((state) => state.dirtyForms);
   const setFormDirty = useUIStore((state) => state.setFormDirty);
@@ -302,13 +366,13 @@ function ProfileSettings() {
     setFormDirty("profile", Boolean(user && displayName !== user.displayName));
     return () => setFormDirty("profile", false);
   }, [displayName, setFormDirty, user]);
-  const submit = (event: FormEvent) => {
+  const submit = (event: FormEvent, custom_values: FormValues) => {
     event.preventDefault();
     if (updateProfile.isPending) return;
-    if (displayName.trim()) updateProfile.mutate({ display_name: displayName.trim() });
+    if (displayName.trim()) updateProfile.mutate({ display_name: displayName.trim(), custom_values });
   };
   return (
-    <form className="settings-section profile-settings" onSubmit={submit}>
+    <SurfaceForm code="profile" recordId={user?.id} className="settings-section profile-settings" onSubmit={submit}>
       <header>
         <div>
           <h2>پروفایل من</h2>
@@ -323,7 +387,7 @@ function ProfileSettings() {
           <input
             type="file"
             accept="image/jpeg,image/png,image/webp,image/gif"
-            disabled={uploadAvatar.isPending}
+            disabled={uploadAvatar.isPending || removeAvatar.isPending}
             onChange={(event) => {
               const file = event.target.files?.[0];
               if (file) uploadAvatar.mutate(file);
@@ -331,6 +395,16 @@ function ProfileSettings() {
             }}
           />
         </label>
+        {user?.avatarUrl && (
+          <Button
+            variant="danger"
+            icon={Trash2}
+            disabled={uploadAvatar.isPending || removeAvatar.isPending}
+            onClick={() => removeAvatar.mutate()}
+          >
+            {removeAvatar.isPending ? "در حال حذف…" : "حذف تصویر پروفایل"}
+          </Button>
+        )}
         <small>JPG، PNG، WebP یا GIF تا حجم ۵ مگابایت</small>
       </div>
       <div className="form-grid">
@@ -382,11 +456,12 @@ function ProfileSettings() {
           </footer>
         </AccessModal>
       )}
-    </form>
+    </SurfaceForm>
   );
 }
 
 function SecuritySettings() {
+  const { data: currentUser } = useCurrentUser();
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const changePassword = useChangePassword();
@@ -395,11 +470,11 @@ function SecuritySettings() {
     setFormDirty("security", Boolean(oldPassword || newPassword));
     return () => setFormDirty("security", false);
   }, [newPassword, oldPassword, setFormDirty]);
-  const submit = (event: FormEvent) => {
+  const submit = (event: FormEvent, custom_values: FormValues) => {
     event.preventDefault();
     if (changePassword.isPending) return;
     changePassword.mutate(
-      { old_password: oldPassword, new_password: newPassword },
+      { old_password: oldPassword, new_password: newPassword, custom_values },
       {
         onSuccess: () => {
           setOldPassword("");
@@ -409,7 +484,12 @@ function SecuritySettings() {
     );
   };
   return (
-    <form className="settings-section security-form" onSubmit={submit}>
+    <SurfaceForm
+      code="security"
+      recordId={currentUser?.id}
+      className="settings-section security-form"
+      onSubmit={submit}
+    >
       <header>
         <div>
           <h2>امنیت حساب</h2>
@@ -440,6 +520,6 @@ function SecuritySettings() {
       <Button type="submit" icon={Shield} disabled={changePassword.isPending}>
         تغییر رمز عبور
       </Button>
-    </form>
+    </SurfaceForm>
   );
 }

@@ -5,6 +5,8 @@ import { useMembers, useWorkspaceAccess } from "../api";
 import { Button } from "../components";
 import { persianDate, toFa } from "../utils";
 import { useAccessMutation, useDelegates } from "./api";
+import { SurfaceFields } from "../engine/surface";
+import type { FormValues } from "@plane/ui";
 
 export function DelegateManager({
   unitId,
@@ -22,6 +24,7 @@ export function DelegateManager({
   const { data: members = [], isLoading: membersLoading, error: membersError, refetch: refetchMembers } = useMembers();
   const mutation = useAccessMutation();
   const [ids, setIds] = useState<string[]>(() => data?.delegates.map((row) => row.user_id) ?? []);
+  const [customValues, setCustomValues] = useState<FormValues>();
   useEffect(() => {
     setIds(data?.delegates.map((row) => row.user_id) ?? []);
   }, [data]);
@@ -37,7 +40,8 @@ export function DelegateManager({
   const availableMembers = members.filter(
     (row) => row.isActive !== false && row.id !== managerId && !ids.includes(row.id)
   );
-  const hasChanges = JSON.stringify(ids) !== JSON.stringify(data?.delegates.map((row) => row.user_id) ?? []);
+  const hasChanges =
+    Boolean(customValues) || JSON.stringify(ids) !== JSON.stringify(data?.delegates.map((row) => row.user_id) ?? []);
   const busy = mutation.isPending || isLoading || membersLoading || !data || Boolean(error) || Boolean(membersError);
   return (
     <section className="panel delegate-manager" aria-label={"جانشینان " + (unitTitle ?? "واحد سازمانی")}>
@@ -179,6 +183,7 @@ export function DelegateManager({
           />
         )}
       </div>
+      <SurfaceFields code="delegates" recordId={unitId} onChange={setCustomValues} disabled={!canManage || busy} />
       {canManage && (
         <footer className="delegate-footer">
           <div>
@@ -191,7 +196,14 @@ export function DelegateManager({
             icon={Save}
             disabled={busy || !hasChanges}
             onClick={() =>
-              mutation.mutate({ path: `units/${unitId}/delegates/`, method: "put", body: { user_ids: ids } })
+              mutation.mutate(
+                {
+                  path: `units/${unitId}/delegates/`,
+                  method: "put",
+                  body: { user_ids: ids, custom_values: customValues },
+                },
+                { onSuccess: () => setCustomValues(undefined) }
+              )
             }
           >
             {mutation.isPending ? "در حال ذخیره…" : "ذخیره ترتیب"}

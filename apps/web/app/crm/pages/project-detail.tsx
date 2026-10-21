@@ -1,3 +1,7 @@
+import { EngineRecordForm } from "../engine/record-form";
+import { SurfaceForm } from "../engine/surface";
+import { WorkTable } from "../engine/work-table";
+import type { FormValues } from "@plane/ui";
 import { IdentifierBadge, SearchableSelect } from "@plane/ui";
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
@@ -10,13 +14,12 @@ import {
   Clock3,
   MoreHorizontal,
   Plus,
-  Save,
   Settings2,
   Target,
   Trash2,
   Users,
 } from "lucide-react";
-import { useNavigate, useParams, useSearchParams } from "react-router";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import {
   useActivities,
   useAddProjectMember,
@@ -30,7 +33,6 @@ import {
   useRemoveProjectMember,
   useReassignIssue,
   useUpdateIssueStatus,
-  useUpdateProject,
   useWorkspaceAccess,
   useCycles,
 } from "../api";
@@ -100,6 +102,9 @@ export default function ProjectDetailPage() {
           </div>
         </div>
         <div className="page-actions">
+          <Link className="button button-secondary" to={`/edit/project/${id}`}>
+            فرم کامل پروژه
+          </Link>
           <Button variant="secondary" icon={Users} onClick={() => setTab("overview")}>
             اعضای پروژه ({toFa(members.length)})
           </Button>
@@ -175,7 +180,7 @@ export default function ProjectDetailPage() {
           {issuesQuery.isLoading ? (
             <Skeleton rows={6} />
           ) : issues.length ? (
-            issues.map((issue) => <IssueRow key={issue.id} issue={issue} />)
+            <WorkTable issues={issues} project={project} />
           ) : (
             <EmptyState
               title="هنوز کاری ثبت نشده"
@@ -194,7 +199,9 @@ export default function ProjectDetailPage() {
       {tab === "board" && (
         <IssueKanbanBoard
           issues={issues}
+          project={project}
           onStatusChange={(issue, status) => updateStatus.mutate({ issue, status })}
+          transferPresentation="inline"
           onCreate={access?.can("Issue.Create") ? () => setCreate(true, "issue") : undefined}
           transferMembers={members}
           transferDisabled={reassign.isPending}
@@ -317,7 +324,11 @@ function Overview({
             </div>
             <button onClick={onIssues}>مشاهده همه</button>
           </div>
-          {loading ? <Skeleton /> : issues.slice(0, 5).map((issue) => <IssueRow key={issue.id} issue={issue} />)}
+          {loading ? (
+            <Skeleton />
+          ) : (
+            issues.slice(0, 5).map((issue) => <IssueRow key={issue.id} issue={issue} project={project} />)
+          )}
         </div>
       </section>
       <aside>
@@ -395,11 +406,11 @@ function CyclesTab({
     [start, setStart] = useState(""),
     [end, setEnd] = useState("");
   const createCycle = useCreateCycle(slug, projectId);
-  const submit = (event: FormEvent) => {
+  const submit = (event: FormEvent, custom_values: FormValues) => {
     event.preventDefault();
     if (name.trim() && !createCycle.isPending && !(start && end && end <= start))
       createCycle.mutate(
-        { name, start_date: start || undefined, end_date: end || undefined },
+        { name, start_date: start || undefined, end_date: end || undefined, custom_values },
         {
           onSuccess: () => {
             setName("");
@@ -412,7 +423,7 @@ function CyclesTab({
   return (
     <div className={canManage ? "split-tab" : ""}>
       {canManage && (
-        <form className="panel cycle-form" onSubmit={submit}>
+        <SurfaceForm key={cycles.length} code="cycles" className="panel cycle-form" onSubmit={submit}>
           <h2>چرخه جدید</h2>
           <label>
             <span>نام چرخه</span>
@@ -443,7 +454,7 @@ function CyclesTab({
           <Button type="submit" icon={Plus} disabled={createCycle.isPending || Boolean(start && end && end <= start)}>
             ساخت چرخه
           </Button>
-        </form>
+        </SurfaceForm>
       )}
       <section className="panel tab-content">
         <h2>چرخه‌های پروژه</h2>
@@ -480,75 +491,14 @@ function ProjectSettings({
   members: NonNullable<ReturnType<typeof useMembers>["data"]>;
   workspaceMembers: NonNullable<ReturnType<typeof useMembers>["data"]>;
 }) {
-  const [name, setName] = useState(project.name),
-    [description, setDescription] = useState(project.description || ""),
-    [targetDate, setTargetDate] = useState(project.targetDate || ""),
-    [lead, setLead] = useState(project.projectLeadId || "");
-  const update = useUpdateProject(slug, project.id);
   const { data: access } = useWorkspaceAccess();
   const addMember = useAddProjectMember(slug, project.id);
   const removeMember = useRemoveProjectMember(slug, project.id);
   const [memberToAdd, setMemberToAdd] = useState("");
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
-    if (update.isPending) return;
-    update.mutate({ name, description, targetDate, projectLeadId: lead });
-  };
   return (
-    <form className="panel project-settings-form" onSubmit={submit}>
-      <header>
-        <div>
-          <h2>تنظیمات پروژه</h2>
-          <p>شناسه پروژه ثابت است و برای جست‌وجو و ارجاع استفاده می‌شود.</p>
-        </div>
-        <Button type="submit" icon={Save} disabled={update.isPending}>
-          ذخیره تغییرات
-        </Button>
-      </header>
-      <div className="form-grid">
-        <label>
-          <span>نام پروژه</span>
-          <input disabled={update.isPending} value={name} onChange={(e) => setName(e.target.value)} />
-        </label>
-        <div className="identifier-field" role="group" aria-label="شناسه پروژه">
-          <span>شناسه</span>
-          <IdentifierBadge value={project.identifier} label="شناسه پروژه" />
-        </div>
-        <label className="wide">
-          <span>توضیحات</span>
-          <textarea disabled={update.isPending} value={description} onChange={(e) => setDescription(e.target.value)} />
-        </label>
-        <label htmlFor="project-target-date">
-          <span>تاریخ پایان</span>
-          <PersianDateInput
-            disabled={update.isPending}
-            id="project-target-date"
-            label="تاریخ پایان"
-            value={targetDate}
-            onChange={setTargetDate}
-          />
-        </label>
-        <label htmlFor="crm-project-detail-select-1">
-          <span>مدیر پروژه</span>
-          <SearchableSelect
-            id="crm-project-detail-select-1"
-            label="مدیر پروژه"
-            disabled={update.isPending}
-            value={lead}
-            onChange={setLead}
-            options={[
-              { id: "", title: "تعیین نشده" },
-              ...members.map((member) => ({
-                id: member.id,
-                title: member.displayName,
-                description: member.email,
-                disabled: member.isActive === false,
-              })),
-            ]}
-          />
-        </label>
-      </div>
-      {update.isError && <p role="alert">عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید.</p>}
+    <section className="panel project-settings-form">
+      <IdentifierBadge value={project.identifier} label="شناسه پروژه" />
+      <EngineRecordForm code="project" id={project.id} />
       {access?.can("Project.Member.Manage") && (
         <section className="project-member-settings">
           <h3>اعضای پروژه</h3>
@@ -598,6 +548,6 @@ function ProjectSettings({
           </div>
         </section>
       )}
-    </form>
+    </section>
   );
 }

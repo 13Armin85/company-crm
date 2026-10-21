@@ -3,9 +3,10 @@
 # See the LICENSE file for details.
 
 from rest_framework import serializers
+from plane.app.services.entity_choices import EntityChoiceSerializerMixin
 
 
-class BaseSerializer(serializers.ModelSerializer):
+class BaseSerializer(EntityChoiceSerializerMixin, serializers.ModelSerializer):
     id = serializers.PrimaryKeyRelatedField(read_only=True)
 
 

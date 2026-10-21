@@ -11,7 +11,9 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": "./dist/index.js",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./styles/schema-form.css": "./styles/schema-form.css",
+    "./styles/schema-data-grid.css": "./styles/schema-data-grid.css"
   },
   "scripts": {
     "build": "tsdown",

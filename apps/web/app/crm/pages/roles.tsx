@@ -12,6 +12,7 @@ import { AccessModal } from "../access/components";
 import { useUIStore } from "../store";
 import type { OrganizationRole } from "../types";
 import { matchesRecordSearch } from "../identifiers";
+import { SurfaceForm, SurfaceTable } from "../engine/surface";
 
 export default function RolesPage() {
   const slug = useUIStore((state) => state.workspaceSlug) ?? "";
@@ -53,7 +54,7 @@ export default function RolesPage() {
         <Skeleton rows={5} />
       ) : (
         <div className="table-card">
-          <table>
+          <SurfaceTable code="roles">
             <thead>
               <tr>
                 <th>نام نقش</th>
@@ -70,8 +71,10 @@ export default function RolesPage() {
                 .map((role) => (
                   <tr key={role.id}>
                     <td>
-                      {role.name}
-                      {role.systemKey && <small>سیستمی؛ قابل حذف نیست</small>}
+                      <div className="role-name-cell">
+                        <span>{role.name}</span>
+                        {role.systemKey && <small>سیستمی؛ قابل حذف نیست</small>}
+                      </div>
                     </td>
                     <td>{role.description}</td>
                     <td>{role.isActive ? "فعال" : "غیرفعال"}</td>
@@ -116,7 +119,7 @@ export default function RolesPage() {
                   </tr>
                 ))}
             </tbody>
-          </table>
+          </SurfaceTable>
         </div>
       )}
       {editing && (
@@ -125,12 +128,14 @@ export default function RolesPage() {
           busy={save.isPending}
           onClose={() => setEditing(undefined)}
         >
-          <form
-            onSubmit={(event) => {
+          <SurfaceForm
+            code="roles"
+            recordId={editing.id}
+            onSubmit={(event, custom_values) => {
               event.preventDefault();
               if (save.isPending) return;
               save.mutate(
-                { id: editing.id || undefined, name: editing.name, description: editing.description },
+                { id: editing.id || undefined, name: editing.name, description: editing.description, custom_values },
                 { onSuccess: () => setEditing(undefined) }
               );
             }}
@@ -161,7 +166,7 @@ export default function RolesPage() {
                 ذخیره نقش
               </Button>
             </footer>
-          </form>
+          </SurfaceForm>
         </AccessModal>
       )}
       {deleting && (

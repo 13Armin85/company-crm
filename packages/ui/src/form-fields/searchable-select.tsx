@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Combobox, ComboboxButton, ComboboxInput, ComboboxOption, ComboboxOptions } from "@headlessui/react";
 
 export const normalizePersianSearch = (text: string) =>
@@ -23,6 +23,8 @@ export function SearchableSelect({
   wrapOptions = true,
   optionClassName = "",
   selectedLabel,
+  containedOptions = false,
+  showLabel = false,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -36,8 +38,12 @@ export function SearchableSelect({
   wrapOptions?: boolean;
   optionClassName?: string;
   selectedLabel?: string;
+  containedOptions?: boolean;
+  showLabel?: boolean;
 }) {
   const [query, setQuery] = useState("");
+  const generatedId = useId();
+  const inputId = id || generatedId;
   const filtered = options.filter((option) =>
     normalizePersianSearch(`${option.title} ${option.description ?? ""}`).includes(normalizePersianSearch(query))
   );
@@ -46,6 +52,7 @@ export function SearchableSelect({
       className="searchable-select"
       data-transfer-field={optionClassName === "member-transfer-options" ? "" : undefined}
     >
+      {showLabel && <label htmlFor={inputId}>{label}</label>}
       <Combobox
         value={value}
         onChange={(next: string | null) => {
@@ -57,7 +64,7 @@ export function SearchableSelect({
         <div className="selector-input-row">
           <ComboboxInput
             defaultValue={selectedLabel}
-            id={id}
+            id={inputId}
             aria-label={label}
             aria-invalid={Boolean(error)}
             placeholder={loading ? "در حال دریافت…" : placeholder}
@@ -72,8 +79,9 @@ export function SearchableSelect({
         </div>
         <ComboboxOptions
           data-transfer-options={optionClassName === "member-transfer-options" ? "" : undefined}
-          className={`selector-panel selector-single-options${wrapOptions ? "" : " selector-single-options-nowrap"} ${optionClassName}`}
-          anchor="bottom start"
+          className={`selector-panel selector-single-options${wrapOptions ? "" : " selector-single-options-nowrap"}${containedOptions ? " selector-single-options-contained" : ""} ${optionClassName}`}
+          anchor={containedOptions ? undefined : "bottom start"}
+          portal={!containedOptions}
           modal={false}
           dir="rtl"
         >

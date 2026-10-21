@@ -33,8 +33,23 @@ DEFINITIONS = (
         ("View", "Route", "Queue.View", "Queue.Claim"),
     ),
     ("Workspace", "شرکت", ("Edit",), ()),
+    ("EntityType", "موجودیت‌ها", ("View", "Create", "Edit", "Delete"), ()),
+    ("Lookup", "لیست‌های پایه", ("View", "Create", "Edit", "Delete"), ()),
+    ("Field", "کتابخانه فیلدها", ("View", "Create", "Edit", "Delete"), ()),
+    ("FormLayout", "فرم‌ساز", ("Edit", "Publish"), ()),
+    ("Config", "پیکربندی موتور", ("Export", "Import"), ()),
+    ("View", "نماها", ("Create.Personal", "Create.Shared", "Manage.All"), ()),
+    ("ConditionalFormat", "رنگ‌بندی شرطی", ("Edit",), ()),
+    ("Export", "خروجی داده", ("Data",), ()),
 )
 ACTION_NAMES = {
+    "Create.Personal": "ساخت نمای شخصی",
+    "Create.Shared": "ساخت نمای اشتراکی",
+    "Manage.All": "مدیریت همه نماها",
+    "Data": "دریافت خروجی داده",
+    "Publish": "انتشار",
+    "Export": "خروجی پیکربندی",
+    "Import": "ورود پیکربندی",
     "View": "مشاهده",
     "ViewAll": "مشاهده همه",
     "Create": "ایجاد",
@@ -74,6 +89,7 @@ PERMISSION_REGISTRY = {
     for action in actions
 }
 MEMBER_PERMISSIONS = {
+    "View.Create.Personal",
     "Issue.Create",
     "Project.View",
     "Issue.View",

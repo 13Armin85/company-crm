@@ -5,5 +5,11 @@ export default defineConfig({
   format: ["esm"],
   dts: true,
   platform: "neutral",
-  exports: true,
+  exports: {
+    customExports: (exports) => ({
+      ...exports,
+      "./styles/schema-form.css": "./styles/schema-form.css",
+      "./styles/schema-data-grid.css": "./styles/schema-data-grid.css",
+    }),
+  },
 });

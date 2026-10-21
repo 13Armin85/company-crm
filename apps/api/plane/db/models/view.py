@@ -69,6 +69,13 @@ class IssueView(WorkspaceBaseModel):
     owned_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="views")
     is_locked = models.BooleanField(default=False)
     archived_at = models.DateTimeField(null=True)
+    # Generic CRM views reuse this model; legacy Issue views keep these fields empty.
+    engine_entity = models.ForeignKey("db.EntityType", null=True, blank=True, on_delete=models.PROTECT, related_name="views")
+    engine_definition = models.JSONField(null=True, blank=True)
+    engine_visibility = models.CharField(max_length=12, default="personal")
+    engine_recipients = models.JSONField(default=dict)
+    engine_default_roles = models.JSONField(default=list)
+    engine_revision = models.PositiveIntegerField(default=1)
 
     class Meta:
         verbose_name = "Issue View"
@@ -78,7 +85,7 @@ class IssueView(WorkspaceBaseModel):
 
     def save(self, *args, **kwargs):
         query_params = self.filters
-        self.query = issue_filters(query_params, "POST") if query_params else {}
+        self.query = {} if self.engine_entity_id else issue_filters(query_params, "POST") if query_params else {}
 
         if self._state.adding:
             if self.project:

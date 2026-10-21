@@ -75,6 +75,19 @@ class UserFavoriteSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["workspace", "created_by", "updated_by"]
 
+    def validate(self, attrs):
+        entity_type = attrs.get("entity_type", getattr(self.instance, "entity_type", None))
+        identifier = attrs.get("entity_identifier", getattr(self.instance, "entity_identifier", None))
+        # Generic views have their own ACL-aware picker. Legacy favorites must
+        # neither create a second access path nor expose a private view's title.
+        if (
+            entity_type == "view"
+            and identifier
+            and not IssueView.objects.filter(pk=identifier, engine_entity__isnull=True).exists()
+        ):
+            raise serializers.ValidationError({"entity_identifier": "این نما در علاقه‌مندی‌های قدیمی در دسترس نیست."})
+        return attrs
+
     def get_entity_data(self, obj):
         entity_type = obj.entity_type
         entity_identifier = obj.entity_identifier
@@ -82,7 +95,10 @@ class UserFavoriteSerializer(serializers.ModelSerializer):
         entity_model, entity_serializer = get_entity_model_and_serializer(entity_type)
         if entity_model and entity_serializer:
             try:
-                entity = entity_model.objects.get(pk=entity_identifier)
+                queryset = entity_model.objects.all()
+                if entity_type == "view":
+                    queryset = queryset.filter(engine_entity__isnull=True, workspace_id=obj.workspace_id)
+                entity = queryset.get(pk=entity_identifier)
                 return entity_serializer(entity).data
             except entity_model.DoesNotExist:
                 return None

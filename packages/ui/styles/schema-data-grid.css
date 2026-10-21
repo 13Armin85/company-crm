@@ -1,0 +1,149 @@
+.schema-grid-frame {
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+}
+.schema-data-grid {
+  --schema-grid-background: var(--surface, #fff);
+  --schema-grid-header: var(--surface-soft, #f8fafc);
+  --schema-grid-border: var(--border, #e5e7eb);
+  overflow: auto;
+  position: relative;
+  max-width: 100%;
+  border: 1px solid var(--schema-grid-border);
+  border-radius: 14px;
+  background: var(--schema-grid-background);
+  color: var(--text-primary, #111827);
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-muted, #9ca3af) var(--schema-grid-header);
+  overscroll-behavior-inline: contain;
+  overflow-anchor: none;
+  isolation: isolate;
+}
+.schema-data-grid table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  table-layout: fixed;
+  font-size: 13px;
+}
+.schema-data-grid tr {
+  display: grid;
+}
+.schema-data-grid th,
+.schema-data-grid td {
+  padding: 12px 16px;
+  text-align: start;
+  border-bottom: 1px solid var(--schema-grid-border);
+  border-inline-end: 1px solid color-mix(in srgb, var(--schema-grid-border) 55%, transparent);
+  box-sizing: border-box;
+  min-width: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  line-height: 1.8;
+}
+.schema-data-grid tbody tr {
+  background: var(--grid-row-bg, var(--schema-grid-background));
+}
+.schema-data-grid tbody tr:hover {
+  --grid-row-bg: color-mix(in srgb, var(--accent, #4f46e5) 5%, var(--schema-grid-background));
+}
+.schema-data-grid th {
+  position: relative;
+  background: var(--schema-grid-header);
+  color: var(--text-secondary, #4b5563);
+  font-weight: 600;
+  min-height: 56px;
+  padding-inline-end: 22px;
+  display: flex;
+  align-items: center;
+  white-space: normal;
+}
+.schema-data-grid td {
+  display: flex;
+  align-items: center;
+}
+.schema-grid-column-title {
+  overflow-wrap: anywhere;
+}
+.schema-data-grid tbody tr[aria-hidden="true"] td {
+  border: 0;
+}
+.schema-data-grid tbody tr:has(input:checked) {
+  --grid-row-bg: color-mix(in srgb, var(--accent, #4f46e5) 8%, var(--schema-grid-background));
+  background-color: var(--grid-row-bg);
+}
+.schema-data-grid thead {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+.schema-data-grid tfoot {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  background: var(--schema-grid-header);
+  font-size: 12px;
+  font-weight: 500;
+}
+.schema-data-grid tfoot td {
+  background: var(--schema-grid-header);
+  border-top: 1px solid var(--schema-grid-border);
+  border-bottom: 0;
+}
+.schema-data-grid td > * {
+  max-width: 100%;
+  min-width: 0;
+}
+.schema-data-grid .schema-grid-selection {
+  position: sticky;
+  right: 0;
+  z-index: 3;
+  background: var(--grid-row-bg, var(--schema-grid-background));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+}
+.schema-data-grid thead .schema-grid-selection,
+.schema-data-grid tfoot .schema-grid-selection {
+  background: var(--schema-grid-header);
+}
+.schema-data-grid input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent, #4f46e5);
+  cursor: pointer;
+}
+.schema-grid-resizer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+  cursor: col-resize;
+  touch-action: none;
+  color: var(--text-muted, #9ca3af);
+  background: transparent;
+  border: 0;
+}
+.schema-grid-resizer:hover {
+  color: var(--accent, #4f46e5);
+  background: var(--accent-soft, #eef2ff);
+}
+.schema-data-grid :focus-visible {
+  outline: 2px solid var(--accent, #4f46e5);
+  outline-offset: -2px;
+}
+.schema-data-grid .schema-grid-group {
+  background: var(--schema-grid-header);
+  font-weight: 600;
+  position: sticky;
+  right: 0;
+}
+.schema-grid-scroll-hint {
+  margin: 10px 4px 0;
+  font-size: 12px;
+  line-height: 1.9;
+  color: var(--text-secondary, #4b5563);
+}

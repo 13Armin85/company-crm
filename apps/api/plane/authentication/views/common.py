@@ -23,6 +23,7 @@ from plane.authentication.adapter.error import (
 from django.middleware.csrf import get_token
 from plane.utils.cache import invalidate_cache
 from plane.authentication.utils.host import base_host
+from plane.app.services.surface_config import SurfacePolicyMixin
 
 
 class CSRFTokenEndpoint(APIView):
@@ -44,7 +45,7 @@ def csrf_failure(request, reason=""):
     )
 
 
-class ChangePasswordEndpoint(APIView):
+class ChangePasswordEndpoint(SurfacePolicyMixin, APIView):
     def post(self, request):
         user = User.objects.get(pk=request.user.id)
 

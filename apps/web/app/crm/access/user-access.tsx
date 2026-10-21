@@ -150,9 +150,12 @@ export function UserAccessPanel({ userId }: { userId: string }) {
         </section>
       )}
       {access.can("Access.UserException.Manage") && (
-        <form
+        <SurfaceForm
+          code="exceptions"
+          key={`${editing?.id || "new"}:${exceptions.length}`}
+          recordId={editing?.id}
           className="form-grid"
-          onSubmit={(event) => {
+          onSubmit={(event, custom_values) => {
             event.preventDefault();
             if (mutation.isPending || !permission) return;
             const originalStart = editPeriod ? startsAt || null : (editing?.starts_at ?? null);
@@ -182,7 +185,12 @@ export function UserAccessPanel({ userId }: { userId: string }) {
               {
                 path: `users/${userId}/exceptions/${editing ? `${editing.id}/` : ""}`,
                 method: editing ? "patch" : "post",
-                body: { permission, effect, ...(editPeriod ? { starts_at: originalStart, ends_at: originalEnd } : {}) },
+                body: {
+                  permission,
+                  effect,
+                  custom_values,
+                  ...(editPeriod ? { starts_at: originalStart, ends_at: originalEnd } : {}),
+                },
               },
               { onSuccess: reset }
             );
@@ -290,7 +298,7 @@ export function UserAccessPanel({ userId }: { userId: string }) {
               </Button>
             )}
           </footer>
-        </form>
+        </SurfaceForm>
       )}
       {access.can("Access.UserException.View") && (
         <section>
@@ -307,7 +315,7 @@ export function UserAccessPanel({ userId }: { userId: string }) {
             <p role="status">دسترسی مستقیمی برای این جستجو وجود ندارد.</p>
           ) : (
             <div className="table-card">
-              <table>
+              <SurfaceTable code="exceptions">
                 <thead>
                   <tr>
                     <th>دسته / مجوز</th>
@@ -384,7 +392,7 @@ export function UserAccessPanel({ userId }: { userId: string }) {
                       );
                     })}
                 </tbody>
-              </table>
+              </SurfaceTable>
             </div>
           )}
         </section>
@@ -400,3 +408,4 @@ export function UserAccessPanel({ userId }: { userId: string }) {
     </section>
   );
 }
+import { SurfaceForm, SurfaceTable } from "../engine/surface";

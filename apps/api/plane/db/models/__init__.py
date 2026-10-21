@@ -108,3 +108,5 @@ from .organization import (
 )
 
 from .description import Description, DescriptionVersion
+from .entity import EntityType, LookupCategory, LookupValue, FieldDefinition, FormLayout, FormVersion, EntityRecord, EntityEvent, EntityViewExport
+from .surface import SurfaceConfiguration, SurfaceValues

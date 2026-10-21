@@ -49,6 +49,13 @@ export interface Issue {
   projectName?: string;
   projectIdentifier: string;
   status: Status;
+  statusCode?: string;
+  statusLabel?: string;
+  statusColor?: string;
+  statusOptions?: { id: string; title: string; status: Status }[];
+  priorityCode?: string;
+  hiddenFields?: string[];
+  readonlyFields?: string[];
   stateId?: string;
   priority: Priority;
   assignee?: Member;

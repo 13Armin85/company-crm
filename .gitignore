@@ -185,6 +185,7 @@ Desktop.ini
 backups/
 
 # Private deployment assets and operational reports
+/docs/evidence/
 /deployment/
 /deployments/
 /deploy/

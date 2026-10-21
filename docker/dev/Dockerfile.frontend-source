@@ -1,0 +1,14 @@
+# Apply source changes using dependencies already installed by Dockerfile.frontend.
+# Tag that image as company-crm-local-frontend:installed-deps before building.
+# Rebuild Dockerfile.frontend when dependencies or the lockfile change.
+ARG FRONTEND_BASE_IMAGE=company-crm-local-frontend:installed-deps
+FROM ${FRONTEND_BASE_IMAGE}
+WORKDIR /app
+COPY apps/web/app/crm/ ./apps/web/app/crm/
+COPY apps/web/app/routes.ts ./apps/web/app/routes.ts
+COPY apps/web/styles/ ./apps/web/styles/
+COPY packages/ui/src/ ./packages/ui/src/
+COPY packages/ui/styles/ ./packages/ui/styles/
+COPY packages/ui/package.json packages/ui/tsdown.config.ts ./packages/ui/
+COPY packages/tailwind-config/crm-theme.css ./packages/tailwind-config/crm-theme.css
+RUN --network=none pnpm --filter @plane/ui build && pnpm --filter web build

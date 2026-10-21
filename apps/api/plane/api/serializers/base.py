@@ -4,9 +4,10 @@
 
 # Third party imports
 from rest_framework import serializers
+from plane.app.services.entity_choices import EntityChoiceSerializerMixin
 
 
-class BaseSerializer(serializers.ModelSerializer):
+class BaseSerializer(EntityChoiceSerializerMixin, serializers.ModelSerializer):
     """
     Base serializer providing common functionality for all model serializers.
 

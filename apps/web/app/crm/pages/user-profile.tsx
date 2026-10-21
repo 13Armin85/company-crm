@@ -13,6 +13,8 @@ import { UserAccessPanel } from "../access/user-access";
 import { Button, PageHeader, Skeleton } from "../components";
 import { useUIStore } from "../store";
 import type { OrganizationUserProfile } from "../types";
+import type { FormValues } from "@plane/ui";
+import { SurfaceFields } from "../engine/surface";
 
 export default function UserProfilePage() {
   const { userId = "" } = useParams();
@@ -27,6 +29,7 @@ export default function UserProfilePage() {
   );
   const update = useUpdateOrganizationUserProfile(slug, userId);
   const [form, setForm] = useState<OrganizationUserProfile>();
+  const [customValues, setCustomValues] = useState<FormValues>();
   useEffect(() => {
     if (profile) setForm((current) => (!current || current.id !== profile.id ? profile : current));
   }, [profile, form?.id]);
@@ -51,10 +54,11 @@ export default function UserProfilePage() {
           canSave && (
             <Button
               icon={Save}
-              disabled={update.isPending || !isDirty}
+              disabled={update.isPending || (!isDirty && !customValues)}
               onClick={() =>
                 update.mutate(
                   {
+                    ...(canEdit && customValues ? { custom_values: customValues } : {}),
                     ...(canEdit
                       ? {
                           first_name: form.firstName,
@@ -80,7 +84,12 @@ export default function UserProfilePage() {
                         ? form.unitIds
                         : undefined,
                   },
-                  { onSuccess: () => setForm(undefined) }
+                  {
+                    onSuccess: () => {
+                      setForm(undefined);
+                      setCustomValues(undefined);
+                    },
+                  }
                 )
               }
             >
@@ -89,91 +98,99 @@ export default function UserProfilePage() {
           )
         }
       />
-      <section className="panel user-profile-admin">
-        <header>
-          <UserRound size={24} />
-          <h2>اطلاعات حساب</h2>
-        </header>
-        <fieldset disabled={!canEdit || update.isPending}>
-          <div className="form-grid">
-            <label>
-              <span>نام</span>
-              <input value={form.firstName} onChange={(event) => setForm({ ...form, firstName: event.target.value })} />
-            </label>
-            <label>
-              <span>نام خانوادگی</span>
-              <input value={form.lastName} onChange={(event) => setForm({ ...form, lastName: event.target.value })} />
-            </label>
-            <label>
-              <span>نام نمایشی</span>
+      <SurfaceFields code="users" recordId={userId} onChange={setCustomValues} disabled={!canEdit || update.isPending}>
+        <section className="panel user-profile-admin">
+          <header>
+            <UserRound size={24} />
+            <h2>اطلاعات حساب</h2>
+          </header>
+          <fieldset disabled={!canEdit || update.isPending}>
+            <div className="form-grid">
+              <label>
+                <span>نام</span>
+                <input
+                  value={form.firstName}
+                  onChange={(event) => setForm({ ...form, firstName: event.target.value })}
+                />
+              </label>
+              <label>
+                <span>نام خانوادگی</span>
+                <input value={form.lastName} onChange={(event) => setForm({ ...form, lastName: event.target.value })} />
+              </label>
+              <label>
+                <span>نام نمایشی</span>
+                <input
+                  value={form.displayName}
+                  onChange={(event) => setForm({ ...form, displayName: event.target.value })}
+                />
+              </label>
+              <label>
+                <span>نام کاربری</span>
+                <input
+                  dir="ltr"
+                  value={form.username}
+                  onChange={(event) => setForm({ ...form, username: event.target.value })}
+                />
+              </label>
+              <label>
+                <span>ایمیل</span>
+                <input
+                  dir="ltr"
+                  type="email"
+                  value={form.email}
+                  onChange={(event) => setForm({ ...form, email: event.target.value })}
+                />
+              </label>
+            </div>
+            <label className="active-toggle">
               <input
-                value={form.displayName}
-                onChange={(event) => setForm({ ...form, displayName: event.target.value })}
+                type="checkbox"
+                checked={form.isActive}
+                onChange={(event) => setForm({ ...form, isActive: event.target.checked })}
               />
+              <span>عضویت فعال در این شرکت</span>
             </label>
-            <label>
-              <span>نام کاربری</span>
-              <input
-                dir="ltr"
-                value={form.username}
-                onChange={(event) => setForm({ ...form, username: event.target.value })}
-              />
-            </label>
-            <label>
-              <span>ایمیل</span>
-              <input
-                dir="ltr"
-                type="email"
-                value={form.email}
-                onChange={(event) => setForm({ ...form, email: event.target.value })}
-              />
-            </label>
-          </div>
-          <label className="active-toggle">
-            <input
-              type="checkbox"
-              checked={form.isActive}
-              onChange={(event) => setForm({ ...form, isActive: event.target.checked })}
+          </fieldset>
+        </section>
+        <div className="profile-assignment-grid">
+          <section className="panel assignment-card">
+            <h2>نقش‌ها</h2>
+            {!form.isActive && <p>برای تغییر نقش، ابتدا عضویت کاربر را فعال و ذخیره کنید.</p>}
+            <MultiSelector
+              label="نقش‌های سازمانی"
+              disabled={update.isPending || !access.can("User.Role.Assign") || !form.isActive || !profile?.isActive}
+              selected={form.roleIds}
+              onChange={(roleIds) => setForm({ ...form, roleIds })}
+              options={roles.map((role) => ({
+                id: role.id,
+                title: role.name,
+                description: role.description,
+                disabled: !role.isActive,
+              }))}
             />
-            <span>عضویت فعال در این شرکت</span>
-          </label>
-        </fieldset>
-      </section>
-      <div className="profile-assignment-grid">
-        <section className="panel assignment-card">
-          <h2>نقش‌ها</h2>
-          {!form.isActive && <p>برای تغییر نقش، ابتدا عضویت کاربر را فعال و ذخیره کنید.</p>}
-          <MultiSelector
-            label="نقش‌های سازمانی"
-            disabled={update.isPending || !access.can("User.Role.Assign") || !form.isActive || !profile?.isActive}
-            selected={form.roleIds}
-            onChange={(roleIds) => setForm({ ...form, roleIds })}
-            options={roles.map((role) => ({
-              id: role.id,
-              title: role.name,
-              description: role.description,
-              disabled: !role.isActive,
-            }))}
-          />
-        </section>
-        <section className="panel assignment-card">
-          <h2>واحدهای سازمانی</h2>
-          <MultiSelector
-            label="واحدها"
-            disabled={
-              update.isPending || !access.can("OrganizationUnit.Member.Manage") || !form.isActive || !profile?.isActive
-            }
-            selected={form.unitIds}
-            onChange={(unitIds) => setForm({ ...form, unitIds })}
-            options={units.map((unit) => ({
-              id: unit.id,
-              title: unit.title,
-              description: unit.managerName,
-              disabled: !unit.isActive,
-            }))}
-          />
-        </section>
-      </div>
+          </section>
+          <section className="panel assignment-card">
+            <h2>واحدهای سازمانی</h2>
+            <MultiSelector
+              label="واحدها"
+              disabled={
+                update.isPending ||
+                !access.can("OrganizationUnit.Member.Manage") ||
+                !form.isActive ||
+                !profile?.isActive
+              }
+              selected={form.unitIds}
+              onChange={(unitIds) => setForm({ ...form, unitIds })}
+              options={units.map((unit) => ({
+                id: unit.id,
+                title: unit.title,
+                description: unit.managerName,
+                disabled: !unit.isActive,
+              }))}
+            />
+          </section>
+        </div>
+      </SurfaceFields>
       <UserAccessPanel userId={userId} />
     </div>
   );

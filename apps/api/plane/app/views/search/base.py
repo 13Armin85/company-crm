@@ -217,6 +217,7 @@ class GlobalSearchEndpoint(BaseAPIView):
 
         issue_views = IssueView.objects.filter(
             q,
+            engine_entity__isnull=True,
             project__project_projectmember__member=self.request.user,
             project__project_projectmember__is_active=True,
             project__archived_at__isnull=True,

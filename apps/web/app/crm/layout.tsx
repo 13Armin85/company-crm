@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { BusinessChoicesProvider } from "./engine/choice-provider";
 import { BrandLogo, ModalVisibilityContext } from "@plane/ui";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { Navigate, NavLink, Outlet, useBlocker, useLocation, useNavigate } from "react-router";
@@ -68,6 +69,7 @@ const navItems = [
   { to: "/roles", label: "نقش‌های سازمانی", icon: ShieldCheck, adminOnly: true },
   { to: "/routing", label: "ارجاع هوشمند", icon: GitBranch },
   { to: "/absences", label: "عدم حضور", icon: CalendarDays },
+  { to: "/settings/engine", label: "طراحی فرم‌ها و جدول‌ها", icon: Settings },
 ];
 
 function AppLayout() {
@@ -100,7 +102,8 @@ function AppLayout() {
   const [gPressed, setGPressed] = useState(false);
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const navigationBlocker = useBlocker(dirtyForms.length > 0);
+  // A successful save may navigate before React renders the cleared dirty flag.
+  const navigationBlocker = useBlocker(() => useUIStore.getState().dirtyForms.length > 0);
   const resolvedDark =
     theme === "dark" ||
     (theme === "system" && typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches);
@@ -392,7 +395,7 @@ function AppLayout() {
                 <h2 id="unsaved-title">از این صفحه خارج شوید؟</h2>
               </div>
             </header>
-            <p>فرم یا تیکت در حال ویرایش است. ماندن در صفحه، اطلاعات فعلی را حفظ می‌کند.</p>
+            <p>فرم یا کار در حال ویرایش است. ماندن در صفحه، اطلاعات فعلی را حفظ می‌کند.</p>
             <footer>
               <Button variant="secondary" onClick={() => navigationBlocker.reset()}>
                 ماندن و ادامه ویرایش
@@ -537,7 +540,9 @@ export function AuthenticationBoundary() {
       <div hidden={pending} aria-hidden={pending} inert={pending}>
         {user && verifiedLocation !== undefined && (
           <ModalVisibilityContext.Provider value={!pending}>
-            <AppLayout />
+            <BusinessChoicesProvider>
+              <AppLayout />
+            </BusinessChoicesProvider>
           </ModalVisibilityContext.Provider>
         )}
       </div>

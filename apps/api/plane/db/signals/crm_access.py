@@ -1,7 +1,7 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
-from plane.db.models import Workspace, WorkspaceMember, OrganizationRole, UserOrganizationRole
+from plane.db.models import Workspace, WorkspaceMember, OrganizationRole, UserOrganizationRole, IssueType
 
 
 @receiver(post_save, sender=Workspace)
@@ -10,6 +10,9 @@ def initialize_workspace_access(sender, instance, created, raw=False, **kwargs):
         from plane.app.services.permission_registry import bootstrap_workspace_access
 
         bootstrap_workspace_access(instance)
+        from plane.app.services.entity_schema import initialize_engine
+
+        initialize_engine(instance)
 
 
 @receiver(post_save, sender=WorkspaceMember)
@@ -24,3 +27,11 @@ def initialize_member_access(sender, instance, created, raw=False, **kwargs):
             UserOrganizationRole.objects.get_or_create(
                 workspace_id=instance.workspace_id, user_id=instance.member_id, role=role
             )
+
+
+@receiver(post_save, sender=IssueType)
+def synchronize_ticket_subtype(sender, instance, raw=False, **kwargs):
+    if not raw:
+        from plane.app.services.entity_issue_types import sync_native_subtype
+
+        sync_native_subtype(instance)

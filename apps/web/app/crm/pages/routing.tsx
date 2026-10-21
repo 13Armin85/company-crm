@@ -80,7 +80,7 @@ export default function RoutingPage() {
           <header className="section-heading">
             <div>
               <h2>قانون‌های ارجاع</h2>
-              <p>قانون‌های قابل انتخاب هنگام ساخت تیکت پروژه.</p>
+              <p>قانون‌های قابل انتخاب هنگام ساخت کار پروژه.</p>
             </div>
           </header>
           <SearchBox value={query} onChange={setQuery} placeholder="جستجوی شناسه یا نام قانون ارجاع…" />
@@ -93,7 +93,7 @@ export default function RoutingPage() {
                 description={rules.length ? "عبارت جست‌وجو را بررسی کنید." : "برای اتصال واحد و نقش یک قانون بسازید."}
               />
             ) : (
-              <table>
+              <SurfaceTable code="routing">
                 <thead>
                   <tr>
                     <th>نام</th>
@@ -133,7 +133,7 @@ export default function RoutingPage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </SurfaceTable>
             )}
           </div>
         </section>
@@ -147,11 +147,13 @@ export default function RoutingPage() {
             if (!saveRule.isPending) setEditing(undefined);
           }}
         >
-          <form
-            onSubmit={(event) => {
+          <SurfaceForm
+            code="routing"
+            recordId={editing.id}
+            onSubmit={(event, custom_values) => {
               event.preventDefault();
               if (saveRule.isPending) return;
-              saveRule.mutate(editing, { onSuccess: () => setEditing(undefined) });
+              saveRule.mutate({ ...editing, custom_values }, { onSuccess: () => setEditing(undefined) });
             }}
           >
             <header>
@@ -218,9 +220,10 @@ export default function RoutingPage() {
                 ذخیره قانون
               </Button>
             </footer>
-          </form>
+          </SurfaceForm>
         </ModalCore>
       )}
     </div>
   );
 }
+import { SurfaceForm, SurfaceTable } from "../engine/surface";

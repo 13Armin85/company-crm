@@ -1,8 +1,9 @@
 import { useDismissMenu } from "./use-dismiss-menu";
-import { IdentifierBadge, ModalCore, PersianDatePicker, SearchableSelect } from "@plane/ui";
-import { DialogTitle } from "@headlessui/react";
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import type { FormEvent, ReactNode } from "react";
+import { IdentifierBadge, PersianDatePicker, SearchableSelect } from "@plane/ui";
+import { Popover, PopoverButton, PopoverPanel } from "@headlessui/react";
+import { Fragment, lazy, Suspense, useContext, useEffect, useMemo, useState } from "react";
+import { ChoiceLabelsContext } from "./choice-label-context";
+import type { ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import {
   Archive,
@@ -15,7 +16,6 @@ import {
   Inbox,
   MessageSquare,
   MoreHorizontal,
-  Plus,
   Search,
   Sparkles,
   ShieldCheck,
@@ -25,8 +25,6 @@ import {
 import type { LucideIcon } from "lucide-react";
 import {
   useArchiveProject,
-  useCreateIssue,
-  useCreateProject,
   useCurrentUser,
   useDeleteIssue,
   useDeleteProject,
@@ -49,7 +47,9 @@ import { useUIStore } from "./store";
 import type { Issue, Member, NotificationItem, Priority, Project, Status } from "./types";
 import { persianDate, priorityFa, statusFa, toFa } from "./utils";
 import { issueReference, matchesRecordSearch } from "./identifiers";
-import { canTransferIssue } from "./task-access";
+import { canChangeIssueStatus, canTransferIssue } from "./task-access";
+
+const EngineQuickCreate = lazy(() => import("./engine/quick-create"));
 
 export function IconButton({
   children,
@@ -157,19 +157,43 @@ export function AvatarStack({ members = [], max = 3 }: { members?: Member[]; max
   );
 }
 
-export function StatusBadge({ status }: { status: Status }) {
+export function StatusBadge({
+  status,
+  code,
+  label,
+  color,
+}: {
+  status: Status;
+  code?: string;
+  label?: string;
+  color?: string;
+}) {
+  const choices = useContext(ChoiceLabelsContext);
+  const option = choices.task_status.find((o) => o.id === code);
+  const title =
+    label && !["Backlog", "Todo", "In Progress", "Review", "Done", "Blocked", "Cancelled"].includes(label)
+      ? label
+      : label
+        ? statusFa[status]
+        : option?.title || statusFa[status];
   return (
-    <span className={`status status-${status.replace(" ", "-").toLowerCase()}`}>
+    <span
+      className={`status status-${status.replace(" ", "-").toLowerCase()}`}
+      style={{ color: color || option?.color }}
+    >
       <i />
-      {statusFa[status]}
+      {title}
     </span>
   );
 }
-export function PriorityBadge({ priority }: { priority: Priority }) {
+export function PriorityBadge({ priority, code }: { priority: Priority; code?: string }) {
+  const choices = useContext(ChoiceLabelsContext);
+  const option = choices.priority.find((o) => o.id === (code || priority.toLowerCase()));
   return (
-    <span className={`priority priority-${priority.toLowerCase()}`}>
+    <span className={`priority priority-${priority.toLowerCase()}`} style={{ color: option?.color }}>
       <CircleAlert size={13} />
-      {priorityFa[priority]}
+      {option?.title ||
+        (code && !["urgent", "high", "medium", "low", "none"].includes(code) ? code : priorityFa[priority])}
     </span>
   );
 }
@@ -180,97 +204,27 @@ export function IssueRow({
   table = false,
   readOnly = false,
   allowTransfer = false,
-  inlineTransfer = false,
+  project,
 }: {
   issue: Issue;
   compact?: boolean;
   table?: boolean;
   readOnly?: boolean;
   allowTransfer?: boolean;
-  inlineTransfer?: boolean;
+  project?: Project;
 }) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuContainerRef = useRef<HTMLDivElement>(null);
-  const menuButtonRef = useRef<HTMLButtonElement>(null);
   const slug = useUIStore((state) => state.workspaceSlug) ?? "";
   const { data: access } = useWorkspaceAccess();
   const { data: currentUser } = useCurrentUser();
-  const { data: transferProjects = [] } = useProjects();
   const updateStatus = useUpdateIssueStatus(slug);
-  const deleteIssue = useDeleteIssue(slug);
-  const reassignIssue = useReassignIssue(slug);
-  const { data: teamMembers = [] } = useMembers();
-  const { data: projectMembers = [] } = useMembers(undefined, issue.scope === "project" ? issue.projectId : undefined);
   const navigate = useNavigate();
   const canEdit = access?.can("Issue.Edit") === true;
-  const eligibleMembers = issue.scope === "project" ? projectMembers : teamMembers;
   const ownsIssue = Boolean(currentUser?.id) && issue.assignee?.id === currentUser?.id;
   const canChangeStatus = !readOnly && access?.can("Issue.Status.Edit") === true && (canEdit || ownsIssue);
-  const canTransfer =
-    (!readOnly || allowTransfer) &&
-    canTransferIssue(issue, currentUser?.id, (code) => access?.can(code) === true, transferProjects);
-  const hasActions = canChangeStatus || (canTransfer && !inlineTransfer);
   const statusOptions: Status[] = ["Todo", "In Progress", "Review", "Done", "Blocked"];
-  const transferOptions = eligibleMembers
-    .filter((member) => access?.is_admin || member.id !== currentUser?.id)
-    .map((member) => ({
-      id: member.id,
-      title: member.displayName,
-      description: member.email,
-      disabled: member.isActive === false || member.id === issue.assignee?.id,
-    }));
-  const transferControl = canTransfer && (inlineTransfer || eligibleMembers.length > 1) && (
-    <div className="issue-transfer-control">
-      <label htmlFor={`issue-transfer-${issue.id}`}>انتقال به شخص دیگر</label>
-      <SearchableSelect
-        id={`issue-transfer-${issue.id}`}
-        label="انتقال به عضو دیگر"
-        optionClassName="member-transfer-options"
-        value={issue.assignee?.id ?? ""}
-        selectedLabel={issue.assignee?.displayName ?? "بدون مسئول"}
-        placeholder="نام شخص را جستجو کنید"
-        disabled={reassignIssue.isPending || !transferOptions.some((option) => !option.disabled)}
-        onChange={(id) => {
-          if (id && id !== issue.assignee?.id && !reassignIssue.isPending) {
-            reassignIssue.mutate({ issue, assigneeId: id });
-            setMenuOpen(false);
-          }
-        }}
-        options={transferOptions}
-      />
-    </div>
-  );
-
-  useEffect(() => {
-    if (!menuOpen) return;
-
-    const handlePointerDown = (event: PointerEvent) => {
-      if (
-        event.target instanceof Node &&
-        !menuContainerRef.current?.contains(event.target) &&
-        !(event.target instanceof Element && event.target.closest("[data-transfer-options]"))
-      ) {
-        setMenuOpen(false);
-      }
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      setMenuOpen(false);
-      menuButtonRef.current?.focus();
-    };
-
-    document.addEventListener("pointerdown", handlePointerDown, true);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown, true);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [menuOpen]);
 
   return (
-    <div
-      className={`issue-row ${compact ? "is-compact" : ""} ${table ? "is-table" : ""} ${menuOpen ? "has-open-menu" : ""} ${inlineTransfer && canTransfer ? "has-inline-transfer" : ""}`}
-    >
+    <div className={`issue-row ${compact ? "is-compact" : ""} ${table ? "is-table" : ""}`}>
       <button
         className="issue-check"
         aria-label="تکمیل کار"
@@ -336,63 +290,174 @@ export function IssueRow({
           )}
         </div>
       ) : (
-        <StatusBadge status={issue.status} />
+        !issue.hiddenFields?.some((f) => f === "status" || f === "state_id") && (
+          <StatusBadge
+            status={issue.status}
+            code={issue.statusCode}
+            label={issue.statusLabel}
+            color={issue.statusColor}
+          />
+        )
       )}
-      <PriorityBadge priority={issue.priority} />
+      {!issue.hiddenFields?.includes("priority") && (
+        <PriorityBadge priority={issue.priority} code={issue.priorityCode} />
+      )}
       <span className="issue-date">
         <Clock3 size={14} />
         {persianDate(issue.dueDate)}
       </span>
-      <div className="issue-actions" ref={menuContainerRef}>
+      <div className="issue-actions">
         <span className={table ? "issue-assignee" : ""}>
           <Avatar member={issue.assignee} size="sm" />
           {table && <span>{issue.assignee?.displayName || "بدون مسئول"}</span>}
         </span>
-        {hasActions && (
-          <button
-            ref={menuButtonRef}
-            className="plain-icon"
-            aria-label="عملیات کار"
-            aria-haspopup="menu"
-            aria-expanded={menuOpen}
-            onClick={() => setMenuOpen((value) => !value)}
-          >
+        <IssueActionsMenu
+          issue={issue}
+          readOnly={readOnly}
+          allowTransfer={allowTransfer}
+          project={project}
+          statusMutation={updateStatus}
+        />
+      </div>
+    </div>
+  );
+}
+
+export function IssueActionsMenu({
+  issue,
+  project,
+  readOnly = false,
+  allowTransfer = false,
+  transferMembers,
+  transferDisabled = false,
+  onAssigneeChange,
+  statusMutation,
+}: {
+  issue: Issue;
+  project?: Project;
+  readOnly?: boolean;
+  allowTransfer?: boolean;
+  transferMembers?: Member[];
+  transferDisabled?: boolean;
+  onAssigneeChange?: (issue: Issue, assigneeId: string) => void;
+  statusMutation?: ReturnType<typeof useUpdateIssueStatus>;
+}) {
+  const slug = useUIStore((state) => state.workspaceSlug) ?? "";
+  const { data: access } = useWorkspaceAccess();
+  const { data: currentUser } = useCurrentUser();
+  const { data: projects = [] } = useProjects();
+  const { data: members = [] } = useMembers(undefined, issue.scope === "project" ? issue.projectId : undefined);
+  const ownStatusMutation = useUpdateIssueStatus(slug);
+  const businessChoices = useContext(ChoiceLabelsContext);
+  const updateStatus = statusMutation ?? ownStatusMutation;
+  const deleteIssue = useDeleteIssue(slug);
+  const reassignIssue = useReassignIssue(slug);
+  const can = (code: string) => access?.can(code) === true;
+  const protectedFields = new Set([...(issue.hiddenFields ?? []), ...(issue.readonlyFields ?? [])]);
+  const canChangeStatus =
+    !readOnly &&
+    !protectedFields.has(issue.scope === "project" ? "state_id" : "status") &&
+    canChangeIssueStatus(issue, currentUser?.id, can);
+  const canTransfer =
+    (!readOnly || allowTransfer) &&
+    !protectedFields.has(issue.scope === "project" ? "assignee_ids" : "assignee_id") &&
+    canTransferIssue(issue, currentUser?.id, can, project ? [project] : projects);
+  const canDelete = !readOnly && can("Issue.Delete");
+  const pending = transferDisabled || reassignIssue.isPending;
+  const eligibleMembers = issue.scope === "project" ? members : (transferMembers ?? members);
+  const transferOptions = eligibleMembers
+    .filter((member) => access?.is_admin || member.id !== currentUser?.id)
+    .map((member) => ({
+      id: member.id,
+      title: member.displayName,
+      description: member.email,
+      disabled: member.isActive === false || member.id === issue.assignee?.id,
+    }));
+  const statuses: Status[] = ["Todo", "In Progress", "Review", "Done", "Blocked"];
+  const semanticStatus: Record<string, Status> = {
+    todo: "Todo",
+    in_progress: "In Progress",
+    review: "Review",
+    done: "Done",
+    blocked: "Blocked",
+  };
+  const statusChoices =
+    issue.scope === "project" && issue.statusOptions?.length
+      ? issue.statusOptions.map((option) => ({ ...option, title: statusFa[option.title as Status] || option.title }))
+      : businessChoices.task_status.length
+        ? businessChoices.task_status
+            .filter((option) => !option.disabled)
+            .map((option) => ({ ...option, status: semanticStatus[option.id] || ("Todo" as Status) }))
+        : statuses.map((status) => ({ id: status, title: statusFa[status], status }));
+  if (!canChangeStatus && !canTransfer && !canDelete) return null;
+  return (
+    <Popover className="issue-actions" onPointerDown={(event) => event.stopPropagation()}>
+      {({ close }) => (
+        <>
+          <PopoverButton className="plain-icon" aria-label="عملیات کار" aria-haspopup="menu">
             <MoreHorizontal size={16} />
-          </button>
-        )}
-        {hasActions && menuOpen && (
-          <div className="action-menu issue-action-menu" role="menu">
+          </PopoverButton>
+          <PopoverPanel className="action-menu issue-action-menu" role="menu" anchor="bottom end" portal dir="rtl">
+            <Link to={`/edit/${issue.scope === "project" ? "ticket" : "task"}/${issue.id}`} onClick={() => close()}>
+              جزئیات و فرم کامل
+            </Link>
             {canChangeStatus && <small>تغییر وضعیت</small>}
             {canChangeStatus &&
-              statusOptions.map((status) => (
+              statusChoices.map((option) => (
                 <button
-                  key={status}
-                  disabled={status === issue.status || updateStatus.isPending}
+                  key={option.id}
+                  disabled={option.id === (issue.stateId || issue.statusCode || issue.status) || updateStatus.isPending}
                   onClick={() => {
-                    updateStatus.mutate({ issue, status });
-                    setMenuOpen(false);
+                    updateStatus.mutate({
+                      issue,
+                      status: option.status,
+                      ...(option.id !== option.status ? { nativeValue: option.id } : {}),
+                    });
+                    close();
                   }}
                 >
-                  {statusFa[status]}
+                  {option.title}
                 </button>
               ))}
-            {!inlineTransfer && transferControl}
-            {!readOnly && access?.can("Issue.Delete") && (
+            {canTransfer && (
+              <div className="issue-transfer-control">
+                <label htmlFor={`issue-transfer-${issue.id}`}>انتقال به شخص دیگر</label>
+                <SearchableSelect
+                  id={`issue-transfer-${issue.id}`}
+                  label="انتقال به عضو دیگر"
+                  optionClassName="member-transfer-options"
+                  containedOptions
+                  value={issue.assignee?.id ?? ""}
+                  selectedLabel={issue.assignee?.displayName ?? "بدون مسئول"}
+                  placeholder="نام شخص را جستجو کنید"
+                  disabled={pending || !transferOptions.some((option) => !option.disabled)}
+                  onChange={(id) => {
+                    if (id && id !== issue.assignee?.id && !pending) {
+                      if (onAssigneeChange) onAssigneeChange(issue, id);
+                      else reassignIssue.mutate({ issue, assigneeId: id });
+                      close();
+                    }
+                  }}
+                  options={transferOptions}
+                />
+              </div>
+            )}
+            {canDelete && (
               <button
                 className="danger-action"
+                disabled={deleteIssue.isPending}
                 onClick={() => {
                   if (window.confirm(`کار «${issue.name}» حذف شود؟`)) deleteIssue.mutate(issue);
-                  setMenuOpen(false);
+                  close();
                 }}
               >
                 حذف کار
               </button>
             )}
-          </div>
-        )}
-      </div>
-      {inlineTransfer && transferControl}
-    </div>
+          </PopoverPanel>
+        </>
+      )}
+    </Popover>
   );
 }
 
@@ -916,236 +981,20 @@ export function CommandPalette() {
 }
 
 export function CreateModal() {
-  const location = useLocation();
   const open = useUIStore((state) => state.createOpen);
   const createKind = useUIStore((state) => state.createKind);
-  const setOpen = useUIStore((state) => state.setCreateOpen);
-  const setFormDirty = useUIStore((state) => state.setFormDirty);
-  const [kind, setKind] = useState<"project" | "issue">("issue");
-  const [name, setName] = useState("");
-  const [projectId, setProjectId] = useState("");
-  const [priority, setPriority] = useState<Priority>("Medium");
-  const [targetDate, setTargetDate] = useState("");
-  const [assigneeId, setAssigneeId] = useState("");
-  const [routingRuleId, setRoutingRuleId] = useState("");
-  const slug = useUIStore((state) => state.workspaceSlug) ?? "";
+  const location = useLocation();
   const { data: access } = useWorkspaceAccess();
-  const { data: currentUser } = useCurrentUser();
-  const { data: projects = [] } = useProjects();
-  const activeProjects = useMemo(() => projects.filter((project) => !project.archivedAt), [projects]);
-  const routeProjectId = location.pathname.match(/^\/projects\/([^/]+)/)?.[1];
-  const selectedScope =
-    projectId ||
-    (activeProjects.some((project) => project.id === routeProjectId) ? (routeProjectId ?? "workspace") : "workspace");
-  const selectedProjectId = selectedScope === "workspace" ? undefined : selectedScope;
-  const { data: members = [] } = useMembers(undefined, selectedProjectId);
-  const { data: routingRules = [] } = useTicketRoutingRules(undefined, access?.can("Routing.View") === true);
-  const activeRoutingRules = useMemo(() => routingRules.filter((rule) => rule.isActive), [routingRules]);
-  const createProject = useCreateProject(slug);
-  const createIssue = useCreateIssue(slug, selectedProjectId);
-  const busy = createProject.isPending || createIssue.isPending;
-  const canCreateTaskHere =
-    access?.can("Issue.Create") === true && location.pathname.replace(/\/+$/, "") !== "/my-work";
-  useEffect(() => {
-    if (open) {
-      setKind(createKind);
-      setProjectId(
-        activeProjects.some((project) => project.id === routeProjectId) ? (routeProjectId ?? "") : "workspace"
-      );
-    }
-  }, [activeProjects, createKind, open, routeProjectId]);
-  useEffect(() => {
-    setFormDirty("quick-create", open && Boolean(name || targetDate || assigneeId || routingRuleId));
-    return () => setFormDirty("quick-create", false);
-  }, [assigneeId, name, open, routingRuleId, setFormDirty, targetDate]);
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
-    if (busy || !name.trim() || (kind === "issue" && !canCreateTaskHere)) return;
-    if (kind === "issue" && !access?.is_admin && assigneeId === currentUser?.id) return;
-    const done = () => {
-      setName("");
-      setProjectId("");
-      setTargetDate("");
-      setAssigneeId("");
-      setRoutingRuleId("");
-      setPriority("Medium");
-      setOpen(false);
-    };
-    if (kind === "project") createProject.mutate({ name, description: "" }, { onSuccess: done });
-    else createIssue.mutate({ name, priority, targetDate, assigneeId, routingRuleId }, { onSuccess: done });
-  };
   if (
     !open ||
-    !access?.can(kind === "project" ? "Project.Create" : "Issue.Create") ||
-    (kind === "issue" && !canCreateTaskHere)
+    !access?.can(createKind === "project" ? "Project.Create" : "Issue.Create") ||
+    (createKind !== "project" && location.pathname.replace(/\/+$/, "") === "/my-work")
   )
     return null;
   return (
-    <ModalCore
-      isOpen
-      className="create-modal"
-      handleClose={() => {
-        if (!busy) setOpen(false);
-      }}
-    >
-      <form className="quick-create-form" onSubmit={submit}>
-        <header>
-          <div>
-            <span className="modal-kicker">ایجاد سریع</span>
-            <DialogTitle as="h2">{kind === "issue" ? "کار جدید" : "پروژه جدید"}</DialogTitle>
-          </div>
-          <IconButton label="بستن" disabled={busy} onClick={() => setOpen(false)}>
-            <X size={19} />
-          </IconButton>
-        </header>
-        <div className="segmented">
-          {canCreateTaskHere && (
-            <button
-              type="button"
-              disabled={busy}
-              className={kind === "issue" ? "active" : ""}
-              onClick={() => setKind("issue")}
-            >
-              کار
-            </button>
-          )}
-          <button
-            type="button"
-            disabled={busy}
-            className={kind === "project" ? "active" : ""}
-            aria-disabled={!access.can("Project.Create")}
-            onClick={() => access.can("Project.Create") && setKind("project")}
-          >
-            پروژه
-          </button>
-        </div>
-        <label>
-          <span>عنوان</span>
-          <input
-            value={name}
-            disabled={busy}
-            onChange={(event) => setName(event.target.value)}
-            placeholder={kind === "issue" ? "مثلاً طراحی صفحه پرداخت" : "مثلاً نسخه جدید محصول"}
-          />
-        </label>
-        {kind === "issue" && (
-          <>
-            <label htmlFor="create-issue-project">
-              <span>پروژه</span>
-              <SearchableSelect
-                id="create-issue-project"
-                label="پروژه"
-                disabled={busy}
-                value={selectedScope}
-                onChange={(id) => {
-                  setProjectId(id);
-                  setAssigneeId("");
-                  setRoutingRuleId("");
-                }}
-                options={[
-                  { id: "workspace", title: "خارج از پروژه (کار مستقل)" },
-                  ...activeProjects.map((project) => ({ id: project.id, title: project.name })),
-                ]}
-              />
-            </label>
-            <div className="form-grid">
-              <label>
-                <span>اولویت</span>
-                <select
-                  disabled={busy}
-                  value={priority}
-                  onChange={(event) => setPriority(event.target.value as Priority)}
-                >
-                  <option value="Urgent">فوری</option>
-                  <option value="High">زیاد</option>
-                  <option value="Medium">متوسط</option>
-                  <option value="Low">کم</option>
-                </select>
-              </label>
-              <label htmlFor="issue-target-date">
-                <span>تاریخ پایان</span>
-                <PersianDateInput
-                  label="تاریخ پایان"
-                  disabled={busy}
-                  id="issue-target-date"
-                  value={targetDate}
-                  onChange={setTargetDate}
-                />
-              </label>
-              <label className="wide" htmlFor="create-issue-assignee">
-                <span>مسئول مستقیم</span>
-                <SearchableSelect
-                  id="create-issue-assignee"
-                  label="مسئول مستقیم"
-                  disabled={busy}
-                  value={assigneeId}
-                  onChange={(id) => {
-                    setAssigneeId(id);
-                    if (id) setRoutingRuleId("");
-                  }}
-                  options={[
-                    { id: "", title: "بدون مسئول" },
-                    ...members
-                      .filter((member) => access.is_admin || member.id !== currentUser?.id)
-                      .map((member) => ({
-                        id: member.id,
-                        title: member.displayName,
-                        description: member.email,
-                        disabled: member.isActive === false,
-                      })),
-                  ]}
-                />
-              </label>
-              {selectedProjectId && (
-                <label className="wide" htmlFor="create-issue-routing">
-                  <span>یا قانون ارجاع هوشمند</span>
-                  <SearchableSelect
-                    id="create-issue-routing"
-                    label="قانون ارجاع هوشمند"
-                    disabled={busy}
-                    value={routingRuleId}
-                    onChange={(id) => {
-                      setRoutingRuleId(id);
-                      if (id) setAssigneeId("");
-                    }}
-                    options={[
-                      { id: "", title: "بدون مسیریابی خودکار" },
-                      ...activeRoutingRules.map((rule) => ({
-                        id: rule.id,
-                        title: rule.name,
-                        description: `${rule.unitTitle} / ${rule.roleName}`,
-                      })),
-                    ]}
-                  />
-                </label>
-              )}
-            </div>
-          </>
-        )}
-        {(createIssue.isError || createProject.isError) && (
-          <p role="alert">عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید.</p>
-        )}
-        <footer>
-          <Button variant="secondary" disabled={busy} onClick={() => setOpen(false)}>
-            انصراف
-          </Button>
-          <Button
-            type="submit"
-            icon={Plus}
-            disabled={
-              !name.trim() ||
-              !slug ||
-              (kind === "issue" && !assigneeId && !routingRuleId) ||
-              (kind === "issue" && !access.is_admin && assigneeId === currentUser?.id) ||
-              createIssue.isPending ||
-              createProject.isPending
-            }
-          >
-            ایجاد {kind === "issue" ? "کار" : "پروژه"}
-          </Button>
-        </footer>
-      </form>
-    </ModalCore>
+    <Suspense fallback={<Skeleton rows={3} />}>
+      <EngineQuickCreate />
+    </Suspense>
   );
 }
 
@@ -1226,8 +1075,19 @@ export function Breadcrumb() {
     roles: "نقش‌های سازمانی",
     routing: "ارجاع هوشمند",
     settings: "تنظیمات",
+    edit: "فرم",
+    task: "وظیفه",
+    ticket: "کار پروژه",
+    project: "پروژه",
+    leave: "عدم حضور",
+    engine: "طراحی فرم‌ها و جدول‌ها",
   };
-  const chunks = location.pathname.split("/").filter(Boolean);
+  const chunks = location.pathname.startsWith("/entities")
+    ? []
+    : location.pathname
+        .split("/")
+        .filter(Boolean)
+        .filter((_, index) => !location.pathname.startsWith("/edit/") || index < 2);
   return (
     <div className="breadcrumb">
       <Link to="/">خانه</Link>

@@ -17,6 +17,7 @@ from django.db.models import (
 from django.utils.decorators import method_decorator
 from django.views.decorators.gzip import gzip_page
 from django.db import transaction
+from django.shortcuts import get_object_or_404
 
 # Third party imports
 from rest_framework import status
@@ -61,7 +62,7 @@ class WorkspaceViewViewSet(BaseViewSet):
         return self.filter_queryset(
             super()
             .get_queryset()
-            .filter(workspace__slug=self.kwargs.get("slug"))
+            .filter(workspace__slug=self.kwargs.get("slug"), engine_entity__isnull=True)
             .filter(project__isnull=True)
             .filter(Q(owned_by=self.request.user) | Q(access=1))
             .order_by(
@@ -86,7 +87,9 @@ class WorkspaceViewViewSet(BaseViewSet):
     @allow_permission(allowed_roles=[], level="WORKSPACE", creator=True, model=IssueView)
     def partial_update(self, request, slug, pk):
         with transaction.atomic():
-            workspace_view = IssueView.objects.select_for_update().get(pk=pk, workspace__slug=slug)
+            workspace_view = IssueView.objects.select_for_update().get(
+                engine_entity__isnull=True, pk=pk, workspace__slug=slug
+            )
 
             if workspace_view.is_locked:
                 return Response({"error": "دیدگاه قفل شده است"}, status=status.HTTP_400_BAD_REQUEST)
@@ -119,7 +122,7 @@ class WorkspaceViewViewSet(BaseViewSet):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN], level="WORKSPACE", creator=True, model=IssueView)
     def destroy(self, request, slug, pk):
-        workspace_view = IssueView.objects.get(pk=pk, workspace__slug=slug)
+        workspace_view = IssueView.objects.get(engine_entity__isnull=True, pk=pk, workspace__slug=slug)
 
         workspace_member = WorkspaceMember.objects.filter(
             workspace__slug=slug, member=request.user, role=20, is_active=True
@@ -277,7 +280,7 @@ class IssueViewViewSet(BaseViewSet):
         return self.filter_queryset(
             super()
             .get_queryset()
-            .filter(workspace__slug=self.kwargs.get("slug"))
+            .filter(workspace__slug=self.kwargs.get("slug"), engine_entity__isnull=True)
             .filter(project_id=self.kwargs.get("project_id"))
             .filter(
                 project__project_projectmember__member=self.request.user,
@@ -349,7 +352,9 @@ class IssueViewViewSet(BaseViewSet):
     @allow_permission(allowed_roles=[], creator=True, model=IssueView)
     def partial_update(self, request, slug, project_id, pk):
         with transaction.atomic():
-            issue_view = IssueView.objects.select_for_update().get(pk=pk, workspace__slug=slug, project_id=project_id)
+            issue_view = IssueView.objects.select_for_update().get(
+                engine_entity__isnull=True, pk=pk, workspace__slug=slug, project_id=project_id
+            )
 
             if issue_view.is_locked:
                 return Response({"error": "دیدگاه قفل شده است"}, status=status.HTTP_400_BAD_REQUEST)
@@ -370,7 +375,9 @@ class IssueViewViewSet(BaseViewSet):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN], creator=True, model=IssueView)
     def destroy(self, request, slug, project_id, pk):
-        project_view = IssueView.objects.get(pk=pk, project_id=project_id, workspace__slug=slug)
+        project_view = IssueView.objects.get(
+            engine_entity__isnull=True, pk=pk, project_id=project_id, workspace__slug=slug
+        )
         if (
             ProjectMember.objects.filter(
                 workspace__slug=slug,
@@ -418,9 +425,16 @@ class IssueViewFavoriteViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def create(self, request, slug, project_id):
+        view = get_object_or_404(
+            IssueView,
+            id=request.data.get("view"),
+            workspace__slug=slug,
+            project_id=project_id,
+            engine_entity__isnull=True,
+        )
         _ = UserFavorite.objects.create(
             user=request.user,
-            entity_identifier=request.data.get("view"),
+            entity_identifier=view.id,
             entity_type="view",
             project_id=project_id,
         )

@@ -2,6 +2,7 @@ import { CanceledError, create } from "axios";
 import type { AxiosError, InternalAxiosRequestConfig } from "axios";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { QueryClient } from "@tanstack/react-query";
+import type { FormValues } from "@plane/ui";
 import { useUIStore } from "./store";
 import { publishSessionEnd } from "./access/session-events";
 import { combineRequestSignals } from "./access/request-signals";
@@ -253,6 +254,15 @@ const mapIssue = (
         typeof stateRaw === "object" ? stateRaw?.name : ""
       ),
     stateId,
+    statusCode: stateId,
+    statusLabel:
+      knownState?.name ??
+      (typeof stateRaw === "object" && typeof stateRaw?.name === "string" ? stateRaw.name : undefined),
+    statusColor: knownState?.color,
+    statusOptions: states.map((state) => ({ id: state.id, title: state.name, status: state.status })),
+    priorityCode: rawPriority,
+    hiddenFields: Array.isArray(item.engine_hidden_fields) ? item.engine_hidden_fields.map(String) : [],
+    readonlyFields: Array.isArray(item.engine_readonly_fields) ? item.engine_readonly_fields.map(String) : [],
     priority: (["urgent", "high", "medium", "low", "none"].includes(rawPriority)
       ? `${rawPriority[0].toUpperCase()}${rawPriority.slice(1)}`
       : "None") as Issue["priority"],
@@ -296,6 +306,10 @@ const mapWorkspaceTask = (item: Record<string, unknown>, members: Member[]): Iss
     scope: "workspace",
     projectIdentifier: "TEAM",
     status: workspaceTaskStatus[String(item.status)] ?? "Todo",
+    statusCode: String(item.status ?? "todo"),
+    priorityCode: rawPriority,
+    hiddenFields: Array.isArray(item.engine_hidden_fields) ? item.engine_hidden_fields.map(String) : [],
+    readonlyFields: Array.isArray(item.engine_readonly_fields) ? item.engine_readonly_fields.map(String) : [],
     priority: (["urgent", "high", "medium", "low", "none"].includes(rawPriority)
       ? `${rawPriority[0].toUpperCase()}${rawPriority.slice(1)}`
       : "None") as Issue["priority"],
@@ -379,11 +393,16 @@ export const useSignOut = () => {
 export const useUpdateUserProfile = () => {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (payload: { display_name: string; first_name?: string; last_name?: string }) =>
-      api.patch("/api/users/me/", payload),
+    mutationFn: (payload: {
+      display_name: string;
+      first_name?: string;
+      last_name?: string;
+      custom_values?: FormValues;
+    }) => api.patch("/api/users/me/", payload, { headers: { "X-CRM-Workspace": useUIStore.getState().workspaceSlug } }),
     onSuccess: () => {
       client.invalidateQueries({ queryKey: ["current-user"] });
       client.invalidateQueries({ queryKey: ["members"] });
+      client.invalidateQueries({ queryKey: ["entity-engine"] });
       useUIStore.getState().toast("پروفایل ذخیره شد");
     },
     onError: (error) => useUIStore.getState().toast(errorMessage(error, "ذخیره پروفایل انجام نشد"), "error"),
@@ -426,6 +445,20 @@ export const useUploadAvatar = () => {
   });
 };
 
+export const useRemoveAvatar = () => {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.delete("/api/users/me/avatar/"),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: ["current-user"] });
+      client.invalidateQueries({ queryKey: ["members"] });
+      client.invalidateQueries({ queryKey: ["organization-user-profile"] });
+      useUIStore.getState().toast("تصویر پروفایل حذف شد");
+    },
+    onError: (error) => useUIStore.getState().toast(errorMessage(error, "حذف تصویر انجام نشد"), "error"),
+  });
+};
+
 export interface AppearancePreferences {
   theme: "light" | "dark" | "system";
   accent: string;
@@ -456,17 +489,22 @@ export const useAppearance = () =>
 export const useUpdateAppearance = () => {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: Partial<AppearancePreferences>) => {
+    mutationFn: async (payload: Partial<AppearancePreferences> & { custom_values?: FormValues }) => {
       const current = (await api.get("/api/users/me/profile/")).data as { theme?: Record<string, unknown> };
       const theme = { ...current.theme };
       if (payload.theme) theme.theme = payload.theme;
       if (payload.accent) theme.hamkar_accent = payload.accent;
       if (payload.density) theme.hamkar_density = payload.density;
-      await api.patch("/api/users/me/profile/", { theme });
+      await api.patch(
+        "/api/users/me/profile/",
+        { theme, custom_values: payload.custom_values },
+        { headers: { "X-CRM-Workspace": useUIStore.getState().workspaceSlug } }
+      );
       return payload;
     },
     onSuccess: () => {
       client.invalidateQueries({ queryKey: ["appearance"] });
+      client.invalidateQueries({ queryKey: ["entity-engine"] });
       useUIStore.getState().toast("تغییرات با موفقیت انجام شد");
     },
     onError: (error) => useUIStore.getState().toast(errorMessage(error, "ذخیره ترجیحات انجام نشد"), "error"),
@@ -534,22 +572,32 @@ export const useNotificationPreferences = () =>
 export const useUpdateNotificationPreferences = () => {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (payload: Partial<NotificationPreferences>) =>
-      api.patch("/api/users/me/notification-preferences/", payload),
+    mutationFn: (payload: Partial<NotificationPreferences> & { custom_values?: FormValues }) =>
+      api.patch("/api/users/me/notification-preferences/", payload, {
+        headers: { "X-CRM-Workspace": useUIStore.getState().workspaceSlug },
+      }),
     onSuccess: () => {
       client.invalidateQueries({ queryKey: ["notification-preferences"] });
+      client.invalidateQueries({ queryKey: ["entity-engine"] });
       useUIStore.getState().toast("تنظیمات اعلان ذخیره شد");
     },
     onError: (error) => useUIStore.getState().toast(errorMessage(error, "ذخیره اعلان‌ها انجام نشد"), "error"),
   });
 };
-export const useChangePassword = () =>
-  useMutation({
-    mutationFn: (payload: { old_password: string; new_password: string }) =>
-      api.post("/auth/change-password/", payload),
-    onSuccess: () => useUIStore.getState().toast("رمز عبور تغییر کرد"),
+export const useChangePassword = () => {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { old_password: string; new_password: string; custom_values?: FormValues }) =>
+      api.post("/auth/change-password/", payload, {
+        headers: { "X-CRM-Workspace": useUIStore.getState().workspaceSlug },
+      }),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: ["entity-engine"] });
+      useUIStore.getState().toast("رمز عبور تغییر کرد");
+    },
     onError: (error) => useUIStore.getState().toast(errorMessage(error, "تغییر رمز عبور انجام نشد"), "error"),
   });
+};
 
 export const useProjects = (providedSlug?: string) => {
   const slug = useSlug(providedSlug);
@@ -843,7 +891,7 @@ export const useCreateIssue = (slug: string, projectId?: string) => {
 export const useUpdateIssueStatus = (slug: string) => {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: async ({ issue, status }: { issue: Issue; status: Status }) => {
+    mutationFn: async ({ issue, status, nativeValue }: { issue: Issue; status: Status; nativeValue?: string }) => {
       if (issue.scope === "workspace") {
         const rawStatus = {
           Todo: "todo",
@@ -852,13 +900,13 @@ export const useUpdateIssueStatus = (slug: string) => {
           Done: "done",
           Blocked: "blocked",
         }[status];
-        await api.patch(`/api/workspaces/${slug}/tasks/${issue.id}/`, { status: rawStatus });
+        await api.patch(`/api/workspaces/${slug}/tasks/${issue.id}/`, { status: nativeValue || rawStatus });
         return { issue, status };
       }
       const states = unwrap<Record<string, unknown>[]>(
         (await api.get(`/api/workspaces/${slug}/projects/${issue.projectId}/states/`)).data
       ).map(mapState);
-      const target = states.find((state) => state.status === status);
+      const target = states.find((state) => (nativeValue ? state.id === nativeValue : state.status === status));
       if (!target) throw new Error("The operation failed. Please try again.");
       await api.patch(`/api/workspaces/${slug}/projects/${issue.projectId}/issues/${issue.id}/`, {
         state_id: target.id,
@@ -923,10 +971,11 @@ export const useReassignIssue = (slug: string) => {
 export const useCreateCycle = (slug: string, projectId: string) => {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (payload: { name: string; start_date?: string; end_date?: string }) =>
+    mutationFn: (payload: { name: string; start_date?: string; end_date?: string; custom_values?: FormValues }) =>
       api.post(`/api/workspaces/${slug}/projects/${projectId}/cycles/`, payload),
     onSuccess: () => {
       client.invalidateQueries({ queryKey: ["cycles", slug, projectId] });
+      client.invalidateQueries({ queryKey: ["entity-engine", slug] });
       useUIStore.getState().toast("چرخه ساخته شد");
     },
     onError: (error) => useUIStore.getState().toast(errorMessage(error, "ساخت چرخه انجام نشد"), "error"),
@@ -935,9 +984,11 @@ export const useCreateCycle = (slug: string, projectId: string) => {
 export const useUpdateWorkspace = (slug: string) => {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (payload: { name: string }) => api.patch(`/api/workspaces/${slug}/`, payload),
+    mutationFn: (payload: { name: string; custom_values?: FormValues }) =>
+      api.patch(`/api/workspaces/${slug}/`, payload),
     onSuccess: () => {
       client.invalidateQueries({ queryKey: ["workspaces"] });
+      client.invalidateQueries({ queryKey: ["entity-engine"] });
       useUIStore.getState().toast("مشخصات شرکت ذخیره شد");
     },
     onError: (error) => useUIStore.getState().toast(errorMessage(error, "ذخیره مشخصات شرکت انجام نشد"), "error"),
@@ -982,6 +1033,7 @@ export const useCreateWorkspaceUser = (slug: string) => {
       display_name: string;
       role_ids?: string[];
       unit_ids?: string[];
+      custom_values?: FormValues;
     }) => api.post(`/api/workspaces/${slug}/members/`, payload),
     onSuccess: async () => {
       await invalidateOrganizationAccess(client, slug);
@@ -1039,6 +1091,7 @@ export const useOrganizationRole = (roleId: string, enabled = true) => {
 export const invalidateOrganizationAccess = (client: QueryClient, slug: string) =>
   Promise.all(
     [
+      "entity-engine",
       "organization-roles",
       "organization-role",
       "organization-units",
@@ -1079,15 +1132,19 @@ export const useSaveOrganizationRole = (slug: string) => {
       description?: string;
       permissionIds?: string[];
       isActive?: boolean;
+      custom_values?: FormValues;
     }) => {
       const body = {
         name: payload.name,
         description: payload.description,
         permission_ids: payload.permissionIds,
         is_active: payload.isActive,
+        custom_values: payload.custom_values,
       };
       const response = payload.id
-        ? await api.patch(`/api/workspaces/${slug}/organization/roles/${payload.id}/`, body)
+        ? await api.patch(`/api/workspaces/${slug}/organization/roles/${payload.id}/`, body, {
+            headers: payload.permissionIds !== undefined ? { "X-CRM-Surface": "role-permissions" } : {},
+          })
         : await api.post(`/api/workspaces/${slug}/organization/roles/`, body);
       return mapOrganizationRole(response.data);
     },
@@ -1134,6 +1191,7 @@ export const useSaveOrganizationUnit = (slug: string) => {
       managerId?: string;
       memberIds?: string[];
       isActive?: boolean;
+      custom_values?: FormValues;
     }) => {
       const body = {
         title: payload.title,
@@ -1141,6 +1199,7 @@ export const useSaveOrganizationUnit = (slug: string) => {
         ...(payload.managerId !== undefined ? { manager_id: payload.managerId || null } : {}),
         member_ids: payload.memberIds,
         is_active: payload.isActive,
+        custom_values: payload.custom_values,
       };
       const response = payload.id
         ? await api.patch(`/api/workspaces/${slug}/organization/units/${payload.id}/`, body)
@@ -1203,6 +1262,7 @@ export const useUpdateOrganizationUserProfile = (slug: string, userId: string) =
       is_active?: boolean;
       role_ids?: string[];
       unit_ids?: string[];
+      custom_values?: FormValues;
     }) => api.patch(`/api/workspaces/${slug}/organization/users/${userId}/`, payload),
     onSuccess: async () => {
       await invalidateOrganizationAccess(client, slug);
@@ -1233,12 +1293,14 @@ export const useSaveTicketRoutingRule = (slug: string) => {
       unitId: string;
       requiredRoleId: string;
       isActive?: boolean;
+      custom_values?: FormValues;
     }) => {
       const body = {
         name: payload.name,
         unit_id: payload.unitId,
         required_role_id: payload.requiredRoleId,
         is_active: payload.isActive,
+        custom_values: payload.custom_values,
       };
       const response = payload.id
         ? await api.patch(`/api/workspaces/${slug}/organization/routing-rules/${payload.id}/`, body)
@@ -1290,7 +1352,7 @@ export const useClaimTicketRoleQueue = (slug: string) => {
       client.invalidateQueries({ queryKey: ["ticket-role-queue", slug] });
       client.invalidateQueries({ queryKey: ["issues", slug] });
       client.invalidateQueries({ queryKey: ["task-history", slug] });
-      useUIStore.getState().toast("تیکت به شما واگذار شد");
+      useUIStore.getState().toast("کار پروژه به شما واگذار شد");
       client.invalidateQueries({ queryKey: ["notifications", slug] });
     },
     onError: (error) => {

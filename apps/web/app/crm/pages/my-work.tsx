@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { CalendarClock, Check, Circle, LayoutDashboard, List, ListTodo } from "lucide-react";
+import { CalendarClock, Check, CheckCheck, ArrowUpLeft, LayoutDashboard, List, ListTodo } from "lucide-react";
+import { zonedDateTime } from "@plane/ui";
 import {
   useCurrentUser,
   useIssues,
@@ -9,7 +10,9 @@ import {
   useMembers,
   useReassignIssue,
 } from "../api";
-import { EmptyState, IssueRow, PageHeader, Skeleton, TabBar } from "../components";
+import { EmptyState, PageHeader, SearchBox, Skeleton, TabBar } from "../components";
+import { issueReference, matchesRecordSearch } from "../identifiers";
+import { WorkTable } from "../engine/work-table";
 import { IssueKanbanBoard } from "../kanban";
 import { useUIStore } from "../store";
 import { toFa } from "../utils";
@@ -18,6 +21,7 @@ import { isCurrentReceivedIssue } from "../task-access";
 export default function MyWorkPage() {
   const [tab, setTab] = useState("all");
   const [view, setView] = useState<"list" | "board">("list");
+  const [query, setQuery] = useState("");
   const { data: currentUser, isLoading: userLoading } = useCurrentUser();
   const { data: access } = useWorkspaceAccess();
   const isAdmin = access?.is_admin === true;
@@ -34,12 +38,12 @@ export default function MyWorkPage() {
         isAdmin ? issue.assignee?.id === currentUser.id : isCurrentReceivedIssue(issue, currentUser.id)
       )
     : [];
-  const endToday = new Date();
-  endToday.setHours(23, 59, 59, 999);
+  const today = zonedDateTime(new Date(), currentUser?.timeZone)!.date;
+  const dueDay = (date: string) => zonedDateTime(date, currentUser?.timeZone)?.date;
   const weekAgo = new Date(Date.now() - 7 * 86_400_000);
   const openIssues = myIssues.filter((issue) => issue.status !== "Done");
-  const dueToday = openIssues.filter((issue) => issue.dueDate && new Date(issue.dueDate) <= endToday);
-  const upcoming = openIssues.filter((issue) => !issue.dueDate || new Date(issue.dueDate) > endToday);
+  const dueToday = openIssues.filter((issue) => issue.dueDate && (dueDay(issue.dueDate) || "9999") <= today);
+  const upcoming = openIssues.filter((issue) => !issue.dueDate || (dueDay(issue.dueDate) || "9999") > today);
   const completedThisWeek = issues.filter(
     (issue) =>
       issue.assignee?.id === currentUser?.id &&
@@ -47,10 +51,7 @@ export default function MyWorkPage() {
       issue.completedAt &&
       new Date(issue.completedAt) >= weekAgo
   );
-  const completedOnTime = completedThisWeek.filter(
-    (issue) => !issue.dueDate || new Date(issue.completedAt!) <= new Date(issue.dueDate)
-  );
-  const visible =
+  const selected =
     tab === "all"
       ? openIssues
       : tab === "done"
@@ -58,6 +59,9 @@ export default function MyWorkPage() {
         : tab === "upcoming"
           ? upcoming
           : dueToday;
+  const visible = selected.filter((issue) =>
+    matchesRecordSearch(query, [issue.name, issueReference(issue), issue.projectName, issue.sender?.displayName])
+  );
   const items = [
     { id: "all", label: "دریافتی‌های فعلی", count: openIssues.length },
     { id: "today", label: "امروز و عقب‌افتاده", count: dueToday.length },
@@ -65,28 +69,120 @@ export default function MyWorkPage() {
     ...(isAdmin ? [{ id: "done", label: "انجام‌شده", count: myIssues.filter((i) => i.status === "Done").length }] : []),
   ];
   return (
-    <div>
+    <div className="my-work-page">
       <PageHeader
         eyebrow="فضای شخصی"
         title="کارهای من"
-        description="کارهای دریافتی خود را ببینید و در صورت نیاز به شخص دیگری منتقل کنید؛ تاریخچه در بخش همه کارها"
+        description="کارهای دریافتی، موعدها و اولویت‌های شما در یک نگاه"
       />
-      <div className="content-toolbar my-work-toolbar">
-        <div className="view-switcher">
-          <button className={view === "list" ? "active" : ""} onClick={() => setView("list")}>
-            <List size={17} /> لیست
+      <div className="my-work-overview" aria-label="خلاصه کارهای من">
+        {[
+          {
+            id: "all",
+            title: "کارهای باز",
+            count: openIssues.length,
+            icon: ListTodo,
+            tone: "accent",
+            note: "دریافتی‌های فعلی شما",
+          },
+          {
+            id: "today",
+            title: "امروز و عقب‌افتاده",
+            count: dueToday.length,
+            icon: CalendarClock,
+            tone: "warm",
+            note: "نیازمند توجه شما",
+          },
+          {
+            id: "upcoming",
+            title: "پیش‌رو",
+            count: upcoming.length,
+            icon: ArrowUpLeft,
+            tone: "blue",
+            note: "موعدهای بعدی و بدون موعد",
+          },
+        ].map(({ id, title, count, icon: Icon, tone, note }) => (
+          <button
+            key={id}
+            type="button"
+            className={`my-work-stat tone-${tone}`}
+            aria-pressed={tab === id}
+            onClick={() => setTab(id)}
+          >
+            <span className="my-work-stat-icon">
+              <Icon size={20} />
+            </span>
+            <span className="my-work-stat-copy">
+              <span>{title}</span>
+              <strong>{isLoading || userLoading ? "—" : toFa(count)}</strong>
+              <small>{note}</small>
+            </span>
           </button>
-          <button className={view === "board" ? "active" : ""} onClick={() => setView("board")}>
-            <LayoutDashboard size={17} /> برد کانبان
-          </button>
+        ))}
+        <div className="my-work-stat tone-green">
+          <span className="my-work-stat-icon">
+            <CheckCheck size={20} />
+          </span>
+          <span className="my-work-stat-copy">
+            <span>انجام‌شده این هفته</span>
+            <strong>{isLoading || userLoading ? "—" : toFa(completedThisWeek.length)}</strong>
+            <small>در هفت روز گذشته</small>
+          </span>
         </div>
       </div>
-      {view === "board" ? (
-        isLoading || userLoading ? (
+      <section className="panel my-work-content" aria-label="فهرست کارهای من">
+        <div className="my-work-content-heading">
+          <div>
+            <h2>فهرست کارها</h2>
+            <p>جزئیات هر کار و انتقال به همکاران از منوی عملیات در دسترس است.</p>
+          </div>
+          <div className="view-switcher" aria-label="نمای کارها">
+            <button
+              type="button"
+              aria-pressed={view === "list"}
+              className={view === "list" ? "active" : ""}
+              onClick={() => setView("list")}
+            >
+              <List size={17} /> لیست
+            </button>
+            <button
+              type="button"
+              aria-pressed={view === "board"}
+              className={view === "board" ? "active" : ""}
+              onClick={() => setView("board")}
+            >
+              <LayoutDashboard size={17} /> برد کانبان
+            </button>
+          </div>
+        </div>
+        <div className="my-work-filters">
+          <TabBar items={items} active={tab} onChange={setTab} />
+          <SearchBox value={query} onChange={setQuery} placeholder="جستجوی عنوان، شناسه یا فرستنده…" />
+        </div>
+        <div className="my-work-results" role="status">
+          {isLoading || userLoading
+            ? "در حال دریافت کارها…"
+            : `${toFa(visible.length)} کار${query ? ` از ${toFa(selected.length)} کار` : ""}`}
+        </div>
+        {isLoading || userLoading ? (
           <Skeleton rows={5} />
-        ) : myIssues.length ? (
+        ) : (isAdmin ? currentIssues.error : history.error) ? (
+          <p className="my-work-error" role="alert">
+            دریافت کارها انجام نشد. صفحه را دوباره بارگذاری کنید.
+          </p>
+        ) : !visible.length ? (
+          <EmptyState
+            icon={Check}
+            title={query ? "کاری با این مشخصات پیدا نشد" : "در این بخش کاری ندارید"}
+            description={
+              query
+                ? "عنوان، شناسه یا نام فرستنده دیگری را جستجو کنید."
+                : "کارهای دریافتی شما با توجه به موعد، در این بخش نمایش داده می‌شوند."
+            }
+          />
+        ) : view === "board" ? (
           <IssueKanbanBoard
-            issues={myIssues}
+            issues={visible}
             onStatusChange={(issue, status) => updateStatus.mutate({ issue, status })}
             readOnly={!isAdmin}
             allowTransfer
@@ -95,83 +191,9 @@ export default function MyWorkPage() {
             onAssigneeChange={(issue, assigneeId) => reassign.mutate({ issue, assigneeId })}
           />
         ) : (
-          <EmptyState
-            icon={Check}
-            title="کاری به شما واگذار نشده"
-            description="کارهای واگذارشده اینجا نمایش داده می‌شوند."
-          />
-        )
-      ) : (
-        <div className="my-work-layout">
-          <main>
-            <TabBar items={items} active={tab} onChange={setTab} />
-            <div className="panel my-work-list">
-              {isLoading || userLoading ? (
-                <Skeleton rows={5} />
-              ) : visible.length ? (
-                visible.map((issue) => (
-                  <IssueRow key={issue.id} issue={issue} readOnly={!isAdmin} allowTransfer inlineTransfer />
-                ))
-              ) : (
-                <EmptyState
-                  icon={Check}
-                  title="همه کارها تمام شد"
-                  description="عالی بود! فعلاً کار دیگری در این بخش ندارید."
-                />
-              )}
-            </div>
-          </main>
-          <aside>
-            <div className="focus-card">
-              <span>
-                <ListTodo size={21} />
-              </span>
-              <h3>تمرکز امروز</h3>
-              <strong>{toFa(dueToday.length)} کار</strong>
-              <div className="progress">
-                <i
-                  style={{
-                    width: `${openIssues.length + completedThisWeek.length ? Math.round((completedThisWeek.length / (openIssues.length + completedThisWeek.length)) * 100) : 0}%`,
-                  }}
-                />
-              </div>
-              <p>
-                {dueToday.length ? "کارهای سررسیدشده امروز و موارد عقب‌افتاده." : "برای امروز کار سررسیدشده‌ای ندارید."}
-              </p>
-            </div>
-            <div className="panel personal-summary">
-              <h3>خلاصه این هفته</h3>
-              <dl>
-                <div>
-                  <dt>
-                    <Check size={16} /> تکمیل‌شده
-                  </dt>
-                  <dd>{toFa(completedThisWeek.length)}</dd>
-                </div>
-                <div>
-                  <dt>
-                    <CalendarClock size={16} /> در موعد
-                  </dt>
-                  <dd>
-                    {toFa(
-                      completedThisWeek.length
-                        ? Math.round((completedOnTime.length / completedThisWeek.length) * 100)
-                        : 0
-                    )}
-                    ٪
-                  </dd>
-                </div>
-                <div>
-                  <dt>
-                    <Circle size={16} /> باقی‌مانده
-                  </dt>
-                  <dd>{toFa(openIssues.length)}</dd>
-                </div>
-              </dl>
-            </div>
-          </aside>
-        </div>
-      )}
+          <WorkTable issues={visible} code="task" readOnly={!isAdmin} allowTransfer personal />
+        )}
+      </section>
     </div>
   );
 }

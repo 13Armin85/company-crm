@@ -18,6 +18,7 @@ import { useUIStore } from "../store";
 import type { Member } from "../types";
 import { toFa } from "../utils";
 import { matchesRecordSearch } from "../identifiers";
+import { SurfaceForm, SurfaceTable } from "../engine/surface";
 
 export function UserActionItems({
   member,
@@ -113,7 +114,7 @@ export default function TeamPage() {
         ) : !filtered.length ? (
           <EmptyState title="عضوی پیدا نشد" description="نام یا ایمیل دیگری را جستجو کنید." />
         ) : (
-          <table>
+          <SurfaceTable code="users">
             <thead>
               <tr>
                 <th>عضو</th>
@@ -171,7 +172,7 @@ export default function TeamPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </SurfaceTable>
         )}
       </div>
       {createOpen && (
@@ -183,13 +184,15 @@ export default function TeamPage() {
             setForm({ email: "", username: "", display_name: "", password: "", role_ids: [], unit_ids: [] });
           }}
         >
-          <form
-            onSubmit={(event) => {
+          <SurfaceForm
+            code="users"
+            onSubmit={(event, custom_values) => {
               event.preventDefault();
               if (createUser.isPending) return;
               createUser.mutate(
                 {
                   ...form,
+                  custom_values,
                   unit_ids: access.can("OrganizationUnit.Member.Manage") ? form.unit_ids : undefined,
                   role_ids: access.can("User.Role.Assign") && form.role_ids.length ? form.role_ids : undefined,
                 },
@@ -274,7 +277,7 @@ export default function TeamPage() {
                 ساخت حساب
               </Button>
             </footer>
-          </form>
+          </SurfaceForm>
         </AccessModal>
       )}
       {passwordUser && (
@@ -283,14 +286,16 @@ export default function TeamPage() {
           busy={mutation.isPending}
           onClose={closePassword}
         >
-          <form
-            onSubmit={(event) => {
+          <SurfaceForm
+            code="password"
+            recordId={passwordUser.id}
+            onSubmit={(event, custom_values) => {
               event.preventDefault();
               if (passwordError(password, confirmation)) return;
               mutation.mutate(
                 {
                   path: `users/${passwordUser.id}/password/`,
-                  body: { new_password: password, confirm_password: confirmation },
+                  body: { new_password: password, confirm_password: confirmation, custom_values },
                 },
                 { onSuccess: closePassword }
               );
@@ -337,7 +342,7 @@ export default function TeamPage() {
                 تغییر رمز عبور
               </Button>
             </footer>
-          </form>
+          </SurfaceForm>
         </AccessModal>
       )}
       {removeUser && (

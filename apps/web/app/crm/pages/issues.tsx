@@ -12,7 +12,8 @@ import {
   useTaskHistory,
   useReassignIssue,
 } from "../api";
-import { Button, EmptyState, IssueRow, PageHeader, SearchBox, Skeleton, TabBar } from "../components";
+import { Button, EmptyState, PageHeader, SearchBox, Skeleton, TabBar } from "../components";
+import { WorkTable } from "../engine/work-table";
 import { DataFilterButton, IssueFilterDialog } from "../filter-controls";
 import { emptyIssueFilters, filterIssues, issueFilterCount } from "../filter-rules";
 import { IssueKanbanBoard } from "../kanban";
@@ -129,19 +130,7 @@ export default function IssuesPage() {
         />
       ) : view === "list" ? (
         <div className="table-card issue-list-card">
-          <div className="issue-list-head">
-            <span />
-            <span>عنوان کار</span>
-            <span>شناسه</span>
-            <span>پروژه</span>
-            <span>وضعیت</span>
-            <span>اولویت</span>
-            <span>موعد</span>
-            <span>مسئول</span>
-          </div>
-          {filtered.map((issue) => (
-            <IssueRow key={issue.id} issue={issue} table readOnly={!isAdmin && tab === "history"} />
-          ))}
+          <WorkTable issues={filtered} readOnly={!isAdmin && tab === "history"} />
         </div>
       ) : (
         <IssueKanbanBoard

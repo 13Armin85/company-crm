@@ -11,6 +11,8 @@ import {
 import { Button, PageHeader, Skeleton } from "../components";
 import { permissionPresentation } from "../access/permission-labels";
 import { useUIStore } from "../store";
+import { SurfaceFields } from "../engine/surface";
+import type { FormValues } from "@plane/ui";
 
 export default function RolePermissionsPage() {
   const { roleId = "" } = useParams();
@@ -28,6 +30,7 @@ export default function RolePermissionsPage() {
   } = useOrganizationPermissions(undefined, Boolean(access?.can("Role.View") || access?.can("Role.Permission.Assign")));
   const save = useSaveOrganizationRole(slug);
   const [draft, setDraft] = useState<{ roleId: string; selected: string[]; baseline: string[] }>();
+  const [customValues, setCustomValues] = useState<FormValues>();
   const selected = draft?.roleId === roleId ? draft.selected : (role?.permissionIds ?? []);
   // Sort private copies for order-independent comparison on browsers without Array.toSorted.
   // eslint-disable-next-line unicorn/no-array-sort
@@ -63,45 +66,52 @@ export default function RolePermissionsPage() {
           <p role="status">
             {selected.length.toLocaleString("fa-IR")} مجوز انتخاب شده {dirty && "· تغییرات ذخیره نشده"}
           </p>
-          <CompactMultiSelector
-            expanded
-            label="مجوزهای نقش"
+          <SurfaceFields
+            code="role-permissions"
+            recordId={roleId}
+            onChange={setCustomValues}
             disabled={!canEdit || save.isPending}
-            selected={selected}
-            onChange={(ids) =>
-              setDraft({
-                roleId,
-                selected: ids,
-                baseline: draft?.roleId === roleId ? draft.baseline : role.permissionIds,
-              })
-            }
-            options={[
-              ...permissions.map(permissionPresentation).map((permission) => ({
-                id: permission.id,
-                title: permission.name,
-                description: permission.description,
-                category: permission.category,
-                disabled: !permission.isActive,
-              })),
-              ...Array.from(new Set([...role.permissionIds, ...selected]))
-                .filter((id) => !permissions.some((permission) => permission.id === id))
-                .map((id) => ({
-                  id,
-                  title: "مجوز قدیمی یا غیرفعال",
-                  category: "مجوزهای غیرفعال",
-                  description: "تخصیص قبلی حفظ می‌شود؛ می‌توانید آن را بردارید ولی انتخاب دوباره ممکن نیست.",
-                  disabled: true,
+          >
+            <CompactMultiSelector
+              expanded
+              label="مجوزهای نقش"
+              disabled={!canEdit || save.isPending}
+              selected={selected}
+              onChange={(ids) =>
+                setDraft({
+                  roleId,
+                  selected: ids,
+                  baseline: draft?.roleId === roleId ? draft.baseline : role.permissionIds,
+                })
+              }
+              options={[
+                ...permissions.map(permissionPresentation).map((permission) => ({
+                  id: permission.id,
+                  title: permission.name,
+                  description: permission.description,
+                  category: permission.category,
+                  disabled: !permission.isActive,
                 })),
-            ]}
-          />
+                ...Array.from(new Set([...role.permissionIds, ...selected]))
+                  .filter((id) => !permissions.some((permission) => permission.id === id))
+                  .map((id) => ({
+                    id,
+                    title: "مجوز قدیمی یا غیرفعال",
+                    category: "مجوزهای غیرفعال",
+                    description: "تخصیص قبلی حفظ می‌شود؛ می‌توانید آن را بردارید ولی انتخاب دوباره ممکن نیست.",
+                    disabled: true,
+                  })),
+              ]}
+            />
+          </SurfaceFields>
           {save.error && <p role="alert">{errorMessage(save.error, "ذخیره مجوزها انجام نشد.")}</p>}
           {canEdit && (
             <footer className="row-actions">
               <Button
-                disabled={save.isPending || !dirty}
+                disabled={save.isPending || (!dirty && !customValues)}
                 onClick={() =>
                   save.mutate(
-                    { id: roleId, permissionIds: selected },
+                    { id: roleId, permissionIds: selected, custom_values: customValues },
                     {
                       onSuccess: (saved) =>
                         setDraft({ roleId, selected: saved.permissionIds, baseline: saved.permissionIds }),

@@ -30,6 +30,8 @@ from plane.utils.exception_logger import log_exception
 from plane.utils.paginator import BasePaginator
 from plane.utils.core.mixins import ReadReplicaControlMixin
 from plane.app.services.error_language import persian_errors
+from plane.app.services.entity_legacy import EntityPolicyMixin
+from plane.app.services.surface_config import SurfacePolicyMixin
 
 
 class PersianErrorMixin:
@@ -53,7 +55,7 @@ class TimezoneMixin:
             timezone.deactivate()
 
 
-class BaseViewSet(PersianErrorMixin, TimezoneMixin, ReadReplicaControlMixin, ModelViewSet, BasePaginator):
+class BaseViewSet(SurfacePolicyMixin, EntityPolicyMixin, PersianErrorMixin, TimezoneMixin, ReadReplicaControlMixin, ModelViewSet, BasePaginator):
     model = None
 
     permission_classes = [IsAuthenticated]
@@ -154,7 +156,7 @@ class BaseViewSet(PersianErrorMixin, TimezoneMixin, ReadReplicaControlMixin, Mod
         return expand if expand else None
 
 
-class BaseAPIView(PersianErrorMixin, TimezoneMixin, ReadReplicaControlMixin, APIView, BasePaginator):
+class BaseAPIView(SurfacePolicyMixin, EntityPolicyMixin, PersianErrorMixin, TimezoneMixin, ReadReplicaControlMixin, APIView, BasePaginator):
     permission_classes = [IsAuthenticated]
 
     filter_backends = (DjangoFilterBackend, SearchFilter)

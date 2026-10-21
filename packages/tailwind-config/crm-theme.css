@@ -985,60 +985,50 @@ input[aria-invalid="true"] {
   font-size: 12px;
   font-weight: 500;
 }
-.my-work-list .issue-row.has-inline-transfer {
+.my-work-list .issue-row:not(.is-table) {
   grid-template-columns: 20px minmax(120px, 1fr) auto auto auto auto;
 }
-.my-work-list .issue-row.has-inline-transfer > .issue-main {
+.my-work-list .issue-row:not(.is-table) > .issue-main {
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
   text-align: start;
   opacity: 1;
 }
-.my-work-list .issue-row.has-inline-transfer > .issue-main strong {
+.my-work-list .issue-row:not(.is-table) > .issue-main strong {
   width: 100%;
   white-space: normal;
   overflow-wrap: anywhere;
   font-size: 12px;
   line-height: 1.7;
 }
-.my-work-list .issue-row.has-inline-transfer > .issue-transfer-control {
-  grid-column: 1 / -1;
-  justify-self: start;
-  width: min(100%, 360px);
-  padding: 12px 0 2px;
-}
 @media (max-width: 900px) {
-  .my-work-list .issue-row.has-inline-transfer {
+  .my-work-list .issue-row:not(.is-table) {
     grid-template-columns: 20px minmax(0, 1fr) auto;
     grid-template-areas:
       "check main actions"
       ". status priority"
-      ". date date"
-      ". transfer transfer";
+      ". date date";
   }
-  .my-work-list .issue-row.has-inline-transfer > .issue-check {
+  .my-work-list .issue-row:not(.is-table) > .issue-check {
     grid-area: check;
   }
-  .my-work-list .issue-row.has-inline-transfer > .issue-main {
+  .my-work-list .issue-row:not(.is-table) > .issue-main {
     grid-area: main;
   }
-  .my-work-list .issue-row.has-inline-transfer > .issue-actions {
+  .my-work-list .issue-row:not(.is-table) > .issue-actions {
     grid-area: actions;
   }
-  .my-work-list .issue-row.has-inline-transfer > .status {
+  .my-work-list .issue-row:not(.is-table) > .status {
     grid-area: status;
   }
-  .my-work-list .issue-row.has-inline-transfer > .priority {
+  .my-work-list .issue-row:not(.is-table) > .priority {
     display: inline-flex;
     grid-area: priority;
   }
-  .my-work-list .issue-row.has-inline-transfer > .issue-date {
+  .my-work-list .issue-row:not(.is-table) > .issue-date {
     display: inline-flex;
     grid-area: date;
-  }
-  .my-work-list .issue-row.has-inline-transfer > .issue-transfer-control {
-    grid-area: transfer;
   }
 }
 [data-transfer-field] .selector-input-row {
@@ -1101,6 +1091,13 @@ input[aria-invalid="true"] {
   width: max(280px, var(--input-width));
   padding: 6px;
   z-index: 160;
+}
+.member-transfer-options.selector-single-options-contained {
+  width: 100%;
+  max-width: 100%;
+  max-height: 180px;
+  margin-top: 6px;
+  box-shadow: none;
 }
 .member-transfer-options .selector-single-option {
   padding: 10px 12px;
