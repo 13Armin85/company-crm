@@ -15,6 +15,51 @@ def dashboard_path(workspace, suffix=""):
     return f"/api/workspaces/{workspace.slug}/dashboard/{suffix}"
 
 
+def test_new_personal_dashboard_has_live_server_widgets(engine):
+    workspace, _, client = engine
+    response = client.get(dashboard_path(workspace))
+
+    assert response.status_code == 200, response.data
+    widgets = response.data["tabs"][0]["widgets"]
+    assert [widget["type"] for widget in widgets] == ["counter", "my-work", "table", "chart", "calendar"]
+    for widget in widgets:
+        result = client.post(dashboard_path(workspace, "widgets/data/"), {"widget": widget}, format="json")
+        assert result.status_code == 200, (widget["type"], result.data)
+        assert not result.data.get("hidden"), widget["type"]
+
+
+def test_existing_empty_personal_dashboard_is_backfilled_once(engine):
+    workspace, user, client = engine
+    legacy_tabs = [
+        {"id": "legacy-home", "title": "کارهای من", "widgets": []},
+        {"id": "legacy-team", "title": "تیم من", "widgets": [
+            {"id": "legacy-team-widget", "type": "team-cards", "x": 0, "y": 0, "w": 12, "h": 5, "config": {"entity": "ticket"}}
+        ]},
+    ]
+    DashboardConfiguration.objects.create(workspace=workspace, user=user, tabs=legacy_tabs)
+
+    first = client.get(dashboard_path(workspace))
+    assert first.status_code == 200, first.data
+    assert len(first.data["tabs"][0]["widgets"]) == 5
+    assert first.data["tabs"][1] == legacy_tabs[1]
+    assert first.data["revision"] == 2
+
+    second = client.get(dashboard_path(workspace))
+    assert second.data["tabs"] == first.data["tabs"]
+    assert second.data["revision"] == 2
+
+
+def test_customized_empty_dashboard_is_not_backfilled(engine):
+    workspace, user, client = engine
+    tabs = [{"id": "custom", "title": "کارهای من", "widgets": []}]
+    DashboardConfiguration.objects.create(workspace=workspace, user=user, tabs=tabs, revision=2)
+
+    response = client.get(dashboard_path(workspace))
+    assert response.status_code == 200, response.data
+    assert response.data["tabs"] == tabs
+    assert response.data["revision"] == 2
+
+
 def test_new_work_identifier_uses_tt_prefix_without_separator(engine):
     workspace, _, _ = engine
     from plane.db.models import EntityType

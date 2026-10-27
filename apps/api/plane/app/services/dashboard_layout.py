@@ -82,11 +82,29 @@ def make_tab(title="کارهای من"):
     return {"id": str(uuid4()), "title": title, "widgets": []}
 
 
+def starter_widgets():
+    """Server-owned widgets for a personal dashboard without role defaults."""
+    definitions = (
+        ("counter", "تعداد کارها", 0, 0, 3, 3, {"entity": "ticket", "operation": "count"}),
+        ("my-work", "کارهای من", 3, 0, 9, 3, {"entity": "ticket", "rows": 8}),
+        ("table", "آخرین کارها", 0, 3, 12, 4, {"entity": "ticket", "rows": 8}),
+        ("chart", "کارها بر اساس اولویت", 0, 7, 6, 4, {"entity": "ticket", "group_by": "priority", "chart": "bar"}),
+        ("calendar", "تقویم کارها", 6, 7, 6, 4, {"entity": "ticket", "date_field": "due_date", "calendar_view": "month"}),
+    )
+    return [
+        {"id": str(uuid4()), "type": kind, "title": title, "x": x, "y": y, "w": width, "h": height, "config": config}
+        for kind, title, x, y, width, height, config in definitions
+    ]
+
+
 def _copy_defaults(default):
     tabs = deepcopy(default.tabs if default else [make_tab()])
+    if not default:
+        tabs[0]["widgets"] = starter_widgets()
     for tab in tabs:
         for widget in tab.get("widgets", []):
-            widget["origin"] = widget["id"]
+            if default:
+                widget["origin"] = widget["id"]
     return tabs
 
 
@@ -104,11 +122,26 @@ def _initial_tabs(workspace, user, default):
 @transaction.atomic
 def personal_layout(workspace, user):
     default = default_layout(workspace, user)
-    config, _ = DashboardConfiguration.objects.select_for_update().get_or_create(
+    config, created = DashboardConfiguration.objects.select_for_update().get_or_create(
         workspace=workspace, user=user,
         defaults={"tabs": _initial_tabs(workspace, user, default), "inherited_revision": default.revision if default else 0},
     )
     added = False
+    if not created and not default and config.revision == 1 and config.inherited_revision == 0:
+        tabs = deepcopy(config.tabs)
+        if (
+            tabs and tabs[0].get("title") == "کارهای من" and not tabs[0].get("widgets")
+            and (len(tabs) == 1 or (
+                len(tabs) == 2 and tabs[1].get("title") == "تیم من"
+                and len(tabs[1].get("widgets", [])) == 1
+                and tabs[1]["widgets"][0].get("type") == "team-cards"
+            ))
+        ):
+            tabs[0]["widgets"] = starter_widgets()
+            config.tabs = tabs
+            config.revision += 1
+            config.save(update_fields=["tabs", "revision"])
+            added = True
     if default and config.inherited_revision < default.revision:
         tabs = deepcopy(config.tabs)
         existing = {w.get("origin", w["id"]) for t in tabs for w in t.get("widgets", [])}
