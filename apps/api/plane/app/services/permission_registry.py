@@ -100,6 +100,34 @@ MEMBER_PERMISSIONS = {
     "Routing.Queue.Claim",
 }
 
+TICKET_SIX_PERMISSIONS = {
+    "View.Personal.Create": "ساخت جدول شخصی",
+    "View.Personal.Share": "اشتراک‌گذاری جدول شخصی",
+    "View.Official.Manage": "مدیریت جدول رسمی",
+    "UniqueRule.Manage": "مدیریت قاعده یکتایی",
+    "NumberingRule.Manage": "مدیریت شماره‌گذاری خودکار",
+    "Relation.View": "مشاهده ارتباط‌ها",
+    "Relation.Create": "ایجاد ارتباط",
+    "Relation.Edit": "ویرایش ارتباط",
+    "Relation.Delete": "حذف ارتباط",
+    "FormDesigner.View": "مشاهده فرم‌ساز",
+    "FormDesigner.Publish": "ویرایش و انتشار فرم",
+}
+PERMISSION_REGISTRY.update({code: {"name": title, "description": title, "category": code.split(".")[0], "is_delegatable": False, "is_active": True} for code, title in TICKET_SIX_PERMISSIONS.items()})
+MEMBER_PERMISSIONS.add("View.Personal.Create")
+
+TICKET_SEVEN_PERMISSIONS = {
+    "Dashboard.Personal.Manage": "ساخت و ویرایش داشبورد شخصی",
+    "Dashboard.Default.Manage": "مدیریت داشبورد پیش‌فرض نقش‌ها",
+    "Dashboard.Share": "اشتراک‌گذاری تب داشبورد",
+    "Dashboard.Team.View": "مشاهده تب تیم من",
+    "Dashboard.Team.Rules": "مدیریت قواعد رنگ‌بندی کارت‌ها",
+    "Dashboard.Team.Assign": "ارجاع از روی کارت تیم",
+    "Dashboard.Team.Remind": "ارسال یادآور به اعضای تیم",
+}
+PERMISSION_REGISTRY.update({code: {"name": title, "description": title, "category": "Dashboard", "is_delegatable": False, "is_active": True} for code, title in TICKET_SEVEN_PERMISSIONS.items()})
+MEMBER_PERMISSIONS.add("Dashboard.Personal.Manage")
+
 
 def sync_permission_catalog(workspace):
     from plane.db.models import OrganizationPermission

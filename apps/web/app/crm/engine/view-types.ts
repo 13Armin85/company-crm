@@ -1,6 +1,7 @@
 import type { Condition, FieldConfig, FieldKind, FieldValue, FormValues } from "@plane/ui";
 
 export interface ViewColumn {
+  display?: "related_list";
   field: string;
   width: number;
   pin?: "right" | "left" | "";
@@ -10,6 +11,7 @@ export interface ViewDefinition {
   type: "table" | "kanban" | "list" | "calendar" | "cards";
   subtype?: string;
   columns: ViewColumn[];
+  summary?: string[];
   sort: { field: string; direction: "asc" | "desc" }[];
   filter?: Condition | null;
   group?: string | null;
@@ -95,6 +97,8 @@ export interface SavedView {
 export interface SavedViewList {
   results: SavedView[];
   default_id: string | null;
+  official_id: string | null;
+  personal_view_limit: number;
   system: { id: string; name: string }[];
 }
 export const viewKinds = [

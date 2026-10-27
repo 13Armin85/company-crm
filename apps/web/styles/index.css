@@ -4951,3 +4951,79 @@ canvas {
 :root[data-density="compact"] .settings-section {
   padding: 18px;
 }
+
+/* Page introductions shared by CRM screens. */
+.page-header {
+  position: relative;
+  align-items: center;
+  min-width: 0;
+  padding: 22px 26px;
+  margin-bottom: 24px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--accent) 13%, var(--border));
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 4% 8%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 34%),
+    linear-gradient(125deg, var(--surface), color-mix(in srgb, var(--accent) 3%, var(--surface)));
+  box-shadow: var(--shadow);
+}
+.page-header::before {
+  position: absolute;
+  inset-block: 20px;
+  inset-inline-start: 0;
+  width: 4px;
+  border-radius: 4px;
+  background: var(--accent);
+  content: "";
+}
+.page-header > div:first-child {
+  min-width: 0;
+}
+.page-header .eyebrow {
+  width: fit-content;
+  min-height: 25px;
+  padding: 3px 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 16%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+}
+.page-header h1 {
+  margin: 10px 0 6px;
+  color: var(--text-primary);
+  font-size: clamp(22px, 2vw, 30px);
+  font-weight: 800;
+  line-height: 1.45;
+  letter-spacing: 0;
+}
+.page-header p {
+  max-width: 70ch;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.9;
+}
+.page-header .page-actions {
+  justify-content: flex-end;
+  max-width: 100%;
+}
+@media (max-width: 720px) {
+  .page-header {
+    align-items: stretch;
+    padding: 19px 20px;
+    border-radius: 16px;
+  }
+  .page-header .page-actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+}
+@media (max-width: 420px) {
+  .page-header {
+    padding: 17px;
+  }
+  .page-header h1 {
+    font-size: 21px;
+  }
+}

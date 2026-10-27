@@ -50,6 +50,7 @@ export interface FieldDefinition {
   relation_entity: string | null;
   is_active: boolean;
   used_at: string | null;
+  hidden_from_form: boolean;
   show_in_summary: boolean;
   searchable: boolean;
   filterable: boolean;
@@ -62,12 +63,14 @@ export interface Catalog {
   templates: { code: string; title: string }[];
 }
 export interface FormDefinition {
+  locked_fields?: string[];
   draft: FormLayoutSchema;
   revision: number;
   published: FormLayoutSchema | null;
   versions: { id: string; number: number; created_at: string; created_by_id: string | null; change_note: string }[];
 }
 export interface EngineRecord {
+  warnings?: import("./duplicate-feedback").DuplicateDetail[];
   id: string;
   entity: string;
   subtype: string | null;
@@ -124,7 +127,7 @@ export const useEngineRecord = (code: string, id: string) =>
 export const useEngineDefinitions = <T>(kind: string, enabled = true) =>
   useEngineQuery<T[]>(kind, `definitions/${kind}/`, enabled);
 
-export function useEngineMutation() {
+export function useEngineMutation(successMessage = "تغییرات ذخیره شد") {
   const slug = useEngineSlug(),
     client = useQueryClient();
   return useMutation({
@@ -137,20 +140,20 @@ export function useEngineMutation() {
       data?: unknown;
       method?: "post" | "put" | "patch" | "delete";
     }): Promise<unknown> => (await api.request({ url: `${enginePath(slug)}/${path}`, method, data })).data,
-    onSuccess: async () => {
-      await Promise.all(
-        [
-          "entity-engine",
-          "issues",
-          "projects",
-          "project",
-          "absences",
-          "task-history",
-          "workspace-access",
-          "organization-permissions",
-        ].map((key) => client.invalidateQueries({ queryKey: [key, slug] }))
-      );
-      useUIStore.getState().toast("تغییرات ذخیره شد");
+    onSuccess: () => {
+      for (const key of [
+        "entity-engine",
+        "issues",
+        "projects",
+        "project",
+        "absences",
+        "task-history",
+        "workspace-access",
+        "organization-permissions",
+      ]) {
+        void client.invalidateQueries({ queryKey: [key, slug] }).catch(() => {});
+      }
+      useUIStore.getState().toast(successMessage);
     },
     onError: (error) =>
       useUIStore.getState().toast(errorMessage(error, "عملیات انجام نشد؛ اطلاعات را بررسی کنید."), "error"),

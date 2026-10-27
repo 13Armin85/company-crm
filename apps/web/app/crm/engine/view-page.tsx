@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useParams, useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogPanel, DialogTitle } from "@headlessui/react";
 import { Plus, SlidersHorizontal, Filter, Download, Palette, X } from "lucide-react";
@@ -14,6 +14,9 @@ import { ViewFilterEditor, ColumnEditor, ViewValueInput } from "./view-controls"
 import { ViewRenderer, ViewValue, numberText } from "./view-renderers";
 import { viewKinds } from "./view-types";
 import { entityDisplayTitle } from "./presentation";
+import { RecordSummaryDrawer } from "./record-drawer";
+import { RecordImport } from "./record-import";
+import { DuplicateFeedback, duplicateDetails } from "./duplicate-feedback";
 import type {
   ViewDefinition,
   ViewField,
@@ -137,9 +140,9 @@ function SaveViewEditor({
         value={visibility}
         disabled={Boolean(original && !copy)}
         options={[
-          ...(access?.can("View.Create.Personal") ? [{ id: "personal", title: "شخصی؛ فقط خودم" }] : []),
-          ...(access?.can("View.Create.Shared") ? [{ id: "shared", title: "اشتراکی؛ گیرندگان مشخص" }] : []),
-          ...(access?.can("View.Manage.All") ? [{ id: "official", title: "رسمی" }] : []),
+          ...(access?.can("View.Personal.Create") ? [{ id: "personal", title: "شخصی؛ فقط خودم" }] : []),
+          ...(access?.can("View.Personal.Share") ? [{ id: "shared", title: "اشتراکی؛ گیرندگان مشخص" }] : []),
+          ...(access?.can("View.Official.Manage") ? [{ id: "official", title: "رسمی" }] : []),
         ]}
         onChange={(v) => setVisibility(v as SavedView["visibility"])}
       />
@@ -307,7 +310,7 @@ function PresentationEditor({
           </Button>
         </>
       )}
-      {access?.can("View.Manage.All") && (
+      {access?.can("View.Official.Manage") && (
         <>
           <h3>خلاصه بالای جزئیات رکورد</h3>
           <SearchableSelect
@@ -364,7 +367,7 @@ function PresentationEditor({
               method: "put",
               data: {
                 ...(access?.can("ConditionalFormat.Edit") ? { rules } : {}),
-                ...(access?.can("View.Manage.All") ? { summary } : {}),
+                ...(access?.can("View.Official.Manage") ? { summary } : {}),
               },
             })
             .then(onSaved)
@@ -378,10 +381,14 @@ function PresentationEditor({
   );
 }
 
-export function EntityViewsPage() {
-  const { code = "" } = useParams(),
+export function EntityViewsPage({ entityCode }: { entityCode?: string } = {}) {
+  const [urlParams] = useSearchParams();
+  const [summaryId, setSummaryId] = useState<string | null>(null);
+  const [summaryPage, setSummaryPage] = useState<{ page: number; direction: -1 | 1 } | null>(null);
+  const { code: routeCode = "" } = useParams(),
     slug = useEngineSlug(),
     { data: access } = useWorkspaceAccess();
+  const code = entityCode || routeCode;
   const { data: catalog } = useEngineCatalog(),
     entity = catalog?.entities.find((e) => e.code === code);
   const [subtype, setSubtype] = useState("");
@@ -397,9 +404,9 @@ export function EntityViewsPage() {
     [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1),
     [selected, setSelected] = useState<string[]>([]),
-    [drawer, setDrawer] = useState<"columns" | "filter" | "save" | "copy" | "presentation" | "exports" | "bulk" | null>(
-      null
-    );
+    [drawer, setDrawer] = useState<
+      "columns" | "filter" | "save" | "copy" | "presentation" | "exports" | "bulk" | "imports" | null
+    >(null);
   const [calendarDate, setCalendarDate] = useState(zonedDateTime(new Date(), "Asia/Tehran")!.date),
     [bulkField, setBulkField] = useState(""),
     [bulkValue, setBulkValue] = useState<FieldValue>(null),
@@ -417,12 +424,19 @@ export function EntityViewsPage() {
   }, [code]);
   useEffect(() => {
     if (!definition && schema.data && saved.data) {
-      const view = saved.data.results.find((v) => v.id === saved.data.default_id);
-      setDefinition(view?.definition || schema.data.definition);
-      setSubtype(view?.definition.subtype || "");
-      setSelectedView(view?.id || "");
+      const requestedView = urlParams.get("view") || saved.data.default_id;
+      const view = saved.data.results.find((v) => v.id === requestedView);
+      const base = view?.definition || schema.data.definition;
+      let drillFilter: Condition | null = null;
+      try {
+        const raw = urlParams.get("dashboard_filter");
+        if (raw) drillFilter = JSON.parse(raw) as Condition;
+      } catch { drillFilter = null; }
+      setDefinition(drillFilter ? { ...base, filter: base.filter ? { op: "and", rules: [base.filter, drillFilter] } : drillFilter } : base);
+      setSubtype(base.subtype || "");
+      setSelectedView(view?.id || (requestedView?.startsWith("system:") ? requestedView : ""));
     }
-  }, [definition, schema.data, saved.data]);
+  }, [definition, schema.data, saved.data, urlParams]);
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setDebouncedSearch(search);
@@ -478,6 +492,12 @@ export function EntityViewsPage() {
       results: { id: string; status: string; error: string; row_count: number; format: string }[];
     }> => (await api.get(`${enginePath(slug)}/entities/${code}/exports/`)).data,
   });
+  useEffect(() => {
+    if (!summaryPage || records.data?.page !== summaryPage.page) return;
+    const rows = records.data.results;
+    setSummaryId((summaryPage.direction === 1 ? rows[0] : rows.at(-1))?.id || null);
+    setSummaryPage(null);
+  }, [summaryPage, records.data]);
   const update = (next: ViewDefinition) => {
     setSubtype(next.subtype || "");
     setDefinition(next);
@@ -491,10 +511,7 @@ export function EntityViewsPage() {
       });
       setExtraFields((old) => [
         ...old.filter((f) => !result.data.fields.some((next) => next.code === f.code)),
-        ...result.data.fields.map((f) => ({
-          ...f,
-          title: `${fields.find((parent) => parent.code === path)?.title || path} ← ${f.title}`,
-        })),
+        ...result.data.fields,
       ]);
     } catch (error) {
       useUIStore.getState().toast(errorMessage(error, "دسترسی به مسیر ارتباط ندارید."), "error");
@@ -567,6 +584,21 @@ export function EntityViewsPage() {
   const currentData = records.data;
   return (
     <div className="engine-views-page">
+      {summaryId && (
+        <RecordSummaryDrawer
+          code={code}
+          id={summaryId}
+          viewId={selectedView}
+          rows={records.data?.results || []}
+          onSelect={setSummaryId}
+          hasPreviousPage={page > 1}
+          hasNextPage={Boolean(records.data && page * records.data.page_size < records.data.count)}
+          onPage={(direction) => {
+            setSummaryPage({ page: page + direction, direction });
+            setPage(page + direction);
+          }}
+        />
+      )}
       <PageHeader
         eyebrow="موجودیت‌ها و فرم‌ها"
         title={entityDisplayTitle(entity?.title || "رکوردها")}
@@ -638,7 +670,7 @@ export function EntityViewsPage() {
               <Filter size={16} />
               فیلتر پیشرفته
             </Button>
-            {(access?.can("ConditionalFormat.Edit") || access?.can("View.Manage.All")) && (
+            {(access?.can("ConditionalFormat.Edit") || access?.can("View.Official.Manage")) && (
               <Button variant="secondary" onClick={() => setDrawer("presentation")}>
                 <Palette size={16} />
                 ظاهر و خلاصه رسمی
@@ -648,6 +680,11 @@ export function EntityViewsPage() {
               <Button variant="secondary" onClick={() => setDrawer("exports")}>
                 <Download size={16} />
                 خروجی
+              </Button>
+            )}
+            {entity?.can_create && (
+              <Button variant="secondary" onClick={() => setDrawer("imports")}>
+                ورود Excel
               </Button>
             )}
           </div>
@@ -699,11 +736,11 @@ export function EntityViewsPage() {
               فیلترهای فعال ×
             </button>
           )}
-          {(access?.can("View.Create.Personal") ||
-            access?.can("View.Create.Shared") ||
-            access?.can("View.Manage.All")) && (
+          {(access?.can("View.Personal.Create") ||
+            access?.can("View.Personal.Share") ||
+            access?.can("View.Official.Manage")) && (
             <Button variant="secondary" onClick={() => setDrawer("save")}>
-              {activeView?.can_edit ? "ذخیره / تغییر نام نما" : "ذخیره نمای جدید"}
+              {activeView?.can_edit ? "ذخیره / تغییر نام جدول من" : "جدول من"}
             </Button>
           )}
           {activeView && (
@@ -727,8 +764,24 @@ export function EntityViewsPage() {
               حذف نما
             </Button>
           )}
-          <Button variant="ghost" onClick={() => chooseView(saved.data?.default_id || "")}>
-            بازگشت به پیش‌فرض
+          {activeView && activeView.visibility !== "official" && activeView.can_edit && (
+            <Button
+              variant="ghost"
+              onClick={() =>
+                void mutation
+                  .mutateAsync({
+                    path: `entities/${code}/views/${activeView.id}/`,
+                    method: "patch",
+                    data: { is_default: saved.data?.default_id !== activeView.id },
+                  })
+                  .catch(() => {})
+              }
+            >
+              {saved.data?.default_id === activeView.id ? "★ پیش‌فرض من" : "☆ پیش‌فرض من"}
+            </Button>
+          )}
+          <Button variant="ghost" onClick={() => chooseView(saved.data?.official_id || "")}>
+            بازگشت به جدول رسمی
           </Button>
           {selected.length > 0 && (
             <Button
@@ -813,6 +866,7 @@ export function EntityViewsPage() {
         ) : (
           currentData && (
             <ViewRenderer
+              onOpenSummary={(row) => setSummaryId(row.id)}
               code={code}
               definition={{ ...definition, columns: currentData.definition.columns }}
               data={currentData}
@@ -885,6 +939,7 @@ export function EntityViewsPage() {
               copy: "کپی نما",
               presentation: "تنظیمات رسمی",
               exports: "خروجی نمای فعلی",
+              imports: "ورود رکوردها از Excel",
               bulk: "عملیات گروهی",
             }[drawer]
           }
@@ -893,6 +948,7 @@ export function EntityViewsPage() {
           {drawer === "columns" && (
             <ColumnEditor value={definition} fields={fields} onChange={update} onLoadPath={loadPath} />
           )}
+          {drawer === "imports" && <RecordImport code={code} subtype={subtype} />}
           {drawer === "filter" && (
             <>
               <ViewFilterEditor
@@ -1017,10 +1073,13 @@ export function EntityViewsPage() {
                 </Button>
               )}
               {bulkResult.map((result) => (
-                <p key={result.id} role={result.ok ? "status" : "alert"}>
+                <div key={result.id} role={result.ok ? "status" : "alert"}>
                   {result.id}:{" "}
-                  {result.ok ? "موفق" : typeof result.error === "string" ? result.error : JSON.stringify(result.error)}
-                </p>
+                  {result.ok
+                    ? "موفق"
+                    : errorMessage({ response: { data: result.error } }, "تغییر این رکورد انجام نشد.")}
+                  <DuplicateFeedback details={duplicateDetails({ response: { data: result.error } })} />
+                </div>
               ))}
             </div>
           )}

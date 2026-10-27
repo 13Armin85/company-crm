@@ -9,6 +9,7 @@ import { useUIStore } from "../store";
 import { persianDate } from "../utils";
 import { EngineRecordForm } from "./record-form";
 import { EntityRecordSummary } from "./record-summary";
+import { RelatedRecords } from "./related-records";
 import { useEngineCatalog, useEngineQuery, useEngineRecord, useEngineMutation } from "./api";
 import type { AuditEvent, EnginePage } from "./api";
 import { entityDisplayTitle } from "./presentation";
@@ -199,6 +200,7 @@ export function EntityRecordPage() {
         </div>
       )}
       {!creating && <EntityRecordSummary code={code} id={recordId} />}
+      {!creating && <RelatedRecords code={code} id={recordId} />}
       <div className="engine-record-card">
         <EngineRecordForm
           key={`${code}:${recordId}:${subtype}`}
@@ -256,9 +258,7 @@ export function EngineQuickCreate() {
     createKind = useUIStore((s) => s.createKind),
     close = useUIStore((s) => s.setCreateOpen);
   const { data: catalog } = useEngineCatalog();
-  const [kind, setKind] = useState(
-      createKind === "project" ? "project" : location.pathname.startsWith("/projects/") ? "ticket" : "task"
-    ),
+  const [kind, setKind] = useState(createKind === "project" ? "project" : "ticket"),
     [subtype, setSubtype] = useState("");
   const entity = catalog?.entities.find((e) => e.code === kind),
     projectId = location.pathname.match(/^\/projects\/([^/]+)/)?.[1];

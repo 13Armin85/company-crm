@@ -112,9 +112,18 @@ export default function SettingsPage() {
       />
       <div className="settings-layout">
         <aside className="settings-nav">
-          {["EntityType.View", "Lookup.View", "Field.View", "FormLayout.Edit", "Config.Import", "Config.Export"].some(
-            (code) => access?.can(code)
-          ) && (
+          {[
+            "EntityType.View",
+            "Lookup.View",
+            "Field.View",
+            "FormDesigner.View",
+            "UniqueRule.Manage",
+            "NumberingRule.Manage",
+            "Relation.View",
+            "View.Official.Manage",
+            "Config.Import",
+            "Config.Export",
+          ].some((code) => access?.can(code)) && (
             <Link className="button button-secondary" to="/settings/engine">
               طراحی فرم‌ها و جدول‌ها
             </Link>

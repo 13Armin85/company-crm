@@ -24,14 +24,14 @@ function renderPage(children: React.ReactNode) {
   useUIStore.setState({ workspaceSlug: "" });
   client.setQueryData(["entity-engine", "", "surfaces", "surfaces/"], {
     results: [
-      { code: "roles", title: "نقش‌های سازمانی", native_columns: ["نام نقش"] },
+      { code: "ticket", title: "کارها", native_columns: ["عنوان"] },
       { code: "profile", title: "پروفایل من", native_columns: [] },
     ],
   });
-  client.setQueryData(
-    ["entity-engine", "", "entities", "definitions/entities/"],
-    [{ code: "custom", title: "موجودیت آزمایشی", adapter: "" }]
-  );
+  client.setQueryData(["entity-engine", "", "catalog", "catalog/"], {
+    entities: [{ id: "work", code: "ticket", title: "کار", adapter: "ticket", is_active: true, parent: null }],
+  });
+  client.setQueryData(["entity-engine", "", "fields", "definitions/fields/"], []);
   const html = renderToStaticMarkup(
     <QueryClientProvider client={client}>
       <RouterProvider router={createMemoryRouter([{ path: "*", element: children }])} />
@@ -46,13 +46,20 @@ describe("simplified forms and profile", () => {
     state.avatar = "";
     state.removing = false;
   });
-  it("shows only existing pages and removes advanced management tabs and entity links", () => {
+  it("offers entity forms and data rules while excluding fixed personal pages", () => {
     const html = renderPage(<EngineSettingsPage />);
-    expect(html).toContain("نقش‌های سازمانی");
-    expect(html).toContain("پروفایل من");
+    expect(html).toContain("کارها");
+    expect(html).not.toContain("پروفایل من");
+    expect(html).toContain("ورودی‌های فرم");
+    expect(html).toContain("چیدمان فرم");
+    expect(html).toContain("جدول و تب‌ها");
+    expect(html).toContain("قواعد ثبت");
+    expect(html).toContain("ارتباط‌ها");
+    expect(html).toContain('type="search"');
+    expect(html).toContain("جستجوی موجودیت");
+    expect(html.match(/engine-workspace-tab-copy/g)).toHaveLength(7);
     for (const label of [
-      "موجودیت آزمایشی",
-      "موجودیت‌ها",
+      "نقش‌های سازمانی",
       "لیست‌های پایه",
       "مقادیر لیست‌ها",
       "کتابخانه فیلدها",

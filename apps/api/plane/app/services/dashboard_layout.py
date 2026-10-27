@@ -1,0 +1,186 @@
+"""Stored dashboard layouts, role inheritance and widget registry metadata."""
+
+from copy import deepcopy
+from uuid import uuid4
+
+from django.db import transaction
+from rest_framework.exceptions import PermissionDenied, ValidationError
+
+from plane.db.models import DashboardConfiguration, OrganizationRole
+from .access_control import has_permission
+from .entity_records import emit_definition
+from .entity_schema import role_ids
+
+
+WIDGETS = {
+    "counter": "شمارنده",
+    "table": "جدول",
+    "my-work": "فهرست کارهای من",
+    "chart": "نمودار",
+    "progress": "نوار پیشرفت",
+    "calendar": "تقویم کوچک",
+    "activity": "فعالیت‌های اخیر",
+    "links": "پیوندهای سریع",
+    "note": "یادداشت شخصی",
+    "absences": "غایبین و مرخصی‌های امروز",
+    "approvals": "درخواست‌های منتظر تأیید من",
+    "workload": "نقشه بار کاری",
+    "age": "سن رکوردها",
+    "unassigned": "رکوردهای بدون مسئول",
+    "team-cards": "کارت‌های تیم",
+}
+
+
+def validate_tabs(tabs, *, allow_locked=False):
+    if not isinstance(tabs, list) or len(tabs) > 30:
+        raise ValidationError("حداکثر ۳۰ تب داشبورد مجاز است.")
+    seen_tabs, seen_widgets = set(), set()
+    for tab in tabs:
+        if not isinstance(tab, dict) or not isinstance(tab.get("id"), str) or not isinstance(tab.get("title"), str):
+            raise ValidationError("تعریف تب معتبر نیست.")
+        if not 1 <= len(tab["title"].strip()) <= 80 or tab["id"] in seen_tabs:
+            raise ValidationError("نام یا شناسه تب تکراری یا نامعتبر است.")
+        seen_tabs.add(tab["id"])
+        widgets = tab.get("widgets", [])
+        if not isinstance(widgets, list) or len(widgets) > 50:
+            raise ValidationError("حداکثر ۵۰ ویجت در هر تب مجاز است.")
+        for widget in widgets:
+            if not isinstance(widget, dict) or widget.get("type") not in WIDGETS:
+                raise ValidationError("نوع ویجت معتبر نیست.")
+            wid = widget.get("id")
+            if not isinstance(wid, str) or wid in seen_widgets:
+                raise ValidationError("شناسه ویجت تکراری یا نامعتبر است.")
+            seen_widgets.add(wid)
+            if not isinstance(widget.get("config", {}), dict):
+                raise ValidationError("تنظیمات ویجت معتبر نیست.")
+            for key, minimum, maximum in (("x", 0, 11), ("y", 0, 999), ("w", 1, 12), ("h", 1, 8)):
+                value = widget.get(key, 0 if key in {"x", "y"} else 1)
+                if not isinstance(value, int) or not minimum <= value <= maximum:
+                    raise ValidationError("جایگاه یا اندازه ویجت معتبر نیست.")
+            if widget.get("x", 0) + widget.get("w", 1) > 12:
+                raise ValidationError("ویجت از عرض شبکه بیرون می‌رود.")
+            if widget.get("locked") and not allow_locked:
+                raise ValidationError("فقط ادمین می‌تواند ویجت قفل‌شده تعریف کند.")
+    return deepcopy(tabs)
+
+
+def selected_role(workspace, user):
+    ids = role_ids(user, workspace)
+    return OrganizationRole.objects.filter(workspace=workspace, id__in=ids, is_active=True).order_by("system_key", "id").first()
+
+
+def default_layout(workspace, user):
+    role = selected_role(workspace, user)
+    if role:
+        config = DashboardConfiguration.objects.filter(workspace=workspace, role=role).first()
+        if config:
+            return config
+    return None
+
+
+def make_tab(title="کارهای من"):
+    return {"id": str(uuid4()), "title": title, "widgets": []}
+
+
+def _copy_defaults(default):
+    tabs = deepcopy(default.tabs if default else [make_tab()])
+    for tab in tabs:
+        for widget in tab.get("widgets", []):
+            widget["origin"] = widget["id"]
+    return tabs
+
+
+def _initial_tabs(workspace, user, default):
+    tabs = _copy_defaults(default)
+    if has_permission(user, workspace, "Dashboard.Team.View") and not any(
+        widget.get("type") == "team-cards" for tab in tabs for widget in tab.get("widgets", [])
+    ):
+        tabs.append({"id": str(uuid4()), "title": "تیم من", "widgets": [
+            {"id": str(uuid4()), "type": "team-cards", "title": "وضعیت تیم", "x": 0, "y": 0, "w": 12, "h": 5, "config": {"entity": "ticket", "refresh_seconds": 45}}
+        ]})
+    return tabs
+
+
+@transaction.atomic
+def personal_layout(workspace, user):
+    default = default_layout(workspace, user)
+    config, _ = DashboardConfiguration.objects.select_for_update().get_or_create(
+        workspace=workspace, user=user,
+        defaults={"tabs": _initial_tabs(workspace, user, default), "inherited_revision": default.revision if default else 0},
+    )
+    added = False
+    if default and config.inherited_revision < default.revision:
+        tabs = deepcopy(config.tabs)
+        existing = {w.get("origin", w["id"]) for t in tabs for w in t.get("widgets", [])}
+        if not tabs:
+            tabs = [make_tab()]
+        for tab in default.tabs:
+            target = next((t for t in tabs if t["id"] == tab["id"]), None)
+            if target is None:
+                target = {"id": tab["id"], "title": tab["title"], "widgets": []}
+                tabs.append(target)
+                added = True
+            for widget in tab.get("widgets", []):
+                if widget["id"] not in existing:
+                    new_widget = deepcopy(widget)
+                    new_widget["origin"] = widget["id"]
+                    new_widget["y"] = max([w.get("y", 0) + w.get("h", 1) for w in target.get("widgets", [])] or [0])
+                    target.setdefault("widgets", []).append(new_widget)
+                    added = True
+        config.tabs = tabs
+        config.inherited_revision = default.revision
+        config.revision += 1
+        config.save(update_fields=["tabs", "inherited_revision", "revision"])
+    return config, added
+
+
+def shared_tabs(workspace, user):
+    roles = role_ids(user, workspace)
+    result = []
+    for config in DashboardConfiguration.objects.filter(workspace=workspace, user__isnull=False).exclude(user=user):
+        for tab in config.tabs:
+            share = tab.get("share", {})
+            if str(user.id) in share.get("users", []) or roles.intersection(share.get("roles", [])):
+                result.append({"id": tab["id"], "title": tab["title"], "widgets": tab.get("widgets", []), "mode": share.get("mode", "read"), "owner": str(config.user_id)})
+    return result
+
+
+@transaction.atomic
+def save_layout(workspace, user, tabs, revision, *, role=None, request=None):
+    if role:
+        if not has_permission(user, workspace, "Dashboard.Default.Manage", request=request):
+            raise PermissionDenied()
+        target = DashboardConfiguration.objects.select_for_update().filter(workspace=workspace, role=role).first()
+    else:
+        if not has_permission(user, workspace, "Dashboard.Personal.Manage", request=request):
+            raise PermissionDenied()
+        target, _ = personal_layout(workspace, user)
+        target = DashboardConfiguration.objects.select_for_update().get(pk=target.pk)
+    if target and revision != target.revision:
+        raise ValidationError("داشبورد در دستگاه دیگری تغییر کرده است؛ دوباره بارگذاری کنید.")
+    clean = validate_tabs(tabs, allow_locked=True)
+    if not role:
+        defaults = default_layout(workspace, user)
+        required = {w["id"] for tab in (defaults.tabs if defaults else []) for w in tab.get("widgets", []) if w.get("locked")}
+        retained = {w["id"] for tab in clean for w in tab.get("widgets", [])}
+        if not required.issubset(retained):
+            raise ValidationError("ویجت قفل‌شدهٔ داشبورد پیش‌فرض را نمی‌توان حذف کرد.")
+        old = {w["id"]: w for tab in target.tabs for w in tab.get("widgets", [])}
+        for tab in clean:
+            if tab.get("share") and not has_permission(user, workspace, "Dashboard.Share", request=request):
+                raise PermissionDenied()
+            for widget in tab.get("widgets", []):
+                previous = old.get(widget["id"])
+                if widget.get("locked") and not (previous and previous.get("locked")):
+                    raise ValidationError("کاربر نمی‌تواند ویجت جدید را قفل کند.")
+                if previous and previous.get("locked") and widget.get("origin", widget["id"]) == previous.get("origin", previous["id"]):
+                    widget["locked"] = True
+    before = deepcopy(target.tabs) if target else []
+    if target:
+        target.tabs, target.revision = clean, target.revision + 1
+        target.save(update_fields=["tabs", "revision"])
+    else:
+        target = DashboardConfiguration.objects.create(workspace=workspace, role=role, tabs=clean)
+    if role:
+        emit_definition(workspace, user, "dashboard.default_changed", target, before, clean)
+    return target

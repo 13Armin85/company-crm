@@ -27,13 +27,23 @@ FALLBACKS = {
     409: "اطلاعات تکراری است یا با تغییرات دیگری تداخل دارد.",
     429: "تعداد درخواست‌ها زیاد است؛ کمی بعد دوباره تلاش کنید.",
 }
-MACHINE_FIELDS = {"code", "error_code", "status_code", "type"}
+MACHINE_FIELDS = {"code", "error_code", "status_code", "type", "record_url", "rule", "choices", "substitute"}
 
 
 def persian_errors(value, status_code=400, field=None):
     if field in MACHINE_FIELDS:
         return value
+    if field and re.fullmatch(r"_unique\d+", field):
+        return value
+    if field == "fields" and isinstance(value, list) and all(isinstance(item, str) and re.fullmatch(r"[a-zA-Z0-9_-]+", item) for item in value):
+        return value
     if isinstance(value, dict):
+        if set(value) == {"path", "label", "message"}:
+            return {
+                "path": value["path"],
+                "label": persian_errors(value["label"], status_code),
+                "message": persian_errors(value["message"], status_code),
+            }
         return {key: persian_errors(item, status_code, key) for key, item in value.items()}
     if isinstance(value, (list, tuple)):
         return [persian_errors(item, status_code, field) for item in value]

@@ -12,9 +12,9 @@ import { ChevronLeftOutline, ChevronRightOutline } from "@makeplane/propel/icons
 //hooks
 // icons
 // constants
-import { getDate } from "@plane/utils";
-import { MONTHS_LIST } from "@plane/constants";
+import { persianDigits, persianMonths } from "@plane/ui";
 import { useCalendarView } from "@/hooks/store/use-calendar-view";
+import { gregorianDate, persianCalendarDate, shiftPersianMonth } from "@/store/issue/persian-calendar";
 import type { ICycleIssuesFilter } from "@/store/issue/cycle";
 import type { IModuleIssuesFilter } from "@/store/issue/module";
 import type { IProjectIssuesFilter } from "@/store/issue/project";
@@ -47,30 +47,24 @@ export const CalendarMonthsDropdown = observer(function CalendarMonthsDropdown(p
   });
 
   const { activeMonthDate } = issueCalendarView.calendarFilters;
+  const active = persianCalendarDate(activeMonthDate);
 
   const getWeekLayoutHeader = (): string => {
     const allDaysOfActiveWeek = issueCalendarView.allDaysOfActiveWeek;
 
-    if (!allDaysOfActiveWeek) return "Week view";
+    if (!allDaysOfActiveWeek) return "نمای هفتگی";
 
     const daysList = Object.keys(allDaysOfActiveWeek);
 
-    const firstDay = getDate(daysList[0]);
-    const lastDay = getDate(daysList[daysList.length - 1]);
+    const firstDay = allDaysOfActiveWeek[daysList[0]]?.date;
+    const lastDay = allDaysOfActiveWeek[daysList[daysList.length - 1]]?.date;
 
-    if (!firstDay || !lastDay) return "Week view";
-
-    if (firstDay.getMonth() === lastDay.getMonth() && firstDay.getFullYear() === lastDay.getFullYear())
-      return `${MONTHS_LIST[firstDay.getMonth() + 1].title} ${firstDay.getFullYear()}`;
-
-    if (firstDay.getFullYear() !== lastDay.getFullYear()) {
-      return `${MONTHS_LIST[firstDay.getMonth() + 1].shortTitle} ${firstDay.getFullYear()} - ${
-        MONTHS_LIST[lastDay.getMonth() + 1].shortTitle
-      } ${lastDay.getFullYear()}`;
-    } else
-      return `${MONTHS_LIST[firstDay.getMonth() + 1].shortTitle} - ${
-        MONTHS_LIST[lastDay.getMonth() + 1].shortTitle
-      } ${lastDay.getFullYear()}`;
+    if (!firstDay || !lastDay) return "نمای هفتگی";
+    const first = persianCalendarDate(firstDay);
+    const last = persianCalendarDate(lastDay);
+    const firstLabel = `${persianMonths[first.jm - 1]} ${persianDigits(first.jy)}`;
+    const lastLabel = `${persianMonths[last.jm - 1]} ${persianDigits(last.jy)}`;
+    return first.jy === last.jy && first.jm === last.jm ? firstLabel : `${firstLabel} – ${lastLabel}`;
   };
 
   const handleDateChange = (date: Date) => {
@@ -89,7 +83,7 @@ export const CalendarMonthsDropdown = observer(function CalendarMonthsDropdown(p
           disabled={calendarLayout === "week"}
         >
           {calendarLayout === "month"
-            ? `${MONTHS_LIST[activeMonthDate.getMonth() + 1].title} ${activeMonthDate.getFullYear()}`
+            ? `${persianMonths[active.jm - 1]} ${persianDigits(active.jy)}`
             : getWeekLayoutHeader()}
         </button>
       </Popover.Button>
@@ -114,18 +108,18 @@ export const CalendarMonthsDropdown = observer(function CalendarMonthsDropdown(p
                 type="button"
                 className="grid place-items-center"
                 onClick={() => {
-                  const previousYear = new Date(activeMonthDate.getFullYear() - 1, activeMonthDate.getMonth(), 1);
+                  const previousYear = shiftPersianMonth(activeMonthDate, -12);
                   handleDateChange(previousYear);
                 }}
               >
                 <ChevronLeftOutline height={14} width={14} className="rtl:-scale-x-100" />
               </button>
-              <span className="text-11">{activeMonthDate.getFullYear()}</span>
+              <span className="text-11">{persianDigits(active.jy)}</span>
               <button
                 type="button"
                 className="grid place-items-center"
                 onClick={() => {
-                  const nextYear = new Date(activeMonthDate.getFullYear() + 1, activeMonthDate.getMonth(), 1);
+                  const nextYear = shiftPersianMonth(activeMonthDate, 12);
                   handleDateChange(nextYear);
                 }}
               >
@@ -133,17 +127,17 @@ export const CalendarMonthsDropdown = observer(function CalendarMonthsDropdown(p
               </button>
             </div>
             <div className="grid grid-cols-4 items-stretch justify-items-stretch gap-4 pt-3">
-              {Object.values(MONTHS_LIST).map((month, index) => (
+              {persianMonths.map((month, index) => (
                 <button
-                  key={month.shortTitle}
+                  key={month}
                   type="button"
                   className="rounded-sm py-0.5 text-11 hover:bg-layer-1"
                   onClick={() => {
-                    const newDate = new Date(activeMonthDate.getFullYear(), index, 1);
+                    const newDate = gregorianDate(active.jy, index + 1, 1);
                     handleDateChange(newDate);
                   }}
                 >
-                  {month.shortTitle}
+                  {month}
                 </button>
               ))}
             </div>

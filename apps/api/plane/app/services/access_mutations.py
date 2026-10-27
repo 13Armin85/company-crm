@@ -84,6 +84,9 @@ def sync_user_roles(workspace, user, role_ids):
 
 
 def remove_workspace_user(workspace, user):
+    from .entity_directory import check_directory_deletion
+
+    check_directory_deletion(workspace, "user", user.id)
     # Retain identity, authored work and historical references. A new membership
     # must never reactivate any of these revoked workspace-scoped relations.
     now = timezone.now()

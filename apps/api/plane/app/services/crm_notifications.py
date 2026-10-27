@@ -53,8 +53,8 @@ def notify_members(
 
 def task_snapshot(task):
     return {
-        "assignee_id": str(task.assignee_id),
-        "assignee_name": task.assignee.display_name,
+        "assignee_id": str(task.assignee_id) if task.assignee_id else None,
+        "assignee_name": task.assignee.display_name if task.assignee_id else "",
         "state": task.status,
         "priority": task.priority,
         "target_date": task.target_date.isoformat() if task.target_date else None,

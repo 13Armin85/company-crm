@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ArrowUp, GripVertical, Search, Trash2 } from "lucide-react";
 import { SearchableSelect, SchemaDrivenForm } from "@plane/ui";
 import type { Condition, FieldValue, SchemaField, EntityFormSchema } from "@plane/ui";
 import { useSchemaTransport } from "./record-form";
@@ -68,6 +69,7 @@ export function ViewValueInput({
   if (["boolean", "checkbox"].includes(field.kind))
     return (
       <SearchableSelect
+        showLabel
         label={field.title}
         value={value == null ? "" : String(value)}
         options={[
@@ -127,6 +129,7 @@ export function ViewFilterEditor({
       <fieldset className="engine-rule-group">
         <legend>گروه شرط‌ها</legend>
         <SearchableSelect
+          showLabel
           label="ترکیب"
           value={value.op}
           options={[
@@ -166,12 +169,14 @@ export function ViewFilterEditor({
     <fieldset className="engine-rule-group">
       <div className="engine-view-filter-leaf">
         <SearchableSelect
+          showLabel
           label="فیلد شرط"
           value={value.field}
           options={fields.filter((f) => f.filterable).map((f) => ({ id: f.code, title: f.title }))}
-          onChange={(field) => onChange({ field, op: "eq", value: null })}
+          onChange={(fieldCode) => onChange({ field: fieldCode, op: "eq", value: null })}
         />
         <SearchableSelect
+          showLabel
           label="عملگر"
           value={value.op}
           options={(field?.operators || []).map((id) => ({ id, title: operatorNames[id] || id }))}
@@ -219,11 +224,13 @@ export function ColumnEditor({
   onChange,
   fields,
   onLoadPath,
+  columnsOnly = false,
 }: {
   value: ViewDefinition;
   onChange: (value: ViewDefinition) => void;
   fields: ViewField[];
   onLoadPath: (path: string) => Promise<void>;
+  columnsOnly?: boolean;
 }) {
   const [search, setSearch] = useState(""),
     [drag, setDrag] = useState("");
@@ -231,20 +238,24 @@ export function ColumnEditor({
     onChange({ ...value, columns: value.columns.map((c) => (c.field === field ? { ...c, ...patch } : c)) });
   return (
     <div className="engine-column-editor">
-      <input
-        aria-label="جستجوی ستون"
-        placeholder="جستجوی عنوان یا مسیر ستون…"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-      />
-      <div className="engine-actions">
+      <div className="engine-column-tools">
+        <label className="engine-column-search">
+          <span>جستجو در ستون‌ها</span>
+          <span className="engine-input-with-icon">
+            <Search size={16} aria-hidden="true" />
+            <input placeholder="عنوان یا مسیر ستون…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          </span>
+        </label>
         <SearchableSelect
+          showLabel
           label="افزودن ستون"
           value=""
           options={fields
             .filter((f) => f.table_visible && !value.columns.some((c) => c.field === f.code))
             .map((f) => ({ id: f.code, title: f.title }))}
-          onChange={(field) => onChange({ ...value, columns: [...value.columns, { field, width: 180 }] })}
+          onChange={(fieldCode) =>
+            onChange({ ...value, columns: [...value.columns, { field: fieldCode, width: 180 }] })
+          }
         />
       </div>
       {fields
@@ -277,18 +288,48 @@ export function ColumnEditor({
               }
             }}
           >
-            <span>{fields.find((f) => f.code === column.field)?.title || "فیلد بدون عنوان"}</span>
-            <input
-              aria-label={`عرض ${fields.find((f) => f.code === column.field)?.title || "ستون"}`}
-              type="number"
-              min={80}
-              max={800}
-              value={column.width}
-              onChange={(e) =>
-                updateColumn(column.field, { width: Math.max(80, Math.min(800, Number(e.target.value))) })
-              }
-            />
+            <span className="engine-column-drag" aria-hidden="true">
+              <GripVertical size={17} />
+            </span>
+            <span className="engine-column-name">
+              <strong>{fields.find((f) => f.code === column.field)?.title || "فیلد بدون عنوان"}</strong>
+              <small dir="ltr">{column.field}</small>
+            </span>
+            {fields.find((field) => field.code === column.field)?.kind === "relation" &&
+              !column.field.includes(".") && (
+                <SearchableSelect
+                  showLabel
+                  label="نمایش ارتباط"
+                  value={column.display || "values"}
+                  options={[
+                    { id: "values", title: "مقادیر مرتبط" },
+                    { id: "related_list", title: "تعداد و فهرست مرتبط" },
+                  ]}
+                  onChange={(displayMode) =>
+                    updateColumn(column.field, {
+                      display: displayMode === "related_list" ? "related_list" : undefined,
+                    })
+                  }
+                />
+              )}
+            <label className="engine-column-width">
+              <span>عرض ستون</span>
+              <span className="engine-suffixed-input">
+                <input
+                  aria-label={`عرض ${fields.find((f) => f.code === column.field)?.title || "ستون"}`}
+                  type="number"
+                  min={80}
+                  max={800}
+                  value={column.width}
+                  onChange={(e) =>
+                    updateColumn(column.field, { width: Math.max(80, Math.min(800, Number(e.target.value))) })
+                  }
+                />
+                <small>px</small>
+              </span>
+            </label>
             <SearchableSelect
+              showLabel
               label="پین ستون"
               value={column.pin || ""}
               options={[
@@ -298,81 +339,133 @@ export function ColumnEditor({
               ]}
               onChange={(pin) => updateColumn(column.field, { pin: pin as ViewColumn["pin"] })}
             />
-            <button
-              type="button"
-              aria-label="ستون به بالا"
-              disabled={!index}
-              onClick={() => {
-                const next = [...value.columns],
-                  position = next.findIndex((c) => c.field === column.field);
-                [next[position - 1], next[position]] = [next[position], next[position - 1]];
-                onChange({ ...value, columns: next });
-              }}
-            >
-              ↑
-            </button>
-            <button
-              type="button"
-              aria-label={`مخفی کردن ${fields.find((f) => f.code === column.field)?.title || "ستون"}`}
-              disabled={value.columns.length === 1}
-              onClick={() => onChange({ ...value, columns: value.columns.filter((c) => c.field !== column.field) })}
-            >
-              ×
-            </button>
+            <span className="engine-column-actions">
+              <button
+                type="button"
+                aria-label="ستون به بالا"
+                title="انتقال به بالا"
+                disabled={!index}
+                onClick={() => {
+                  const next = [...value.columns],
+                    position = next.findIndex((c) => c.field === column.field);
+                  [next[position - 1], next[position]] = [next[position], next[position - 1]];
+                  onChange({ ...value, columns: next });
+                }}
+              >
+                <ArrowUp size={16} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                aria-label={`مخفی کردن ${fields.find((f) => f.code === column.field)?.title || "ستون"}`}
+                title="حذف از جدول"
+                disabled={value.columns.length === 1}
+                onClick={() => onChange({ ...value, columns: value.columns.filter((c) => c.field !== column.field) })}
+              >
+                <Trash2 size={16} aria-hidden="true" />
+              </button>
+            </span>
           </div>
         ))}
-      <h3>مرتب‌سازی چندستونه</h3>
-      {value.sort.map((sort, i) => (
-        <div className="engine-actions" key={`${i}:${sort.field}`}>
-          <SearchableSelect
-            label={`فیلد مرتب‌سازی ${i + 1}`}
-            value={sort.field}
-            options={fields.map((f) => ({ id: f.code, title: f.title }))}
-            onChange={(field) =>
-              onChange({ ...value, sort: value.sort.map((s, index) => (index === i ? { ...s, field } : s)) })
-            }
-          />
-          <SearchableSelect
-            label="جهت"
-            value={sort.direction}
-            options={[
-              { id: "asc", title: "صعودی" },
-              { id: "desc", title: "نزولی" },
-            ]}
-            onChange={(direction) =>
-              onChange({
-                ...value,
-                sort: value.sort.map((s, index) =>
-                  index === i ? { ...s, direction: direction as "asc" | "desc" } : s
-                ),
-              })
-            }
-          />
+      {!value.columns.some((column) =>
+        (fields.find((field) => field.code === column.field)?.title || column.field).includes(search)
+      ) && <p className="engine-column-empty">ستونی با این عبارت پیدا نشد.</p>}
+      {!columnsOnly && (
+        <div className="engine-column-advanced">
+          <h3>مرتب‌سازی چندستونه</h3>
+          <fieldset>
+            <legend>ستون‌های خلاصه اطلاعات من</legend>
+            <p>ستون‌ها را انتخاب و برای تغییر ترتیب جابه‌جا کنید. بدون انتخاب، خلاصه رسمی استفاده می‌شود.</p>
+            {fields.map((field) => (
+              <label key={field.code} className="engine-checkbox">
+                <input
+                  type="checkbox"
+                  checked={value.summary?.includes(field.code) || false}
+                  onChange={(event) =>
+                    onChange({
+                      ...value,
+                      summary: event.target.checked
+                        ? [...(value.summary || []), field.code]
+                        : (value.summary || []).filter((path) => path !== field.code),
+                    })
+                  }
+                />
+                {field.title}
+              </label>
+            ))}
+            {(value.summary || []).map((path) => (
+              <div
+                key={path}
+                draggable
+                onDragStart={() => setDrag(path)}
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  if (!value.summary?.includes(drag)) return;
+                  const next = value.summary.filter((field) => field !== drag);
+                  next.splice(next.indexOf(path), 0, drag);
+                  onChange({ ...value, summary: next });
+                }}
+              >
+                {fields.find((field) => field.code === path)?.title || path}
+              </div>
+            ))}
+          </fieldset>
+          {value.sort.map((sort, i) => (
+            <div className="engine-actions" key={`${i}:${sort.field}`}>
+              <SearchableSelect
+                showLabel
+                label={`فیلد مرتب‌سازی ${i + 1}`}
+                value={sort.field}
+                options={fields.map((f) => ({ id: f.code, title: f.title }))}
+                onChange={(field) =>
+                  onChange({ ...value, sort: value.sort.map((s, index) => (index === i ? { ...s, field } : s)) })
+                }
+              />
+              <SearchableSelect
+                showLabel
+                label="جهت"
+                value={sort.direction}
+                options={[
+                  { id: "asc", title: "صعودی" },
+                  { id: "desc", title: "نزولی" },
+                ]}
+                onChange={(direction) =>
+                  onChange({
+                    ...value,
+                    sort: value.sort.map((s, index) =>
+                      index === i ? { ...s, direction: direction as "asc" | "desc" } : s
+                    ),
+                  })
+                }
+              />
+              <button
+                type="button"
+                onClick={() => onChange({ ...value, sort: value.sort.filter((_, index) => index !== i) })}
+              >
+                ×
+              </button>
+            </div>
+          ))}
           <button
             type="button"
-            onClick={() => onChange({ ...value, sort: value.sort.filter((_, index) => index !== i) })}
+            onClick={() =>
+              onChange({ ...value, sort: [...value.sort, { field: fields[0]?.code || "", direction: "asc" }] })
+            }
           >
-            ×
+            افزودن مرتب‌سازی
           </button>
+          <SearchableSelect
+            showLabel
+            label="گروه‌بندی"
+            value={value.group || ""}
+            options={[
+              { id: "", title: "بدون گروه" },
+              ...fields.filter((f) => f.filterable).map((f) => ({ id: f.code, title: f.title })),
+            ]}
+            onChange={(group) => onChange({ ...value, group: group || null })}
+          />
         </div>
-      ))}
-      <button
-        type="button"
-        onClick={() =>
-          onChange({ ...value, sort: [...value.sort, { field: fields[0]?.code || "", direction: "asc" }] })
-        }
-      >
-        افزودن مرتب‌سازی
-      </button>
-      <SearchableSelect
-        label="گروه‌بندی"
-        value={value.group || ""}
-        options={[
-          { id: "", title: "بدون گروه" },
-          ...fields.filter((f) => f.filterable).map((f) => ({ id: f.code, title: f.title })),
-        ]}
-        onChange={(group) => onChange({ ...value, group: group || null })}
-      />
+      )}
     </div>
   );
 }

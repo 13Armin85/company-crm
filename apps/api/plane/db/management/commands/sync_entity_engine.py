@@ -4,7 +4,7 @@ from django.utils import timezone
 
 from plane.db.models import Workspace, EntityRecord, FieldDefinition, SystemIdentifierCounter, FormLayout
 from plane.app.services.entity_schema import initialize_engine, schema_fields
-from plane.app.services.entity_records import ADAPTERS
+from plane.app.services.entity_records import ADAPTERS, base_native_rows
 from plane.app.services.permission_registry import sync_permission_catalog
 
 
@@ -32,18 +32,23 @@ class Command(BaseCommand):
                 }
                 attached = 0
                 for code, model in ADAPTERS.items():
+                    if code not in types:
+                        # Legacy aliases use the canonical entity and do not own a second catalog row.
+                        continue
                     entity = types[code]
                     form = FormLayout.objects.get(entity=entity)
                     counter = SystemIdentifierCounter.locked(f"entity:{entity.id}", "default")
                     sources = set(EntityRecord.all_objects.filter(entity=entity).values_list("source_id", flat=True))
-                    for native in model.all_objects.filter(workspace=workspace).iterator():
+                    for native in base_native_rows(entity, include_deleted=True).iterator():
                         if native.id in sources:
                             if code == "ticket" and native.type_id:
                                 EntityRecord.all_objects.filter(
                                     entity=entity, source_id=native.id, subtype__isnull=True
                                 ).update(subtype=subtype_map.get(native.type_id))
                             continue
-                        number = f"{entity.numbering['prefix']}-{str(counter.advance()).zfill(5)}"
+                        from plane.app.services.entity_identifiers import format_record_number
+
+                        number = format_record_number(entity, counter.advance())
                         record = EntityRecord(
                             entity=entity,
                             workspace=workspace,
@@ -52,8 +57,8 @@ class Command(BaseCommand):
                             number=number,
                             data={},
                             form_version=form.published,
-                            created_by_id=native.created_by_id,
-                            deleted_at=native.deleted_at,
+                            created_by_id=getattr(native, "created_by_id", None),
+                            deleted_at=getattr(native, "deleted_at", None),
                         )
                         record.save(disable_auto_set_user=True)
                         attached += 1

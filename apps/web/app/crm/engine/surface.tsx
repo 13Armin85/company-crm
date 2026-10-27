@@ -17,6 +17,10 @@ import { useUIStore } from "../store";
 import { useEngineQuery, useEngineSlug, enginePath } from "./api";
 import { EngineRichText } from "./record-form";
 import { persianDate } from "../utils";
+import { Button } from "../components";
+import { EntityViewsPage } from "./view-page";
+import type { SavedViewList } from "./view-types";
+import { RecordSummaryDrawer } from "./record-drawer";
 
 export interface NativeField {
   code: string;
@@ -24,6 +28,7 @@ export interface NativeField {
   kind: SchemaField["kind"];
   required: boolean;
   locked: boolean;
+  lock_reason?: string;
   hidden?: boolean;
   aliases: string[];
 }
@@ -45,6 +50,16 @@ export interface SurfaceSchema {
   engine_fields: (SchemaField & { options_surface?: string })[];
   form?: { revision: number; layout: FormLayoutSchema } | null;
   schema: EntityFormSchema;
+  designer?: SurfaceDesigner;
+}
+export interface SurfaceDesigner {
+  can_publish: boolean;
+  can_create_field: boolean;
+  publish_reason: string;
+  create_field_reason: string;
+  field_types: { id: SchemaField["kind"]; title: string }[];
+  locked_fields: Record<string, string>;
+  limits: { table_tabs: number; tab_title: number; field_title: number; options: number };
 }
 export const useSurface = (code: string) =>
   useEngineQuery<SurfaceSchema>("surface", `surfaces/${code}/`, Boolean(code));
@@ -370,6 +385,14 @@ export function SurfaceTable({
 }: { code: string; children: ReactNode } & React.TableHTMLAttributes<HTMLTableElement>) {
   const config = useSurface(code),
     { data: access } = useWorkspaceAccess();
+  const engineCode = config.data?.engine || ({ users: "user", units: "unit" } as Record<string, string>)[code];
+  const saved = useEngineQuery<SavedViewList>(
+    "views",
+    `entities/${engineCode}/views/`,
+    Boolean(engineCode && access?.can("View.Personal.Create"))
+  );
+  const [personalMode, setPersonalMode] = useState<boolean | null>(null);
+  const [summaryId, setSummaryId] = useState<string | null>(null);
   const elements = Children.toArray(children).filter(isValidElement) as ReactElement<{ children?: ReactNode }>[];
   const head = elements.find((element) => element.type === "thead"),
     body = elements.find((element) => element.type === "tbody");
@@ -387,9 +410,34 @@ export function SurfaceTable({
     selectedTab?.columns || config.data?.definition.columns || headings.map((h) => `native:${textOf(h) || "عملیات"}`);
   const values = useSurfaceValues(code, columns.some((c) => !c.startsWith("native:")) ? rows.map(surfaceRowId) : []);
   const fields = [...(config.data?.schema.fields || []), ...(config.data?.engine_fields || [])];
+  const showPersonal =
+    personalMode ?? Boolean(saved.data?.default_id && saved.data.default_id !== saved.data.official_id);
+  if (showPersonal && engineCode)
+    return (
+      <div className="surface-table-wrap">
+        <Button variant="ghost" onClick={() => setPersonalMode(false)}>
+          بازگشت به جدول رسمی
+        </Button>
+        <EntityViewsPage entityCode={engineCode} />
+      </div>
+    );
   return (
     <div className="surface-table-wrap">
-      {access?.can("FormLayout.Edit") && (
+      {engineCode && summaryId && (
+        <RecordSummaryDrawer
+          code={engineCode}
+          id={summaryId}
+          viewId=""
+          rows={rows.map((row) => ({ id: surfaceRowId(row) }))}
+          onSelect={setSummaryId}
+        />
+      )}
+      {engineCode && access?.can("View.Personal.Create") && (
+        <Button variant="secondary" onClick={() => setPersonalMode(true)}>
+          جدول من
+        </Button>
+      )}
+      {access?.can("FormDesigner.Publish") && (
         <Link className="surface-config-link" to={`/settings/engine?page=${code}&mode=columns`}>
           <Settings2 size={14} /> تنظیم جدول و تب‌ها
         </Link>
@@ -430,6 +478,18 @@ export function SurfaceTable({
             const cells = Children.toArray(row.props.children),
               id = surfaceRowId(row);
             return cloneElement(row, {
+              ...(engineCode
+                ? {
+                    onClick: (event: React.MouseEvent<HTMLElement>) => {
+                      if (
+                        !(event.target as HTMLElement).closest(
+                          "a,button,input,select,textarea,[role='button'],[role='menuitem']"
+                        )
+                      )
+                        setSummaryId(id);
+                    },
+                  }
+                : {}),
               children: columns.map((column) => {
                 const name = column.slice(column.indexOf(":") + 1);
                 if (column.startsWith("native:")) {

@@ -19,6 +19,40 @@ def add_member(workspace, email):
 
 
 @pytest.mark.django_db
+def test_standalone_and_project_work_share_one_canonical_issue_table(session_client, workspace):
+    assignee = add_member(workspace, "unified-assignee@example.com")
+    legacy = session_client.post(
+        f"/api/workspaces/{workspace.slug}/tasks/",
+        {"name": "Old API work", "assignee_id": str(assignee.id)},
+        format="json",
+    )
+    assert legacy.status_code == 201, legacy.data
+    assert legacy.data["work_number"].startswith("TT")
+    assert "-" not in legacy.data["work_number"]
+    work = Issue.all_objects.get(id=legacy.data["id"])
+    assert work.project_id is None
+    assert WorkspaceTask._meta.db_table == Issue._meta.db_table == "issues"
+    assert IssueAssignee.objects.filter(issue=work, assignee=assignee).exists()
+
+    schema = session_client.get(f"/api/workspaces/{workspace.slug}/engine/entities/ticket/schema/")
+    assert schema.status_code == 200, schema.data
+    assert {field["binding"].get("source") for field in schema.data["fields"]} >= {
+        "work_status", "assignee_ids", "project_id"
+    }
+    record = session_client.get(
+        f"/api/workspaces/{workspace.slug}/engine/entities/ticket/records/{work.id}/"
+    )
+    assert record.status_code == 200, record.data
+    assert record.data["id"] == str(work.id)
+    assert record.data["number"] == legacy.data["work_number"]
+
+    catalog = session_client.get(f"/api/workspaces/{workspace.slug}/engine/catalog/")
+    assert catalog.status_code == 200
+    codes = [item["code"] for item in catalog.data["entities"]]
+    assert "ticket" in codes and "task" not in codes
+
+
+@pytest.mark.django_db
 def test_workspace_admin_creates_standalone_task_and_assignee_sees_it(session_client, workspace):
     assignee = add_member(workspace, "task-assignee@example.com")
 

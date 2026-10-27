@@ -207,7 +207,10 @@ class ProjectBaseModel(BaseModel):
         abstract = True
 
     def save(self, *args, **kwargs):
-        self.workspace = self.project.workspace
+        if self.project_id:
+            self.workspace = self.project.workspace
+        elif not self.workspace_id:
+            raise ValueError("Workspace is required for a record without a project.")
         super(ProjectBaseModel, self).save(*args, **kwargs)
 
 

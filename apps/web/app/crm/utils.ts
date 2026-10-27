@@ -32,6 +32,11 @@ export const persianDate = (date?: string | Date, options?: Intl.DateTimeFormatO
     : "";
   return `${toFa(jd)} ${months[jm - 1]}${options?.year ? ` ${toFa(jy)}` : ""}${clock}`;
 };
+export const persianDateValue = (value: unknown) => {
+  if (typeof value !== "string") return String(value ?? "—");
+  if (!/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?)?$/.test(value)) return value;
+  return persianDate(value, { year: "numeric", ...(value.includes("T") ? { hour: "2-digit" as const } : {}) });
+};
 export const greeting = (hour = new Date().getHours()) => {
   if (hour < 12) return "صبح بخیر";
   if (hour < 15) return "ظهر بخیر";

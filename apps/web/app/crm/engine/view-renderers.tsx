@@ -17,6 +17,8 @@ import { useEngineSchema, useEngineRecord, useEngineMutation, fieldErrors } from
 import { useSchemaTransport } from "./record-form";
 import type { ViewDefinition, ViewField, ViewResult, ViewRow, ViewStyle } from "./view-types";
 import { entityDisplaySchema } from "./presentation";
+import { RelatedListPreview } from "./related-records";
+import { DuplicateFeedback, duplicateDetails } from "./duplicate-feedback";
 
 export { ViewValue, appearance, numberText } from "./view-value";
 
@@ -81,6 +83,7 @@ export function InlineViewEditor({
             "ویرایش انجام نشد؛ مجوز و قواعد فیلد را بررسی کنید."}
         </p>
       )}
+      <DuplicateFeedback details={duplicateDetails(mutation.error)} />
       <Button type="submit" disabled={mutation.isPending || definition.config.readonly}>
         ذخیره
       </Button>
@@ -102,6 +105,7 @@ export function ViewRenderer({
   onMove,
   calendarDate,
   onCalendarDate,
+  onOpenSummary,
 }: {
   code: string;
   definition: ViewDefinition;
@@ -113,6 +117,7 @@ export function ViewRenderer({
   onMove: (row: ViewRow, field: string, value: FieldValue) => Promise<void>;
   calendarDate: string;
   onCalendarDate: (date: string) => void;
+  onOpenSummary?: (row: ViewRow) => void;
 }) {
   const [editing, setEditing] = useState<{ id: string; field: string; top: number; left: number } | null>(null),
     dragged = useRef<ViewRow | null>(null);
@@ -121,6 +126,17 @@ export function ViewRenderer({
     title: fields.find((f) => f.code === c.field)?.title || "فیلد بدون عنوان",
   }));
   const cell = (row: ViewRow, path: string): ReactNode => {
+    if (definition.columns.find((column) => column.field === path)?.display === "related_list") {
+      const value = row.values[path];
+      return (
+        <RelatedListPreview
+          code={code}
+          id={row.id}
+          field={path}
+          count={Array.isArray(value) ? value.length : value ? 1 : 0}
+        />
+      );
+    }
     const field = fields.find((f) => f.code === path),
       style = { color: row.styles.row.color, ...row.styles.cells[path], ...row.styles.badges[path] };
     return (
@@ -268,10 +284,19 @@ export function ViewRenderer({
           }}
           columns={columns}
           rows={data.results}
+          onRowClick={onOpenSummary}
           selected={selected}
           onSelect={onSelect}
           onColumnsChange={(next) =>
-            onChange({ ...definition, columns: next.map(({ field, width, pin }) => ({ field, width, pin })) })
+            onChange({
+              ...definition,
+              columns: next.map(({ field, width, pin }) => ({
+                ...definition.columns.find((column) => column.field === field),
+                field,
+                width,
+                pin,
+              })),
+            })
           }
           rowStyle={(row) =>
             ({

@@ -20,6 +20,7 @@ export interface SchemaDataGridProps<T extends { id: string }> {
   groupLabel?: (key: string) => ReactNode;
   renderFooter?: (column: SchemaGridColumn) => ReactNode;
   height?: number;
+  onRowClick?: (row: T) => void;
 }
 
 /** Virtual DOM rows complement server pagination; they never replace it. */
@@ -35,6 +36,7 @@ export function SchemaDataGrid<T extends { id: string }>({
   groupKey,
   groupLabel,
   renderFooter,
+  onRowClick,
   height = 640,
 }: SchemaDataGridProps<T>) {
   const [scroll, setScroll] = useState(0),
@@ -251,6 +253,21 @@ export function SchemaDataGrid<T extends { id: string }>({
                   key={key}
                   data-entry-key={key}
                   aria-rowindex={start + index + 2}
+                  tabIndex={onRowClick ? 0 : undefined}
+                  onClick={(event) => {
+                    if (
+                      !(event.target as HTMLElement).closest(
+                        "a,button,input,select,textarea,[role='button'],[role='menuitem']"
+                      )
+                    )
+                      onRowClick?.(row);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) {
+                      event.preventDefault();
+                      onRowClick?.(row);
+                    }
+                  }}
                   style={{ ...style, ...rowStyle?.(row), minHeight: 64 }}
                 >
                   <td className="schema-grid-selection">

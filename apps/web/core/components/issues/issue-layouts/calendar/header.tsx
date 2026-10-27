@@ -18,6 +18,7 @@ import type { ICycleIssuesFilter } from "@/store/issue/cycle";
 import type { IModuleIssuesFilter } from "@/store/issue/module";
 import type { IProjectIssuesFilter } from "@/store/issue/project";
 import type { IProjectViewIssuesFilter } from "@/store/issue/project-views";
+import { gregorianDate, persianCalendarDate, shiftPersianMonth } from "@/store/issue/persian-calendar";
 import { CalendarMonthsDropdown, CalendarOptionsDropdown } from "./dropdowns";
 
 interface ICalendarHeader {
@@ -43,14 +44,8 @@ export const CalendarHeader = observer(function CalendarHeader(props: ICalendarH
 
   const handlePrevious = () => {
     if (calendarLayout === "month") {
-      const previousMonthYear =
-        activeMonthDate.getMonth() === 0 ? activeMonthDate.getFullYear() - 1 : activeMonthDate.getFullYear();
-      const previousMonthMonth = activeMonthDate.getMonth() === 0 ? 11 : activeMonthDate.getMonth() - 1;
-
-      const previousMonthFirstDate = new Date(previousMonthYear, previousMonthMonth, 1);
-
       issueCalendarView.updateCalendarFilters({
-        activeMonthDate: previousMonthFirstDate,
+        activeMonthDate: shiftPersianMonth(activeMonthDate, -1),
       });
     } else {
       const previousWeekDate = new Date(
@@ -67,14 +62,8 @@ export const CalendarHeader = observer(function CalendarHeader(props: ICalendarH
 
   const handleNext = () => {
     if (calendarLayout === "month") {
-      const nextMonthYear =
-        activeMonthDate.getMonth() === 11 ? activeMonthDate.getFullYear() + 1 : activeMonthDate.getFullYear();
-      const nextMonthMonth = (activeMonthDate.getMonth() + 1) % 12;
-
-      const nextMonthFirstDate = new Date(nextMonthYear, nextMonthMonth, 1);
-
       issueCalendarView.updateCalendarFilters({
-        activeMonthDate: nextMonthFirstDate,
+        activeMonthDate: shiftPersianMonth(activeMonthDate, 1),
       });
     } else {
       const nextWeekDate = new Date(
@@ -91,7 +80,8 @@ export const CalendarHeader = observer(function CalendarHeader(props: ICalendarH
 
   const handleToday = () => {
     const today = new Date();
-    const firstDayOfCurrentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const { jy, jm } = persianCalendarDate(today);
+    const firstDayOfCurrentMonth = gregorianDate(jy, jm, 1);
 
     issueCalendarView.updateCalendarFilters({
       activeMonthDate: firstDayOfCurrentMonth,

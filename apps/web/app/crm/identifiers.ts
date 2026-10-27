@@ -1,8 +1,8 @@
 import { normalizePersianSearch } from "@plane/ui";
 import type { Issue, OrganizationUnit } from "./types";
 
-export const issueReference = (issue: Pick<Issue, "scope" | "projectIdentifier" | "sequenceId">) =>
-  `${issue.scope === "workspace" ? "TEAM" : issue.projectIdentifier}-${issue.sequenceId}`;
+export const issueReference = (issue: Pick<Issue, "scope" | "projectIdentifier" | "sequenceId" | "workNumber">) =>
+  issue.workNumber || `${issue.scope === "workspace" ? "TEAM" : issue.projectIdentifier}-${issue.sequenceId}`;
 
 export function matchesRecordSearch(query: string, values: (string | undefined)[]) {
   const search = normalizePersianSearch(query);

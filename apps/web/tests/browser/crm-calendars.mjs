@@ -10,7 +10,10 @@ const { chromium } = await import(
 );
 const base = process.env.CRM_BROWSER_URL ?? "http://localhost:3000";
 const browserScope = process.env.CRM_BROWSER_SCOPE ?? "all";
-assert(["all", "navigation"].includes(browserScope), "CRM_BROWSER_SCOPE must be all or navigation");
+assert(
+  ["all", "navigation", "calendar"].includes(browserScope),
+  "CRM_BROWSER_SCOPE must be all, navigation or calendar"
+);
 const output = resolve(process.env.CRM_BROWSER_OUTPUT ?? ".cache/browser/docker-calendars");
 await mkdir(output, { recursive: true });
 const projects = [1, 2].map((id) => ({ id: `project-${id}`, name: `پروژه ${id}`, identifier: `P${id}` }));

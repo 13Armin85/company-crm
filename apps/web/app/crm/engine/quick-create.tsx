@@ -8,7 +8,7 @@ export default function QuickCreate() {
     kind = useUIStore((state) => state.createKind),
     close = useUIStore((state) => state.setCreateOpen);
   const projectId = location.pathname.match(/^\/projects\/([^/]+)/)?.[1];
-  const code = kind === "project" ? "project" : projectId ? "ticket" : "task";
+  const code = kind === "project" ? "project" : "ticket";
   return (
     <AccessModal title={kind === "project" ? "پروژه جدید" : "کار جدید"} onClose={() => close(false)}>
       <EngineRecordForm

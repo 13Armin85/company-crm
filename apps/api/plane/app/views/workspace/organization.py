@@ -338,6 +338,10 @@ class OrganizationUnitDetailEndpoint(BaseAPIView):
             with transaction.atomic():
                 Workspace.objects.select_for_update().get(pk=unit.workspace_id)
                 unit = OrganizationUnit.objects.select_for_update().get(pk=unit.pk)
+                if serializer.validated_data.get("is_active") is False:
+                    from plane.app.services.entity_directory import check_directory_deletion
+
+                    check_directory_deletion(unit.workspace, "unit", unit.id, request.user, request)
                 for field in ("title", "parent", "manager", "is_active"):
                     if field in serializer.validated_data:
                         setattr(unit, field, serializer.validated_data[field])
@@ -368,6 +372,9 @@ class OrganizationUnitDetailEndpoint(BaseAPIView):
                         }
                     )
                 now = timezone.now()
+                from plane.app.services.entity_directory import check_directory_deletion
+
+                check_directory_deletion(unit.workspace, "unit", unit.id, request.user, request)
                 OrganizationUnitMember.objects.filter(unit=unit).update(is_active=False, deleted_at=now, updated_at=now)
                 OrganizationUnitDelegate.objects.filter(unit=unit).update(
                     is_active=False, deleted_at=now, updated_at=now
@@ -454,6 +461,10 @@ class OrganizationUserProfileEndpoint(BaseAPIView):
                     if not isinstance(request.data["is_active"], bool):
                         raise ValidationError({"is_active": "Expected a boolean."})
                     membership = WorkspaceMember.objects.get(workspace=workspace, member=user)
+                    if request.data["is_active"] is False:
+                        from plane.app.services.entity_directory import check_directory_deletion
+
+                        check_directory_deletion(workspace, "user", user.id, request.user, request)
                     membership.is_active = request.data["is_active"]
                     membership.save(update_fields=["is_active", "updated_at"])
                     if not membership.is_active:

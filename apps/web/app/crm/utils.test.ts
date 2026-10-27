@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { greeting, persianDate, priorityFa, statusFa, toFa } from "./utils";
+import { greeting, persianDate, persianDateValue, priorityFa, statusFa, toFa } from "./utils";
 
 describe("Persian CRM formatting", () => {
   it("converts Latin digits to Persian digits", () => {
@@ -9,6 +9,13 @@ describe("Persian CRM formatting", () => {
 
   it("converts Gregorian dates to the Jalali calendar", () => {
     expect(persianDate("2026-09-13")).toBe("۲۲ شهریور");
+  });
+
+  it("formats dashboard date values without changing other values", () => {
+    expect(persianDateValue("2024-03-20")).toBe("۱ فروردین ۱۴۰۳");
+    expect(persianDateValue("2024-03-20T12:00:00Z")).toContain("۱ فروردین ۱۴۰۳");
+    expect(persianDateValue("2024-03-20 extra")).toBe("2024-03-20 extra");
+    expect(persianDateValue(null)).toBe("—");
   });
 
   it.each([

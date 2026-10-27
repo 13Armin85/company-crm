@@ -40,7 +40,15 @@ def jalali(value):
     gy, gm, gd = value.year, value.month, value.day
     offsets = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334]
     gy2 = gy + (1 if gm > 2 else 0)
-    days = 355666 + 365 * gy + (gy2 + 3) // 4 - (gy2 + 99) // 100 + (gy2 + 399) // 400 + gd + offsets[gm - 1]
+    days = (
+        355666
+        + 365 * gy
+        + (gy2 + 3) // 4
+        - (gy2 + 99) // 100
+        + (gy2 + 399) // 400
+        + gd
+        + offsets[gm - 1]
+    )
     jy = -1595 + 33 * (days // 12053)
     days %= 12053
     jy += 4 * (days // 1461)
@@ -64,14 +72,17 @@ def value_labels(query, records):
     paths = {key for row in records for key in row["values"]}
     for path in paths:
         field = query.describe(path)
-        values = set(str(v) for row in records for v in flatten(row["values"].get(path)))
+        values = set(
+            str(v) for row in records for v in flatten(row["values"].get(path))
+        )
         if not values:
             result[path] = {}
             continue
         labels = {}
         if field.get("lookup"):
             choices = LookupValue.objects.select_related("category").filter(
-                category__workspace=query.entity.workspace, category__code=field["lookup"]
+                category__workspace=query.entity.workspace,
+                category__code=field["lookup"],
             )
             if field["config"].get("lookup_codes"):
                 choices = choices.filter(code__in=values)
@@ -85,21 +96,41 @@ def value_labels(query, records):
                 }
                 for v in choices
             }
-        elif field["config"].get("provider") == "project_states":
+        elif field["config"].get("provider") in {"project_states", "work_states"}:
             labels = {
                 str(v.id): {"title": v.name, "color": v.color}
                 for v in State.objects.filter(
-                    workspace=query.entity.workspace, id__in=[v for v in values if len(v) == 36]
+                    workspace=query.entity.workspace,
+                    id__in=[v for v in values if len(v) == 36],
                 )
             }
+            if field["config"].get("provider") == "work_states":
+                labels.update(
+                    {
+                        value.code: {
+                            "title": value.title,
+                            "color": value.color,
+                            "inactive": not value.is_active,
+                        }
+                        for value in LookupValue.objects.filter(
+                            category__workspace=query.entity.workspace,
+                            category__code="task-status",
+                            code__in=values,
+                        )
+                    }
+                )
         elif field["kind"] in {"user", "unit", "role"}:
-            model = {"user": User, "unit": OrganizationUnit, "role": OrganizationRole}[field["kind"]]
+            model = {"user": User, "unit": OrganizationUnit, "role": OrganizationRole}[
+                field["kind"]
+            ]
             scope = (
                 {"member_workspace__workspace": query.entity.workspace}
                 if field["kind"] == "user"
                 else {"workspace": query.entity.workspace}
             )
-            objects = model.objects.filter(**scope, id__in=[v for v in values if len(v) == 36]).distinct()
+            objects = model.objects.filter(
+                **scope, id__in=[v for v in values if len(v) == 36]
+            ).distinct()
             labels = {
                 str(v.id): {
                     "title": getattr(v, "display_name", None)
@@ -111,13 +142,24 @@ def value_labels(query, records):
             }
         elif field["kind"] == "relation":
             child = query.child(field)
-            title = child.scalar(child.entity.title_field) if child.path_allowed(child.entity.title_field) else "number"
-            objects = child.rows.filter(Q(id__in=values) | Q(source_id__in=values)).values("id", "source_id", title)
-            labels = {str(v["source_id"] or v["id"]): {"title": v[title] or "رکورد"} for v in objects}
+            title = (
+                child.scalar(child.entity.title_field)
+                if child.path_allowed(child.entity.title_field)
+                else "number"
+            )
+            objects = child.rows.filter(
+                Q(id__in=values) | Q(source_id__in=values)
+            ).values("id", "source_id", title)
+            labels = {
+                str(v["source_id"] or v["id"]): {"title": v[title] or "رکورد"}
+                for v in objects
+            }
         elif field["kind"] == "file":
             labels = {
                 str(v.id): {"title": v.attributes.get("name", "پیوست")}
-                for v in FileAsset.objects.filter(workspace=query.entity.workspace, id__in=values)
+                for v in FileAsset.objects.filter(
+                    workspace=query.entity.workspace, id__in=values
+                )
             }
         result[path] = labels
     return result
@@ -126,7 +168,9 @@ def value_labels(query, records):
 def export_query(job):
     if (
         not job.user.is_active
-        or not WorkspaceMember.objects.filter(workspace=job.workspace, member=job.user, is_active=True).exists()
+        or not WorkspaceMember.objects.filter(
+            workspace=job.workspace, member=job.user, is_active=True
+        ).exists()
     ):
         raise PermissionDenied("عضویت فعال برای دریافت خروجی لازم است.")
     request = SimpleNamespace(user=job.user)
@@ -151,7 +195,9 @@ def kanban_choices(query):
         ).select_related("category")
         active = all_values.filter(is_active=True, category__is_active=True)
         key = "code" if config.get("lookup_codes") else "id"
-        values = list(active[:200]) + list(all_values.filter(**{f"{key}__in": selected}))
+        values = list(active[:200]) + list(
+            all_values.filter(**{f"{key}__in": selected})
+        )
         result = {
             (v.code if key == "code" else str(v.id)): {
                 "title": v.title,
@@ -160,24 +206,53 @@ def kanban_choices(query):
             }
             for v in values
         }
-    elif config.get("provider") == "project_states":
+    elif config.get("provider") in {"project_states", "work_states"}:
         from plane.db.models import Issue
 
-        projects = Issue.objects.filter(id__in=query.rows.order_by().values("source_id")).values("project_id")
-        active = State.objects.filter(workspace=query.entity.workspace, project_id__in=projects).order_by("name", "id")
-        values = list(active[:200]) + list(active.filter(id__in=selected))
+        projects = Issue.objects.filter(
+            id__in=query.rows.order_by().values("source_id")
+        ).values("project_id")
+        active = State.objects.filter(
+            workspace=query.entity.workspace, project_id__in=projects
+        ).order_by("name", "id")
+        values = list(active[:200]) + list(active.filter(id__in=[value for value in selected if len(value) == 36]))
         result = {str(v.id): {"title": v.name, "color": v.color} for v in values}
+        if config.get("provider") == "work_states":
+            standalone = LookupValue.objects.filter(
+                category__workspace=query.entity.workspace,
+                category__code="task-status",
+                category__is_active=True,
+            )
+            active_standalone = standalone.filter(is_active=True)
+            choices = list(active_standalone.order_by("position", "id")[:200]) + list(
+                standalone.filter(code__in=selected)
+            )
+            result.update({
+                value.code: {
+                    "title": value.title,
+                    "color": value.color,
+                    "inactive": not value.is_active,
+                }
+                for value in choices
+            })
     else:
         return {}
     if active.count() > 200:
-        query.warnings.append("۲۰۰ ستون نخست نمایش داده شد؛ با جستجوی ستون کانبان، هر مقدار دیگر را به نما اضافه کنید.")
+        query.warnings.append(
+            "۲۰۰ ستون نخست نمایش داده شد؛ با جستجوی ستون کانبان، هر مقدار دیگر را به نما اضافه کنید."
+        )
     return result
 
 
 def export_records(query):
     projection = query.projection()
     rows = query.ordered().values(
-        "id", "source_id", "number", "revision", "is_active", *query.value_aliases(projection)
+        "id",
+        "source_id",
+        "number",
+        "revision",
+        "is_active",
+        *query.value_aliases(projection),
     )
     for row in rows.iterator(chunk_size=1000):
         yield query.payload(row, projection)
@@ -198,7 +273,11 @@ def update_fingerprint(digest, row, displayed):
 
 def safe_text(value):
     value = str(value)
-    return "'" + value if value.lstrip().startswith(("=", "+", "-", "@", "\t", "\r")) else value
+    return (
+        "'" + value
+        if value.lstrip().startswith(("=", "+", "-", "@", "\t", "\r"))
+        else value
+    )
 
 
 def export_cell(query, path, value, labels):
@@ -207,7 +286,9 @@ def export_cell(query, path, value, labels):
     if value is None:
         return ""
     if isinstance(value, list):
-        return safe_text("، ".join(str(export_cell(query, path, v, labels)) for v in flatten(value)))
+        return safe_text(
+            "، ".join(str(export_cell(query, path, v, labels)) for v in flatten(value))
+        )
     if kind in {"integer", "decimal", "money", "percent", "rating", "computed"}:
         return Decimal(str(value)) if kind != "integer" else int(value)
     if kind == "date":
@@ -223,9 +304,13 @@ def export_cell(query, path, value, labels):
     return safe_text(labels.get(path, {}).get(str(value), {}).get("title", value))
 
 
-@shared_task(name="plane.entity_view_export", acks_late=True, reject_on_worker_lost=True)
+@shared_task(
+    name="plane.entity_view_export", acks_late=True, reject_on_worker_lost=True
+)
 def build_entity_export(identifier):
-    job = EntityViewExport.objects.select_related("entity__workspace", "workspace", "user").get(id=identifier)
+    job = EntityViewExport.objects.select_related(
+        "entity__workspace", "workspace", "user"
+    ).get(id=identifier)
     if job.status == "ready" or job.expires_at <= timezone.now():
         return
     job.status, job.error = "running", ""
@@ -239,7 +324,9 @@ def build_entity_export(identifier):
                 sheet = book.create_sheet("داده‌ها")
                 write = sheet.append
             else:
-                text = TextIOWrapper(output, encoding="utf-8-sig", newline="", write_through=True)
+                text = TextIOWrapper(
+                    output, encoding="utf-8-sig", newline="", write_through=True
+                )
                 writer = csv.writer(text)
                 write = writer.writerow
             write([safe_text(query.describe(c["field"])["title"]) for c in columns])
@@ -248,7 +335,12 @@ def build_entity_export(identifier):
             def flush(records):
                 labels = value_labels(query, records)
                 for row in records:
-                    displayed = [export_cell(query, c["field"], row["values"].get(c["field"]), labels) for c in columns]
+                    displayed = [
+                        export_cell(
+                            query, c["field"], row["values"].get(c["field"]), labels
+                        )
+                        for c in columns
+                    ]
                     update_fingerprint(digest, row, displayed)
                     write(displayed)
 
@@ -274,14 +366,26 @@ def build_entity_export(identifier):
                 asset=File(output, name=f"{job.entity.code}.{job.format}"),
                 is_uploaded=True,
             )
-        job.asset, job.row_count, job.fingerprint, job.status = asset, count, digest.hexdigest(), "ready"
+        job.asset, job.row_count, job.fingerprint, job.status = (
+            asset,
+            count,
+            digest.hexdigest(),
+            "ready",
+        )
         job.save()
         emit_definition(
-            job.workspace, job.user, "view.export_ready", job, after={"row_count": count, "format": job.format}
+            job.workspace,
+            job.user,
+            "view.export_ready",
+            job,
+            after={"row_count": count, "format": job.format},
         )
     except Exception:
         logger.exception("Entity view export failed", extra={"export_id": str(job.id)})
-        job.status, job.error = "failed", "ساخت خروجی انجام نشد؛ دسترسی و تنظیمات نما را بررسی و دوباره درخواست کنید."
+        job.status, job.error = (
+            "failed",
+            "ساخت خروجی انجام نشد؛ دسترسی و تنظیمات نما را بررسی و دوباره درخواست کنید.",
+        )
         job.save()
 
 
@@ -298,7 +402,12 @@ def verify_export_access(job):
             update_fingerprint(
                 digest,
                 row,
-                [export_cell(query, c["field"], row["values"].get(c["field"]), labels) for c in query.spec["columns"]],
+                [
+                    export_cell(
+                        query, c["field"], row["values"].get(c["field"]), labels
+                    )
+                    for c in query.spec["columns"]
+                ],
             )
 
     for row in export_records(query):
@@ -310,4 +419,6 @@ def verify_export_access(job):
     if batch:
         flush(batch)
     if digest.hexdigest() != job.fingerprint or count != job.row_count:
-        raise PermissionDenied("داده یا دسترسی از زمان ساخت فایل تغییر کرده است؛ خروجی تازه درخواست کنید.")
+        raise PermissionDenied(
+            "داده یا دسترسی از زمان ساخت فایل تغییر کرده است؛ خروجی تازه درخواست کنید."
+        )

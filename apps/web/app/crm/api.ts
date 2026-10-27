@@ -235,6 +235,7 @@ const mapIssue = (
   return {
     id: String(item.id),
     sequenceId: Number(item.sequence_id ?? 0),
+    workNumber: item.work_number ? String(item.work_number) : undefined,
     name: String(item.name ?? "کار بدون عنوان"),
     scope: "project",
     projectId,
@@ -302,6 +303,7 @@ const mapWorkspaceTask = (item: Record<string, unknown>, members: Member[]): Iss
   return {
     id: String(item.id),
     sequenceId: Number(item.sequence_id ?? 0),
+    workNumber: item.work_number ? String(item.work_number) : undefined,
     name: String(item.name ?? "کار بدون عنوان"),
     scope: "workspace",
     projectIdentifier: "TEAM",

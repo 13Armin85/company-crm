@@ -387,7 +387,7 @@ export function IssueActionsMenu({
       : businessChoices.task_status.length
         ? businessChoices.task_status
             .filter((option) => !option.disabled)
-            .map((option) => ({ ...option, status: semanticStatus[option.id] || ("Todo" as Status) }))
+            .map((option) => ({ id: option.id, title: option.title, status: semanticStatus[option.id] || ("Todo" as Status) }))
         : statuses.map((status) => ({ id: status, title: statusFa[status], status }));
   if (!canChangeStatus && !canTransfer && !canDelete) return null;
   return (
@@ -587,7 +587,13 @@ export function ToastRegion() {
     <div className="toast-region" aria-live="polite">
       {toasts.map((toast) => (
         <button key={toast.id} className={`toast toast-${toast.kind}`} onClick={() => remove(toast.id)}>
-          <CheckCircle2 size={18} />
+          {toast.kind === "error" ? (
+            <CircleAlert size={18} />
+          ) : toast.kind === "info" ? (
+            <CircleDot size={18} />
+          ) : (
+            <CheckCircle2 size={18} />
+          )}
           <span>{toast.message}</span>
           <X size={14} />
         </button>

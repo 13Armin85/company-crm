@@ -41,6 +41,7 @@ export type Formula =
   | { dynamic: "today" }
   | { op: "add" | "subtract" | "multiply" | "divide" | "date_diff"; args: [Formula, Formula] };
 export interface FieldConfig {
+  secret?: boolean;
   required?: boolean;
   hidden?: boolean;
   readonly?: boolean;

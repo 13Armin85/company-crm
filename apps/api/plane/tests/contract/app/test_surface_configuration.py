@@ -47,6 +47,18 @@ def publish(surface, code="roles", **changes):
     return response.data
 
 
+def seed_legacy_fixed_surface(surface, code, **changes):
+    """Historical definitions remain safe to read; Ticket 6 forbids designing new ones."""
+    workspace, _, client = surface
+    current = client.get(path(workspace, code))
+    assert current.status_code == 200, current.data
+    definition = {**deepcopy(current.data["definition"]), **changes}
+    SurfaceConfiguration.objects.update_or_create(
+        workspace=workspace, code=code, defaults={"definition": definition}
+    )
+    return client.get(path(workspace, code)).data
+
+
 def role_url(workspace, identifier=""):
     return f"/api/workspaces/{workspace.slug}/organization/roles/{str(identifier) + '/' if identifier else ''}"
 
@@ -66,9 +78,11 @@ def test_all_native_pages_have_a_backend_configuration(surface):
     # The catalog lives at surfaces/, without an empty code segment.
     response = client.get(f"/api/workspaces/{workspace.slug}/engine/surfaces/")
     assert response.status_code == 200, response.data
-    project_work = next(row for row in response.data["results"] if row["code"] == "ticket")
+    project_work = next(
+        row for row in response.data["results"] if row["code"] == "ticket"
+    )
     assert project_work["title"] == "کارهای پروژه"
-    assert {row["code"] for row in response.data["results"]} >= {
+    assert {row["code"] for row in response.data["results"]} == {
         "ticket",
         "task",
         "project",
@@ -78,6 +92,8 @@ def test_all_native_pages_have_a_backend_configuration(surface):
         "units",
         "routing",
         "cycles",
+    }
+    for code in (
         "profile",
         "security",
         "notifications",
@@ -87,8 +103,95 @@ def test_all_native_pages_have_a_backend_configuration(surface):
         "delegates",
         "role-permissions",
         "appearance",
-    }
+    ):
+        assert client.get(path(workspace, code)).status_code == 200
+        assert (
+            client.put(
+                path(workspace, code), {"revision": 0, "definition": {}}, format="json"
+            ).status_code
+            == 400
+        )
     assert SurfaceConfiguration.objects.count() == 0  # Reads never initialize records.
+
+
+def test_both_work_pages_read_the_same_form_and_table_configuration(surface):
+    workspace, _, client = surface
+    configured = publish(surface, "ticket")
+    personal_work = client.get(path(workspace, "task"))
+    assert personal_work.status_code == 200, personal_work.data
+    assert personal_work.data["definition"] == configured["definition"]
+    assert personal_work.data["form"] == configured["form"]
+    assert not SurfaceConfiguration.objects.filter(workspace=workspace, code="task").exists()
+
+
+def test_designer_publishes_server_owned_types_limits_permissions_and_locks(surface):
+    workspace, _, client = surface
+    result = client.get(path(workspace, "task")).data
+    designer = result["designer"]
+    assert designer["can_publish"] is True
+    assert designer["can_create_field"] is True
+    assert designer["limits"]["table_tabs"] == 20
+    assert {row["id"] for row in designer["field_types"]} >= {
+        "short_text",
+        "integer",
+        "select",
+        "file",
+    }
+    bindings = [
+        binding
+        for section in result["form"]["layout"]["sections"]
+        for binding in section["bindings"]
+    ]
+    for binding in bindings:
+        if binding.get("source") == "name":
+            assert binding["field"] in designer["locked_fields"]
+
+
+@pytest.mark.parametrize(
+    "patch", [{"hidden": True}, {"required": False}, {"title": " "}]
+)
+def test_native_essential_fields_cannot_be_bypassed_in_direct_form_updates(
+    surface, patch
+):
+    from plane.db.models import FormLayout, FormVersion
+
+    workspace, _, client = surface
+    schema = client.get(path(workspace, "project")).data
+    layout = deepcopy(schema["form"]["layout"])
+    title = next(
+        binding
+        for section in layout["sections"]
+        for binding in section["bindings"]
+        if binding.get("source") == "name"
+    )
+    title.update(patch)
+    before = FormVersion.objects.count()
+    result = client.put(
+        path(workspace, "project"),
+        {
+            "revision": schema["revision"],
+            "definition": schema["definition"],
+            "form": {"revision": schema["form"]["revision"], "layout": layout},
+        },
+        format="json",
+    )
+    assert result.status_code == 400, result.data
+    assert "detail" in result.data and result.data["errors"]
+    assert FormVersion.objects.count() == before
+    assert FormLayout.objects.filter(revision=schema["form"]["revision"]).exists()
+
+
+def test_failed_field_creation_returns_inline_errors_and_creates_nothing(surface):
+    workspace, _, client = surface
+    count = FieldDefinition.objects.count()
+    result = client.post(
+        path(workspace, suffix="fields/"),
+        {"title": " ", "kind": "select", "options": ["یک", " یک "]},
+        format="json",
+    )
+    assert result.status_code == 400
+    assert {item["path"] for item in result.data["errors"]} == {"title", "options"}
+    assert FieldDefinition.objects.count() == count
 
 
 def test_configuration_requires_publish_permission_and_rejects_stale_revisions(surface):
@@ -273,7 +376,9 @@ def test_removing_field_preserves_history_and_removes_it_from_values_and_columns
 def test_personal_form_values_are_scoped_to_the_authenticated_user(surface):
     workspace, actor, client = surface
     extra = field(surface)
-    publish(surface, code="profile", fields=[{"field": extra.code, "required": True}])
+    seed_legacy_fixed_surface(
+        surface, code="profile", fields=[{"field": extra.code, "required": True}]
+    )
     response = client.patch(
         "/api/users/me/",
         {"display_name": "نام جدید", "custom_values": {extra.code: 5}},
@@ -380,7 +485,21 @@ def test_extra_values_are_saved_by_each_native_form_endpoint(surface, code):
 
     workspace, actor, client = surface
     extra = field(surface)
-    publish(surface, code=code, fields=[{"field": extra.code, "required": True}])
+    if code in {
+        "delegates",
+        "role-permissions",
+        "exceptions",
+        "password",
+        "notifications",
+        "appearance",
+        "workspace",
+        "security",
+    }:
+        seed_legacy_fixed_surface(
+            surface, code=code, fields=[{"field": extra.code, "required": True}]
+        )
+    else:
+        publish(surface, code=code, fields=[{"field": extra.code, "required": True}])
     body, method, expected = {}, "post", 201
     headers = {}
     identifier = None
@@ -503,7 +622,9 @@ def test_personal_required_fields_cannot_be_bypassed_by_omitting_workspace_heade
 ):
     workspace, actor, client = surface
     extra = field(surface)
-    publish(surface, code="profile", fields=[{"field": extra.code, "required": True}])
+    seed_legacy_fixed_surface(
+        surface, code="profile", fields=[{"field": extra.code, "required": True}]
+    )
     rejected = client.patch(
         "/api/users/me/", {"display_name": "بدون اطلاعات الزامی"}, format="json"
     )
@@ -545,7 +666,7 @@ def test_required_appearance_fields_do_not_block_workspace_navigation(surface):
     workspace, actor, client = surface
     Profile.objects.get_or_create(user=actor)
     extra = field(surface)
-    publish(
+    seed_legacy_fixed_surface(
         surface, code="appearance", fields=[{"field": extra.code, "required": True}]
     )
     response = client.patch(
@@ -616,7 +737,10 @@ def test_simple_field_creation_generates_choice_options_without_library_setup(su
         LookupValue.objects.filter(category_id=response.data["lookup"]).values_list(
             "title", flat=True
         )
-    ) == {"عادی", "فوری"}
+    ) == {
+        "عادی",
+        "فوری",
+    }
 
 
 def test_simple_form_and_columns_publish_together_and_roll_back_on_invalid_columns(

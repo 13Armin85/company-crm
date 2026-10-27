@@ -15,9 +15,9 @@ import type { TGroupedIssues, TIssue, TIssueMap, TPaginationData, ICalendarDate 
 // ui
 // components
 import { cn, renderFormattedPayloadDate } from "@plane/utils";
+import { persianDigits, persianMonths } from "@plane/ui";
 import { highlightIssueOnDrop } from "@/components/issues/issue-layouts/utils";
-// helpers
-import { MONTHS_LIST } from "@plane/constants";
+import { persianCalendarDate } from "@/store/issue/persian-calendar";
 // helpers
 // types
 import type { ICycleIssuesFilter } from "@/store/issue/cycle";
@@ -129,7 +129,7 @@ export const CalendarDayTile = observer(function CalendarDayTile(props: Props) {
         },
       })
     );
-  }, [dayTileRef?.current, formattedDatePayload]);
+  }, [formattedDatePayload, handleDragAndDrop, issues]);
 
   if (!formattedDatePayload) return null;
   const issueIds = groupedIssueIds?.[formattedDatePayload];
@@ -137,7 +137,8 @@ export const CalendarDayTile = observer(function CalendarDayTile(props: Props) {
   const isToday = date.date.toDateString() === new Date().toDateString();
   const isSelectedDate = date.date.toDateString() == selectedDate.toDateString();
 
-  const isWeekend = [0, 6].includes(date.date.getDay());
+  const isWeekend = date.date.getDay() === 5;
+  const jalali = persianCalendarDate(date.date);
   const isMonthLayout = calendarLayout === "month";
 
   const normalBackground = isWeekend ? "bg-layer-1" : "bg-layer-transparent";
@@ -156,13 +157,13 @@ export const CalendarDayTile = observer(function CalendarDayTile(props: Props) {
               : "font-medium" // if week layout, highlight all days
           } ${isWeekend ? "bg-layer-1" : "bg-layer-transparent"} `}
         >
-          {date.date.getDate() === 1 && MONTHS_LIST[date.date.getMonth() + 1].shortTitle + " "}
+          {jalali.jd === 1 && `${persianMonths[jalali.jm - 1]} `}
           {isToday ? (
             <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent-primary text-on-color">
-              {date.date.getDate()}
+              {persianDigits(jalali.jd)}
             </span>
           ) : (
-            <>{date.date.getDate()}</>
+            <>{persianDigits(jalali.jd)}</>
           )}
         </div>
 
@@ -196,7 +197,9 @@ export const CalendarDayTile = observer(function CalendarDayTile(props: Props) {
         </div>
 
         {/* Mobile view content */}
-        <div
+        <button
+          type="button"
+          aria-label={`${persianDigits(jalali.jd)} ${persianMonths[jalali.jm - 1]} ${persianDigits(jalali.jy)}`}
           onClick={() => setSelectedDate(date.date)}
           className={cn(
             "mx-auto flex h-full w-full cursor-pointer flex-col items-center justify-start py-2.5 text-13 font-medium opacity-80 md:hidden",
@@ -211,9 +214,9 @@ export const CalendarDayTile = observer(function CalendarDayTile(props: Props) {
               "bg-accent-primary/10 text-accent-primary": isToday && !isSelectedDate,
             })}
           >
-            {date.date.getDate()}
+            {persianDigits(jalali.jd)}
           </div>
-        </div>
+        </button>
       </div>
     </>
   );

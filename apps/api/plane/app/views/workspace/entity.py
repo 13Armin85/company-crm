@@ -19,6 +19,7 @@ from plane.app.permissions.crm import WorkspaceScopePermission
 from plane.app.services.access_control import has_permission
 from plane.app.services.entity_schema import (
     FIELD_KINDS,
+    MANDATORY_SOURCES,
     field_dict,
     bindings,
     schema_fields,
@@ -29,6 +30,7 @@ from plane.app.services.entity_schema import (
 )
 from plane.app.services.entity_records import (
     ADAPTERS,
+    base_native_rows,
     permission,
     require_action,
     native_queryset,
@@ -97,6 +99,8 @@ class EngineAPIView(BaseAPIView):
         return get_object_or_404(Workspace, slug=slug)
 
     def entity(self, slug, code):
+        if code == "task":
+            code = "ticket"
         return get_object_or_404(
             EntityType.objects.select_related("workspace"), workspace__slug=slug, code=code, parent__isnull=True
         )
@@ -194,7 +198,7 @@ def lookup_used(value):
             source = schema.get(field.code, {}).get("binding", {}).get("source")
             if (
                 source
-                and ADAPTERS[entity.adapter].all_objects.filter(workspace=entity.workspace, **{source: key}).exists()
+                and base_native_rows(entity, include_deleted=True).filter(**{source: key}).exists()
             ):
                 return True
     return False
@@ -203,7 +207,7 @@ def lookup_used(value):
 class EngineCatalogEndpoint(EngineAPIView):
     def get(self, request, slug):
         workspace = self.workspace(slug)
-        entities = EntityType.objects.filter(workspace=workspace).select_related("parent")
+        entities = EntityType.objects.filter(workspace=workspace).exclude(code="task", parent__isnull=True).select_related("parent")
         rows = [
             dict(
                 EntityTypeSerializer(e, context={"workspace": workspace}).data,
@@ -211,6 +215,7 @@ class EngineCatalogEndpoint(EngineAPIView):
             )
             for e in entities
             if has_permission(request.user, workspace, "EntityType.View", request=request)
+            or has_permission(request.user, workspace, "FormDesigner.View", request=request)
             or permission(e.parent or e, request.user, "view", request)
         ]
         choices = {"priority": [], "task_status": []}
@@ -249,7 +254,8 @@ class EngineDefinitionEndpoint(EngineAPIView):
             raise ValidationError("نوع تعریف معتبر نیست.")
         model, serializer, prefix = DEFINITIONS[kind]
         workspace = self.workspace(slug)
-        self.require(request, workspace, f"{prefix}.{action}")
+        if not (kind == "fields" and action == "View" and has_permission(request.user, workspace, "FormDesigner.View", request=request)):
+            self.require(request, workspace, f"{prefix}.{action}")
         if action != "View":
             Workspace.objects.select_for_update().get(id=workspace.id)
         rows = model.objects.filter(
@@ -314,8 +320,16 @@ class EngineDefinitionEndpoint(EngineAPIView):
             raise ValidationError("لیست سیستمی یا دارای وابستگی حذف نمی‌شود؛ آن را غیرفعال کنید.")
         if kind == "values" and (lookup_used(row) or row.children.exists()):
             raise ValidationError("این مقدار استفاده شده یا والد مقادیر دیگر است؛ آن را غیرفعال کنید.")
-        if kind == "fields" and (row.used_at or field_referenced(workspace, row.code)):
-            raise ValidationError("فیلد استفاده‌شده یا متصل به فرم حذف نمی‌شود؛ آن را غیرفعال کنید.")
+        if kind == "fields":
+            from plane.app.services.field_lifecycle import populated_count, assert_can_hide, detach_empty_field
+
+            assert_can_hide(row)
+            count = populated_count(row)
+            if count:
+                raise ValidationError(f"این فیلد در {count} رکورد داده دارد؛ به‌جای حذف، آن را از فرم مخفی کنید")
+            if hasattr(row, "entitynumberingrule") or hasattr(row, "forward_relation") or hasattr(row, "reverse_relation"):
+                raise ValidationError("این فیلد به تعریف شماره‌گذاری یا ارتباط متصل است؛ ابتدا تعریف مربوط را مدیریت کنید.")
+            detach_empty_field(row, request.user)
         before = dict(serializer_type(row, context={"workspace": workspace}).data)
         definition_audit(request, workspace, f"definition.{kind}.deleted", row, before)
         if kind == "lookups":
@@ -349,11 +363,12 @@ class EngineFormEndpoint(EngineAPIView):
         return entity
 
     def get(self, request, slug, code):
-        entity = self.form(request, slug, code, "FormLayout.Edit")
+        entity = self.form(request, slug, code, "FormDesigner.View")
         form = FormLayout.objects.filter(entity=entity).select_related("published").first()
         return Response(
             {
                 "draft": form.draft if form else {"tabs": [], "sections": []},
+                "locked_fields": sorted({(entity.parent or entity).title_field} | {binding["field"] for binding in bindings(form.draft if form else {}) if binding.get("source") in MANDATORY_SOURCES.get((entity.parent or entity).adapter, set())}),
                 "revision": form.revision if form else 0,
                 "published": form.published.schema if form and form.published_id else None,
                 "versions": list(form.versions.values("id", "number", "created_at", "created_by_id", "change_note"))
@@ -364,7 +379,7 @@ class EngineFormEndpoint(EngineAPIView):
 
     @transaction.atomic
     def put(self, request, slug, code):
-        entity = self.form(request, slug, code, "FormLayout.Edit")
+        entity = self.form(request, slug, code, "FormDesigner.Publish")
         EntityType.objects.select_for_update().get(id=entity.id)
         form = FormLayout.objects.select_for_update().filter(entity=entity).first()
         if request.data.get("revision") != (form.revision if form else 0):
@@ -388,7 +403,7 @@ class EngineFormEndpoint(EngineAPIView):
 
     @transaction.atomic
     def post(self, request, slug, code):
-        entity = self.form(request, slug, code, "FormLayout.Publish")
+        entity = self.form(request, slug, code, "FormDesigner.Publish")
         EntityType.objects.select_for_update().get(id=entity.id)
         form = get_object_or_404(FormLayout.objects.select_for_update(), entity=entity)
         if request.data.get("revision") != form.revision:
@@ -439,6 +454,9 @@ class EngineSchemaEndpoint(EngineAPIView):
 
             actions = record_edit_actions(entity, request.user, native, request)
             for field in schema["fields"]:
+                if field["config"].get("secret"):
+                    field["config"]["required"] = False
+                    field["config"]["readonly"] = True
                 field["config"]["readonly"] = bool(
                     field["config"].get("readonly")
                     or field["config"].get("editable_after_create") is False
@@ -595,11 +613,16 @@ class EngineOptionsEndpoint(EngineAPIView):
                 }
                 for r in rows[offset * size : (offset + 1) * size]
             ]
-        elif config.get("provider") == "project_states":
+        elif config.get("provider") in {"project_states", "work_states"}:
             from plane.app.services.project_visibility import visible_projects
             from plane.db.models import Project
 
             project = request.query_params.get("parent")
+            if not project and config.get("provider") == "work_states":
+                rows = LookupValue.objects.filter(category__workspace=entity.workspace,category__code="task-status",is_active=True,title__icontains=query)
+                if resolving:
+                    rows = rows.filter(code__in=selected)
+                return Response({"results":[{"id":row.code,"title":row.title,"color":row.color} for row in rows.order_by("position","id")[offset*size:(offset+1)*size]],"count":rows.count(),"page":offset+1})
             allowed = visible_projects(Project.objects.filter(workspace=entity.workspace), request.user, slug)
             rows = (
                 State.objects.filter(project_id=project, project_id__in=allowed.values("id"), name__icontains=query)
@@ -631,7 +654,8 @@ class EngineOptionsEndpoint(EngineAPIView):
             }:
                 rows = rows.none()
             if target.adapter:
-                rows = rows.filter(**{("reason" if target.adapter == "leave" else "name") + "__icontains": query})
+                title_source = {"user": "display_name", "unit": "title", "leave": "reason"}.get(target.adapter, "name")
+                rows = rows.filter(**{title_source + "__icontains": query})
             else:
                 rows = rows.filter(**{f"data__{target.title_field}__icontains": query})
             count, result = rows.count(), []
@@ -721,7 +745,7 @@ class EngineConfigEndpoint(EngineAPIView):
     def post(self, request, slug):
         workspace = self.workspace(slug)
         self.require(request, workspace, "Config.Import")
-        self.require(request, workspace, "FormLayout.Publish")
+        self.require(request, workspace, "FormDesigner.Publish")
         upload = request.FILES.get("file")
         if upload:
             import json
@@ -941,7 +965,7 @@ class EngineDefaultFileEndpoint(EngineAPIView):
     def field(self, request, slug, identifier, edit=False):
         workspace = self.workspace(slug)
         if not (
-            has_permission(request.user, workspace, "FormLayout.Edit", request=request)
+            has_permission(request.user, workspace, "FormDesigner.Publish", request=request)
             or has_permission(request.user, workspace, "Field.Edit" if edit else "Field.View", request=request)
         ):
             raise PermissionDenied()
@@ -997,7 +1021,7 @@ class EngineEventsEndpoint(EngineAPIView):
             )
             rows = rows.exclude(private_view & ~Q(created_by=request.user))
             rows = rows.exclude(Q(metadata__definition_type="entityviewexport") & ~Q(created_by=request.user))
-            if not has_permission(request.user, workspace, "View.Manage.All", request=request):
+            if not has_permission(request.user, workspace, "View.Official.Manage", request=request):
                 rows = rows.exclude(Q(metadata__definition_type="issueview") & ~Q(created_by=request.user))
         offset, size = page(request)
         result = []

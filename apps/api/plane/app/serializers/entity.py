@@ -98,8 +98,8 @@ class EntityTypeSerializer(ScopedDefinitionSerializer):
             or len(numbering.get("prefix", "")) > 60
         ):
             raise serializers.ValidationError("پیشوند شماره‌گذاری حداکثر شصت نویسه است.")
-        if not isinstance(numbering.get("padding", 5), int) or not 1 <= numbering.get("padding", 5) <= 12:
-            raise serializers.ValidationError("تعداد رقم شماره‌گذاری باید بین یک و دوازده باشد.")
+        if not isinstance(numbering.get("padding", 5), int) or not 0 <= numbering.get("padding", 5) <= 12:
+            raise serializers.ValidationError("تعداد رقم شماره‌گذاری باید بین صفر و دوازده باشد.")
         return attrs
 
 
@@ -168,10 +168,18 @@ class FieldDefinitionSerializer(ScopedDefinitionSerializer):
             "filterable",
             "table_visible",
             "used_at",
+            "hidden_from_form",
         )
         read_only_fields = ("id", "used_at")
 
     def validate(self, attrs):
+        if attrs.get("hidden_from_form") and self.instance:
+            from plane.app.services.field_lifecycle import assert_can_hide
+
+            assert_can_hide(self.instance)
+        if self.instance and (hasattr(self.instance, "entitynumberingrule") or hasattr(self.instance, "forward_relation") or hasattr(self.instance, "reverse_relation")):
+            if any(key in attrs and attrs[key] != getattr(self.instance, key) for key in ("code", "kind", "config", "relation_entity")):
+                raise serializers.ValidationError("تنظیمات این ستون از بخش شماره‌گذاری یا ارتباط مدیریت می‌شود.")
         if self.instance and self.instance.used_at:
             changed = {key for key, value in attrs.items() if value != getattr(self.instance, key)}
             if changed - DISPLAY_SETTINGS:
@@ -192,7 +200,7 @@ class FieldDefinitionSerializer(ScopedDefinitionSerializer):
             attrs["config"] = {**config, "default": normalize({"kind": kind, "config": config}, config["default"])}
         lookup = attrs.get("lookup", self.instance.lookup if self.instance else None)
         relation = attrs.get("relation_entity", self.instance.relation_entity if self.instance else None)
-        if kind in {"select", "multi_select"} and not lookup and config.get("provider") != "project_states":
+        if kind in {"select", "multi_select"} and not lookup and config.get("provider") not in {"project_states", "work_states"}:
             raise serializers.ValidationError("فیلد انتخابی باید به لیست پایه متصل باشد.")
         if kind == "relation" and not relation:
             raise serializers.ValidationError("موجودیت مقصد ارتباط را انتخاب کنید.")

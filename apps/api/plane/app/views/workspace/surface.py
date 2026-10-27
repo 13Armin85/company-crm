@@ -1,6 +1,7 @@
 from pathlib import PurePath
 from copy import deepcopy
 from uuid import UUID, uuid4
+import logging
 
 from django.db import transaction
 from django.db.models import Q
@@ -12,6 +13,7 @@ from rest_framework.response import Response
 from plane.app.views.workspace.entity import EngineAPIView, conflict, page
 from plane.app.services.surface_config import (
     SURFACES,
+    DESIGNABLE_SURFACES,
     member_workspace,
     allowed,
     configuration,
@@ -21,6 +23,7 @@ from plane.app.services.surface_config import (
     extra_fields,
 )
 from plane.app.services.access_control import has_permission
+from plane.app.services.surface_designer import new_field_data, persian_errors
 from plane.app.serializers.entity import FieldDefinitionSerializer
 from plane.app.services.entity_schema import can_field, role_ids, present_schema
 from plane.app.services.entity_schema import validate_layout
@@ -49,6 +52,24 @@ from plane.db.models import (
 
 
 class SurfaceEndpoint(EngineAPIView):
+    def handle_exception(self, exc):
+        try:
+            response = super().handle_exception(exc)
+        except Exception:
+            reference = uuid4().hex[:8]
+            logging.getLogger(__name__).exception(
+                "Surface configuration failed; reference=%s", reference
+            )
+            return Response(
+                {
+                    "detail": f"خطای غیرمنتظره رخ داد و عملیات انجام نشد. دوباره تلاش کنید؛ کد پیگیری: {reference}"
+                },
+                status=500,
+            )
+        if response.status_code >= 400:
+            response.data = persian_errors(response.data, response.status_code)
+        return response
+
     def context(self, request, slug, code):
         if code not in SURFACES:
             from django.http import Http404
@@ -61,11 +82,11 @@ class SurfaceEndpoint(EngineAPIView):
     def get(self, request, slug, code=None):
         if code is None:
             workspace = member_workspace(request, slug)
-            self.require(request, workspace, "FormLayout.Edit")
+            self.require(request, workspace, "FormDesigner.View")
             return Response(
                 {
                     "results": [
-                        surface_schema(workspace, key, request.user) for key in SURFACES
+                        surface_schema(workspace, key, request.user) for key in SURFACES if key in DESIGNABLE_SURFACES
                     ]
                 }
             )
@@ -74,9 +95,15 @@ class SurfaceEndpoint(EngineAPIView):
 
     @transaction.atomic
     def put(self, request, slug, code):
+        if code not in DESIGNABLE_SURFACES:
+            raise ValidationError("فرم‌ساز فقط برای ایجاد و ویرایش موجودیت‌هاست؛ طراحی صفحه‌های ثابت مجاز نیست.")
         workspace = self.context(request, slug, code)
         allowed(request, workspace, code, manage=True)
-        self.require(request, workspace, "FormLayout.Publish")
+        self.require(request, workspace, "FormDesigner.Publish")
+        if not isinstance(request.data, dict):
+            raise ValidationError(
+                "اطلاعات تنظیمات باید به‌صورت یک فرم معتبر ارسال شود."
+            )
         Workspace.objects.select_for_update().get(id=workspace.id)
         row, previous = configuration(workspace, code)
         revision = row.revision if row else 0
@@ -158,55 +185,17 @@ class SurfaceEndpoint(EngineAPIView):
 class SurfaceFieldEndpoint(SurfaceEndpoint):
     @transaction.atomic
     def post(self, request, slug, code):
+        if code not in DESIGNABLE_SURFACES:
+            raise ValidationError("صفحه‌های ثابت سیستم در دامنه فرم‌ساز نیستند.")
         workspace = self.context(request, slug, code)
         allowed(request, workspace, code, manage=True)
         self.require(request, workspace, "Field.Create")
-        kind = request.data.get("kind", "short_text")
-        if kind not in {
-            "short_text",
-            "long_text",
-            "rich_text",
-            "integer",
-            "decimal",
-            "money",
-            "percent",
-            "date",
-            "datetime",
-            "date_range",
-            "checkbox",
-            "boolean",
-            "select",
-            "multi_select",
-            "tags",
-            "user",
-            "unit",
-            "role",
-            "file",
-            "url",
-            "email",
-            "phone",
-            "rating",
-        }:
-            raise ValidationError("نوع فیلد معتبر نیست.")
+        data = new_field_data(request.data)
+        kind = data["kind"]
         identifier = f"page-{uuid4().hex}"
-        data = {
-            key: request.data[key]
-            for key in ("title", "help_text", "placeholder")
-            if key in request.data
-        }
         data.update(code=identifier, kind=kind, config={})
         if kind in {"select", "multi_select"}:
             options = request.data.get("options")
-            if (
-                not isinstance(options, list)
-                or not 1 <= len(options) <= 100
-                or any(
-                    not isinstance(v, str) or not v.strip() or len(v) > 255
-                    for v in options
-                )
-                or len({v.strip() for v in options}) != len(options)
-            ):
-                raise ValidationError("یک تا صد گزینه غیرتکراری وارد کنید.")
             category = LookupCategory.objects.create(
                 workspace=workspace,
                 code=identifier,

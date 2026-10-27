@@ -9,6 +9,7 @@ import { Button, Skeleton } from "../components";
 import { useEngineSchema, useEngineRecord, useEngineSlug, enginePath, useEngineMutation, fieldErrors } from "./api";
 import type { EngineRecord } from "./api";
 import { entityDisplaySchema } from "./presentation";
+import { DuplicateFeedback, duplicateDetails } from "./duplicate-feedback";
 
 const noEmbeddedUpload = async (): Promise<string> => {
   throw new Error("برای فایل از فیلد آپلود فرم استفاده کنید.");
@@ -130,6 +131,8 @@ export function EngineRecordForm({
   onSaved,
   onCancel,
   readOnly = false,
+  onDirtyChange,
+  visibleFields,
 }: {
   code: string;
   id?: string;
@@ -138,6 +141,8 @@ export function EngineRecordForm({
   onSaved?: (record: EngineRecord) => void;
   onCancel?: () => void;
   readOnly?: boolean;
+  onDirtyChange?: (dirty: boolean) => void;
+  visibleFields?: string[];
 }) {
   const schemaQuery = useEngineSchema(code, subtype, id),
     recordQuery = useEngineRecord(code, id);
@@ -146,6 +151,7 @@ export function EngineRecordForm({
   const [values, setValues] = useState<FormValues>({}),
     [errors, setErrors] = useState<Record<string, string>>({}),
     [readyKey, setReadyKey] = useState("");
+  const [savedWithWarning, setSavedWithWarning] = useState<EngineRecord | null>(null);
   const setDirty = useUIStore((s) => s.setFormDirty);
   const schema = schemaQuery.data,
     record = recordQuery.data;
@@ -160,9 +166,10 @@ export function EngineRecordForm({
     readyKey === key &&
     JSON.stringify(values) !== JSON.stringify({ ...schema?.defaults, ...(record?.values || initialValues) });
   useEffect(() => {
+    onDirtyChange?.(dirty && !readOnly);
     setDirty(`entity:${key}`, dirty && !readOnly);
     return () => setDirty(`entity:${key}`, false);
-  }, [dirty, key, readOnly, setDirty]);
+  }, [dirty, key, readOnly, setDirty, onDirtyChange]);
   const canEdit = !readOnly && (!id || Boolean(record?.can_edit));
   const failure = schemaQuery.error || recordQuery.error || mutation.error;
   if (schemaQuery.isLoading || (id && recordQuery.isLoading) || (readyKey !== key && !failure))
@@ -201,15 +208,49 @@ export function EngineRecordForm({
           })) as EngineRecord;
           setDirty(`entity:${key}`, false);
           setReadyKey("");
-          onSaved?.(result);
+          if (result.warnings?.length) setSavedWithWarning(result);
+          else onSaved?.(result);
         } catch (error) {
           setErrors(fieldErrors(error));
         }
       }}
     >
       {failure && <p role="alert">{errorMessage(failure, "ذخیره انجام نشد؛ مقادیر و دسترسی خود را بررسی کنید.")}</p>}
+      <DuplicateFeedback details={duplicateDetails(mutation.error)} />
+      {savedWithWarning && (
+        <>
+          <p role="status">رکورد با هشدار ثبت شد.</p>
+          <DuplicateFeedback details={savedWithWarning.warnings || []} />
+          <Button
+            onClick={() => {
+              onSaved?.(savedWithWarning);
+              setSavedWithWarning(null);
+            }}
+          >
+            ادامه
+          </Button>
+        </>
+      )}
       <SchemaDrivenForm
-        schema={entityDisplaySchema(schema)}
+        schema={entityDisplaySchema(
+          visibleFields
+            ? {
+                ...schema,
+                layout: {
+                  tabs: [],
+                  sections: [
+                    {
+                      id: "summary",
+                      columns: 1,
+                      bindings: visibleFields
+                        .filter((code) => schema.fields.some((field) => field.code === code))
+                        .map((field) => ({ field })),
+                    },
+                  ],
+                },
+              }
+            : schema
+        )}
         values={values}
         onChange={setValues}
         errors={errors}
@@ -219,7 +260,7 @@ export function EngineRecordForm({
       />
       <footer className="engine-form-footer">
         {canEdit && (
-          <Button type="submit" disabled={mutation.isPending}>
+          <Button type="submit" disabled={mutation.isPending || Boolean(savedWithWarning)}>
             {mutation.isPending ? "در حال ذخیره…" : id ? "ذخیره تغییرات" : "ثبت"}
           </Button>
         )}

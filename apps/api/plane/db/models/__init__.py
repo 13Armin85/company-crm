@@ -108,5 +108,9 @@ from .organization import (
 )
 
 from .description import Description, DescriptionVersion
-from .entity import EntityType, LookupCategory, LookupValue, FieldDefinition, FormLayout, FormVersion, EntityRecord, EntityEvent, EntityViewExport
+from .entity import EntityType, LookupCategory, LookupValue, FieldDefinition, FormLayout, FormVersion, EntityRecord, EntityEvent, EntityViewExport, EntityViewPreference
 from .surface import SurfaceConfiguration, SurfaceValues
+from .entity import EntityUniqueRule
+from .entity import EntityNumberingRule, EntityNumberValue
+from .entity import EntityRelation, EntityRelationLink
+from .dashboard import DashboardConfiguration, DashboardTeamSettings

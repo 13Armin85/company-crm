@@ -1,10 +1,10 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { configureNativeFields, SurfaceTable } from "./surface";
 import type { NativeField, SurfaceSchema } from "./surface";
-import { reorderColumn } from "./page-studio";
+import { createTableTabId, reorderColumn } from "./page-studio";
 
 const native: NativeField = {
   code: "description",
@@ -16,6 +16,17 @@ const native: NativeField = {
 };
 
 describe("native form customization", () => {
+  it("creates distinct valid table tab identifiers on plain HTTP without randomUUID", () => {
+    vi.stubGlobal("crypto", { getRandomValues: globalThis.crypto.getRandomValues.bind(globalThis.crypto) });
+    try {
+      const first = createTableTabId(),
+        second = createTableTabId();
+      expect(first).toMatch(/^[a-zA-Z0-9_-]{1,80}$/);
+      expect(second).not.toBe(first);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
   it("removes a hidden input while preserving unrelated controls", () => {
     const html = renderToStaticMarkup(
       <>

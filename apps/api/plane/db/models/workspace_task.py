@@ -1,16 +1,22 @@
-# Copyright (c) 2023-present Plane Software, Inc. and contributors
-# SPDX-License-Identifier: AGPL-3.0-only
+﻿"""Compatibility API for standalone work; all rows live in the Issue model."""
 
-from django.conf import settings
-from django.db import models, router, transaction
-from django.utils import timezone
-
-from .base import BaseModel
-from .identifier import SystemIdentifierCounter
+from django.db import models, transaction
+from plane.db.mixins import SoftDeletionManager
+from .issue import Issue, IssueAssignee
 
 
-class WorkspaceTask(BaseModel):
-    """A task that belongs to a workspace but is not tied to a project."""
+class StandaloneWorkManager(SoftDeletionManager):
+    def get_queryset(self):
+        return super().get_queryset().filter(project__isnull=True)
+
+
+class AllStandaloneWorkManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().filter(project__isnull=True)
+
+
+class WorkspaceTask(Issue):
+    """An import/URL alias retained for old clients, without a second table."""
 
     class Status(models.TextChoices):
         TODO = "todo", "Todo"
@@ -26,49 +32,24 @@ class WorkspaceTask(BaseModel):
         LOW = "low", "Low"
         NONE = "none", "None"
 
-    workspace = models.ForeignKey(
-        "db.Workspace",
-        on_delete=models.CASCADE,
-        related_name="workspace_tasks",
-    )
-    assignee = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.PROTECT,
-        related_name="assigned_workspace_tasks",
-    )
-    name = models.CharField(max_length=255)
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.TODO)
-    priority = models.CharField(max_length=20, choices=Priority.choices, default=Priority.NONE)
-    sequence_id = models.PositiveIntegerField()
-    target_date = models.DateField(null=True, blank=True)
-    completed_at = models.DateTimeField(null=True, blank=True)
+    objects = StandaloneWorkManager()
+    all_objects = AllStandaloneWorkManager()
 
     class Meta:
-        db_table = "workspace_tasks"
+        proxy = True
         ordering = ("-created_at",)
-        constraints = [
-            models.UniqueConstraint(
-                fields=["workspace", "sequence_id"],
-                name="workspace_task_unique_sequence",
-            )
-        ]
 
     def save(self, *args, **kwargs):
-        if self.status == self.Status.DONE and self.completed_at is None:
-            self.completed_at = timezone.now()
-        elif self.status != self.Status.DONE:
-            self.completed_at = None
-        if self._state.adding and self.sequence_id is None:
-            using = kwargs.get("using") or router.db_for_write(type(self), instance=self)
-            with transaction.atomic(using=using):
-                counter = SystemIdentifierCounter.locked(f"workspace-task:{self.workspace_id}", using)
-                largest = (
-                    type(self)
-                    .all_objects.using(using)
-                    .filter(workspace_id=self.workspace_id)
-                    .aggregate(value=models.Max("sequence_id"))["value"]
-                    or 0
+        if self.project_id is not None:
+            raise ValueError("The legacy standalone API cannot change project work.")
+        with transaction.atomic():
+            super().save(*args, **kwargs)
+            IssueAssignee.objects.filter(issue_id=self.id).exclude(
+                assignee_id=self.assignee_id
+            ).delete()
+            if self.assignee_id:
+                IssueAssignee.objects.get_or_create(
+                    issue_id=self.id,
+                    assignee_id=self.assignee_id,
+                    defaults={"workspace_id": self.workspace_id, "project_id": None},
                 )
-                self.sequence_id = counter.advance(minimum=largest)
-                return super().save(*args, **kwargs)
-        return super().save(*args, **kwargs)

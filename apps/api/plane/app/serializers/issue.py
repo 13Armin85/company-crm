@@ -83,7 +83,10 @@ class IssueProjectLiteSerializer(BaseSerializer):
 class IssueCreateSerializer(BaseSerializer):
     # ids
     state_id = serializers.PrimaryKeyRelatedField(
-        source="state", queryset=State.all_state_objects.all(), required=False, allow_null=True
+        source="state",
+        queryset=State.all_state_objects.all(),
+        required=False,
+        allow_null=True,
     )
     parent_id = serializers.PrimaryKeyRelatedField(
         source="parent", queryset=Issue.objects.all(), required=False, allow_null=True
@@ -133,11 +136,15 @@ class IssueCreateSerializer(BaseSerializer):
             and attrs.get("target_date", None) is not None
             and attrs.get("start_date", None) > attrs.get("target_date", None)
         ):
-            raise serializers.ValidationError("تاریخ شروع نمی‌تواند بیش از تاریخ هدف باشد")
+            raise serializers.ValidationError(
+                "تاریخ شروع نمی‌تواند بیش از تاریخ هدف باشد"
+            )
 
         # Validate description content for security
         if "description_html" in attrs and attrs["description_html"]:
-            is_valid, error_msg, sanitized_html = validate_html_content(attrs["description_html"])
+            is_valid, error_msg, sanitized_html = validate_html_content(
+                attrs["description_html"]
+            )
             if not is_valid:
                 raise serializers.ValidationError({"error": "محتوای HTML معتبر نیست"})
             # Update the attrs with sanitized HTML if available
@@ -147,16 +154,36 @@ class IssueCreateSerializer(BaseSerializer):
         if "description_binary" in attrs and attrs["description_binary"]:
             is_valid, error_msg = validate_binary_data(attrs["description_binary"])
             if not is_valid:
-                raise serializers.ValidationError({"description_binary": "دادهٔ دودویی نامعتبر است"})
+                raise serializers.ValidationError(
+                    {"description_binary": "دادهٔ دودویی نامعتبر است"}
+                )
 
         # Validate assignees are from project
         if attrs.get("assignee_ids", []):
-            attrs["assignee_ids"] = ProjectMember.objects.filter(
-                project_id=self.context["project_id"],
-                role__gte=15,
-                is_active=True,
-                member_id__in=attrs["assignee_ids"],
-            ).values_list("member_id", flat=True)
+            if self.context.get("project_id") is None:
+                from plane.db.models import WorkspaceMember
+
+                supplied = [getattr(item, "id", item) for item in attrs["assignee_ids"]]
+                active = list(
+                    WorkspaceMember.objects.filter(
+                        workspace_id=self.context["workspace_id"],
+                        member_id__in=supplied,
+                        is_active=True,
+                        member__is_active=True,
+                    ).values_list("member_id", flat=True)
+                )
+                if len(active) != len(set(supplied)):
+                    raise serializers.ValidationError(
+                        "مسئولان باید عضو فعال همین شرکت باشند."
+                    )
+                attrs["assignee_ids"] = active
+            else:
+                attrs["assignee_ids"] = ProjectMember.objects.filter(
+                    project_id=self.context["project_id"],
+                    role__gte=15,
+                    is_active=True,
+                    member_id__in=attrs["assignee_ids"],
+                ).values_list("member_id", flat=True)
 
         # Validate labels are from project
         if attrs.get("label_ids"):
@@ -176,7 +203,9 @@ class IssueCreateSerializer(BaseSerializer):
                 pk=attrs.get("state").id,
             ).exists()
         ):
-            raise serializers.ValidationError("وضعیت معتبر نیست؛ یک state_id معتبر ارسال کنید")
+            raise serializers.ValidationError(
+                "وضعیت معتبر نیست؛ یک state_id معتبر ارسال کنید"
+            )
 
         # Check parent issue is from workspace as it can be cross workspace
         if (
@@ -186,7 +215,9 @@ class IssueCreateSerializer(BaseSerializer):
                 pk=attrs.get("parent").id,
             ).exists()
         ):
-            raise serializers.ValidationError("کار والد معتبر نیست؛ یک issue_id معتبر ارسال کنید")
+            raise serializers.ValidationError(
+                "کار والد معتبر نیست؛ یک issue_id معتبر ارسال کنید"
+            )
 
         if (
             attrs.get("estimate_point")
@@ -195,7 +226,9 @@ class IssueCreateSerializer(BaseSerializer):
                 pk=attrs.get("estimate_point").id,
             ).exists()
         ):
-            raise serializers.ValidationError("امتیاز برآورد معتبر نیست؛ یک estimate_point_id معتبر ارسال کنید")
+            raise serializers.ValidationError(
+                "امتیاز برآورد معتبر نیست؛ یک estimate_point_id معتبر ارسال کنید"
+            )
 
         return attrs
 
@@ -208,7 +241,11 @@ class IssueCreateSerializer(BaseSerializer):
         default_assignee_id = self.context["default_assignee_id"]
 
         # Create Issue
-        issue = Issue(**validated_data, project_id=project_id)
+        if project_id is None:
+            validated_data["assignee_id"] = assignees[0] if assignees else None
+        issue = Issue(
+            **validated_data, project_id=project_id, workspace_id=workspace_id
+        )
         issue.save(created_by_id=self.context.get("actor_id"))
 
         # Issue Audit Users
@@ -284,6 +321,8 @@ class IssueCreateSerializer(BaseSerializer):
         # Related models
         project_id = instance.project_id
         workspace_id = instance.workspace_id
+        if project_id is None and assignees is not None:
+            validated_data["assignee_id"] = assignees[0] if assignees else None
         created_by_id = instance.created_by_id
         updated_by_id = instance.updated_by_id
 
@@ -342,7 +381,11 @@ class IssueActivitySerializer(BaseSerializer):
     source_data = serializers.SerializerMethodField()
 
     def get_source_data(self, obj):
-        if hasattr(obj, "issue") and hasattr(obj.issue, "source_data") and obj.issue.source_data:
+        if (
+            hasattr(obj, "issue")
+            and hasattr(obj.issue, "source_data")
+            and obj.issue.source_data
+        ):
             return {
                 "source": obj.issue.source_data[0].source,
                 "source_email": obj.issue.source_data[0].source_email,
@@ -405,8 +448,12 @@ class IssueLabelSerializer(BaseSerializer):
 
 class IssueRelationSerializer(BaseSerializer):
     id = serializers.UUIDField(source="related_issue.id", read_only=True)
-    project_id = serializers.PrimaryKeyRelatedField(source="related_issue.project_id", read_only=True)
-    sequence_id = serializers.IntegerField(source="related_issue.sequence_id", read_only=True)
+    project_id = serializers.PrimaryKeyRelatedField(
+        source="related_issue.project_id", read_only=True
+    )
+    sequence_id = serializers.IntegerField(
+        source="related_issue.sequence_id", read_only=True
+    )
     name = serializers.CharField(source="related_issue.name", read_only=True)
     relation_type = serializers.CharField(read_only=True)
     state_id = serializers.UUIDField(source="related_issue.state.id", read_only=True)
@@ -445,7 +492,9 @@ class IssueRelationSerializer(BaseSerializer):
 
 class RelatedIssueSerializer(BaseSerializer):
     id = serializers.UUIDField(source="issue.id", read_only=True)
-    project_id = serializers.PrimaryKeyRelatedField(source="issue.project_id", read_only=True)
+    project_id = serializers.PrimaryKeyRelatedField(
+        source="issue.project_id", read_only=True
+    )
     sequence_id = serializers.IntegerField(source="issue.sequence_id", read_only=True)
     name = serializers.CharField(source="issue.name", read_only=True)
     relation_type = serializers.CharField(read_only=True)
@@ -587,17 +636,25 @@ class IssueLinkSerializer(BaseSerializer):
 
     # Validation if url already exists
     def create(self, validated_data):
-        if IssueLink.objects.filter(url=validated_data.get("url"), issue_id=validated_data.get("issue_id")).exists():
-            raise serializers.ValidationError({"error": "این URL از قبل برای این کار ثبت شده است"})
+        if IssueLink.objects.filter(
+            url=validated_data.get("url"), issue_id=validated_data.get("issue_id")
+        ).exists():
+            raise serializers.ValidationError(
+                {"error": "این URL از قبل برای این کار ثبت شده است"}
+            )
         return IssueLink.objects.create(**validated_data)
 
     def update(self, instance, validated_data):
         if (
-            IssueLink.objects.filter(url=validated_data.get("url"), issue_id=instance.issue_id)
+            IssueLink.objects.filter(
+                url=validated_data.get("url"), issue_id=instance.issue_id
+            )
             .exclude(pk=instance.id)
             .exists()
         ):
-            raise serializers.ValidationError({"error": "این URL از قبل برای این کار ثبت شده است"})
+            raise serializers.ValidationError(
+                {"error": "این URL از قبل برای این کار ثبت شده است"}
+            )
 
         return super().update(instance, validated_data)
 
@@ -686,7 +743,15 @@ class CommentReactionSerializer(BaseSerializer):
             "created_by",
             "updated_by",
         ]
-        read_only_fields = ["workspace", "project", "comment", "actor", "deleted_at", "created_by", "updated_by"]
+        read_only_fields = [
+            "workspace",
+            "project",
+            "comment",
+            "actor",
+            "deleted_at",
+            "created_by",
+            "updated_by",
+        ]
 
 
 class IssueVoteSerializer(BaseSerializer):
@@ -721,9 +786,13 @@ class IssueCommentSerializer(BaseSerializer):
 
     def validate(self, attrs):
         if "comment_html" in attrs and attrs["comment_html"]:
-            is_valid, error_msg, sanitized_html = validate_html_content(attrs["comment_html"])
+            is_valid, error_msg, sanitized_html = validate_html_content(
+                attrs["comment_html"]
+            )
             if not is_valid:
-                raise serializers.ValidationError({"comment_html": "محتوای HTML معتبر نیست"})
+                raise serializers.ValidationError(
+                    {"comment_html": "محتوای HTML معتبر نیست"}
+                )
             if sanitized_html is not None:
                 attrs["comment_html"] = sanitized_html
         return attrs
@@ -821,13 +890,35 @@ class IssueSerializer(DynamicBaseSerializer):
     def validate(self, data):
         if (
             data.get("state_id")
-            and not State.objects.filter(project_id=self.context.get("project_id"), pk=data.get("state_id")).exists()
+            and not State.objects.filter(
+                project_id=self.context.get("project_id"), pk=data.get("state_id")
+            ).exists()
         ):
-            raise serializers.ValidationError("وضعیت معتبر نیست؛ یک state_id معتبر ارسال کنید")
+            raise serializers.ValidationError(
+                "وضعیت معتبر نیست؛ یک state_id معتبر ارسال کنید"
+            )
         return data
 
 
+class WorkNumberListSerializer(serializers.ListSerializer):
+    def to_representation(self, data):
+        items = list(data)
+        from plane.db.models import EntityRecord
+
+        self.child._work_numbers = {
+            row["source_id"]: row["number"]
+            for row in EntityRecord.objects.filter(
+                entity__code="ticket", entity__parent__isnull=True,
+                source_id__in=[item.id for item in items],
+            ).values("source_id", "number")
+        }
+        return super().to_representation(items)
+
+
 class IssueListDetailSerializer(serializers.Serializer):
+    class Meta:
+        list_serializer_class = WorkNumberListSerializer
+
     def __init__(self, *args, **kwargs):
         # Extract expand parameter and store it as instance variable
         self.expand = kwargs.pop("expand", []) or []
@@ -857,6 +948,7 @@ class IssueListDetailSerializer(serializers.Serializer):
             "start_date": instance.start_date,
             "target_date": instance.target_date,
             "sequence_id": instance.sequence_id,
+            "work_number": getattr(self, "_work_numbers", {}).get(instance.id),
             "project_id": instance.project_id,
             "parent_id": instance.parent_id,
             "created_at": instance.created_at,
@@ -954,7 +1046,9 @@ class IssueDetailSerializer(IssueSerializer):
 class IssuePublicSerializer(BaseSerializer):
     project_detail = ProjectLiteSerializer(read_only=True, source="project")
     state_detail = StateLiteSerializer(read_only=True, source="state")
-    reactions = IssueReactionSerializer(read_only=True, many=True, source="issue_reactions")
+    reactions = IssueReactionSerializer(
+        read_only=True, many=True, source="issue_reactions"
+    )
     votes = IssueVoteSerializer(read_only=True, many=True)
 
     class Meta:

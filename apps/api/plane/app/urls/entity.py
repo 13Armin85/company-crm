@@ -1,4 +1,9 @@
 from django.urls import path
+from plane.app.views.workspace.dashboard import DashboardEndpoint, DashboardRoleEndpoint, DashboardWidgetEndpoint, DashboardTeamEndpoint, DashboardTeamSettingsEndpoint, DashboardTeamDetailEndpoint, DashboardTeamAssignEndpoint, DashboardTeamRemindEndpoint
+from plane.app.views.workspace.entity_import import EngineRecordImportEndpoint
+from plane.app.views.workspace.entity_governance import EngineFieldUsageEndpoint
+from plane.app.views.workspace.entity_governance import EngineLookupColumnEndpoint, EngineRelatedRecordsEndpoint
+from plane.app.views.workspace.entity_governance import EngineUniqueRulesEndpoint, EngineSettingsEndpoint, EngineNumberingEndpoint, EngineRelationDefinitionsEndpoint
 from plane.app.views.workspace.surface import SurfaceEndpoint, SurfaceFieldEndpoint, SurfaceValuesEndpoint, SurfaceOptionsEndpoint, SurfaceFileEndpoint
 from plane.app.views.workspace.entity_views import (
     EngineViewSchemaEndpoint, EngineViewQueryEndpoint, EngineSavedViewsEndpoint,
@@ -23,6 +28,25 @@ from plane.app.views.workspace.entity import (
 
 
 urlpatterns = [
+    path("workspaces/<str:slug>/dashboard/", DashboardEndpoint.as_view()),
+    path("workspaces/<str:slug>/dashboard/defaults/<uuid:role_id>/", DashboardRoleEndpoint.as_view()),
+    path("workspaces/<str:slug>/dashboard/widgets/data/", DashboardWidgetEndpoint.as_view()),
+    path("workspaces/<str:slug>/dashboard/team/", DashboardTeamEndpoint.as_view()),
+    path("workspaces/<str:slug>/dashboard/team/settings/", DashboardTeamSettingsEndpoint.as_view()),
+    path("workspaces/<str:slug>/dashboard/team/members/<uuid:user_id>/", DashboardTeamDetailEndpoint.as_view()),
+    path("workspaces/<str:slug>/dashboard/team/members/<uuid:user_id>/assign/", DashboardTeamAssignEndpoint.as_view()),
+    path("workspaces/<str:slug>/dashboard/team/members/<uuid:user_id>/remind/", DashboardTeamRemindEndpoint.as_view()),
+    path("workspaces/<str:slug>/engine/entities/<str:code>/import/", EngineRecordImportEndpoint.as_view()),
+    path("workspaces/<str:slug>/engine/definitions/fields/<uuid:identifier>/usage/", EngineFieldUsageEndpoint.as_view()),
+    path("workspaces/<str:slug>/engine/entities/<str:code>/lookup-columns/", EngineLookupColumnEndpoint.as_view()),
+    path("workspaces/<str:slug>/engine/entities/<str:code>/records/<uuid:identifier>/related/<str:field_code>/", EngineRelatedRecordsEndpoint.as_view()),
+    path("workspaces/<str:slug>/engine/relations/", EngineRelationDefinitionsEndpoint.as_view()),
+    path("workspaces/<str:slug>/engine/relations/<uuid:identifier>/", EngineRelationDefinitionsEndpoint.as_view()),
+    path("workspaces/<str:slug>/engine/entities/<str:code>/numbering-rules/", EngineNumberingEndpoint.as_view()),
+    path("workspaces/<str:slug>/engine/entities/<str:code>/numbering-rules/<uuid:identifier>/", EngineNumberingEndpoint.as_view()),
+    path("workspaces/<str:slug>/engine/settings/", EngineSettingsEndpoint.as_view()),
+    path("workspaces/<str:slug>/engine/entities/<str:code>/unique-rules/", EngineUniqueRulesEndpoint.as_view()),
+    path("workspaces/<str:slug>/engine/entities/<str:code>/unique-rules/<uuid:identifier>/", EngineUniqueRulesEndpoint.as_view()),
     path("workspaces/<str:slug>/engine/surfaces/", SurfaceEndpoint.as_view()),
     path("workspaces/<str:slug>/engine/surfaces/<str:code>/", SurfaceEndpoint.as_view()),
     path("workspaces/<str:slug>/engine/surfaces/<str:code>/fields/", SurfaceFieldEndpoint.as_view()),

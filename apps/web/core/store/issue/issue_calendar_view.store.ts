@@ -4,13 +4,12 @@
  * See the LICENSE file for details.
  */
 
-import { observable, action, makeObservable, runInAction, computed, reaction } from "mobx";
+import { observable, action, makeObservable, runInAction, computed } from "mobx";
 
 // helpers
 import { computedFn } from "mobx-utils";
 import type { ICalendarPayload, ICalendarWeek } from "@plane/types";
-import { EStartOfTheWeek } from "@plane/types";
-import { generateCalendarData, getWeekNumberOfDate } from "@plane/utils";
+import { generatePersianCalendarData, gregorianDate, persianCalendarDate } from "./persian-calendar";
 // types
 import type { IIssueRootStore } from "./root.store";
 
@@ -73,15 +72,6 @@ export class CalendarStore implements ICalendarStore {
 
     this.rootStore = _rootStore;
     this.initCalendar();
-
-    // Watch for changes in startOfWeek preference and regenerate calendar
-    reaction(
-      () => this.rootStore.rootStore.user.userProfile.data?.start_of_the_week,
-      () => {
-        // Regenerate calendar when startOfWeek preference changes
-        this.regenerateCalendar();
-      }
-    );
   }
 
   get allWeeksOfActiveMonth() {
@@ -89,11 +79,10 @@ export class CalendarStore implements ICalendarStore {
 
     const { activeMonthDate } = this.calendarFilters;
 
-    const year = activeMonthDate.getFullYear();
-    const month = activeMonthDate.getMonth();
+    const { jy: year, jm: month } = persianCalendarDate(activeMonthDate);
 
     // Get the weeks for the current month
-    const weeks = this.calendarPayload[`y-${year}`][`m-${month}`];
+    const weeks = this.calendarPayload[`y-${year}`]?.[`m-${month}`];
 
     // If no weeks exist, return undefined
     if (!weeks) return undefined;
@@ -115,16 +104,16 @@ export class CalendarStore implements ICalendarStore {
   }
 
   get activeWeekNumber() {
-    return getWeekNumberOfDate(this.calendarFilters.activeWeekDate);
+    const { jy, jm, jd } = persianCalendarDate(this.calendarFilters.activeWeekDate);
+    const firstWeekday = (gregorianDate(jy, jm, 1).getDay() + 1) % 7;
+    return Math.floor((jd - 1 + firstWeekday) / 7);
   }
 
   get allDaysOfActiveWeek() {
     if (!this.calendarPayload) return undefined;
 
     const { activeWeekDate } = this.calendarFilters;
-    const year = activeWeekDate.getFullYear();
-    const month = activeWeekDate.getMonth();
-    const dayOfMonth = activeWeekDate.getDate();
+    const { jy: year, jm: month, jd: dayOfMonth } = persianCalendarDate(activeWeekDate);
 
     // Check if calendar data exists for this year and month
     const yearData = this.calendarPayload[`y-${year}`];
@@ -133,19 +122,9 @@ export class CalendarStore implements ICalendarStore {
     const monthData = yearData[`m-${month}`];
     if (!monthData) return undefined;
 
-    // Calculate firstDayOfMonth offset (same logic as calendar generation)
-    const startOfWeek = this.rootStore?.rootStore?.user?.userProfile?.data?.start_of_the_week ?? EStartOfTheWeek.SUNDAY;
-    const firstDayOfMonthRaw = new Date(year, month, 1).getDay();
-    const firstDayOfMonth = (firstDayOfMonthRaw - startOfWeek + 7) % 7;
-
-    // Calculate which sequential week this date falls into
-    const weekIndex = Math.floor((dayOfMonth - 1 + firstDayOfMonth) / 7);
-
-    const weekKey = `w-${weekIndex}`;
-    if (!(weekKey in monthData)) {
-      return undefined;
-    }
-    return monthData[weekKey];
+    return Object.values(monthData).find((week) =>
+      Object.values(week).some((day) => day.is_current_month && day.day === dayOfMonth)
+    );
   }
 
   getStartAndEndDate = computedFn((layout: "week" | "month") => {
@@ -181,32 +160,22 @@ export class CalendarStore implements ICalendarStore {
     if (!this.calendarPayload) return null;
 
     const nextDate = new Date(date);
-    const startOfWeek = this.rootStore.rootStore.user.userProfile.data?.start_of_the_week ?? EStartOfTheWeek.SUNDAY;
-
     runInAction(() => {
-      this.calendarPayload = generateCalendarData(this.calendarPayload, nextDate, startOfWeek);
+      this.calendarPayload = generatePersianCalendarData(this.calendarPayload, nextDate);
     });
   };
 
   initCalendar = () => {
-    const startOfWeek = this.rootStore.rootStore.user.userProfile.data?.start_of_the_week ?? EStartOfTheWeek.SUNDAY;
-    const newCalendarPayload = generateCalendarData(null, new Date(), startOfWeek);
+    const newCalendarPayload = generatePersianCalendarData(null, new Date());
 
     runInAction(() => {
       this.calendarPayload = newCalendarPayload;
     });
   };
 
-  /**
-   * Force complete regeneration of calendar data
-   * This should be called when startOfWeek preference changes
-   */
   regenerateCalendar = () => {
-    const startOfWeek = this.rootStore.rootStore.user.userProfile.data?.start_of_the_week ?? EStartOfTheWeek.SUNDAY;
     const { activeMonthDate } = this.calendarFilters;
-
-    // Force complete regeneration by passing null to clear all cached data
-    const newCalendarPayload = generateCalendarData(null, activeMonthDate, startOfWeek);
+    const newCalendarPayload = generatePersianCalendarData(null, activeMonthDate);
 
     runInAction(() => {
       this.calendarPayload = newCalendarPayload;

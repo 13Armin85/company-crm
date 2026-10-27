@@ -3,8 +3,8 @@ import { Button, PageHeader } from "../components";
 import { EngineRecordForm } from "./record-form";
 
 const pages: Record<string, { title: string; path: string }> = {
-  ticket: { title: "کار پروژه", path: "/issues" },
-  task: { title: "وظیفه", path: "/my-work" },
+  ticket: { title: "کار", path: "/issues" },
+  task: { title: "کار", path: "/my-work" },
   project: { title: "پروژه", path: "/projects" },
   leave: { title: "عدم حضور", path: "/absences" },
 };

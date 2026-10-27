@@ -33,6 +33,12 @@ from plane.db.models import (
     FormLayout,
 )
 from .access_control import has_permission
+from .surface_designer import (
+    designer_schema,
+    LOCK_REASON,
+    MAX_TABLE_TABS,
+    MAX_TAB_TITLE,
+)
 from .entity_schema import (
     field_dict,
     schema_fields,
@@ -79,10 +85,10 @@ SURFACES = {
         ],
     },
     "task": {
-        "title": "وظایف و کارهای من",
+        "title": "کارهای من",
         "path": "/my-work",
         "permission": "Issue.View",
-        "engine": "task",
+        "engine": "ticket",
         "columns": [
             "عنوان کار",
             "شناسه",
@@ -120,7 +126,7 @@ SURFACES = {
             native("email", "ایمیل", "email", True, True),
             native("username", "نام کاربری", required=True, locked=True),
             native("password", "رمز عبور اولیه", required=True, locked=True),
-            native("role_ids", "نقش‌ها", "role", aliases=("نقش‌های سازمانی",)),
+            native("role_ids", "نقش‌ها", "role", locked=True, aliases=("نقش‌های سازمانی",)),
             native("unit_ids", "واحدهای سازمانی", "unit", aliases=("واحدها",)),
             native("is_active", "عضویت فعال در این شرکت", "boolean"),
         ],
@@ -269,6 +275,8 @@ SURFACES = {
     },
 }
 
+DESIGNABLE_SURFACES = {"ticket", "project", "task", "leave", "users", "roles", "units", "routing", "cycles"}
+
 WRITE_PERMISSIONS = {
     "users": {"POST": ("User.Create",), "PATCH": ("User.Edit",)},
     "roles": {"POST": ("Role.Create",), "PATCH": ("Role.Edit",)},
@@ -303,10 +311,10 @@ def allowed(request, workspace, code, manage=False, records=False):
     spec = SURFACES[code]
     if spec["permission"] == "self" and not manage:
         return
-    permissions = ["FormLayout.Edit"] if manage else [spec["permission"]]
+    permissions = ["FormDesigner.Publish"] if manage else [spec["permission"]]
     if not manage and not records:
         permissions += [
-            "FormLayout.Edit",
+            "FormDesigner.Publish",
             *{p for grants in WRITE_PERMISSIONS.get(code, {}).values() for p in grants},
         ]
     if code == "exceptions" and not manage:
@@ -318,7 +326,10 @@ def allowed(request, workspace, code, manage=False, records=False):
 
 
 def configuration(workspace, code):
-    row = SurfaceConfiguration.objects.filter(workspace=workspace, code=code).first()
+    # Both work pages share the same table tabs and fields after unification.
+    row = SurfaceConfiguration.objects.filter(
+        workspace=workspace, code="ticket" if code == "task" else code
+    ).first()
     definition = deepcopy(row.definition) if row else {}
     definition.setdefault("native", {})
     definition.setdefault("fields", [])
@@ -365,7 +376,7 @@ def surface_schema(workspace, code, user):
     fields = {
         key: field
         for key, field in fields.items()
-        if can_field(field, roles) and not field["config"].get("hidden")
+        if can_field(field, roles) and not field["config"].get("hidden") and not field["hidden_from_form"]
     }
     engine_fields = []
     form_definition = None
@@ -374,7 +385,7 @@ def surface_schema(workspace, code, user):
             workspace=workspace, code=spec["engine"], parent__isnull=True
         ).first()
         if entity:
-            if has_permission(user, workspace, "FormLayout.Edit"):
+            if has_permission(user, workspace, "FormDesigner.Publish"):
                 form = (
                     FormLayout.objects.filter(entity=entity)
                     .select_related("published")
@@ -392,19 +403,6 @@ def surface_schema(workspace, code, user):
                 {**f, "options_surface": entity.code}
                 for f in present_schema(entity, user)["fields"]
             ]
-            if code in {"task", "ticket"}:
-                other = EntityType.objects.filter(
-                    workspace=workspace,
-                    code="ticket" if code == "task" else "task",
-                    parent__isnull=True,
-                ).first()
-                if other:
-                    seen = {f["code"] for f in engine_fields}
-                    engine_fields += [
-                        {**f, "options_surface": other.code}
-                        for f in present_schema(other, user)["fields"]
-                        if f["code"] not in seen
-                    ]
     defaults = {}
     user._engine_workspace = workspace
     for field in fields.values():
@@ -422,11 +420,16 @@ def surface_schema(workspace, code, user):
         "revision": row.revision if row else 0,
         "definition": definition,
         "native_fields": [
-            {**f, **definition["native"].get(f["code"], {})}
+            {
+                **f,
+                **definition["native"].get(f["code"], {}),
+                "lock_reason": LOCK_REASON if f["locked"] else "",
+            }
             for f in spec.get("native", [])
         ],
         "native_columns": spec["columns"],
         "engine_fields": engine_fields,
+        "designer": designer_schema(workspace, spec.get("engine") or code, user, engine_fields),
         "schema": {
             "entity": code,
             "time_zone": timezone.get_current_timezone_name(),
@@ -521,18 +524,12 @@ def validate_definition(workspace, code, definition):
     engine_codes = set()
     if SURFACES[code].get("engine"):
         entity = EntityType.objects.filter(
-            workspace=workspace, code=code, parent__isnull=True
+            workspace=workspace,
+            code=SURFACES[code]["engine"],
+            parent__isnull=True,
         ).first()
         if entity:
             engine_codes = set(schema_fields(entity)[1])
-            if code in {"task", "ticket"}:
-                other = EntityType.objects.filter(
-                    workspace=workspace,
-                    code="ticket" if code == "task" else "task",
-                    parent__isnull=True,
-                ).first()
-                if other:
-                    engine_codes |= set(schema_fields(other)[1])
     choices = (
         {f"native:{title}" for title in SURFACES[code]["columns"]}
         | {f"field:{f}" for f in fields}
@@ -541,11 +538,7 @@ def validate_definition(workspace, code, definition):
     if SURFACES[code].get("engine"):
         roots = EntityType.objects.filter(
             workspace=workspace,
-            code__in=(
-                [code, "ticket" if code == "task" else "task"]
-                if code in {"ticket", "task"}
-                else [code]
-            ),
+            code=SURFACES[code]["engine"],
             parent__isnull=True,
         )
         for root in roots:
@@ -563,12 +556,35 @@ def validate_definition(workspace, code, definition):
     if SURFACES[code]["columns"] and not columns:
         raise ValidationError("حداقل یک ستون برای جدول انتخاب کنید.")
     tabs = definition.setdefault("table_tabs", [])
-    if not isinstance(tabs, list) or len(tabs) > 20:
+    if not isinstance(tabs, list) or len(tabs) > MAX_TABLE_TABS:
         raise ValidationError("حداکثر بیست تب جدول مجاز است.")
     if tabs and not SURFACES[code]["columns"]:
         raise ValidationError("این صفحه جدول ندارد.")
-    identifiers = set()
-    for tab in tabs:
+    identifiers, titles = set(), set()
+    for index, tab in enumerate(tabs):
+        error_key = f"table_tabs.{index}"
+        if not isinstance(tab, dict):
+            raise ValidationError({error_key: "اطلاعات تب جدول معتبر نیست."})
+        if not isinstance(tab.get("title"), str) or not tab["title"].strip():
+            raise ValidationError(
+                {
+                    f"{error_key}.title": "نام تب را وارد کنید؛ نام تب نمی‌تواند خالی باشد."
+                }
+            )
+        if len(tab["title"]) > MAX_TAB_TITLE:
+            raise ValidationError({f"{error_key}.title": "نام تب حداکثر ۸۰ نویسه است."})
+        if tab["title"].strip().casefold() in titles:
+            raise ValidationError(
+                {
+                    f"{error_key}.title": "نام تب تکراری است؛ برای هر تب نام متفاوتی انتخاب کنید."
+                }
+            )
+        if not tab.get("columns"):
+            raise ValidationError(
+                {
+                    f"{error_key}.columns": f"برای تب «{tab['title']}» حداقل یک ستون انتخاب کنید."
+                }
+            )
         if (
             not isinstance(tab, dict)
             or set(tab) != {"id", "title", "columns"}
@@ -577,7 +593,7 @@ def validate_definition(workspace, code, definition):
             or tab["id"] in identifiers
             or not isinstance(tab["title"], str)
             or not tab["title"].strip()
-            or len(tab["title"]) > 80
+            or len(tab["title"]) > MAX_TAB_TITLE
             or not isinstance(tab["columns"], list)
             or not tab["columns"]
             or any(not isinstance(c, str) or c not in choices for c in tab["columns"])
@@ -586,6 +602,7 @@ def validate_definition(workspace, code, definition):
             raise ValidationError("نام، شناسه یا ستون‌های تب جدول معتبر نیست.")
         tab["title"] = tab["title"].strip()
         identifiers.add(tab["id"])
+        titles.add(tab["title"].casefold())
     return definition
 
 
@@ -739,13 +756,14 @@ def prepare_surface_request(request):
     request.user._engine_workspace = workspace
     context = SimpleNamespace(workspace=workspace, code=code)
     for key, field in fields.items():
-        if creating and key not in values:
+        if creating and key not in values and not field["hidden_from_form"]:
             values[key] = default_value(field, request.user)
         if key not in submitted:
             continue
         raw = submitted[key]
         if (
             not can_field(field, roles, edit=True)
+            or field["hidden_from_form"]
             or field["config"].get("hidden")
             or field["config"].get("readonly")
             or field["kind"] == "computed"
@@ -768,6 +786,7 @@ def prepare_surface_request(request):
         config, value = field["config"], values.get(key)
         hidden = (
             config.get("hidden")
+            or field["hidden_from_form"]
             or not can_field(field, roles)
             or not condition(config.get("visible_if"), values, fields)
         )
@@ -934,7 +953,7 @@ def read_values(request, workspace, code, identifiers):
     if code in {"task", "ticket"}:
         result = {}
         for entity in EntityType.objects.filter(
-            workspace=workspace, code__in=["task", "ticket"], parent__isnull=True
+            workspace=workspace, code="ticket", parent__isnull=True
         ):
             rows = list(
                 native_queryset(entity, request.user, request).filter(

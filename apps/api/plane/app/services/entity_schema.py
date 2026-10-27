@@ -33,12 +33,37 @@ schema_request_cache = ContextVar("entity_schema_request_cache", default=None)
 
 
 SOURCE_FIELDS = {
-    "ticket": {"name", "description_html", "target_date", "priority", "state_id", "project_id", "assignee_ids"},
+    "user": {"display_name", "username", "email", "password", "role_ids"},
+    "unit": {"title"},
+    "ticket": {
+        "name",
+        "description_html",
+        "target_date",
+        "priority",
+        "state_id",
+        "work_status",
+        "project_id",
+        "assignee_ids",
+    },
     "task": {"name", "target_date", "priority", "status", "assignee_id"},
     "project": {"name", "description", "target_date", "project_lead_id"},
     "leave": {"reason", "user_id", "starts_at", "ends_at", "status"},
 }
+MANDATORY_SOURCES = {
+    "user": {"display_name", "username", "email", "password", "role_ids"},
+    "unit": {"title"},
+    "ticket": {"name"},
+    "task": {"name", "assignee_id"},
+    "project": {"name"},
+    "leave": {"user_id", "starts_at", "ends_at"},
+}
 SOURCE_KINDS = {
+    "display_name": {"short_text"},
+    "username": {"short_text"},
+    "email": {"email"},
+    "password": {"short_text"},
+    "role_ids": {"role"},
+    "title": {"short_text"},
     "name": {"short_text"},
     "description": {"long_text", "rich_text"},
     "description_html": {"rich_text"},
@@ -46,6 +71,7 @@ SOURCE_KINDS = {
     "priority": {"select"},
     "status": {"select"},
     "state_id": {"select"},
+    "work_status": {"select"},
     "project_id": {"relation"},
     "assignee_id": {"user"},
     "assignee_ids": {"user"},
@@ -64,6 +90,7 @@ DISPLAY_SETTINGS = {
     "filterable",
     "table_visible",
     "is_active",
+    "hidden_from_form",
 }
 
 
@@ -77,15 +104,25 @@ def field_dict(field):
         "placeholder": field.placeholder,
         "config": deepcopy(field.config),
         "lookup": field.lookup.code if field.lookup_id else None,
-        "relation_entity": field.relation_entity.code if field.relation_entity_id else None,
+        "relation_entity": (
+            field.relation_entity.code if field.relation_entity_id else None
+        ),
         "is_active": field.is_active,
+        "hidden_from_form": field.hidden_from_form,
         "used": field.used_at is not None,
-        **{key: getattr(field, key) for key in ("show_in_summary", "searchable", "filterable", "table_visible")},
+        **{
+            key: getattr(field, key)
+            for key in ("show_in_summary", "searchable", "filterable", "table_visible")
+        },
     }
 
 
 def bindings(layout):
-    return [binding for section in layout.get("sections", []) for binding in section.get("bindings", [])]
+    return [
+        binding
+        for section in layout.get("sections", [])
+        for binding in section.get("bindings", [])
+    ]
 
 
 def validate_field_config(kind, config):
@@ -93,7 +130,14 @@ def validate_field_config(kind, config):
         raise ValidationError("نوع یا تنظیمات فیلد معتبر نیست.")
     if config.get("regex"):
         validate_regex(config["regex"])
-    for key in ("required", "hidden", "readonly", "editable_after_create", "unique", "multiple"):
+    for key in (
+        "required",
+        "hidden",
+        "readonly",
+        "editable_after_create",
+        "unique",
+        "multiple",
+    ):
         if key in config and not isinstance(config[key], bool):
             raise ValidationError({key: "تنظیم رفتاری باید بله/خیر باشد."})
     for key in ("min_length", "max_length", "max_file_size", "stars"):
@@ -102,13 +146,18 @@ def validate_field_config(kind, config):
     for key in ("min", "max"):
         if key in config:
             try:
-                if isinstance(config[key], bool) or not Decimal(str(config[key])).is_finite():
+                if (
+                    isinstance(config[key], bool)
+                    or not Decimal(str(config[key])).is_finite()
+                ):
                     raise ValueError()
             except (ValueError, InvalidOperation):
                 raise ValidationError({key: "حد عددی معتبر وارد کنید."})
     if "extensions" in config and (
         not isinstance(config["extensions"], list)
-        or any(not isinstance(v, str) or not v or len(v) > 15 for v in config["extensions"])
+        or any(
+            not isinstance(v, str) or not v or len(v) > 15 for v in config["extensions"]
+        )
     ):
         raise ValidationError("پسوند فایل‌ها باید یک فهرست معتبر باشد.")
     if "stars" in config and not 1 <= config["stars"] <= 10:
@@ -125,7 +174,9 @@ def validate_field_config(kind, config):
     if config.get("default_dynamic") not in {None, "", "today", "current_user", "now"}:
         raise ValidationError("مقدار پیش‌فرض پویا معتبر نیست.")
     value = config.get("default")
-    dynamic = config.get("default_dynamic") or (value.get("dynamic") if isinstance(value, dict) else None)
+    dynamic = config.get("default_dynamic") or (
+        value.get("dynamic") if isinstance(value, dict) else None
+    )
     allowed = {
         "current_user": {"user", "short_text", "long_text"},
         "today": {"date", "date_range", "datetime", "short_text", "long_text"},
@@ -138,11 +189,17 @@ def validate_field_config(kind, config):
 
 
 def validate_layout(entity, layout):
-    if not isinstance(layout, dict) or not isinstance(layout.get("sections"), list) or len(layout["sections"]) > 60:
+    if (
+        not isinstance(layout, dict)
+        or not isinstance(layout.get("sections"), list)
+        or len(layout["sections"]) > 60
+    ):
         raise ValidationError("چیدمان باید شامل حداکثر شصت بخش باشد.")
     all_fields = {
         f.code: f
-        for f in FieldDefinition.objects.filter(workspace=entity.workspace).select_related("lookup", "relation_entity")
+        for f in FieldDefinition.objects.filter(
+            workspace=entity.workspace
+        ).select_related("lookup", "relation_entity")
     }
     root = entity.parent or entity
     parent_layout = published_layout(root) if entity.parent_id else {"sections": []}
@@ -153,33 +210,86 @@ def validate_layout(entity, layout):
     if (
         not isinstance(tabs, list)
         or len(tabs) > 20
-        or any(not isinstance(t, dict) or not t.get("id") or not t.get("title") for t in tabs)
+        or any(
+            not isinstance(t, dict) or not t.get("id") or not t.get("title")
+            for t in tabs
+        )
     ):
         raise ValidationError("تب‌های فرم معتبر نیستند.")
     tab_ids = {t["id"] for t in tabs}
     if len(tab_ids) != len(tabs):
         raise ValidationError("شناسه تب تکراری است.")
     for section in layout["sections"]:
-        if not isinstance(section, dict) or not section.get("id") or section["id"] in section_ids:
+        if (
+            not isinstance(section, dict)
+            or not section.get("id")
+            or section["id"] in section_ids
+        ):
             raise ValidationError("شناسه بخش خالی یا تکراری است.")
         section_ids.add(section["id"])
-        if section.get("columns", 1) not in {1, 2, 3} or section.get("tab") and section["tab"] not in tab_ids:
+        if (
+            section.get("columns", 1) not in {1, 2, 3}
+            or section.get("tab")
+            and section["tab"] not in tab_ids
+        ):
             raise ValidationError("تعداد ستون یا تب بخش معتبر نیست.")
-        if not isinstance(section.get("bindings"), list) or len(section["bindings"]) > 200:
+        if (
+            not isinstance(section.get("bindings"), list)
+            or len(section["bindings"]) > 200
+        ):
             raise ValidationError("فهرست اتصال‌های بخش معتبر نیست.")
         for binding in section["bindings"]:
             if not isinstance(binding, dict) or binding.get("field") not in all_fields:
-                raise ValidationError("فیلد اتصال باید از کتابخانه همین فضای کاری انتخاب شود.")
+                raise ValidationError(
+                    "فیلد اتصال باید از کتابخانه همین فضای کاری انتخاب شود."
+                )
             code = binding["field"]
             if code in seen or code in inherited:
-                raise ValidationError({code: "فیلد مشترک یا اتصال تکراری است؛ فیلد مشترک را در فرم اصلی ویرایش کنید."})
+                raise ValidationError(
+                    {
+                        code: "فیلد مشترک یا اتصال تکراری است؛ فیلد مشترک را در فرم اصلی ویرایش کنید."
+                    }
+                )
             seen.add(code)
-            if binding.get("source") and binding["source"] not in SOURCE_FIELDS.get(root.adapter, set()):
+            if "title" in binding and (
+                not isinstance(binding["title"], str)
+                or not binding["title"].strip()
+                or len(binding["title"]) > 255
+            ):
+                raise ValidationError({code: "نام فیلد باید بین یک تا ۲۵۵ نویسه باشد."})
+            if code == root.title_field and (
+                all_fields[code].hidden_from_form
+                or binding.get("hidden", all_fields[code].config.get("hidden", False))
+            ):
+                raise ValidationError(
+                    {code: "فیلد عنوان هسته‌ای قفل است و مخفی نمی‌شود."}
+                )
+            if binding.get("source") in MANDATORY_SOURCES.get(root.adapter, set()) and (
+                all_fields[code].hidden_from_form
+                or binding.get("hidden", all_fields[code].config.get("hidden", False))
+                or binding.get(
+                    "required", all_fields[code].config.get("required", False)
+                )
+                is False
+            ):
+                raise ValidationError(
+                    {
+                        code: "این ورودی برای ثبت اطلاعات ضروری است؛ نمایش و الزامی‌بودن آن قابل حذف نیست."
+                    }
+                )
+            if binding.get("source") and binding["source"] not in SOURCE_FIELDS.get(
+                root.adapter, set()
+            ):
                 raise ValidationError({code: "اتصال به ستون سیستمی مجاز نیست."})
             if binding.get("source"):
                 source = binding["source"]
-                if source in sources or all_fields[code].kind not in SOURCE_KINDS[source]:
-                    raise ValidationError({code: "اتصال سیستمی تکراری یا با نوع فیلد ناسازگار است."})
+                if (
+                    source in sources
+                    or all_fields[code].kind not in SOURCE_KINDS[source]
+                ):
+                    raise ValidationError(
+                        {code: "اتصال سیستمی تکراری یا با نوع فیلد ناسازگار است."}
+                    )
                 sources.add(source)
             for role_key in ("view_roles", "edit_roles"):
                 roles = binding.get(role_key)
@@ -193,39 +303,47 @@ def validate_layout(entity, layout):
                     if OrganizationRole.objects.filter(
                         workspace=entity.workspace, id__in=role_ids, is_active=True
                     ).count() != len(role_ids):
-                        raise ValidationError("نقش باید فعال و متعلق به همین فضای کاری باشد.")
+                        raise ValidationError(
+                            "نقش باید فعال و متعلق به همین فضای کاری باشد."
+                        )
             for key in ("required", "hidden", "readonly", "editable_after_create"):
                 if key in binding and not isinstance(binding[key], bool):
                     raise ValidationError({code: "تنظیم رفتاری باید بله/خیر باشد."})
-    fields = {code: field_dict(field) for code, field in all_fields.items() if code in seen | inherited}
-    mandatory = {
-        "ticket": {"name", "project_id"},
-        "task": {"name", "assignee_id"},
-        "project": {"name"},
-        "leave": {"user_id", "starts_at", "ends_at"},
+    fields = {
+        code: field_dict(field)
+        for code, field in all_fields.items()
+        if code in seen | inherited
     }
-    if root.adapter and not mandatory[root.adapter].issubset(sources):
+    if root.adapter and not MANDATORY_SOURCES[root.adapter].issubset(sources):
         raise ValidationError(
             "فیلدهای اصلی لازم برای ثبت رکورد سیستمی نباید از فرم حذف شوند؛ برای جابه‌جایی آن‌ها اتصال را حفظ کنید."
         )
     if root.title_field not in fields:
-        raise ValidationError("فیلد عنوان رکورد باید در فرم مشترک موجودیت وجود داشته باشد.")
+        raise ValidationError(
+            "فیلد عنوان رکورد باید در فرم مشترک موجودیت وجود داشته باشد."
+        )
     for binding in bindings(layout) + bindings(parent_layout):
         config = fields[binding["field"]]["config"]
         if "default" in binding:
             validate_field_config(
-                fields[binding["field"]]["kind"], {**config, "default_dynamic": "", "default": binding["default"]}
+                fields[binding["field"]]["kind"],
+                {**config, "default_dynamic": "", "default": binding["default"]},
             )
-            if not (isinstance(binding["default"], dict) and "dynamic" in binding["default"]):
+            if not (
+                isinstance(binding["default"], dict) and "dynamic" in binding["default"]
+            ):
                 binding["default"] = normalize(
-                    {"kind": fields[binding["field"]]["kind"], "config": config}, binding["default"]
+                    {"kind": fields[binding["field"]]["kind"], "config": config},
+                    binding["default"],
                 )
         for key in ("required_if", "visible_if"):
             validate_condition(binding.get(key, config.get(key)), fields)
         dependency = config.get("depends_on")
         if dependency and dependency not in fields:
             raise ValidationError("فیلد والد لیست وابسته در فرم وجود ندارد.")
-        if config.get("formula") and not formula_fields(config["formula"]).issubset(fields):
+        if config.get("formula") and not formula_fields(config["formula"]).issubset(
+            fields
+        ):
             raise ValidationError("فیلد مرجع فرمول در فرم وجود ندارد.")
     # Dependency validation without evaluating arbitrary expressions or requiring sample dates.
     pending, complete = set(), set()
@@ -237,7 +355,9 @@ def validate_layout(entity, layout):
             return
         pending.add(code)
         config = fields[code]["config"]
-        for dependency in formula_fields(config["formula"]) if config.get("formula") else []:
+        for dependency in (
+            formula_fields(config["formula"]) if config.get("formula") else []
+        ):
             visit(dependency)
         pending.remove(code)
         complete.add(code)
@@ -249,12 +369,18 @@ def validate_layout(entity, layout):
 
 def published_layout(entity):
     form = FormLayout.objects.filter(entity=entity).select_related("published").first()
-    return deepcopy(form.published.schema) if form and form.published_id else {"tabs": [], "sections": []}
+    return (
+        deepcopy(form.published.schema)
+        if form and form.published_id
+        else {"tabs": [], "sections": []}
+    )
 
 
 def effective_layout(entity, subtype=None, draft=False):
     def get_layout(item):
-        form = FormLayout.objects.filter(entity=item).select_related("published").first()
+        form = (
+            FormLayout.objects.filter(entity=item).select_related("published").first()
+        )
         return (
             deepcopy(form.draft if draft else form.published.schema)
             if form and (draft or form.published_id)
@@ -266,7 +392,9 @@ def effective_layout(entity, subtype=None, draft=False):
         extra = get_layout(subtype)
         result["sections"] = result.get("sections", []) + extra.get("sections", [])
         existing = {t["id"] for t in result.get("tabs", [])}
-        result["tabs"] = result.get("tabs", []) + [t for t in extra.get("tabs", []) if t["id"] not in existing]
+        result["tabs"] = result.get("tabs", []) + [
+            t for t in extra.get("tabs", []) if t["id"] not in existing
+        ]
     return result
 
 
@@ -279,9 +407,9 @@ def schema_fields(entity, subtype=None, draft=False):
     codes = [binding["field"] for binding in bindings(layout)]
     library = {
         field.code: field_dict(field)
-        for field in FieldDefinition.objects.filter(workspace=entity.workspace, code__in=codes).select_related(
-            "lookup", "relation_entity"
-        )
+        for field in FieldDefinition.objects.filter(
+            workspace=entity.workspace, code__in=codes
+        ).select_related("lookup", "relation_entity")
     }
     result = {}
     for binding in bindings(layout):
@@ -290,7 +418,22 @@ def schema_fields(entity, subtype=None, draft=False):
             continue
         field = deepcopy(library[code])
         field["binding"] = binding
-        for key in ("required", "hidden", "readonly", "default", "required_if", "visible_if", "editable_after_create"):
+        if (entity.parent or entity).adapter == "user" and binding.get(
+            "source"
+        ) == "password":
+            field["config"]["secret"] = True
+            field["table_visible"] = False
+            field["searchable"] = False
+            field["filterable"] = False
+        for key in (
+            "required",
+            "hidden",
+            "readonly",
+            "default",
+            "required_if",
+            "visible_if",
+            "editable_after_create",
+        ):
             if key in binding:
                 field["config"][key] = binding[key]
         if "default" in binding:
@@ -299,6 +442,8 @@ def schema_fields(entity, subtype=None, draft=False):
             field["config"].pop("required_if", None)
         if binding.get("title"):
             field["title"] = binding["title"]
+        if field["hidden_from_form"]:
+            field["config"]["readonly"] = True
         result[code] = field
     if cache is not None:
         cache[cache_key] = deepcopy((layout, result))
@@ -342,23 +487,34 @@ def present_schema(entity, user, subtype=None, values=None, draft=False, stage="
         for code, field in fields.items()
         if can_field(field, roles)
         and not field["config"].get("hidden")
+        and not field["hidden_from_form"]
         and (not field["binding"].get("stage") or field["binding"]["stage"] == stage)
     }
     permitted = {}
     for code, field in fields.items():
         if code not in visible:
             continue
+        from .entity_lookups import lookup_allowed
+
+        if not lookup_allowed(entity, user, field):
+            continue
         config = field["config"]
-        restricted_formula = config.get("formula") and not formula_fields(config["formula"]).issubset(visible)
+        restricted_formula = config.get("formula") and not formula_fields(
+            config["formula"]
+        ).issubset(visible)
         if restricted_formula:
             continue
         for key in ("required_if", "visible_if"):
             rule = config.get(key)
             if rule and not condition_fields(rule).issubset(visible):
-                config["required" if key == "required_if" else "effective_visible"] = condition(rule, values, fields)
+                config["required" if key == "required_if" else "effective_visible"] = (
+                    condition(rule, values, fields)
+                )
                 config.pop(key)
         config["readonly"] = (
-            config.get("readonly", False) or not can_field(field, roles, edit=True) or field["kind"] == "computed"
+            config.get("readonly", False)
+            or not can_field(field, roles, edit=True)
+            or field["kind"] == "computed"
         )
         field["binding"].pop("view_roles", None)
         field["binding"].pop("edit_roles", None)
@@ -366,7 +522,14 @@ def present_schema(entity, user, subtype=None, values=None, draft=False, stage="
             config["hidden"] = True
         permitted[code] = field
     layout["sections"] = [
-        {**section, "bindings": [{"field": b["field"]} for b in section["bindings"] if b["field"] in permitted]}
+        {
+            **section,
+            "bindings": [
+                {"field": b["field"]}
+                for b in section["bindings"]
+                if b["field"] in permitted
+            ],
+        }
         for section in layout.get("sections", [])
     ]
     return {
@@ -384,7 +547,9 @@ def present_schema(entity, user, subtype=None, values=None, draft=False, stage="
 def initialize_engine(workspace):
     """Explicit idempotent bootstrap for existing/new workspaces, never a read-time write."""
     priority, _ = LookupCategory.objects.get_or_create(
-        workspace=workspace, code="priority", defaults={"title": "اولویت", "is_system": True}
+        workspace=workspace,
+        code="priority",
+        defaults={"title": "اولویت", "is_system": True},
     )
     for pos, (code, title, color) in enumerate(
         (
@@ -396,10 +561,14 @@ def initialize_engine(workspace):
         )
     ):
         LookupValue.objects.get_or_create(
-            category=priority, code=code, defaults={"title": title, "color": color, "position": pos}
+            category=priority,
+            code=code,
+            defaults={"title": title, "color": color, "position": pos},
         )
     statuses, _ = LookupCategory.objects.get_or_create(
-        workspace=workspace, code="task-status", defaults={"title": "وضعیت وظیفه", "is_system": True}
+        workspace=workspace,
+        code="task-status",
+        defaults={"title": "وضعیت وظیفه", "is_system": True},
     )
     for pos, (code, title) in enumerate(
         (
@@ -410,43 +579,74 @@ def initialize_engine(workspace):
             ("blocked", "مسدود"),
         )
     ):
-        LookupValue.objects.get_or_create(category=statuses, code=code, defaults={"title": title, "position": pos})
+        LookupValue.objects.get_or_create(
+            category=statuses, code=code, defaults={"title": title, "position": pos}
+        )
     leave_types, _ = LookupCategory.objects.get_or_create(
-        workspace=workspace, code="leave-type", defaults={"title": "نوع مرخصی", "is_system": True}
+        workspace=workspace,
+        code="leave-type",
+        defaults={"title": "نوع مرخصی", "is_system": True},
     )
-    for pos, (code, title) in enumerate((("annual", "استحقاقی"), ("sick", "استعلاجی"), ("unpaid", "بدون حقوق"))):
-        LookupValue.objects.get_or_create(category=leave_types, code=code, defaults={"title": title, "position": pos})
+    for pos, (code, title) in enumerate(
+        (("annual", "استحقاقی"), ("sick", "استعلاجی"), ("unpaid", "بدون حقوق"))
+    ):
+        LookupValue.objects.get_or_create(
+            category=leave_types, code=code, defaults={"title": title, "position": pos}
+        )
     types = {}
     for code, title, adapter, prefix in (
-        ("ticket", "تیکت", "ticket", "TKT"),
+        ("ticket", "کار", "ticket", "TKT"),
         ("project", "پروژه", "project", "PRJ"),
-        ("task", "وظیفه", "task", "TSK"),
         ("leave", "درخواست مرخصی", "leave", "LEV"),
+        ("user", "کاربر", "user", "USR"),
+        ("unit", "واحد سازمانی", "unit", "UNT"),
     ):
         permissions = (
             {
-                "view": "Project.View",
-                "view_all": "Project.ViewAll",
-                "create": "Project.Create",
-                "edit": "Project.Edit",
-                "delete": "Project.Delete",
+                "view": "User.View",
+                "view_all": "User.View",
+                "create": "User.Create",
+                "edit": "User.Edit",
+                "delete": "User.Delete",
             }
-            if adapter == "project"
-            else {
-                "view": "Absence.View",
-                "view_all": "Absence.ManageAll",
-                "create": "Absence.Create",
-                "edit": "Absence.Edit",
-                "delete": "Absence.End",
-            }
-            if adapter == "leave"
-            else {
-                "view": "Issue.View",
-                "view_all": "Issue.ViewAll",
-                "create": "Issue.Create",
-                "edit": "Issue.Edit",
-                "delete": "Issue.Delete",
-            }
+            if adapter == "user"
+            else (
+                {
+                    "view": "OrganizationUnit.View",
+                    "view_all": "OrganizationUnit.View",
+                    "create": "OrganizationUnit.Create",
+                    "edit": "OrganizationUnit.Edit",
+                    "delete": "OrganizationUnit.Delete",
+                }
+                if adapter == "unit"
+                else (
+                    {
+                        "view": "Project.View",
+                        "view_all": "Project.ViewAll",
+                        "create": "Project.Create",
+                        "edit": "Project.Edit",
+                        "delete": "Project.Delete",
+                    }
+                    if adapter == "project"
+                    else (
+                        {
+                            "view": "Absence.View",
+                            "view_all": "Absence.ManageAll",
+                            "create": "Absence.Create",
+                            "edit": "Absence.Edit",
+                            "delete": "Absence.End",
+                        }
+                        if adapter == "leave"
+                        else {
+                            "view": "Issue.View",
+                            "view_all": "Issue.ViewAll",
+                            "create": "Issue.Create",
+                            "edit": "Issue.Edit",
+                            "delete": "Issue.Delete",
+                        }
+                    )
+                )
+            )
         )
         types[code], _ = EntityType.objects.get_or_create(
             workspace=workspace,
@@ -454,23 +654,72 @@ def initialize_engine(workspace):
             defaults={
                 "title": title,
                 "adapter": adapter,
-                "numbering": {"prefix": prefix, "padding": 5},
+                "numbering": {"prefix": "TT" if code == "ticket" else prefix, "padding": 0 if code == "ticket" else 5},
                 "record_permissions": permissions,
-                "title_field": "reason" if adapter == "leave" else "title",
+                "title_field": (
+                    "reason"
+                    if adapter == "leave"
+                    else (
+                        "user_name"
+                        if adapter == "user"
+                        else "unit_title" if adapter == "unit" else "title"
+                    )
+                ),
             },
         )
     definitions = [
-        ("title", "عنوان", "short_text", {"required": True, "max_length": 255}, None, None),
+        ("user_name", "نام نمایشی", "short_text", {"required": True}, None, None),
+        ("user_username", "نام کاربری", "short_text", {"required": True}, None, None),
+        ("user_email", "ایمیل", "email", {"required": True}, None, None),
+        (
+            "user_password",
+            "رمز عبور اولیه",
+            "short_text",
+            {"required": True, "secret": True, "max_length": 128},
+            None,
+            None,
+        ),
+        ("user_roles", "نقش", "role", {"required": True, "multiple": True}, None, None),
+        ("unit_title", "عنوان واحد", "short_text", {"required": True}, None, None),
+        (
+            "title",
+            "عنوان",
+            "short_text",
+            {"required": True, "max_length": 255},
+            None,
+            None,
+        ),
         ("description", "توضیحات", "long_text", {}, None, None),
         ("rich_description", "توضیحات", "rich_text", {}, None, None),
         ("due_date", "سررسید", "date", {}, None, None),
         ("assignee", "مسئول", "user", {"required": True}, None, None),
         ("project_lead", "مدیر پروژه", "user", {}, None, None),
         ("ticket_assignees", "مسئولان", "user", {"multiple": True}, None, None),
-        ("project", "پروژه", "relation", {"required": True}, None, types["project"]),
-        ("priority", "اولویت", "select", {"default": "medium", "lookup_codes": True}, priority, None),
-        ("task_status", "وضعیت", "select", {"default": "todo", "lookup_codes": True}, statuses, None),
-        ("ticket_state", "وضعیت", "select", {"provider": "project_states", "depends_on": "project"}, None, None),
+        ("project", "پروژه", "relation", {}, None, types["project"]),
+        (
+            "priority",
+            "اولویت",
+            "select",
+            {"default": "medium", "lookup_codes": True},
+            priority,
+            None,
+        ),
+        (
+            "task_status",
+            "وضعیت",
+            "select",
+            {"default": "todo", "lookup_codes": True},
+            statuses,
+            None,
+        ),
+        (
+            "ticket_state",
+            "وضعیت",
+            "select",
+            {"provider": "work_states", "depends_on": "project"},
+            None,
+            None,
+        ),
         ("leave_user", "کاربر", "user", {"required": True}, None, None),
         ("starts_at", "شروع", "datetime", {"required": True}, None, None),
         ("ends_at", "پایان", "datetime", {"required": True}, None, None),
@@ -481,23 +730,30 @@ def initialize_engine(workspace):
         FieldDefinition.objects.get_or_create(
             workspace=workspace,
             code=code,
-            defaults={"title": title, "kind": kind, "config": config, "lookup": lookup, "relation_entity": relation},
+            defaults={
+                "title": title,
+                "kind": kind,
+                "config": config,
+                "lookup": lookup,
+                "relation_entity": relation,
+            },
         )
     maps = {
+        "user": [
+            ("user_name", "display_name"),
+            ("user_username", "username"),
+            ("user_email", "email"),
+            ("user_password", "password"),
+            ("user_roles", "role_ids"),
+        ],
+        "unit": [("unit_title", "title")],
         "ticket": [
             ("title", "name"),
             ("project", "project_id"),
             ("rich_description", "description_html"),
             ("ticket_assignees", "assignee_ids"),
             ("priority", "priority"),
-            ("ticket_state", "state_id"),
-            ("due_date", "target_date"),
-        ],
-        "task": [
-            ("title", "name"),
-            ("assignee", "assignee_id"),
-            ("priority", "priority"),
-            ("task_status", "status"),
+            ("ticket_state", "work_status"),
             ("due_date", "target_date"),
         ],
         "project": [
@@ -523,14 +779,19 @@ def initialize_engine(workspace):
                     "title": "اطلاعات اصلی",
                     "columns": 2,
                     "bindings": [
-                        {"field": field, **({"source": source} if source else {})} for field, source in mapping
+                        {"field": field, **({"source": source} if source else {})}
+                        for field, source in mapping
                     ],
                 }
             ],
         }
-        form, created = FormLayout.objects.get_or_create(entity=types[code], defaults={"draft": layout})
+        form, created = FormLayout.objects.get_or_create(
+            entity=types[code], defaults={"draft": layout}
+        )
         if created:
-            version = FormVersion.objects.create(layout=form, number=1, schema=layout, change_note="فرم پیش‌فرض سیستم")
+            version = FormVersion.objects.create(
+                layout=form, number=1, schema=layout, change_note="فرم پیش‌فرض سیستم"
+            )
             form.published = version
             form.save(update_fields=["published", "updated_at"])
     return types

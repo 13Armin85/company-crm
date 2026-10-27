@@ -382,7 +382,17 @@ function FormField({
     input = (
       <input
         {...common}
-        type={field.kind === "email" ? "email" : field.kind === "url" ? "url" : field.kind === "phone" ? "tel" : "text"}
+        type={
+          field.config.secret
+            ? "password"
+            : field.kind === "email"
+              ? "email"
+              : field.kind === "url"
+                ? "url"
+                : field.kind === "phone"
+                  ? "tel"
+                  : "text"
+        }
         value={text}
         onChange={(e) => onChange(e.target.value)}
       />

@@ -42,6 +42,7 @@ export interface Project {
 }
 export interface Issue {
   id: string;
+    workNumber?: string;
   sequenceId: number;
   name: string;
   scope: "project" | "workspace";

@@ -102,6 +102,7 @@ export function DefinitionEditor({
                     "searchable",
                     "filterable",
                     "table_visible",
+                    "hidden_from_form",
                   ];
         const payload = Object.fromEntries(
           keys
@@ -119,6 +120,7 @@ export function DefinitionEditor({
                     "searchable",
                     "filterable",
                     "table_visible",
+                    "hidden_from_form",
                     "code",
                   ].includes(key)
                 )
@@ -171,7 +173,14 @@ export function DefinitionEditor({
         </label>
       )}
       <label className="engine-checkbox">
-        <input type="checkbox" checked={data.is_active ?? true} onChange={(e) => set("is_active", e.target.checked)} />{" "}
+        <input
+          type="checkbox"
+          checked={data.is_active ?? true}
+          onChange={(e) => {
+            if (window.confirm(e.target.checked ? "این تعریف فعال شود؟" : "این تعریف غیرفعال شود؟"))
+              set("is_active", e.target.checked);
+          }}
+        />{" "}
         فعال
       </label>
       {kind === "entities" && (
@@ -525,6 +534,23 @@ export function DefinitionEditor({
           </fieldset>
           <fieldset>
             <legend>قابلیت‌های نمایش</legend>
+            <label className="engine-checkbox">
+              <input
+                type="checkbox"
+                checked={Boolean(data.hidden_from_form)}
+                onChange={(e) => {
+                  if (
+                    window.confirm(
+                      e.target.checked
+                        ? "فیلد از فرم مخفی شود؟ داده‌های قبلی در جدول باقی می‌مانند و فقط‌خواندنی هستند."
+                        : "فیلد دوباره در فرم فعال شود؟"
+                    )
+                  )
+                    set("hidden_from_form", e.target.checked);
+                }}
+              />
+              مخفی از فرم؛ حفظ داده‌های قبلی در جدول
+            </label>
             {[
               ["show_in_summary", "نمایش در خلاصه اطلاعات"],
               ["searchable", "قابل جستجو"],

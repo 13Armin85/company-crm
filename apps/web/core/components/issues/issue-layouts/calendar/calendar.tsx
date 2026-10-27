@@ -24,7 +24,8 @@ import { EIssuesStoreType, EIssueLayoutTypes } from "@plane/types";
 import { Spinner } from "@plane/ui";
 import { renderFormattedPayloadDate, cn } from "@plane/utils";
 // constants
-import { MONTHS_LIST } from "@plane/constants";
+import { persianDigits, persianMonths } from "@plane/ui";
+import { persianCalendarDate } from "@/store/issue/persian-calendar";
 // helpers
 // hooks
 import { useIssues } from "@/hooks/store/use-issues";
@@ -110,6 +111,8 @@ export const CalendarChart = observer(function CalendarChart(props: Props) {
   const allWeeksOfActiveMonth = issueCalendarView.allWeeksOfActiveMonth;
 
   const formattedDatePayload = renderFormattedPayloadDate(selectedDate) ?? undefined;
+  const selectedJalali = persianCalendarDate(selectedDate);
+  const selectedDateLabel = `${persianDigits(selectedJalali.jd)} ${persianMonths[selectedJalali.jm - 1]} ${persianDigits(selectedJalali.jy)}`;
 
   // Enable Auto Scroll for calendar
   useEffect(() => {
@@ -122,7 +125,7 @@ export const CalendarChart = observer(function CalendarChart(props: Props) {
         element,
       })
     );
-  }, [scrollableContainerRef?.current]);
+  }, []);
 
   if (!calendarPayload || !formattedDatePayload)
     return (
@@ -154,13 +157,13 @@ export const CalendarChart = observer(function CalendarChart(props: Props) {
               {layout === "month" && (
                 <div className="grid h-full w-full grid-cols-1 divide-y-[0.5px] divide-subtle-1">
                   {allWeeksOfActiveMonth &&
-                    Object.values(allWeeksOfActiveMonth).map((week: ICalendarWeek, weekIndex) => (
+                    Object.values(allWeeksOfActiveMonth).map((week: ICalendarWeek) => (
                       <CalendarWeekDays
                         selectedDate={selectedDate}
                         setSelectedDate={setSelectedDate}
                         handleDragAndDrop={handleDragAndDrop}
                         issuesFilterStore={issuesFilterStore}
-                        key={weekIndex}
+                        key={Object.keys(week)[0]}
                         week={week}
                         issues={issues}
                         groupedIssueIds={groupedIssueIds}
@@ -205,11 +208,7 @@ export const CalendarChart = observer(function CalendarChart(props: Props) {
 
             {/* mobile view */}
             <div className="md:hidden">
-              <p className="p-4 text-18 font-semibold">
-                {`${selectedDate.getDate()} ${
-                  MONTHS_LIST[selectedDate.getMonth() + 1].title
-                }, ${selectedDate.getFullYear()}`}
-              </p>
+              <p className="p-4 text-18 font-semibold">{selectedDateLabel}</p>
               <CalendarIssueBlocks
                 date={selectedDate}
                 issueIdList={issueIdList}
@@ -233,11 +232,7 @@ export const CalendarChart = observer(function CalendarChart(props: Props) {
 
         {/* mobile view */}
         <div className="md:hidden">
-          <p className="p-4 text-18 font-semibold">
-            {`${selectedDate.getDate()} ${
-              MONTHS_LIST[selectedDate.getMonth() + 1].title
-            }, ${selectedDate.getFullYear()}`}
-          </p>
+          <p className="p-4 text-18 font-semibold">{selectedDateLabel}</p>
           <CalendarIssueBlocks
             date={selectedDate}
             issueIdList={issueIdList}

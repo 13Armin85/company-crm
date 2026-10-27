@@ -66,7 +66,7 @@ const passed = (message) => {
 const saveSettings = async (surfaceCode = "roles") => {
   const button = page.getByRole("button", { name: "ذخیره تغییرات", exact: true });
   await page.waitForFunction(() =>
-    Array.from(document.querySelectorAll(".page-studio-tabs > button")).some(
+    Array.from(document.querySelectorAll(".studio-save-actions > button")).some(
       (node) => node.textContent.includes("ذخیره تغییرات") && !node.disabled
     )
   );
@@ -76,7 +76,7 @@ const saveSettings = async (surfaceCode = "roles") => {
   ]);
   assert.equal(response.status(), 200);
   await page.waitForFunction(() =>
-    Array.from(document.querySelectorAll(".page-studio-tabs > button")).some(
+    Array.from(document.querySelectorAll(".studio-save-actions > button")).some(
       (node) => node.textContent.includes("ذخیره تغییرات") && node.disabled
     )
   );
