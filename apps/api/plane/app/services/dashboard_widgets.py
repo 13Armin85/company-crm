@@ -74,6 +74,47 @@ def _ticket_rows(query):
     return Issue.objects.filter(id__in=query.rows.values("source_id"), workspace=query.entity.workspace)
 
 
+def _table_display_values(payload, query, request, workspace):
+    """Return readable ticket relations while keeping raw IDs for filters and links."""
+    if query.entity.code != "ticket" or not payload["results"]:
+        return payload
+    columns = {column["field"] for column in query.spec["columns"]}
+    show_project = "project" in columns and query.path_allowed("project")
+    show_assignees = "ticket_assignees" in columns and query.path_allowed("ticket_assignees")
+    project_names = {}
+    if show_project:
+        from .entity_records import native_queryset
+
+        project_ids = {row["values"].get("project") for row in payload["results"] if row["values"].get("project")}
+        project_entity = EntityType.objects.filter(workspace=workspace, code="project", parent__isnull=True, is_active=True).first()
+        if project_entity and project_ids:
+            project_names = {
+                str(identifier): name for identifier, name in native_queryset(project_entity, request.user, request)
+                .filter(id__in=project_ids).values_list("id", "name")
+            }
+    assignee_names = {}
+    if show_assignees:
+        assignee_ids = {
+            identifier for row in payload["results"]
+            for identifier in (row["values"].get("ticket_assignees") or [])
+        }
+        if assignee_ids:
+            assignee_names = {
+                str(user.id): user.display_name or f"{user.first_name} {user.last_name}".strip() or user.username
+                for user in User.objects.filter(id__in=assignee_ids)
+            }
+    for row in payload["results"]:
+        display = row.setdefault("display_values", {})
+        if show_project:
+            display["project"] = project_names.get(str(row["values"].get("project"))) or "—"
+        if show_assignees:
+            display["ticket_assignees"] = "، ".join(
+                assignee_names[str(identifier)] for identifier in (row["values"].get("ticket_assignees") or [])
+                if str(identifier) in assignee_names
+            ) or "—"
+    return payload
+
+
 def widget_data(widget, request, workspace):
     kind = widget.get("type")
     if kind not in WIDGETS:
@@ -102,7 +143,8 @@ def widget_data(widget, request, workspace):
             query.rows = current_rows
         return {"type": kind, "value": value, "previous": previous, "drilldown": {"entity": entity.code, "view_id": config.get("view_id"), "filter": config.get("filter")}}
     if kind == "table":
-        return {"type": kind, **query.execute(1, min(50, max(1, int(config.get("rows", 8))))),
+        payload = query.execute(1, min(50, max(1, int(config.get("rows", 8)))))
+        return {"type": kind, **_table_display_values(payload, query, request, workspace),
                 "headers": [{"field": column["field"], "title": query.describe(column["field"])["title"]} for column in query.spec["columns"]]}
     if kind == "my-work":
         if entity.code != "ticket":

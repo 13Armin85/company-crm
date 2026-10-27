@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api";
 import { useUIStore } from "../store";
-import type { DashboardPayload, DashboardTab, DashboardWidget, TeamData } from "./types";
+import type { DashboardPayload, DashboardTab, DashboardWidget, TeamData, WidgetType } from "./types";
 
 const base = (slug: string) => `/api/workspaces/${slug}/dashboard/`;
 
@@ -21,6 +21,21 @@ export function useSaveDashboard(roleId?: string) {
   return useMutation({
     mutationFn: async (payload: { tabs: DashboardTab[]; revision: number }) =>
       (await api.put(roleId ? `${base(slug)}defaults/${roleId}/` : base(slug), payload)).data as DashboardPayload,
+    onSuccess: () => client.invalidateQueries({ queryKey: ["dashboard", slug] }),
+  });
+}
+
+export function useAddDashboardWidget(roleId?: string) {
+  const slug = useUIStore((state) => state.workspaceSlug) || "";
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { type: WidgetType; tab_id?: string; tabs: DashboardTab[]; revision: number }) =>
+      (await api.post(roleId ? `${base(slug)}defaults/${roleId}/widgets/` : `${base(slug)}widgets/`, payload)).data as {
+        tabs: DashboardTab[];
+        revision: number;
+        widget_id: string;
+        tab_id: string;
+      },
     onSuccess: () => client.invalidateQueries({ queryKey: ["dashboard", slug] }),
   });
 }
@@ -45,8 +60,7 @@ export function useTeamData(options: Record<string, string | boolean>) {
     enabled: Boolean(slug),
     refetchInterval: 45_000,
     retry: false,
-    queryFn: async (): Promise<TeamData> =>
-      (await api.get(`${base(slug)}team/`, { params: options })).data,
+    queryFn: async (): Promise<TeamData> => (await api.get(`${base(slug)}team/`, { params: options })).data,
   });
 }
 

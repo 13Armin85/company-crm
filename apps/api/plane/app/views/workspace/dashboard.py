@@ -10,7 +10,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 
 from plane.app.services.access_control import has_permission
-from plane.app.services.dashboard_layout import WIDGETS, default_layout, personal_layout, save_layout, shared_tabs
+from plane.app.services.dashboard_layout import WIDGETS, add_widget, default_layout, personal_layout, save_layout, shared_tabs
 from plane.app.services.dashboard_team import settings_for, save_team_settings, subordinate_units, team_cards, validate_rules, color_for
 from plane.app.services.dashboard_widgets import widget_data
 from plane.app.services.entity_records import emit_definition, get_record, record_payload, save_record
@@ -79,6 +79,17 @@ class DashboardWidgetEndpoint(EngineAPIView):
         if not isinstance(widget, dict):
             raise ValidationError("ویجت معتبر نیست.")
         return Response(widget_data(widget, request, workspace))
+
+
+class DashboardWidgetCreateEndpoint(EngineAPIView):
+    def post(self, request, slug, role_id=None):
+        workspace = self.workspace(slug)
+        role = get_object_or_404(OrganizationRole, workspace=workspace, id=role_id, is_active=True) if role_id else None
+        row, widget, tab = add_widget(
+            workspace, request.user, request.data.get("type"), request.data.get("tab_id"),
+            request.data.get("tabs"), request.data.get("revision"), role=role, request=request,
+        )
+        return Response({"tabs": row.tabs, "revision": row.revision, "widget_id": widget["id"], "tab_id": tab["id"]}, status=201)
 
 
 class DashboardTeamEndpoint(EngineAPIView):

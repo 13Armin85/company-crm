@@ -92,6 +92,62 @@ def test_personal_dashboard_and_widget_query_share_entity_layer(engine):
     assert client.post(dashboard_path(workspace, "widgets/data/"), {"widget": tab["widgets"][0]}, format="json").data["value"] == 1
 
 
+def test_adding_widget_persists_immediately_in_backend(engine):
+    workspace, _, client = engine
+    opened = client.get(dashboard_path(workspace)).data
+    tab = opened["tabs"][0]
+    previous_count = len(tab["widgets"])
+
+    response = client.post(dashboard_path(workspace, "widgets/"), {
+        "type": "note", "tab_id": tab["id"], "tabs": opened["tabs"], "revision": opened["revision"],
+    }, format="json")
+    assert response.status_code == 201, response.data
+    assert len(response.data["tabs"][0]["widgets"]) == previous_count + 1
+    assert response.data["tabs"][0]["widgets"][-1]["id"] == response.data["widget_id"]
+    assert response.data["tabs"][0]["widgets"][-1]["type"] == "note"
+    assert client.get(dashboard_path(workspace)).data["tabs"] == response.data["tabs"]
+
+    stale = client.post(dashboard_path(workspace, "widgets/"), {
+        "type": "note", "tab_id": tab["id"], "tabs": opened["tabs"], "revision": opened["revision"],
+    }, format="json")
+    assert stale.status_code == 400
+    assert len(client.get(dashboard_path(workspace)).data["tabs"][0]["widgets"]) == previous_count + 1
+
+
+def test_adding_role_widget_creates_missing_tab_in_backend(engine):
+    from plane.app.services.dashboard_layout import selected_role
+
+    workspace, user, client = engine
+    role = selected_role(workspace, user)
+    assert role is not None
+    response = client.post(dashboard_path(workspace, f"defaults/{role.id}/widgets/"), {
+        "type": "counter", "tabs": [], "revision": 0,
+    }, format="json")
+    assert response.status_code == 201, response.data
+    assert len(response.data["tabs"]) == 1
+    assert response.data["tabs"][0]["widgets"][0]["type"] == "counter"
+    saved = client.get(dashboard_path(workspace, f"defaults/{role.id}/"))
+    assert saved.data["tabs"] == response.data["tabs"]
+
+
+def test_ticket_table_widget_returns_project_and_assignee_names(engine):
+    from plane.db.models import EntityType
+
+    workspace, actor, client = engine
+    project = create_record(engine, EntityType.objects.get(workspace=workspace, code="project"), {"title": "پروژه نمایشی"})
+    ticket = create_record(engine, EntityType.objects.get(workspace=workspace, code="ticket"), {
+        "title": "کار نمایشی", "project": project["id"], "ticket_assignees": [str(actor.id)],
+    })
+    widget = {"type": "table", "config": {"entity": "ticket", "columns": ["title", "project", "ticket_assignees"]}}
+    response = client.post(dashboard_path(workspace, "widgets/data/"), {"widget": widget}, format="json")
+    assert response.status_code == 200, response.data
+    row = next(item for item in response.data["results"] if item["id"] == ticket["id"])
+    assert row["values"]["project"] == project["id"]
+    assert row["values"]["ticket_assignees"] == [str(actor.id)]
+    assert row["display_values"]["project"] == "پروژه نمایشی"
+    assert row["display_values"]["ticket_assignees"] == actor.display_name
+
+
 def test_calendar_widget_uses_jalali_month_boundaries(engine):
     workspace, _, client = engine
     entity, _ = make_entity(engine, [{"code": "due_on", "title": "موعد", "kind": "date", "config": {}}])

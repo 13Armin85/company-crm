@@ -72,7 +72,13 @@ function DataWidget({ widget }: { widget: DashboardWidget }) {
   const data = result.data || {};
   if (data.hidden) return <div className="dashboard-empty-small">دادهٔ این ویجت در دسترسی شما نیست.</div>;
   const rows = Array.isArray(data.results)
-    ? (data.results as { id: string; number: string; title: string; values: Record<string, unknown> }[])
+    ? (data.results as {
+        id: string;
+        number: string;
+        title: string;
+        values: Record<string, unknown>;
+        display_values?: Record<string, string>;
+      }[])
     : [];
   const items = Array.isArray(data.items) ? (data.items as Record<string, unknown>[]) : [];
   if (widget.type === "counter")
@@ -103,7 +109,9 @@ function DataWidget({ widget }: { widget: DashboardWidget }) {
             {rows.map((row) => (
               <tr key={row.id} draggable onDragStart={(event) => event.dataTransfer.setData("task-id", row.id)}>
                 {headers.map((header) => (
-                  <td key={header.field}>{persianDateValue(row.values?.[header.field])}</td>
+                  <td key={header.field}>
+                    {row.display_values?.[header.field] ?? persianDateValue(row.values?.[header.field])}
+                  </td>
                 ))}
                 <td>
                   <Link to={`/entities/${entity}/${row.id}`}>{row.number || row.title}</Link>

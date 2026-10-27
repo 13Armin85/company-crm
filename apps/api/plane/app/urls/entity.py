@@ -1,5 +1,5 @@
 from django.urls import path
-from plane.app.views.workspace.dashboard import DashboardEndpoint, DashboardRoleEndpoint, DashboardWidgetEndpoint, DashboardTeamEndpoint, DashboardTeamSettingsEndpoint, DashboardTeamDetailEndpoint, DashboardTeamAssignEndpoint, DashboardTeamRemindEndpoint
+from plane.app.views.workspace.dashboard import DashboardEndpoint, DashboardRoleEndpoint, DashboardWidgetEndpoint, DashboardWidgetCreateEndpoint, DashboardTeamEndpoint, DashboardTeamSettingsEndpoint, DashboardTeamDetailEndpoint, DashboardTeamAssignEndpoint, DashboardTeamRemindEndpoint
 from plane.app.views.workspace.entity_import import EngineRecordImportEndpoint
 from plane.app.views.workspace.entity_governance import EngineFieldUsageEndpoint
 from plane.app.views.workspace.entity_governance import EngineLookupColumnEndpoint, EngineRelatedRecordsEndpoint
@@ -30,6 +30,8 @@ from plane.app.views.workspace.entity import (
 urlpatterns = [
     path("workspaces/<str:slug>/dashboard/", DashboardEndpoint.as_view()),
     path("workspaces/<str:slug>/dashboard/defaults/<uuid:role_id>/", DashboardRoleEndpoint.as_view()),
+    path("workspaces/<str:slug>/dashboard/defaults/<uuid:role_id>/widgets/", DashboardWidgetCreateEndpoint.as_view()),
+    path("workspaces/<str:slug>/dashboard/widgets/", DashboardWidgetCreateEndpoint.as_view()),
     path("workspaces/<str:slug>/dashboard/widgets/data/", DashboardWidgetEndpoint.as_view()),
     path("workspaces/<str:slug>/dashboard/team/", DashboardTeamEndpoint.as_view()),
     path("workspaces/<str:slug>/dashboard/team/settings/", DashboardTeamSettingsEndpoint.as_view()),

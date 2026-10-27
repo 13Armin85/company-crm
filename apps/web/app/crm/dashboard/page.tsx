@@ -25,7 +25,7 @@ import { api, errorMessage, useOrganizationRoles, useWorkspaceAccess } from "../
 import { Button, PageHeader, Skeleton } from "../components";
 import { useEngineCatalog } from "../engine/api";
 import { useUIStore } from "../store";
-import { dashboardUrl, useDashboard, useSaveDashboard } from "./api";
+import { dashboardUrl, useAddDashboardWidget, useDashboard, useSaveDashboard } from "./api";
 import type { DashboardTab, DashboardWidget, WidgetType } from "./types";
 import { WidgetContent } from "./widget";
 import { DashboardWidgetSettings } from "./settings";
@@ -86,6 +86,7 @@ export default function DashboardPage() {
   const [roleId, setRoleId] = useState("");
   const dashboard = useDashboard(roleId || undefined);
   const save = useSaveDashboard(roleId || undefined);
+  const addWidget = useAddDashboardWidget(roleId || undefined);
   const client = useQueryClient();
   const { data: catalog } = useEngineCatalog();
   const [tabs, setTabs] = useState<DashboardTab[]>([]);
@@ -156,30 +157,19 @@ export default function DashboardPage() {
     setNewTab("");
     setEditing(true);
   }
-  function createWidget(type: WidgetType) {
-    if (!active) return;
-    const item: DashboardWidget = {
-      id: identifier(),
-      type,
-      title: dashboard.data?.gallery?.find((entry) => entry.type === type)?.title,
-      x: 0,
-      y: Math.max(0, ...active.widgets.map((widget) => widget.y + widget.h)),
-      w: type === "team-cards" || type === "table" ? 12 : 6,
-      h: type === "team-cards" ? 5 : 3,
-      config: {
-        entity: type === "absences" ? "leave" : "ticket",
-        operation: "count",
-        chart: "bar",
-        group_by: "priority",
-        ...(type === "calendar" ? { date_field: "due_date", calendar_view: "month" } : {}),
-        rows: 8,
-        refresh_seconds: 0,
-      },
-    };
-    modifyTab(active.id, (tab) => ({ ...tab, widgets: [...tab.widgets, item] }));
-    setConfiguredId(item.id);
-    setGallery(false);
-    setEditing(true);
+  async function createWidget(type: WidgetType) {
+    try {
+      const result = await addWidget.mutateAsync({ type, tab_id: active?.id, tabs, revision });
+      setTabs(duplicate(result.tabs));
+      setRevision(result.revision);
+      setActiveId(result.tab_id);
+      setConfiguredId(result.widget_id);
+      setGallery(false);
+      setEditing(false);
+      toast("ویجت افزوده و ذخیره شد", "success");
+    } catch (error) {
+      toast(errorMessage(error, "افزودن ویجت انجام نشد"), "error");
+    }
   }
   function reorder(sourceId: string, targetId: string) {
     if (!active || sourceId === targetId) return;
@@ -554,7 +544,11 @@ export default function DashboardPage() {
                     {galleryItems
                       .filter((item) => galleryGroup[item.type] === group)
                       .map((item) => (
-                        <button key={item.type} onClick={() => createWidget(item.type)}>
+                        <button
+                          key={item.type}
+                          disabled={addWidget.isPending}
+                          onClick={() => void createWidget(item.type)}
+                        >
                           <strong>{item.title}</strong>
                           <span className="dashboard-gallery-preview" aria-hidden="true">
                             {galleryPreview[item.type] || "◧"}

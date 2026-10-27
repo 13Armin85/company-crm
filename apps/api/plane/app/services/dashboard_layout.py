@@ -97,6 +97,29 @@ def starter_widgets():
     ]
 
 
+def make_widget(kind, existing):
+    if kind not in WIDGETS:
+        raise ValidationError("نوع ویجت معتبر نیست.")
+    return {
+        "id": str(uuid4()),
+        "type": kind,
+        "title": WIDGETS[kind],
+        "x": 0,
+        "y": max([widget.get("y", 0) + widget.get("h", 1) for widget in existing] or [0]),
+        "w": 12 if kind in {"team-cards", "table"} else 6,
+        "h": 5 if kind == "team-cards" else 3,
+        "config": {
+            "entity": "leave" if kind == "absences" else "ticket",
+            "operation": "count",
+            "chart": "bar",
+            "group_by": "priority",
+            **({"date_field": "due_date", "calendar_view": "month"} if kind == "calendar" else {}),
+            "rows": 8,
+            "refresh_seconds": 0,
+        },
+    }
+
+
 def _copy_defaults(default):
     tabs = deepcopy(default.tabs if default else [make_tab()])
     if not default:
@@ -217,3 +240,33 @@ def save_layout(workspace, user, tabs, revision, *, role=None, request=None):
     if role:
         emit_definition(workspace, user, "dashboard.default_changed", target, before, clean)
     return target
+
+
+@transaction.atomic
+def add_widget(workspace, user, kind, tab_id, tabs, revision, *, role=None, request=None):
+    permission = "Dashboard.Default.Manage" if role else "Dashboard.Personal.Manage"
+    if not has_permission(user, workspace, permission, request=request):
+        raise PermissionDenied()
+    if kind not in WIDGETS:
+        raise ValidationError("نوع ویجت معتبر نیست.")
+    if kind == "team-cards" and not has_permission(user, workspace, "Dashboard.Team.View", request=request):
+        raise PermissionDenied()
+    current = (
+        DashboardConfiguration.objects.filter(workspace=workspace, role=role).first()
+        if role else personal_layout(workspace, user)[0]
+    )
+    if revision != (current.revision if current else 0):
+        raise ValidationError("داشبورد در دستگاه دیگری تغییر کرده است؛ دوباره بارگذاری کنید.")
+    clean = validate_tabs(tabs if tabs is not None else (current.tabs if current else []), allow_locked=True)
+    if not clean:
+        clean = [make_tab("پیش‌فرض" if role else "کارهای من")]
+    tab = next((item for item in clean if item["id"] == tab_id), None) if tab_id else clean[0]
+    if tab is None:
+        raise ValidationError("تب انتخاب‌شده پیدا نشد؛ داشبورد را دوباره بارگذاری کنید.")
+    widgets = tab.setdefault("widgets", [])
+    if len(widgets) >= 50:
+        raise ValidationError("حداکثر ۵۰ ویجت در هر تب مجاز است.")
+    widget = make_widget(kind, widgets)
+    widgets.append(widget)
+    saved = save_layout(workspace, user, clean, revision, role=role, request=request)
+    return saved, widget, tab
