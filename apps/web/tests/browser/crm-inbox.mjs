@@ -89,6 +89,14 @@ try {
       await page.locator(".inbox-list > button").first().waitFor({ timeout: 60000 });
       assert.equal(await page.locator(".inbox-list > button").count(), 3);
       assert.equal(await page.locator(".inbox-list > button.unread").count(), 2);
+      assert.match(await page.locator(".inbox-overview").textContent(), /۲ اعلان خوانده‌نشده/);
+      assert.equal(await page.locator(".inbox-item-kicker").count(), 3);
+      assert.equal(
+        await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1),
+        false,
+        `inbox must not overflow horizontally at ${width}px in ${theme} mode`
+      );
+      await page.screenshot({ path: resolve(output, `inbox-list-${width}-${theme}.png`), fullPage: true });
       await page.getByRole("button", { name: "خواندن همه", exact: true }).click();
       await page.getByText("خواندن اعلان‌ها انجام نشد", { exact: true }).first().waitFor();
       assert.equal(await page.locator(".inbox-list > button.unread").count(), 2);

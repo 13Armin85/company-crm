@@ -4,6 +4,7 @@
 @import "./engine.css";
 @import "./page-studio.css";
 @import "./my-work.css";
+@import "./inbox.css";
 * {
   box-sizing: border-box;
 }
