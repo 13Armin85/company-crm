@@ -3149,3 +3149,315 @@
     padding: 14px;
   }
 }
+
+/* Entity relation designer */
+.engine-relations-layout {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+.engine-rules-card-icon.is-relation {
+  background: color-mix(in srgb, #6366f1 13%, var(--surface));
+  color: #4f46e5;
+}
+.engine-rules-card-icon.is-relation-lookup {
+  background: color-mix(in srgb, #0891b2 13%, var(--surface));
+  color: #0e7490;
+}
+:root[data-theme="dark"] .engine-rules-card-icon.is-relation {
+  color: #a5b4fc;
+}
+:root[data-theme="dark"] .engine-rules-card-icon.is-relation-lookup {
+  color: #67e8f9;
+}
+.engine-relations-body {
+  grid-template-columns: minmax(260px, 0.88fr) minmax(0, 1.12fr);
+}
+.engine-relations-body.is-readonly {
+  grid-template-columns: minmax(0, 1fr);
+}
+.engine-relations-existing {
+  align-content: start;
+}
+.engine-relations-item {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--surface);
+  box-shadow: 0 5px 16px rgb(15 23 42 / 3%);
+}
+.engine-relations-item-heading,
+.engine-relations-item-footer,
+.engine-relations-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.engine-relations-kind,
+.engine-relations-link-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.engine-relations-kind {
+  background: color-mix(in srgb, #6366f1 11%, var(--surface));
+  color: #4f46e5;
+}
+:root[data-theme="dark"] .engine-relations-kind {
+  color: #a5b4fc;
+}
+.engine-relations-link-count {
+  background: var(--surface-soft);
+  color: var(--text-secondary);
+}
+.engine-relations-item-sides {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 11px;
+}
+.engine-relations-item-sides > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 11px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface-soft);
+}
+.engine-relations-item-sides > svg {
+  color: var(--accent);
+}
+.engine-relations-item-sides small,
+.engine-relations-item-footer,
+.engine-relations-fixed-entity span {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+.engine-relations-item-sides strong {
+  color: var(--text-primary);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.engine-relations-item-sides span {
+  color: var(--text-secondary);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.engine-relations-item-footer {
+  justify-content: flex-start;
+}
+.engine-relations-item-footer span {
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--surface-soft);
+}
+.engine-relations-form {
+  gap: 18px;
+}
+.engine-relations-form-section {
+  display: grid;
+  gap: 13px;
+  padding-block-start: 2px;
+}
+.engine-relations-form-section + .engine-relations-form-section {
+  padding-block-start: 17px;
+  border-top: 1px solid var(--border);
+}
+.engine-relations-section-title {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+.engine-relations-fixed-entity {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+}
+.engine-relations-fixed-entity strong {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+.engine-relations-form-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.engine-relations-form-row > * {
+  min-width: 0;
+}
+.engine-relations-helper {
+  margin: -4px 0 0;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.7;
+}
+.engine-relations-required-options {
+  display: grid;
+  gap: 8px;
+}
+.engine-relations-required-options .engine-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  font-size: 11px;
+  cursor: pointer;
+}
+.engine-relations-required-options input {
+  flex: none;
+}
+.engine-relations-preview {
+  display: grid;
+  gap: 8px;
+  padding: 13px 15px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 35%, var(--border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+}
+.engine-relations-preview > span,
+.engine-relations-preview small {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+.engine-relations-preview > div {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+  color: var(--accent);
+}
+.engine-relations-preview strong {
+  color: var(--text-primary);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.engine-relations-form-actions {
+  justify-content: flex-start;
+}
+.engine-relations-error {
+  margin: 0 22px 22px;
+  color: var(--danger, #b91c1c);
+  font-size: 12px;
+}
+.engine-relations-lookup-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(230px, 0.8fr);
+  gap: 20px;
+  padding: 22px;
+}
+.engine-relations-lookup-fields {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  min-width: 0;
+}
+.engine-relations-lookup-fields > .button {
+  justify-self: start;
+}
+.engine-relations-path {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 11px 13px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-soft);
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+.engine-relations-path bdi {
+  color: var(--text-primary);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.engine-relations-path .button {
+  margin-inline-start: auto;
+}
+.engine-relations-lookup-guide {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface-soft) 70%, var(--surface));
+}
+.engine-relations-guide-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: color-mix(in srgb, #0891b2 12%, var(--surface));
+  color: #0e7490;
+}
+.engine-relations-lookup-guide h4 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+.engine-relations-lookup-guide p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.8;
+}
+.engine-relations-lookup-result {
+  display: grid;
+  gap: 6px;
+  margin-block: 5px;
+  padding: 15px;
+  border: 1px dashed color-mix(in srgb, #0891b2 30%, var(--border));
+  border-radius: 10px;
+  background: var(--surface);
+}
+.engine-relations-lookup-result span,
+.engine-relations-lookup-result small {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+.engine-relations-lookup-result strong {
+  color: var(--text-primary);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+@container engine-workspace-main (max-width: 950px) {
+  .engine-relations-body,
+  .engine-relations-lookup-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 950px) {
+  .engine-relations-body,
+  .engine-relations-lookup-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 560px) {
+  .engine-relations-lookup-body {
+    padding: 14px;
+  }
+  .engine-relations-form-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .engine-relations-lookup-guide {
+    padding: 15px;
+  }
+}
