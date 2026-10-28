@@ -85,7 +85,7 @@
     },
     "states": {
       "active": "فعال",
-      "backlog": "بکلود"
+      "backlog": "فهرست انتظار"
     },
     "comments": {
       "placeholder": "افزودن نظر",

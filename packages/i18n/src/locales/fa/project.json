@@ -338,7 +338,7 @@
   },
   "project_modules": {
     "status": {
-      "backlog": "بکلود",
+      "backlog": "فهرست انتظار",
       "planned": "برنامه‌ریزی",
       "in_progress": "در حال انجام",
       "paused": "معلق",

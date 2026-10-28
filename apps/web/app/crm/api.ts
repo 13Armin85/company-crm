@@ -7,7 +7,7 @@ import { useUIStore } from "./store";
 import { publishSessionEnd } from "./access/session-events";
 import { combineRequestSignals } from "./access/request-signals";
 import { presentNotification } from "./notification-presentation";
-import { issueStatusFromState } from "./issue-status";
+import { issueStatusFromState, stateNameFa } from "./issue-status";
 import { firstError, localizeError } from "./error-messages";
 import type {
   ActivityItem,
@@ -168,7 +168,7 @@ const mapMember = (row: Record<string, unknown>, index = 0): Member => {
 };
 const mapState = (item: Record<string, unknown>): ProjectState => ({
   id: String(item.id),
-  name: String(item.name ?? "بدون وضعیت"),
+  name: stateNameFa(item.name ?? "بدون وضعیت"),
   group: String(item.group ?? "unstarted"),
   color: String(item.color ?? "#9ca3af"),
   status: issueStatusFromState(item.group, item.name),
@@ -258,7 +258,7 @@ const mapIssue = (
     statusCode: stateId,
     statusLabel:
       knownState?.name ??
-      (typeof stateRaw === "object" && typeof stateRaw?.name === "string" ? stateRaw.name : undefined),
+      (typeof stateRaw === "object" && typeof stateRaw?.name === "string" ? stateNameFa(stateRaw.name) : undefined),
     statusColor: knownState?.color,
     statusOptions: states.map((state) => ({ id: state.id, title: state.name, status: state.status })),
     priorityCode: rawPriority,

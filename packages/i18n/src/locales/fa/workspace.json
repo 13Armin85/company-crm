@@ -173,7 +173,7 @@
       "issue_delete": "حذف کار با شکست"
     },
     "state": {
-      "backlog": "بکلود",
+      "backlog": "فهرست انتظار",
       "unstarted": "نابود",
       "started": "شروع شده",
       "completed": "تمام‌شده",
