@@ -1,5 +1,6 @@
+import { ErrorNotice } from "../error-state";
 import { useMemo, useState } from "react";
-import { PasswordInput } from "@plane/ui";
+import { PasswordInput, useNoAutofill } from "@plane/ui";
 import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import { MoreHorizontal, UserPlus } from "lucide-react";
 import { Link, Navigate } from "react-router";
@@ -55,6 +56,8 @@ export function UserActionItems({
 export default function TeamPage() {
   const [query, setQuery] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
+  const passwordGuard = useNoAutofill();
+  const usernameGuard = useNoAutofill();
   const [form, setForm] = useState({
     email: "",
     display_name: "",
@@ -103,7 +106,7 @@ export default function TeamPage() {
           )
         }
       />
-      {error && <p role="alert">عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید.</p>}
+      <ErrorNotice message={error && "عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید."} />
       <div className="table-card team-table">
         <div className="table-toolbar">
           <h2>فهرست اعضا</h2>
@@ -234,6 +237,7 @@ export default function TeamPage() {
                 minLength={3}
                 maxLength={32}
                 pattern="[A-Za-z0-9_.-]{3,32}"
+                {...usernameGuard}
                 value={form.username}
                 onChange={(event) => setForm({ ...form, username: event.target.value })}
               />
@@ -246,7 +250,7 @@ export default function TeamPage() {
                 type="password"
                 dir="ltr"
                 minLength={8}
-                autoComplete="new-password"
+                {...passwordGuard}
                 value={form.password}
                 onChange={(event) => setForm({ ...form, password: event.target.value })}
               />
@@ -271,7 +275,7 @@ export default function TeamPage() {
                   .map((unit) => ({ id: unit.id, title: unit.title, description: unit.managerName }))}
               />
             )}
-            {createUser.error && <p role="alert">{errorMessage(createUser.error, "ساخت حساب انجام نشد.")}</p>}
+            <ErrorNotice message={createUser.error && errorMessage(createUser.error, "ساخت حساب انجام نشد.")} />
             <footer>
               <Button type="submit" disabled={createUser.isPending}>
                 ساخت حساب
@@ -312,6 +316,7 @@ export default function TeamPage() {
                 toggleLabels={{ show: "نمایش رمز عبور", hide: "مخفی کردن رمز عبور" }}
                 minLength={8}
                 autoComplete="new-password"
+                noAutofill
                 value={password}
                 onChange={setPassword}
               />
@@ -326,14 +331,15 @@ export default function TeamPage() {
                 placeholder=""
                 toggleLabels={{ show: "نمایش تأیید رمز عبور", hide: "مخفی کردن تأیید رمز عبور" }}
                 autoComplete="new-password"
+                noAutofill
                 value={confirmation}
                 onChange={setConfirmation}
               />
             </label>
             {confirmation && passwordError(password, confirmation) && (
-              <p role="alert">{passwordError(password, confirmation)}</p>
+              <ErrorNotice message={passwordError(password, confirmation)} />
             )}
-            {mutation.error && <p role="alert">{errorMessage(mutation.error, "تغییر رمز انجام نشد.")}</p>}
+            <ErrorNotice message={mutation.error && errorMessage(mutation.error, "تغییر رمز انجام نشد.")} />
             <footer>
               <Button variant="secondary" disabled={mutation.isPending} onClick={closePassword}>
                 انصراف

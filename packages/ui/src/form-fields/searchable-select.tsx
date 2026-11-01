@@ -1,4 +1,5 @@
 import { useId, useState } from "react";
+import { ErrorNotice } from "../error-notice";
 import { Combobox, ComboboxButton, ComboboxInput, ComboboxOption, ComboboxOptions } from "@headlessui/react";
 
 export const normalizePersianSearch = (text: string) =>
@@ -47,6 +48,10 @@ export function SearchableSelect({
   const filtered = options.filter((option) =>
     normalizePersianSearch(`${option.title} ${option.description ?? ""}`).includes(normalizePersianSearch(query))
   );
+  const visibleOptions: typeof options = filtered.length
+    ? filtered
+    : [{ id: "\u0000empty", title: "نتیجه‌ای یافت نشد.", disabled: true }];
+  const visibleById = new Map(visibleOptions.map((option) => [option.id, option]));
   return (
     <div
       className="searchable-select"
@@ -60,6 +65,10 @@ export function SearchableSelect({
         }}
         disabled={disabled || loading}
         onClose={() => setQuery("")}
+        virtual={{
+          options: visibleOptions.map((option) => option.id),
+          disabled: (optionId) => Boolean(visibleById.get(optionId)?.disabled),
+        }}
       >
         <div className="selector-input-row">
           <ComboboxInput
@@ -85,22 +94,32 @@ export function SearchableSelect({
           modal={false}
           dir="rtl"
         >
-          {filtered.map((option) => (
-            <ComboboxOption
-              key={option.id}
-              value={option.id}
-              disabled={option.disabled}
-              className="selector-single-option"
-            >
-              {option.title}
-              {option.disabled && " (غیرفعال)"}
-              {option.description && <small dir="auto">{option.description}</small>}
-            </ComboboxOption>
-          ))}
-          {!filtered.length && <p role="status">نتیجه‌ای یافت نشد.</p>}
+          {({ option: optionId }: { option: string }) => {
+            const option = visibleById.get(optionId);
+            if (!option)
+              return <ComboboxOption value={optionId || "\u0000stale"} disabled className="selector-single-option" />;
+            return (
+              <ComboboxOption
+                key={option.id}
+                value={option.id}
+                disabled={option.disabled}
+                className="selector-single-option"
+              >
+                {filtered.length ? (
+                  <>
+                    {option.title}
+                    {option.disabled && " (غیرفعال)"}
+                    {option.description && <small dir="auto">{option.description}</small>}
+                  </>
+                ) : (
+                  <p role="status">{option.title}</p>
+                )}
+              </ComboboxOption>
+            );
+          }}
         </ComboboxOptions>
       </Combobox>
-      {error && <p role="alert">{error}</p>}
+      <ErrorNotice message={error} />
     </div>
   );
 }

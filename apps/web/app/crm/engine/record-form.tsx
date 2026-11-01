@@ -1,3 +1,4 @@
+import { ErrorNotice, ErrorState } from "../error-state";
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
 import { SchemaDrivenForm, validateSchemaValues, fieldVisible } from "@plane/ui";
@@ -175,7 +176,7 @@ export function EngineRecordForm({
   if (schemaQuery.isLoading || (id && recordQuery.isLoading) || (readyKey !== key && !failure))
     return <Skeleton rows={4} />;
   if (!schema)
-    return <p role="alert">{errorMessage(failure, "فرم منتشرشده دریافت نشد. دوباره صفحه را بارگذاری کنید.")}</p>;
+    return <ErrorState message={errorMessage(failure, "فرم منتشرشده دریافت نشد. دوباره صفحه را بارگذاری کنید.")} />;
   return (
     <form
       className="engine-record-form"
@@ -215,7 +216,7 @@ export function EngineRecordForm({
         }
       }}
     >
-      {failure && <p role="alert">{errorMessage(failure, "ذخیره انجام نشد؛ مقادیر و دسترسی خود را بررسی کنید.")}</p>}
+      <ErrorNotice message={failure && errorMessage(failure, "ذخیره انجام نشد؛ مقادیر و دسترسی خود را بررسی کنید.")} />
       <DuplicateFeedback details={duplicateDetails(mutation.error)} />
       {savedWithWarning && (
         <>
@@ -243,7 +244,7 @@ export function EngineRecordForm({
                       id: "summary",
                       columns: 1,
                       bindings: visibleFields
-                        .filter((code) => schema.fields.some((field) => field.code === code))
+                        .filter((fieldCode) => schema.fields.some((field) => field.code === fieldCode))
                         .map((field) => ({ field })),
                     },
                   ],

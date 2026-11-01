@@ -1,3 +1,4 @@
+import { ErrorState } from "./error-state";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BusinessChoicesProvider } from "./engine/choice-provider";
 import { BrandLogo, ModalVisibilityContext } from "@plane/ui";
@@ -31,7 +32,6 @@ import {
   useCurrentUser,
   useNotifications,
   useProjects,
-  useSelectWorkspace,
   useUpdateAppearance,
   useWorkspaceAccess,
   useWorkspaces,
@@ -84,7 +84,6 @@ function AppLayout() {
   const density = useUIStore((state) => state.density);
   const dirtyForms = useUIStore((state) => state.dirtyForms);
   const clearDirtyForms = useUIStore((state) => state.clearDirtyForms);
-  const toast = useUIStore((state) => state.toast);
   const setDensity = useUIStore((state) => state.setDensity);
   const setTheme = useUIStore((state) => state.setTheme);
   const workspaceSlug = useUIStore((state) => state.workspaceSlug);
@@ -92,7 +91,6 @@ function AppLayout() {
   const { data: workspaces = [], error: workspaceError } = useWorkspaces();
   const { data: appearance } = useAppearance();
   const updateAppearance = useUpdateAppearance();
-  const selectWorkspace = useSelectWorkspace();
   const { data: projects = [] } = useProjects();
   const { data: notifications = [] } = useNotifications(undefined, true);
   const unreadCount = notifications.filter((item) => !item.read).length;
@@ -100,7 +98,6 @@ function AppLayout() {
   const { data: access, error: accessError } = useWorkspaceAccess();
   const canCreate = access?.can("Issue.Create") === true && location.pathname.replace(/\/+$/, "") !== "/my-work";
   const [gPressed, setGPressed] = useState(false);
-  const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   // A successful save may navigate before React renders the cleared dirty flag.
   const navigationBlocker = useBlocker(() => useUIStore.getState().dirtyForms.length > 0);
@@ -156,7 +153,6 @@ function AppLayout() {
 
   useEffect(() => {
     setMobileSidebarOpen(false);
-    setWorkspaceOpen(false);
   }, [location.pathname]);
 
   useEffect(() => {
@@ -271,43 +267,9 @@ function AppLayout() {
             >
               <Menu size={20} />
             </button>
-            <button
-              className="workspace-switcher"
-              onClick={() => setWorkspaceOpen((value) => !value)}
-              aria-expanded={workspaceOpen}
-            >
-              <span>{workspace?.name?.slice(0, 1) ?? "هـ"}</span>
-              <b>{workspace?.name ?? "فضای کاری"}</b>
-              <ChevronDown size={14} />
-            </button>
-            {workspaceOpen && (
-              <div className="workspace-dropdown">
-                <small>انتخاب شرکت</small>
-                {workspaces.map((item) => (
-                  <button
-                    key={item.id}
-                    className={item.slug === workspace?.slug ? "active" : ""}
-                    onClick={() => {
-                      if (dirtyForms.length > 0) {
-                        toast("ابتدا تغییرات فرم باز را ذخیره یا لغو کنید", "info");
-                        setWorkspaceOpen(false);
-                        return;
-                      }
-                      setWorkspaceSlug(item.slug);
-                      selectWorkspace.mutate(item.id);
-                      setWorkspaceOpen(false);
-                      navigate("/");
-                    }}
-                  >
-                    <span>{item.name.slice(0, 1)}</span>
-                    <b>{item.name}</b>
-                  </button>
-                ))}
-                <NavLink to="/settings" onClick={() => setWorkspaceOpen(false)}>
-                  <Settings size={15} /> تنظیمات شرکت
-                </NavLink>
-              </div>
-            )}
+            <span className="workspace-name" title={workspace?.name}>
+              {workspace?.name ?? "شرکت"}
+            </span>
             <Breadcrumb />
           </div>
           <div className="topbar-actions">
@@ -362,7 +324,7 @@ function AppLayout() {
         </header>
         <main className="page-content">
           {workspaceError || accessError ? (
-            <p role="alert">عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید.</p>
+            <ErrorState message="اطلاعات شرکت دریافت نشد؛ اتصال را بررسی کنید." />
           ) : !workspaces.length ? (
             <p role="status">عضویت فعالی در یک شرکت ندارید.</p>
           ) : !access ? (
@@ -529,8 +491,10 @@ export function AuthenticationBoundary() {
       {pending &&
         (error ? (
           <main className="access-loading">
-            <p role="alert">عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید.</p>
-            <Button onClick={() => setRetryVerification((value) => value + 1)}>تلاش دوباره</Button>
+            <ErrorState
+              message="اتصال به سرور برقرار نشد."
+              onRetry={() => setRetryVerification((value) => value + 1)}
+            />
           </main>
         ) : (
           <main className="access-loading" role="status">

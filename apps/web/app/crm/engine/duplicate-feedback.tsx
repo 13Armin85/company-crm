@@ -1,3 +1,4 @@
+import { ErrorNotice } from "../error-state";
 import { Link } from "react-router";
 
 export type DuplicateDetail = { message: string; record_url?: string | null; inactive?: boolean };
@@ -13,14 +14,21 @@ export function duplicateDetails(error: unknown): DuplicateDetail[] {
 
 export function DuplicateFeedback({ details }: { details: DuplicateDetail[] }) {
   if (!details.length) return null;
+  const links = details.filter((detail) => detail.record_url?.startsWith("/entities/"));
   return (
-    <div role="alert">
-      {details.map((detail) => (
-        <p key={`${detail.record_url || ""}:${detail.message}`}>
-          {detail.message}{" "}
-          {detail.record_url?.startsWith("/entities/") && <Link to={detail.record_url}>مشاهده رکورد موجود</Link>}
+    <>
+      <ErrorNotice
+        message={details.map((detail) => detail.message + (detail.inactive ? " (رکورد غیرفعال)" : "")).join("؛ ")}
+      />
+      {links.length > 0 && (
+        <p className="duplicate-links">
+          {links.map((detail) => (
+            <Link key={detail.record_url} to={detail.record_url!}>
+              مشاهده رکورد مشابه
+            </Link>
+          ))}
         </p>
-      ))}
-    </div>
+      )}
+    </>
   );
 }

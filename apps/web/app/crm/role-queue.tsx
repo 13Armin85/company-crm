@@ -1,3 +1,4 @@
+import { ErrorNotice, ErrorState } from "./error-state";
 import { IdentifierBadge, SearchableSelect } from "@plane/ui";
 import {
   Clock3,
@@ -82,12 +83,10 @@ export function RoleQueue({
       </header>
 
       {isError && (
-        <div className="role-queue-error" role="alert">
-          <p>صف کارها دریافت نشد. {entries.length ? "نتایج قبلی نمایش داده می‌شود." : "اتصال خود را بررسی کنید."}</p>
-          <Button variant="secondary" disabled={isFetching} onClick={() => void refetch()}>
-            تلاش دوباره
-          </Button>
-        </div>
+        <ErrorState
+          message={`صف کارها دریافت نشد. ${entries.length ? "نتایج قبلی نمایش داده می‌شود." : "اتصال خود را بررسی کنید."}`}
+          onRetry={() => void refetch()}
+        />
       )}
       {isLoading ? (
         <Skeleton rows={4} />
@@ -283,11 +282,11 @@ export function RoleQueue({
                             </button>
                           )}
                         </footer>
-                        {claim.isError && claim.variables === entry.id && (
-                          <p className="role-queue-claim-error" role="alert">
-                            دریافت کار انجام نشد؛ دوباره تلاش کنید.
-                          </p>
-                        )}
+                        <ErrorNotice
+                          message={
+                            claim.isError && claim.variables === entry.id && "دریافت کار انجام نشد؛ دوباره تلاش کنید."
+                          }
+                        />
                       </article>
                     </li>
                   );

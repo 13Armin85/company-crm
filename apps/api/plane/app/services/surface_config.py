@@ -226,7 +226,7 @@ SURFACES = {
         "permission": "self",
         "columns": [],
         "native": [
-            native("name", "نام فضای کاری", required=True, locked=True),
+            native("name", "نام شرکت", required=True, locked=True, aliases=("نام فضای کاری",)),
             native("slug", "آدرس فضای کاری", required=True, locked=True),
         ],
     },

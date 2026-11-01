@@ -1,10 +1,11 @@
+import { ErrorNotice, ErrorState } from "../error-state";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogPanel, DialogTitle } from "@headlessui/react";
 import { Plus, SlidersHorizontal, Filter, Download, Palette, X } from "lucide-react";
 import { SchemaDrivenForm, SearchableSelect, zonedDateTime, parseDateOnly } from "@plane/ui";
-import type { Condition, EntityFormSchema, FieldValue, FormValues } from "@plane/ui";
+import type { Condition, EntityFormSchema, FieldValue } from "@plane/ui";
 import { jalaaliMonthLength, toGregorian } from "jalaali-js";
 import { api, errorMessage, useWorkspaceAccess } from "../api";
 import { Button, EmptyState, PageHeader, SearchBox, Skeleton } from "../components";
@@ -164,7 +165,7 @@ function SaveViewEditor({
       {visibility === "official" && (
         <RecipientInput code={code} kind="roles" title="نمای پیش‌فرض نقش‌ها" value={defaults} onChange={setDefaults} />
       )}
-      {mutation.error && <p role="alert">{errorMessage(mutation.error, "ذخیره نما انجام نشد.")}</p>}
+      <ErrorNotice message={mutation.error && errorMessage(mutation.error, "ذخیره نما انجام نشد.")} />
       <Button type="submit" disabled={mutation.isPending}>
         ذخیره نما
       </Button>
@@ -200,6 +201,7 @@ function PresentationEditor({
           <h3>قواعد رنگ‌بندی رسمی</h3>
           <p>اولویت بزرگ‌تر در تعارض مقدم است. شرط مبتنی بر فیلد بدون دسترسی برای آن کاربر اعمال نمی‌شود.</p>
           {rules.map((rule, index) => (
+            // eslint-disable-next-line react/no-array-index-key -- filter rules have no ids and are edited in place.
             <section className="engine-view-rule" key={index}>
               <ViewFilterEditor
                 value={rule.when}
@@ -320,6 +322,7 @@ function PresentationEditor({
             onChange={(field) => setSummary([...summary, { field }])}
           />
           {summary.map((item, index) => (
+            // eslint-disable-next-line react/no-array-index-key -- summary rows have no ids and are edited in place.
             <section className="engine-view-rule" key={index}>
               <strong>{fields.find((f) => f.code === item.field)?.title || item.field}</strong>
               <SearchableSelect
@@ -376,7 +379,7 @@ function PresentationEditor({
       >
         ذخیره تنظیمات رسمی
       </Button>
-      {mutation.error && <p role="alert">{errorMessage(mutation.error, "ذخیره تنظیمات انجام نشد.")}</p>}
+      <ErrorNotice message={mutation.error && errorMessage(mutation.error, "ذخیره تنظیمات انجام نشد.")} />
     </div>
   );
 }
@@ -431,8 +434,14 @@ export function EntityViewsPage({ entityCode }: { entityCode?: string } = {}) {
       try {
         const raw = urlParams.get("dashboard_filter");
         if (raw) drillFilter = JSON.parse(raw) as Condition;
-      } catch { drillFilter = null; }
-      setDefinition(drillFilter ? { ...base, filter: base.filter ? { op: "and", rules: [base.filter, drillFilter] } : drillFilter } : base);
+      } catch {
+        drillFilter = null;
+      }
+      setDefinition(
+        drillFilter
+          ? { ...base, filter: base.filter ? { op: "and", rules: [base.filter, drillFilter] } : drillFilter }
+          : base
+      );
       setSubtype(base.subtype || "");
       setSelectedView(view?.id || (requestedView?.startsWith("system:") ? requestedView : ""));
     }
@@ -447,6 +456,7 @@ export function EntityViewsPage({ entityCode }: { entityCode?: string } = {}) {
   const fields = [
     ...(schema.data?.fields || []),
     ...extraFields.filter((f) => !schema.data?.fields.some((old) => old.code === f.code)),
+    // eslint-disable-next-line oxc/no-map-spread -- schema fields are shared query data and must not be mutated.
   ].map((field) => ({ ...field, title: entityDisplayTitle(field.title) }));
   const effective = useMemo(() => {
     if (!definition) return null;
@@ -523,6 +533,7 @@ export function EntityViewsPage({ entityCode }: { entityCode?: string } = {}) {
       node ? ("rules" in node ? node.rules.flatMap(filterPaths) : [node.field]) : [];
     const paths = new Set(
       [
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- reload only when the view definition changes.
         ...definition.columns.map((c) => c.field),
         ...definition.sort.map((s) => s.field),
         definition.group || "",
@@ -533,6 +544,7 @@ export function EntityViewsPage({ entityCode }: { entityCode?: string } = {}) {
     );
     for (const path of paths) if (!extraFields.some((f) => f.code.startsWith(path + "."))) void loadPath(path);
   }, [
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the serialized definition is the intended trigger.
     JSON.stringify([definition?.columns, definition?.sort, definition?.group, definition?.filter, definition?.subtype]),
   ]);
   const activeView = saved.data?.results.find((v) => v.id === selectedView);
@@ -579,7 +591,7 @@ export function EntityViewsPage({ entityCode }: { entityCode?: string } = {}) {
     }
   };
   if (schema.error || saved.error)
-    return <p role="alert">{errorMessage(schema.error || saved.error, "دریافت تنظیمات نما انجام نشد.")}</p>;
+    return <ErrorState message={errorMessage(schema.error || saved.error, "دریافت تنظیمات نما انجام نشد.")} />;
   if (schema.isLoading || saved.isLoading || !definition) return <Skeleton rows={6} />;
   const currentData = records.data;
   return (
@@ -835,19 +847,16 @@ export function EntityViewsPage({ entityCode }: { entityCode?: string } = {}) {
           onChange={(calendar_field) => update({ ...definition, settings: { ...definition.settings, calendar_field } })}
         />
       )}
-      {records.error && (
-        <p className="engine-view-warning" role="alert">
-          {errorMessage(
+      <ErrorNotice
+        message={
+          records.error &&
+          errorMessage(
             records.error,
             "اعمال نما انجام نشد. ممکن است فیلد فیلتر غیرفعال یا دسترسی آن تغییر کرده باشد؛ فیلتر را بررسی کنید."
-          )}
-        </p>
-      )}
-      {currentData?.warnings.map((warning, index) => (
-        <p key={index} role="alert" className="engine-view-warning">
-          {warning}
-        </p>
-      ))}
+          )
+        }
+      />
+      <ErrorNotice message={currentData?.warnings.join("؛ ")} />
       <div className="engine-results-meta">
         <strong>{currentData?.count.toLocaleString("fa-IR") || "۰"} رکورد</strong>
         <span>
@@ -887,6 +896,7 @@ export function EntityViewsPage({ entityCode }: { entityCode?: string } = {}) {
         <section className="engine-group-summary">
           <h3>آمار کل نتایج به تفکیک گروه</h3>
           {currentData.groups.map((group, index) => (
+            // eslint-disable-next-line react/no-array-index-key -- group rows come back ordered and have no ids.
             <div key={index}>
               <ViewValue
                 value={group.value}
@@ -1022,10 +1032,10 @@ export function EntityViewsPage({ entityCode }: { entityCode?: string } = {}) {
                       دانلود
                     </a>
                   )}
-                  {job.error && <p role="alert">{job.error}</p>}
+                  <ErrorNotice message={job.error} />
                 </div>
               ))}
-              {exports.error && <p role="alert">دریافت وضعیت خروجی انجام نشد.</p>}
+              <ErrorNotice message={exports.error && "دریافت وضعیت خروجی انجام نشد."} />
             </div>
           )}
           {drawer === "bulk" && (

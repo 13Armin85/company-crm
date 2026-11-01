@@ -69,6 +69,7 @@ export default function IssuesPage() {
       />
       {!isAdmin && (
         <TabBar
+          chooserKey="issues-status"
           active={tab}
           onChange={setTab}
           items={[

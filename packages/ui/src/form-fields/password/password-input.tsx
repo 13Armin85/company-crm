@@ -8,6 +8,7 @@ import { HideOutline, ShowOutline } from "@makeplane/propel/icons";
 import { useState } from "react";
 import { Tooltip } from "@plane/propel/tooltip";
 import { cn } from "@plane/utils";
+import { useNoAutofill } from "./no-autofill";
 
 type TPasswordInputProps = {
   id: string;
@@ -22,6 +23,8 @@ type TPasswordInputProps = {
   minLength?: number;
   disabled?: boolean;
   toggleLabels?: { show: string; hide: string };
+  /** Never prefill or suggest saved passwords (e.g. a password set for someone else). */
+  noAutofill?: boolean;
 };
 
 export function PasswordInput({
@@ -37,8 +40,10 @@ export function PasswordInput({
   minLength,
   disabled = false,
   toggleLabels = { show: "Show password", hide: "Hide password" },
+  noAutofill = false,
 }: TPasswordInputProps) {
   const [showPassword, setShowPassword] = useState(false);
+  const guard = useNoAutofill();
   return (
     <div className="relative" dir="ltr">
       <input
@@ -56,7 +61,7 @@ export function PasswordInput({
           className
         )}
         placeholder={placeholder}
-        autoComplete={autoComplete}
+        {...(noAutofill ? guard : { autoComplete })}
         required={required}
         minLength={minLength}
         disabled={disabled}

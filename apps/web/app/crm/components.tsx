@@ -1,5 +1,5 @@
 import { useDismissMenu } from "./use-dismiss-menu";
-import { IdentifierBadge, PersianDatePicker, SearchableSelect } from "@plane/ui";
+import { ERROR_NOTICE_EVENT, ErrorNotice, IdentifierBadge, PersianDatePicker, SearchableSelect } from "@plane/ui";
 import { Popover, PopoverButton, PopoverPanel } from "@headlessui/react";
 import { Fragment, lazy, Suspense, useContext, useEffect, useMemo, useState } from "react";
 import { ChoiceLabelsContext } from "./choice-label-context";
@@ -44,6 +44,7 @@ import {
 } from "./api";
 import { AccessModal } from "./access/components";
 import { useUIStore } from "./store";
+import { TableTabPicker, useHiddenTabs } from "./engine/table-tab-picker";
 import type { Issue, Member, NotificationItem, Priority, Project, Status } from "./types";
 import { persianDate, priorityFa, statusFa, toFa } from "./utils";
 import { issueReference, matchesRecordSearch } from "./identifiers";
@@ -387,7 +388,11 @@ export function IssueActionsMenu({
       : businessChoices.task_status.length
         ? businessChoices.task_status
             .filter((option) => !option.disabled)
-            .map((option) => ({ id: option.id, title: option.title, status: semanticStatus[option.id] || ("Todo" as Status) }))
+            .map((option) => ({
+              id: option.id,
+              title: option.title,
+              status: semanticStatus[option.id] || ("Todo" as Status),
+            }))
         : statuses.map((status) => ({ id: status, title: statusFa[status], status }));
   if (!canChangeStatus && !canTransfer && !canDelete) return null;
   return (
@@ -583,6 +588,14 @@ export function EmptyState({
 export function ToastRegion() {
   const toasts = useUIStore((state) => state.toasts);
   const remove = useUIStore((state) => state.removeToast);
+  useEffect(() => {
+    const show = (event: Event) => {
+      const message = (event as CustomEvent<string>).detail;
+      if (message) useUIStore.getState().toast(message, "error");
+    };
+    window.addEventListener(ERROR_NOTICE_EVENT, show);
+    return () => window.removeEventListener(ERROR_NOTICE_EVENT, show);
+  }, []);
   return (
     <div className="toast-region" aria-live="polite">
       {toasts.map((toast) => (
@@ -664,8 +677,8 @@ export function NotificationDetails({
         )}
         {notification.isLoading && <p role="status">در حال دریافت متن کامل…</p>}
         {notification.isError && (
-          <div role="alert" className="inline-error">
-            جزئیات اعلان دریافت نشد.
+          <div className="error-state">
+            <ErrorNotice message="جزئیات اعلان دریافت نشد." />
             <Button variant="secondary" onClick={() => void notification.refetch()}>
               تلاش دوباره
             </Button>
@@ -758,8 +771,8 @@ export function NotificationDrawer() {
         </div>
         <div className="notification-list">
           {isError && (
-            <div role="alert" className="inline-error">
-              اعلان‌ها دریافت نشدند.
+            <div className="error-state">
+              <ErrorNotice message="اعلان‌ها دریافت نشدند." />
               <Button variant="secondary" onClick={() => void refetch()}>
                 تلاش دوباره
               </Button>
@@ -1008,19 +1021,42 @@ export function TabBar({
   items,
   active,
   onChange,
+  chooserKey,
 }: {
   items: { id: string; label: string; count?: number }[];
   active: string;
   onChange: (id: string) => void;
+  /** Lets each viewer choose which of these tabs to show. */
+  chooserKey?: string;
 }) {
-  return (
+  const [hidden, setHidden] = useHiddenTabs(chooserKey || "");
+  const visible = chooserKey ? items.filter((item) => !hidden.includes(item.id)) : items;
+  const shown = visible.length ? visible : items.slice(0, 1);
+  const activeShown = shown.some((item) => item.id === active);
+  const fallbackId = shown[0]?.id;
+  useEffect(() => {
+    if (!activeShown && fallbackId) onChange(fallbackId);
+  }, [activeShown, fallbackId, onChange]);
+  const bar = (
     <div className="tab-bar">
-      {items.map((item) => (
+      {shown.map((item) => (
         <button key={item.id} className={item.id === active ? "active" : ""} onClick={() => onChange(item.id)}>
           {item.label}
           {item.count !== undefined && <span>{toFa(item.count)}</span>}
         </button>
       ))}
+    </div>
+  );
+  if (!chooserKey) return bar;
+  return (
+    <div className="tab-bar-with-chooser">
+      {bar}
+      <TableTabPicker
+        includeMain={false}
+        tabs={items.map((item) => ({ id: item.id, title: item.label }))}
+        hidden={hidden.filter((id) => items.some((item) => item.id === id))}
+        onChange={setHidden}
+      />
     </div>
   );
 }

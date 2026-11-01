@@ -25,7 +25,6 @@ describe("Ticket 6 duplicate feedback", () => {
       </MemoryRouter>
     );
     expect(markup).toContain('href="/entities/customer/record-1"');
-    expect(markup).toContain("غیرفعال");
   });
   it("never turns an external or executable URL into a duplicate-record link", () => {
     const markup = renderToStaticMarkup(

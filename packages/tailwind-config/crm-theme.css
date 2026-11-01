@@ -423,6 +423,17 @@ fieldset:disabled label {
   box-shadow: var(--shadow);
   min-width: 0;
 }
+.selector-multi-options {
+  --anchor-gap: 6px;
+  --anchor-padding: 12px;
+  z-index: 130;
+  width: max(240px, var(--button-width, 240px));
+  max-width: calc(100vw - 24px);
+  max-height: min(360px, var(--anchor-max-height, 360px));
+  margin: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
 .selector-single-options {
   --anchor-gap: 6px;
   --anchor-padding: 12px;
@@ -435,6 +446,8 @@ fieldset:disabled label {
   overscroll-behavior: contain;
 }
 .selector-single-option {
+  box-sizing: border-box;
+  width: 100%;
   padding: 8px;
   cursor: pointer;
   overflow-wrap: anywhere;

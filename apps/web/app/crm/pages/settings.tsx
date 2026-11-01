@@ -29,6 +29,7 @@ import {
   useUpdateNotificationPreferences,
   useUpdateUserProfile,
   useUpdateWorkspace,
+  useSelectWorkspace,
   useUploadAvatar,
   useRemoveAvatar,
   useWorkspaceAccess,
@@ -38,6 +39,7 @@ import { useUIStore } from "../store";
 import { AccessModal } from "../access/components";
 import type { ThemeMode } from "../store";
 import type { FormValues } from "@plane/ui";
+import { useNoAutofill } from "@plane/ui";
 import { SurfaceForm, SurfaceFields } from "../engine/surface";
 
 const settingsNav = [
@@ -69,6 +71,7 @@ export default function SettingsPage() {
   const [appearanceExtra, setAppearanceExtra] = useState<FormValues>();
   const { data: currentUser } = useCurrentUser();
   const updateWorkspace = useUpdateWorkspace(workspaceSlug);
+  const selectWorkspace = useSelectWorkspace();
   const { data: access } = useWorkspaceAccess();
   const canManage = access?.can("User.View") === true;
   const { data: savedAppearance } = useAppearance();
@@ -209,8 +212,8 @@ export default function SettingsPage() {
               <section className="settings-section">
                 <header>
                   <div>
-                    <h2>مشخصات فضای کاری</h2>
-                    <p>اطلاعاتی که برای همه اعضای تیم نمایش داده می‌شود.</p>
+                    <h2>مشخصات شرکت</h2>
+                    <p>نام شرکت در بالای همه صفحه‌ها نمایش داده می‌شود و فقط از همین‌جا تغییر می‌کند.</p>
                   </div>
                 </header>
                 <div className="workspace-profile">
@@ -224,7 +227,7 @@ export default function SettingsPage() {
                 >
                   <div className="form-grid">
                     <label>
-                      <span>نام فضای کاری</span>
+                      <span>نام شرکت</span>
                       <input
                         value={workspaceName}
                         readOnly={!access?.can("Workspace.Edit")}
@@ -232,7 +235,7 @@ export default function SettingsPage() {
                       />
                     </label>
                     <label>
-                      <span>آدرس فضای کاری</span>
+                      <span>آدرس اختصاصی</span>
                       <div className="slug-input">
                         <span>app.hamkar.ir/</span>
                         <input dir="ltr" value={workspace?.slug ?? ""} readOnly />
@@ -240,6 +243,30 @@ export default function SettingsPage() {
                     </label>
                   </div>
                 </SurfaceFields>
+                {workspaces.length > 1 && (
+                  <label className="workspace-switch-field">
+                    <span>شرکت فعال</span>
+                    <select
+                      value={workspace?.slug ?? ""}
+                      onChange={(event) => {
+                        const next = workspaces.find((item) => item.slug === event.target.value);
+                        if (!next) return;
+                        if (useUIStore.getState().dirtyForms.length) {
+                          useUIStore.getState().toast("ابتدا تغییرات فرم باز را ذخیره یا لغو کنید", "info");
+                          return;
+                        }
+                        useUIStore.getState().setWorkspaceSlug(next.slug);
+                        selectWorkspace.mutate(next.id);
+                      }}
+                    >
+                      {workspaces.map((item) => (
+                        <option key={item.id} value={item.slug}>
+                          {item.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
               </section>
               <section className="settings-section appearance-section">
                 <header>
@@ -471,6 +498,8 @@ export function ProfileSettings() {
 
 function SecuritySettings() {
   const { data: currentUser } = useCurrentUser();
+  const oldPasswordGuard = useNoAutofill();
+  const newPasswordGuard = useNoAutofill();
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const changePassword = useChangePassword();
@@ -510,6 +539,8 @@ function SecuritySettings() {
         <input
           disabled={changePassword.isPending}
           type="password"
+          dir="ltr"
+          {...oldPasswordGuard}
           value={oldPassword}
           onChange={(event) => setOldPassword(event.target.value)}
           required
@@ -519,8 +550,10 @@ function SecuritySettings() {
         <span>رمز عبور جدید</span>
         <input
           type="password"
+          dir="ltr"
           disabled={changePassword.isPending}
           minLength={8}
+          {...newPasswordGuard}
           value={newPassword}
           onChange={(event) => setNewPassword(event.target.value)}
           required

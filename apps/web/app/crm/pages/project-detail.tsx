@@ -1,3 +1,4 @@
+import { ErrorNotice } from "../error-state";
 import { EngineRecordForm } from "../engine/record-form";
 import { SurfaceForm } from "../engine/surface";
 import { WorkTable } from "../engine/work-table";
@@ -449,8 +450,10 @@ function CyclesTab({
               onChange={setEnd}
             />
           </label>
-          {start && end && end <= start && <p role="alert">پایان چرخه باید بعد از شروع آن باشد.</p>}
-          {createCycle.isError && <p role="alert">عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید.</p>}
+          <ErrorNotice message={start && end && end <= start && "پایان چرخه باید بعد از شروع آن باشد."} />
+          <ErrorNotice
+            message={createCycle.isError && "عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید."}
+          />
           <Button type="submit" icon={Plus} disabled={createCycle.isPending || Boolean(start && end && end <= start)}>
             ساخت چرخه
           </Button>

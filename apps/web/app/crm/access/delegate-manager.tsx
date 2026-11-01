@@ -1,3 +1,4 @@
+import { ErrorNotice } from "../error-state";
 import { useEffect, useState } from "react";
 import { MemberDirectory, MemberIdentity } from "@plane/ui";
 import { ArrowDown, ArrowUp, CheckCircle2, Save, Trash2, UsersRound, X } from "lucide-react";
@@ -59,11 +60,7 @@ export function DelegateManager({
           </button>
         )}
       </header>
-      {error && (
-        <p className="delegate-notice" role="alert">
-          فهرست جانشین‌ها دریافت نشد؛ این بخش را دوباره باز کنید.
-        </p>
-      )}
+      <ErrorNotice message={error && "فهرست جانشین‌ها دریافت نشد؛ این بخش را دوباره باز کنید."} />
       {data?.active_delegation && (
         <p className="delegate-active" role="status">
           <CheckCircle2 size={19} aria-hidden="true" />

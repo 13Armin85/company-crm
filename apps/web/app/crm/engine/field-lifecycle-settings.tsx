@@ -1,3 +1,4 @@
+import { ErrorNotice } from "../error-state";
 import { useState } from "react";
 import { Database } from "lucide-react";
 import { SearchableSelect } from "@plane/ui";
@@ -104,11 +105,12 @@ export function FieldLifecycleSettings({ fieldCodes }: { fieldCodes?: string[] }
             وضعیت فیلد انتخاب‌شده در اینجا نمایش داده می‌شود.
           </p>
         )}
-        {(fields.error || usage.error || mutation.error) && (
-          <p role="alert">
-            {errorMessage(fields.error || usage.error || mutation.error, "تغییر وضعیت فیلد انجام نشد.")}
-          </p>
-        )}
+        <ErrorNotice
+          message={
+            (fields.error || usage.error || mutation.error) &&
+            errorMessage(fields.error || usage.error || mutation.error, "تغییر وضعیت فیلد انجام نشد.")
+          }
+        />
       </div>
     </section>
   );

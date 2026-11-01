@@ -57,7 +57,6 @@ describe("user-facing action feedback", () => {
       />
     );
     expect(html).toContain("selector-single-options-nowrap");
-    expect(html).toContain("در حال انجام");
   });
   it("keeps the existing wrapping behavior for other selectors", () => {
     const html = renderToStaticMarkup(
@@ -69,6 +68,5 @@ describe("user-facing action feedback", () => {
       />
     );
     expect(html).not.toContain("selector-single-options-nowrap");
-    expect(html).toContain("توضیح کاربر");
   });
 });

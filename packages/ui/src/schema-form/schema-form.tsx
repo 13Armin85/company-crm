@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useState } from "react";
+import { ErrorNotice } from "../error-notice";
 import type { CSSProperties } from "react";
 import { PersianDatePicker, PersianDateTimePicker } from "../form-fields/persian-date-picker";
 import { fieldRequired, fieldVisible, formDisplayValues } from "./rules";
@@ -34,6 +35,7 @@ function OptionField({
     if (!loadOptions || !selectedKey) return;
     let live = true;
     void loadOptions(field, "", 1, parent, selectedKey.split(","), true)
+      // eslint-disable-next-line promise/always-return -- only updates local labels.
       .then((data) => {
         if (live) setLabels((old) => ({ ...old, ...Object.fromEntries(data.results.map((r) => [r.id, r.title])) }));
       })
@@ -49,6 +51,7 @@ function OptionField({
       setBusy(true);
       setError("");
       void loadOptions(field, query, page, parent)
+        // eslint-disable-next-line promise/always-return -- only updates local options.
         .then((data) => {
           if (!live) return;
           setOptions((old) =>
@@ -100,6 +103,7 @@ function OptionField({
       {open && (
         <div className="schema-picker-panel">
           <input
+            // eslint-disable-next-line jsx-a11y/no-autofocus -- the picker opens on demand and starts at its search box.
             autoFocus
             aria-label={`جستجوی ${field.title}`}
             value={query}
@@ -140,7 +144,7 @@ function OptionField({
             ))}
           </div>
           {busy && <p role="status">در حال دریافت…</p>}
-          {error && <p role="alert">{error}</p>}
+          <ErrorNotice message={error} />
           {!busy && !error && options.length === 0 && <p>گزینه‌ای یافت نشد.</p>}
           {options.length < count && (
             <button type="button" disabled={busy} onClick={() => setPage(page + 1)}>
@@ -312,6 +316,7 @@ function FormField({
                     !config.extensions.includes(file.name.split(".").pop()?.toLowerCase() || "")
                   )
                     throw new Error("نوع فایل مجاز نیست.");
+                  // eslint-disable-next-line no-await-in-loop -- files upload one at a time to keep their order.
                   ids.push((await props.uploadFile(field, file)).id);
                 }
                 onChange(ids);
@@ -325,7 +330,7 @@ function FormField({
           />
         </label>
         {uploading && <p role="status">در حال بارگذاری…</p>}
-        {uploadError && <p role="alert">{uploadError}</p>}
+        <ErrorNotice message={uploadError} />
         {(Array.isArray(value) ? value : []).map((file, i) => (
           <div key={file}>
             <a href={props.fileHref?.(field, file)} target="_blank" rel="noreferrer">
@@ -400,18 +405,21 @@ function FormField({
   }
   const related = field.kind === "relation" ? (Array.isArray(value) ? value : value ? [String(value)] : []) : [];
   return (
-    <div className={`schema-field schema-field-${field.kind}`} data-field={field.code}>
+    <div
+      className={`schema-field schema-field-${field.kind}${props.errors?.[field.code] ? " has-error" : ""}`}
+      data-field={field.code}
+    >
       <label htmlFor={id}>
         {field.title}
         {required && <span aria-label="الزامی"> *</span>}
         {!field.is_active && <small> (غیرفعال)</small>}
       </label>
       {input}
-      {related.map((id) => (
-        <RelationInfo key={id} field={field} id={id} props={props} />
+      {related.map((relatedId) => (
+        <RelationInfo key={relatedId} field={field} id={relatedId} props={props} />
       ))}
       {field.help_text && <small id={`${id}-help`}>{field.help_text}</small>}
-      {props.errors?.[field.code] && <p role="alert">{props.errors[field.code]}</p>}
+      {props.errors?.[field.code] && <span className="sr-only">{props.errors[field.code]}</span>}
     </div>
   );
 }
@@ -460,8 +468,10 @@ export function SchemaDrivenForm(props: SchemaFormProps) {
       if (child.config.depends_on === field.code) next[child.code] = child.kind === "multi_select" ? [] : null;
     onChange(next);
   };
+  const firstError = Object.entries(props.errors || {}).find(([, message]) => message);
   return (
     <div className="schema-form" dir="rtl">
+      <ErrorNotice message={firstError && `${fields.get(firstError[0])?.title || "فرم"}: ${firstError[1]}`} />
       {schema.layout.tabs.length > 0 && (
         <div role="tablist" aria-label="بخش‌های فرم" className="schema-tabs">
           {schema.layout.tabs.map((item) => (

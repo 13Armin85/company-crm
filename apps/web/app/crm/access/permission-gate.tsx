@@ -1,3 +1,4 @@
+import { ErrorState } from "../error-state";
 import type { ReactNode } from "react";
 import { Navigate } from "react-router";
 import { useAccess } from "./api";
@@ -17,7 +18,7 @@ export function PermissionGate({
 
 export function PermissionRoute({ permission, children }: { permission: string; children: ReactNode }) {
   const { data, isLoading, error } = useAccess();
-  if (error) return <p role="alert">عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید.</p>;
+  if (error) return <ErrorState message={"عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید."} />;
   if (isLoading || !data)
     return (
       <div role="status" className="access-loading">

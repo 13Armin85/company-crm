@@ -1,3 +1,4 @@
+import { ErrorNotice, ErrorState } from "../error-state";
 import { useEffect, useMemo, useState } from "react";
 import { Columns3, Filter, ListTree, Plus, Save, SlidersHorizontal } from "lucide-react";
 import { SearchableSelect } from "@plane/ui";
@@ -77,8 +78,9 @@ export function OfficialTableDesigner({ code }: { code: string }) {
   };
   if (schema.isLoading || saved.isLoading) return <Skeleton rows={5} />;
   if (schema.error || saved.error)
-    return <p role="alert">{errorMessage(schema.error || saved.error, "تنظیمات جدول دریافت نشد.")}</p>;
-  if (!access?.can("View.Official.Manage")) return <p role="alert">مجوز مدیریت جدول رسمی را ندارید.</p>;
+    return <ErrorState message={errorMessage(schema.error || saved.error, "تنظیمات جدول دریافت نشد.")} />;
+  if (!access?.can("View.Official.Manage"))
+    return <p role="status">برای تغییر ستون‌های رسمی جدول، دسترسی «مدیریت جدول رسمی» لازم است.</p>;
   if (!definition) return null;
   return (
     <section className="engine-official-designer">
@@ -234,7 +236,7 @@ export function OfficialTableDesigner({ code }: { code: string }) {
         />
       </section>
       {notice && <p role="status">{notice}</p>}
-      {mutation.error && <p role="alert">{errorMessage(mutation.error, "ذخیره جدول رسمی انجام نشد.")}</p>}
+      <ErrorNotice message={mutation.error && errorMessage(mutation.error, "ذخیره جدول رسمی انجام نشد.")} />
       <div className="engine-designer-savebar">
         <div>
           <strong>آمادهٔ ذخیره تنظیمات هستید؟</strong>

@@ -1,0 +1,786 @@
+/*
+ * One visual language for every form in the CRM: record forms, modals, settings,
+ * the form designer and drawers. Selectors start at :root so this layer wins over
+ * the older per-screen rules without !important.
+ */
+:root {
+  --form-control-height: 42px;
+  --form-radius: 10px;
+  --form-gap: 18px;
+  --form-border: var(--border);
+  --form-border-hover: color-mix(in srgb, var(--text-muted) 45%, var(--border));
+  --form-ring: color-mix(in srgb, var(--accent) 22%, transparent);
+  --form-danger: var(--red, #ef4444);
+  --form-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+/* ---------- Text controls ---------- */
+:root
+  :is(
+    .schema-form,
+    .access-modal,
+    .create-modal,
+    .form-grid,
+    .settings-section,
+    .engine-definition-editor,
+    .engine-designer,
+    .engine-record-form,
+    .engine-binding-settings,
+    .engine-field-drawer,
+    .dashboard-drawer,
+    .organization-modal,
+    .cycle-form,
+    .quick-create-form,
+    .auth-card
+  )
+  :is(
+    input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="color"]):not([type="range"]),
+    select,
+    textarea
+  ) {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--form-control-height);
+  padding: 9px 13px;
+  border: 1px solid var(--form-border);
+  border-radius: var(--form-radius);
+  background-color: var(--surface);
+  color: var(--text-primary);
+  font-size: 13.5px;
+  line-height: 1.7;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 4%);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.15s ease;
+}
+:root
+  :is(
+    .schema-form,
+    .access-modal,
+    .create-modal,
+    .form-grid,
+    .settings-section,
+    .engine-definition-editor,
+    .engine-designer,
+    .engine-record-form,
+    .engine-binding-settings,
+    .engine-field-drawer,
+    .dashboard-drawer,
+    .organization-modal,
+    .cycle-form,
+    .quick-create-form,
+    .auth-card
+  )
+  :is(
+    input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="color"]),
+    select,
+    textarea
+  ):hover:not(:disabled):not(:focus) {
+  border-color: var(--form-border-hover);
+}
+:root
+  :is(
+    .schema-form,
+    .access-modal,
+    .create-modal,
+    .form-grid,
+    .settings-section,
+    .engine-definition-editor,
+    .engine-designer,
+    .engine-record-form,
+    .engine-binding-settings,
+    .engine-field-drawer,
+    .dashboard-drawer,
+    .organization-modal,
+    .cycle-form,
+    .quick-create-form,
+    .auth-card
+  )
+  :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="color"]), select, textarea):focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--form-ring);
+}
+:root
+  :is(
+    .schema-form,
+    .access-modal,
+    .create-modal,
+    .form-grid,
+    .settings-section,
+    .engine-definition-editor,
+    .engine-designer,
+    .engine-record-form,
+    .engine-binding-settings,
+    .engine-field-drawer,
+    .dashboard-drawer,
+    .organization-modal,
+    .cycle-form,
+    .quick-create-form,
+    .auth-card
+  )
+  :is(input, select, textarea):is(:disabled, [readonly]:not([data-no-autofill])) {
+  background-color: var(--surface-soft);
+  color: var(--text-secondary);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+:root
+  :is(
+    .schema-form,
+    .access-modal,
+    .create-modal,
+    .form-grid,
+    .settings-section,
+    .engine-definition-editor,
+    .engine-designer,
+    .engine-record-form,
+    .engine-binding-settings,
+    .engine-field-drawer,
+    .dashboard-drawer,
+    .auth-card
+  )
+  :is(input, textarea)::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}
+:root
+  :is(
+    .schema-form,
+    .access-modal,
+    .create-modal,
+    .form-grid,
+    .settings-section,
+    .engine-definition-editor,
+    .engine-designer,
+    .engine-record-form,
+    .engine-binding-settings,
+    .engine-field-drawer,
+    .dashboard-drawer
+  )
+  textarea {
+  min-height: 104px;
+  resize: vertical;
+}
+:root
+  :is(
+    .schema-form,
+    .access-modal,
+    .create-modal,
+    .form-grid,
+    .settings-section,
+    .engine-definition-editor,
+    .engine-designer,
+    .engine-record-form,
+    .engine-binding-settings,
+    .engine-field-drawer,
+    .dashboard-drawer
+  )
+  select:not([multiple]) {
+  appearance: none;
+  padding-inline-start: 36px;
+  background-image: var(--form-chevron);
+  background-repeat: no-repeat;
+  background-position: left 12px center;
+  cursor: pointer;
+}
+:root
+  :is(
+    .schema-form,
+    .access-modal,
+    .create-modal,
+    .form-grid,
+    .settings-section,
+    .engine-definition-editor,
+    .engine-designer,
+    .engine-record-form,
+    .engine-binding-settings,
+    .engine-field-drawer,
+    .dashboard-drawer
+  )
+  select[multiple] {
+  min-height: 120px;
+  padding: 6px;
+}
+:root
+  :is(
+    .schema-form,
+    .access-modal,
+    .create-modal,
+    .form-grid,
+    .settings-section,
+    .engine-definition-editor,
+    .engine-designer,
+    .engine-record-form,
+    .engine-binding-settings,
+    .engine-field-drawer
+  )
+  input[type="color"] {
+  width: 56px;
+  height: var(--form-control-height);
+  padding: 4px;
+  border: 1px solid var(--form-border);
+  border-radius: var(--form-radius);
+  background: var(--surface);
+  cursor: pointer;
+}
+:root
+  :is(
+    .schema-form,
+    .access-modal,
+    .create-modal,
+    .form-grid,
+    .settings-section,
+    .engine-definition-editor,
+    .engine-record-form
+  )
+  input[type="file"] {
+  width: 100%;
+  padding: 10px;
+  border: 1px dashed var(--form-border-hover);
+  border-radius: var(--form-radius);
+  background: var(--surface-soft);
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+}
+:root
+  :is(
+    .schema-form,
+    .access-modal,
+    .create-modal,
+    .form-grid,
+    .settings-section,
+    .engine-definition-editor,
+    .engine-record-form
+  )
+  input[type="file"]::file-selector-button {
+  margin-inline-end: 12px;
+  padding: 7px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ---------- Labels and helper text ---------- */
+:root
+  :is(
+    .access-modal,
+    .create-modal,
+    .form-grid,
+    .settings-section,
+    .engine-definition-editor,
+    .engine-binding-settings,
+    .organization-modal,
+    .cycle-form,
+    .dashboard-drawer
+  )
+  label:not(.selector-option):not(.active-toggle):not(.engine-checkbox):not(.engine-search-field):not(
+    .schema-field > label
+  ) {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.8;
+}
+:root
+  :is(.access-modal, .create-modal, .form-grid, .settings-section)
+  label:not(.selector-option):not(.active-toggle)
+  > span:first-child {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+:root .schema-form .schema-field > label:not(.selector-option) {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 4px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.8;
+}
+:root .schema-form .schema-field > label:not(.selector-option) > span {
+  display: inline;
+  margin: 0;
+}
+:root .schema-field > label > span,
+:root :is(.access-modal, .create-modal, .form-grid) label b[aria-hidden="true"] {
+  color: var(--form-danger);
+  font-weight: 700;
+}
+:root
+  :is(.schema-field, .engine-definition-editor label, .access-modal label, .form-grid label, .settings-section label)
+  small {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.8;
+}
+:root .schema-field.has-error > label {
+  color: var(--form-danger);
+}
+
+/* ---------- Checkboxes and toggles as tappable rows ---------- */
+:root :is(.engine-checkbox, .active-toggle) {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid var(--form-border);
+  border-radius: var(--form-radius);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.7;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+:root :is(.engine-checkbox, .active-toggle):hover {
+  border-color: var(--form-border-hover);
+  background: var(--surface-soft);
+}
+:root :is(.engine-checkbox, .active-toggle):has(input:checked) {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+}
+:root :is(.engine-checkbox, .active-toggle):has(input:disabled) {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+:root :is(.engine-checkbox, .active-toggle):has(input:focus-visible) {
+  box-shadow: 0 0 0 3px var(--form-ring);
+}
+:root input[type="checkbox"],
+:root input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* ---------- Groups ---------- */
+:root
+  :is(.engine-definition-editor, .engine-binding-settings, .access-modal, .settings-section, .dashboard-drawer)
+  fieldset:not(.compact-selector) {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--form-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-soft) 55%, var(--surface));
+}
+:root
+  :is(.engine-definition-editor, .engine-binding-settings, .access-modal, .settings-section, .dashboard-drawer)
+  fieldset
+  > legend {
+  padding-inline: 8px;
+  color: var(--text-primary);
+  font-size: 13.5px;
+  font-weight: 700;
+}
+:root .compact-selector {
+  border-radius: 12px;
+  background: var(--surface);
+}
+:root :is(.engine-definition-editor, .engine-binding-settings) details {
+  border: 1px solid var(--form-border);
+  border-radius: 12px;
+  padding: 12px 16px;
+  background: var(--surface);
+}
+:root :is(.engine-definition-editor, .engine-binding-settings) details > summary {
+  color: var(--text-primary);
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+:root :is(.engine-definition-editor, .engine-binding-settings) details[open] > summary {
+  margin-bottom: 12px;
+}
+
+/* ---------- Record forms (schema-driven) ---------- */
+:root .schema-form {
+  gap: 20px;
+}
+:root .schema-section {
+  padding: 20px;
+  border: 1px solid var(--form-border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgb(15 23 42 / 3%);
+}
+:root .schema-section + .schema-section {
+  padding-top: 20px;
+  border-top: 1px solid var(--form-border);
+}
+:root .schema-section h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 18px;
+  color: var(--text-primary);
+  font-size: 14.5px;
+  font-weight: 700;
+}
+:root .schema-section h3::before {
+  width: 4px;
+  height: 18px;
+  flex: 0 0 4px;
+  border-radius: 4px;
+  background: var(--accent);
+  content: "";
+}
+:root .schema-grid {
+  gap: var(--form-gap) 20px;
+}
+:root .schema-tabs {
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--form-border);
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+:root .schema-tabs button {
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 9px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+:root .schema-tabs button:hover {
+  color: var(--text-primary);
+}
+:root .schema-tabs button[aria-selected="true"] {
+  border: 0;
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: 0 1px 3px rgb(15 23 42 / 10%);
+}
+:root .schema-picker-trigger {
+  min-height: var(--form-control-height);
+  border-radius: var(--form-radius);
+}
+
+/* ---------- Modals ---------- */
+:root .access-modal,
+:root .create-modal {
+  padding: 0 22px 22px;
+  border-radius: 16px;
+  box-shadow: 0 30px 80px rgb(0 0 0 / 28%);
+}
+:root .access-modal {
+  width: min(640px, calc(100vw - 28px));
+}
+:root :is(.access-modal, .create-modal) > header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 -22px 20px;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--form-border);
+  background: var(--surface);
+}
+:root :is(.access-modal, .create-modal) > header h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 17px;
+  font-weight: 700;
+}
+:root .access-modal form {
+  gap: var(--form-gap);
+}
+:root .access-modal footer {
+  position: sticky;
+  bottom: -22px;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  margin: 4px -22px -22px;
+  padding: 14px 22px;
+  border-top: 1px solid var(--form-border);
+  background: var(--surface);
+}
+
+/* ---------- Form footers and actions ---------- */
+:root .engine-form-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 10px;
+  margin-top: 4px;
+  padding-top: 16px;
+  border-top: 1px solid var(--form-border);
+}
+:root
+  :is(
+    .schema-form,
+    .access-modal,
+    .create-modal,
+    .form-grid,
+    .settings-section,
+    .engine-definition-editor,
+    .engine-designer,
+    .engine-record-form,
+    .engine-binding-settings,
+    .engine-field-drawer,
+    .dashboard-drawer,
+    .auth-card
+  )
+  .button {
+  min-height: 40px;
+  padding-inline: 16px;
+  border-radius: var(--form-radius);
+  font-size: 13px;
+  font-weight: 600;
+}
+:root .button-primary {
+  box-shadow: 0 1px 2px rgb(15 23 42 / 12%);
+}
+:root .button-primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 88%, black);
+}
+:root .button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--form-ring);
+}
+
+/* ---------- Field definition editor and drawers ---------- */
+:root .engine-definition-editor {
+  display: grid;
+  gap: var(--form-gap);
+}
+:root .engine-definition-editor > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--form-border);
+}
+:root .engine-definition-editor > header h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+:root .engine-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  align-items: start;
+  gap: 14px;
+}
+:root :is(.form-grid, .schema-grid) {
+  align-items: start;
+}
+:root .engine-field-drawer {
+  padding: 24px;
+  border-inline-start: 1px solid var(--form-border);
+  background: var(--surface);
+  box-shadow: -24px 0 60px rgb(0 0 0 / 18%);
+}
+:root .dashboard-drawer {
+  display: grid;
+  align-content: start;
+  gap: var(--form-gap);
+}
+
+/* ---------- Settings ---------- */
+:root .settings-section {
+  padding: 24px;
+  border-radius: 14px;
+}
+:root .settings-section > header h2 {
+  font-size: 16px;
+  font-weight: 700;
+}
+:root .settings-section > header p {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+:root .form-grid {
+  gap: var(--form-gap) 20px;
+}
+
+@media (max-width: 640px) {
+  :root .schema-section {
+    padding: 16px;
+  }
+  :root :is(.access-modal, .create-modal) {
+    width: 100vw;
+    max-height: 100dvh;
+    border-radius: 0;
+  }
+  :root .access-modal footer .button {
+    flex: 1 1 auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root :is(input, select, textarea, .engine-checkbox, .active-toggle, .schema-tabs button) {
+    transition: none;
+  }
+}
+
+/* ---------- Table tab visibility ---------- */
+.surface-table-tabbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+.surface-table-tabbar > .surface-table-tabs {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+}
+.table-tab-picker {
+  flex: 0 0 auto;
+}
+:root .table-tab-picker-trigger {
+  min-height: 34px;
+  gap: 6px;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.table-tab-picker-count {
+  padding: 1px 8px;
+  border-radius: 99px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11.5px;
+}
+.table-tab-picker-panel {
+  --anchor-gap: 6px;
+  z-index: 140;
+  width: min(280px, calc(100vw - 24px));
+  max-height: min(380px, var(--anchor-max-height, 380px));
+  overflow-y: auto;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text-primary);
+  box-shadow: 0 18px 44px rgb(0 0 0 / 22%);
+}
+.table-tab-picker-actions {
+  display: flex;
+  gap: 6px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.table-tab-picker-actions button {
+  flex: 1;
+  min-height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  font-size: 12px;
+  cursor: pointer;
+}
+.table-tab-picker-actions button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.table-tab-picker-actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.table-tab-picker-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-muted);
+}
+.table-tab-picker-search input {
+  flex: 1;
+  min-width: 0;
+  min-height: 34px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12.5px;
+}
+.table-tab-picker-panel ul {
+  display: grid;
+  gap: 2px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.table-tab-picker-panel label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.table-tab-picker-panel label:hover {
+  background: var(--surface-soft);
+}
+.table-tab-picker-panel label.is-locked {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.table-tab-picker-empty {
+  padding: 8px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+@media (max-width: 640px) {
+  .surface-table-tabbar {
+    flex-wrap: wrap;
+  }
+}
+.tab-bar-with-chooser {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+.tab-bar-with-chooser > .tab-bar {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+}
+@media (max-width: 640px) {
+  .tab-bar-with-chooser {
+    flex-wrap: wrap;
+  }
+}

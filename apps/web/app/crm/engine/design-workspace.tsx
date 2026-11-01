@@ -4,9 +4,8 @@ import { CloseOutline, SearchOutline } from "@makeplane/propel/icons";
 import { Eye, GitBranch, History, LayoutTemplate, ListChecks, ShieldCheck, Table2 } from "lucide-react";
 import { normalizePersianSearch } from "@plane/ui";
 import { Button, Skeleton } from "../components";
-import { errorMessage, useWorkspaceAccess } from "../api";
+import { useWorkspaceAccess } from "../api";
 import { useUIStore } from "../store";
-import { DefinitionEditor } from "./definition-editor";
 import { FormDesigner } from "./form-designer";
 import { PageEditor } from "./page-studio";
 import { OfficialTableDesigner } from "./official-table-designer";
@@ -19,13 +18,13 @@ import type { FieldDefinition } from "./api";
 type DesignTab = "fields" | "layout" | "preview" | "versions" | "table" | "rules" | "relations";
 type Surface = { code: string; path: string; title: string; native_columns: string[] };
 const tabs: { id: DesignTab; label: string; hint: string; icon: typeof ListChecks }[] = [
-  { id: "fields", label: "ورودی‌های فرم", hint: "تعریف و ویرایش ورودی‌ها", icon: ListChecks },
-  { id: "layout", label: "چیدمان فرم", hint: "تب‌ها، بخش‌ها و ترتیب فیلدها", icon: LayoutTemplate },
-  { id: "preview", label: "پیش‌نمایش", hint: "بررسی فرم پیش از انتشار", icon: Eye },
-  { id: "versions", label: "نسخه‌ها", hint: "تاریخچه و بازیابی", icon: History },
-  { id: "table", label: "جدول و تب‌ها", hint: "ستون‌ها، نماها و خلاصه ردیف", icon: Table2 },
-  { id: "rules", label: "قواعد ثبت", hint: "یکتایی، شماره و وضعیت فیلد", icon: ShieldCheck },
-  { id: "relations", label: "ارتباط‌ها", hint: "پیوندها و داده‌های خواندنی", icon: GitBranch },
+  { id: "fields", label: "ورودی‌های فرم", hint: "چه اطلاعاتی از کاربر گرفته شود", icon: ListChecks },
+  { id: "layout", label: "چیدمان فرم", hint: "ترتیب ورودی‌ها، بخش‌ها و تب‌ها", icon: LayoutTemplate },
+  { id: "preview", label: "پیش‌نمایش", hint: "امتحان فرم همان‌طور که کاربر می‌بیند", icon: Eye },
+  { id: "versions", label: "نسخه‌های قبلی", hint: "بازگشت به چیدمان‌های قبلی", icon: History },
+  { id: "table", label: "ستون‌های جدول", hint: "ستون‌ها و تب‌های فهرست", icon: Table2 },
+  { id: "rules", label: "قواعد ثبت", hint: "جلوگیری از تکرار و شماره‌گذاری خودکار", icon: ShieldCheck },
+  { id: "relations", label: "ارتباط‌ها", hint: "اتصال به بخش‌های دیگر", icon: GitBranch },
 ];
 const surfaceCodes = new Set(["ticket", "project", "leave", "users", "units", "roles", "routing", "cycles"]);
 const nativePaths: Record<string, string> = {
@@ -44,7 +43,6 @@ export function DesignWorkspace() {
   const [code, setCode] = useState("ticket");
   const [tab, setTab] = useState<DesignTab>("fields");
   const [search, setSearch] = useState("");
-  const [creating, setCreating] = useState(false);
   const [general, setGeneral] = useState(false);
   const form = useEngineForm(code, Boolean(catalog.data?.entities.some((item) => item.code === code)));
   const entities = (catalog.data?.entities || []).filter((item) => item.is_active && item.code !== "task");
@@ -56,7 +54,7 @@ export function DesignWorkspace() {
     if (next === code) return;
     if (
       useUIStore.getState().dirtyForms.length &&
-      !window.confirm("تغییرات ذخیره‌نشده کنار گذاشته و به موجودیت دیگر برویم؟")
+      !window.confirm("تغییرات ذخیره‌نشده کنار گذاشته شود و به بخش دیگر برویم؟")
     )
       return;
     setCode(next);
@@ -65,7 +63,19 @@ export function DesignWorkspace() {
   if (catalog.isLoading || fields.isLoading || surfaces.isLoading) return <Skeleton rows={8} />;
   if (catalog.error || fields.error || surfaces.error)
     return (
-      <p role="alert">{errorMessage(catalog.error || fields.error || surfaces.error, "فضای طراحی بارگذاری نشد.")}</p>
+      <div className="engine-empty-selection">
+        <strong>طراحی فرم‌ها بارگذاری نشد</strong>
+        <Button
+          variant="secondary"
+          onClick={() => {
+            void catalog.refetch();
+            void fields.refetch();
+            void surfaces.refetch();
+          }}
+        >
+          تلاش دوباره
+        </Button>
+      </div>
     );
   const list = entities.filter((item) =>
     normalizePersianSearch(item.title + item.code).includes(normalizePersianSearch(search))
@@ -76,10 +86,10 @@ export function DesignWorkspace() {
       <aside className="engine-workspace-sidebar" aria-label="فرم‌ها و جدول‌ها">
         <header>
           <strong>فرم‌ها و جدول‌ها</strong>
-          <small>{entities.length.toLocaleString("fa-IR")} موجودیت و زیرنوع</small>
+          <small>{entities.length.toLocaleString("fa-IR")} فرم قابل تنظیم</small>
         </header>
         <div className="engine-entity-search">
-          <label htmlFor="engine-entity-search-input">جستجوی موجودیت</label>
+          <label htmlFor="engine-entity-search-input">جستجوی فرم</label>
           <div className="engine-entity-search-control">
             <SearchOutline aria-hidden="true" />
             <input
@@ -96,7 +106,7 @@ export function DesignWorkspace() {
             )}
           </div>
         </div>
-        <nav aria-label="انتخاب موجودیت">
+        <nav aria-label="انتخاب فرم">
           {list.map((item) => (
             <button
               type="button"
@@ -106,16 +116,11 @@ export function DesignWorkspace() {
               onClick={() => choose(item.code)}
             >
               <strong>{item.code === "ticket" ? "کارها" : item.title}</strong>
-              <small>{item.parent ? "زیرنوع" : item.adapter ? "صفحه اصلی" : "موجودیت سفارشی"}</small>
+              <small>{item.parent ? "نوع فرعی" : item.adapter ? "بخش اصلی سامانه" : "بخش سفارشی"}</small>
             </button>
           ))}
         </nav>
-        {!list.length && <p>موجودیتی با این نام پیدا نشد.</p>}
-        {access?.can("EntityType.Create") && (
-          <Button variant="secondary" onClick={() => setCreating(true)}>
-            موجودیت جدید
-          </Button>
-        )}
+        {!list.length && <p>فرمی با این نام پیدا نشد.</p>}
         {access?.can("View.Official.Manage") && (
           <Button variant="ghost" onClick={() => setGeneral(true)}>
             تنظیمات عمومی جدول‌ها
@@ -127,9 +132,9 @@ export function DesignWorkspace() {
           <>
             <header className="engine-workspace-heading">
               <div>
-                <small>طراحی موجودیت</small>
+                <small>فرم و جدول</small>
                 <h2>{entity.code === "ticket" ? "کارها" : entity.title}</h2>
-                <p>فرم ایجاد و ویرایش مشترک است؛ تنظیمات جدول و قواعد داده در بخش‌های جدا قرار دارند.</p>
+                <p>فرم ثبت و ویرایش یکی است؛ ستون‌های جدول و قواعد ثبت را از تب‌های پایین تنظیم کنید.</p>
               </div>
               <Link
                 className="button button-secondary"
@@ -200,31 +205,9 @@ export function DesignWorkspace() {
             </section>
           </>
         ) : (
-          <p>برای شروع، یک موجودیت را انتخاب کنید.</p>
+          <p>برای شروع، یکی از فرم‌های فهرست را انتخاب کنید.</p>
         )}
       </main>
-      {creating && (
-        <div
-          className="engine-field-drawer-backdrop"
-          role="presentation"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) setCreating(false);
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Escape") setCreating(false);
-          }}
-        >
-          <div className="engine-field-drawer" role="dialog" aria-modal="true" aria-label="موجودیت جدید">
-            <DefinitionEditor
-              kind="entities"
-              onClose={() => setCreating(false)}
-              onSaved={(item) => {
-                if (item?.code) choose(item.code);
-              }}
-            />
-          </div>
-        </div>
-      )}
       {general && (
         <div
           className="engine-field-drawer-backdrop"

@@ -1,3 +1,4 @@
+import { ErrorNotice } from "../error-state";
 import { useState } from "react";
 import { ArrowLeftRight, GitBranch, Link2, Plus, ScanSearch } from "lucide-react";
 import { SearchableSelect } from "@plane/ui";
@@ -147,7 +148,7 @@ function LookupEditor({ entityCode }: { entityCode?: string }) {
             </>
           )}
           {(fields.error || mutation.error) && (
-            <p role="alert">{errorMessage(fields.error || mutation.error, "افزودن فیلد خواندنی انجام نشد.")}</p>
+            <ErrorNotice message={errorMessage(fields.error || mutation.error, "افزودن فیلد خواندنی انجام نشد.")} />
           )}
         </div>
         <aside className="engine-relations-lookup-guide">
@@ -445,11 +446,12 @@ export function RelationSettings({ entityCode }: { entityCode?: string } = {}) {
             </form>
           )}
         </div>
-        {(relations.error || mutation.error) && (
-          <p className="engine-relations-error" role="alert">
-            {errorMessage(relations.error || mutation.error, "ذخیره ارتباط انجام نشد.")}
-          </p>
-        )}
+        <ErrorNotice
+          message={
+            (relations.error || mutation.error) &&
+            errorMessage(relations.error || mutation.error, "ذخیره ارتباط انجام نشد.")
+          }
+        />
       </section>
       {access?.can("Relation.Edit") && <LookupEditor entityCode={entityCode} />}
     </div>

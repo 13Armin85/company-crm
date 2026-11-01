@@ -299,6 +299,18 @@ class OrganizationUnitListEndpoint(BaseAPIView):
         return Response(OrganizationUnitSerializer(unit).data, status=status.HTTP_201_CREATED)
 
 
+def _unit_descendant_ids(unit):
+    found, frontier = [], [unit.id]
+    while frontier:
+        frontier = list(
+            OrganizationUnit.objects.filter(workspace_id=unit.workspace_id, parent_id__in=frontier)
+            .exclude(id__in=found + [unit.id])
+            .values_list("id", flat=True)
+        )
+        found.extend(frontier)
+    return found
+
+
 def _sync_unit_members(unit, member_ids):
     member_ids = normalize_ids(member_ids, "member_ids")
     users = User.objects.filter(
@@ -338,15 +350,25 @@ class OrganizationUnitDetailEndpoint(BaseAPIView):
             with transaction.atomic():
                 Workspace.objects.select_for_update().get(pk=unit.workspace_id)
                 unit = OrganizationUnit.objects.select_for_update().get(pk=unit.pk)
+                deactivated = []
                 if serializer.validated_data.get("is_active") is False:
                     from plane.app.services.entity_directory import check_directory_deletion
 
-                    check_directory_deletion(unit.workspace, "unit", unit.id, request.user, request)
+                    # Disabling a unit disables its whole subtree.
+                    deactivated = _unit_descendant_ids(unit)
+                    for unit_id_ in [unit.id, *deactivated]:
+                        check_directory_deletion(unit.workspace, "unit", unit_id_, request.user, request)
                 for field in ("title", "parent", "manager", "is_active"):
                     if field in serializer.validated_data:
                         setattr(unit, field, serializer.validated_data[field])
+                if unit.is_active and unit.parent_id and not unit.parent.is_active:
+                    raise ValidationError({"is_active": "ابتدا واحد بالادستی را فعال کنید."})
                 unit.full_clean(exclude=["created_by", "updated_by"])
                 unit.save()
+                if deactivated:
+                    OrganizationUnit.objects.filter(id__in=deactivated, is_active=True).update(
+                        is_active=False, updated_at=timezone.now()
+                    )
                 if "member_ids" in request.data:
                     _sync_unit_members(unit, request.data.get("member_ids", []))
                 audit_access(request, unit.workspace, "unit.edit", unit.id)

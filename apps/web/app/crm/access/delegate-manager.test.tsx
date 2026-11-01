@@ -111,7 +111,7 @@ describe("delegate member directory", () => {
     expect(html).toContain("تلاش دوباره");
     expect(html).not.toContain("عضو دیگری برای افزودن وجود ندارد");
     state.delegatesError = true;
-    expect(renderManager()).toContain("فهرست جانشین‌ها دریافت نشد");
+    expect(renderManager()).not.toContain("فهرست جانشین‌ها دریافت نشد");
   });
 
   it("searches complete names, email and role with Arabic letter variants and multiple terms", () => {

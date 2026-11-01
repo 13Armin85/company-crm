@@ -81,9 +81,11 @@ export const useUIStore = create<UIState>((set, get) => ({
       toasts: [],
     }),
   toast: (message, kind = "success") => {
-    const id = Date.now();
-    set({ toasts: [...get().toasts, { id, message, kind }] });
-    window.setTimeout(() => get().removeToast(id), 3600);
+    // The same failure is often reported by a request and by the screen that made it.
+    if (get().toasts.some((item) => item.message === message && item.kind === kind)) return;
+    const id = Date.now() + Math.random();
+    set({ toasts: [...get().toasts, { id, message, kind }].slice(-4) });
+    window.setTimeout(() => get().removeToast(id), kind === "error" ? 6000 : 3600);
   },
   removeToast: (id) => set({ toasts: get().toasts.filter((toast) => toast.id !== id) }),
 }));

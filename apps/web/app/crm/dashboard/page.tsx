@@ -1,3 +1,4 @@
+import { ErrorState } from "../error-state";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -149,13 +150,25 @@ export default function DashboardPage() {
       toast(errorMessage(error, "ذخیره داشبورد انجام نشد"), "error");
     }
   }
-  function createTab() {
-    if (!newTab.trim()) return;
-    const tab = { id: identifier(), title: newTab.trim(), widgets: [] };
-    setTabs((current) => [...current, tab]);
+  async function createTab() {
+    const title = newTab.trim() || `تب ${(tabs.length + 1).toLocaleString("fa-IR")}`;
+    const tab: DashboardTab = { id: identifier(), title, widgets: [] };
+    const next = [...tabs, tab];
+    setTabs(next);
+    setSharedActive(null);
     setActiveId(tab.id);
     setNewTab("");
-    setEditing(true);
+    // A draft with other unsaved edits is saved together with the new tab.
+    try {
+      const result = await save.mutateAsync({ tabs: next, revision });
+      setTabs(duplicate(result.tabs));
+      setRevision(result.revision);
+      setEditing(false);
+      toast(`تب «${title}» ساخته شد`, "success");
+    } catch (error) {
+      setEditing(true);
+      toast(errorMessage(error, "ساخت تب انجام نشد"), "error");
+    }
   }
   async function createWidget(type: WidgetType) {
     try {
@@ -180,6 +193,7 @@ export default function DashboardPage() {
       if (from < 0 || to < 0) return tab;
       const [moved] = widgets.splice(from, 1);
       widgets.splice(to, 0, moved);
+      // eslint-disable-next-line oxc/no-map-spread -- React state must be copied, not mutated.
       return { ...tab, widgets: widgets.map((item, index) => ({ ...item, x: 0, y: index * 3 })) };
     });
   }
@@ -196,11 +210,7 @@ export default function DashboardPage() {
   }
   if (dashboard.isLoading) return <Skeleton rows={6} cards />;
   if (dashboard.isError)
-    return (
-      <div className="dashboard-error">
-        دریافت داشبورد انجام نشد. <Button onClick={() => dashboard.refetch()}>تلاش دوباره</Button>
-      </div>
-    );
+    return <ErrorState message="دریافت داشبورد انجام نشد." onRetry={() => void dashboard.refetch()} />;
   return (
     <div className="custom-dashboard" dir="rtl">
       <PageHeader
@@ -330,18 +340,18 @@ export default function DashboardPage() {
             )}
           </div>
         ))}
-        {editing && (
+        {!sharedActive && (
           <div className="dashboard-new-tab">
             <input
               aria-label="نام تب جدید"
-              placeholder="نام تب جدید"
+              placeholder="تب جدید"
               value={newTab}
               onChange={(event) => setNewTab(event.target.value)}
               onKeyDown={(event) => {
-                if (event.key === "Enter") createTab();
+                if (event.key === "Enter") void createTab();
               }}
             />
-            <button aria-label="ساخت تب" onClick={createTab}>
+            <button aria-label="افزودن تب" title="افزودن تب" disabled={save.isPending} onClick={() => void createTab()}>
               <Plus size={17} />
             </button>
           </div>
@@ -452,6 +462,12 @@ export default function DashboardPage() {
                     >
                       بلندتر
                     </button>
+                    <button
+                      disabled={widget.h <= 2}
+                      onClick={() => modifyWidget(widget.id, (item) => ({ ...item, h: Math.max(2, item.h - 1) }))}
+                    >
+                      کوتاه‌تر
+                    </button>
                   </footer>
                 )}
               </article>
@@ -521,6 +537,7 @@ export default function DashboardPage() {
       {gallery && (
         <div
           className="dashboard-overlay"
+          role="presentation"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) setGallery(false);
           }}
@@ -566,6 +583,7 @@ export default function DashboardPage() {
       {configured && (
         <div
           className="dashboard-overlay"
+          role="presentation"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) setConfiguredId("");
           }}
@@ -591,6 +609,7 @@ export default function DashboardPage() {
       {sharing && (
         <div
           className="dashboard-overlay"
+          role="presentation"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) setSharingId("");
           }}

@@ -1,4 +1,5 @@
-import { AlertCircle, RefreshCw } from "lucide-react";
+import { ErrorNotice } from "../error-state";
+import { RefreshCw } from "lucide-react";
 import { errorMessage } from "../api";
 import { localizeError } from "../error-messages";
 
@@ -26,6 +27,18 @@ export function studioIssues(error: unknown): StudioIssue[] {
 }
 export const studioInputError = (error: unknown, path: string) =>
   studioIssues(error).find((issue) => issue.path === path)?.message;
+export function studioErrorNotice(error: unknown, fallback: string, preservesDraft = false) {
+  const code = (error as { code?: string })?.code;
+  const message =
+    code === "ECONNABORTED" || code === "ETIMEDOUT"
+      ? "دریافت پاسخ بیش از حد طول کشید؛ اتصال را بررسی و دوباره تلاش کنید."
+      : errorMessage(error, fallback);
+  const details = studioIssues(error)
+    .filter((issue) => issue.message !== message)
+    .map((issue) => `${issue.label}: ${issue.message}`);
+  return [message, ...details, preservesDraft ? "تغییرات ذخیره‌نشده شما حفظ شده است." : ""].filter(Boolean).join(" · ");
+}
+
 export function StudioError({
   error,
   fallback,
@@ -37,33 +50,17 @@ export function StudioError({
   retry?: () => void;
   preservesDraft?: boolean;
 }) {
-  const code = (error as { code?: string })?.code;
-  const message =
-    code === "ECONNABORTED" || code === "ETIMEDOUT"
-      ? "دریافت پاسخ بیش از حد طول کشید؛ اتصال را بررسی و دوباره تلاش کنید."
-      : errorMessage(error, fallback);
-  const issues = studioIssues(error).filter((issue) => issue.message !== message);
+  const notice = studioErrorNotice(error, fallback, preservesDraft);
   return (
-    <div className="studio-error" role="alert">
-      <AlertCircle size={20} aria-hidden="true" />
-      <div>
-        <strong>{message}</strong>
-        {issues.length > 0 && (
-          <ul>
-            {issues.map((issue) => (
-              <li key={`${issue.path}:${issue.message}`}>
-                {issue.label}: {issue.message}
-              </li>
-            ))}
-          </ul>
-        )}
-        {preservesDraft && <p>تغییرات ذخیره‌نشده شما حفظ شده است.</p>}
-        {retry && (
-          <button type="button" onClick={retry}>
+    <>
+      <ErrorNotice message={notice} />
+      {retry && (
+        <div className="error-state">
+          <button type="button" className="button button-secondary" onClick={retry}>
             <RefreshCw size={14} /> تلاش دوباره
           </button>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
+    </>
   );
 }

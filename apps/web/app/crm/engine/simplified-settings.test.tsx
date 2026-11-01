@@ -52,11 +52,12 @@ describe("simplified forms and profile", () => {
     expect(html).not.toContain("پروفایل من");
     expect(html).toContain("ورودی‌های فرم");
     expect(html).toContain("چیدمان فرم");
-    expect(html).toContain("جدول و تب‌ها");
+    expect(html).toContain("ستون‌های جدول");
     expect(html).toContain("قواعد ثبت");
     expect(html).toContain("ارتباط‌ها");
     expect(html).toContain('type="search"');
-    expect(html).toContain("جستجوی موجودیت");
+    expect(html).toContain("جستجوی فرم");
+    expect(html).not.toContain("موجودیت جدید");
     expect(html.match(/engine-workspace-tab-copy/g)).toHaveLength(7);
     for (const label of [
       "نقش‌های سازمانی",

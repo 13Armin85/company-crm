@@ -1,3 +1,4 @@
+import { ErrorNotice } from "../error-state";
 import { Children, cloneElement, isValidElement, useEffect, useState } from "react";
 import type { FormEvent, FormHTMLAttributes, ReactElement, ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -21,6 +22,7 @@ import { Button } from "../components";
 import { EntityViewsPage } from "./view-page";
 import type { SavedViewList } from "./view-types";
 import { RecordSummaryDrawer } from "./record-drawer";
+import { MAIN_TABLE_TAB, TableTabPicker, useVisibleTableTabs } from "./table-tab-picker";
 
 export interface NativeField {
   code: string;
@@ -222,7 +224,7 @@ export function SurfaceForm({
         content.filter((node) => !isAction(node)),
         config.data?.native_fields || []
       )}
-      {failure && <p role="alert">{errorMessage(failure, "تنظیمات فرم دریافت نشد. دوباره تلاش کنید.")}</p>}
+      <ErrorNotice message={failure && errorMessage(failure, "تنظیمات فرم دریافت نشد. دوباره تلاش کنید.")} />
       {!!config.data?.schema.fields.length && (
         <div className="surface-extra-fields">
           <SchemaDrivenForm
@@ -278,7 +280,7 @@ export function SurfaceFields({
   return (
     <>
       {configureNativeFields(children, config.data?.native_fields || [])}
-      {(config.error || stored.error) && <p role="alert">دریافت اطلاعات تکمیلی انجام نشد.</p>}
+      <ErrorNotice message={(config.error || stored.error) && "دریافت اطلاعات تکمیلی انجام نشد."} />
       {!!config.data?.schema.fields.length && (
         <div className="surface-extra-fields">
           <SchemaDrivenForm
@@ -405,7 +407,15 @@ export function SurfaceTable({
   }>[];
   const [activeTab, setActiveTab] = useState("");
   const tabs = config.data?.definition.table_tabs || [];
-  const selectedTab = tabs.find((tab) => tab.id === activeTab);
+  const tabView = useVisibleTableTabs(
+    code,
+    tabs.map((tab) => tab.id)
+  );
+  const visibleTabs = tabs.filter((tab) => tabView.isVisible(tab.id));
+  const mainVisible = tabView.isVisible(MAIN_TABLE_TAB);
+  const currentTab =
+    activeTab && tabView.isVisible(activeTab) ? activeTab : mainVisible ? "" : visibleTabs[0]?.id || "";
+  const selectedTab = tabs.find((tab) => tab.id === currentTab);
   const columns =
     selectedTab?.columns || config.data?.definition.columns || headings.map((h) => `native:${textOf(h) || "عملیات"}`);
   const values = useSurfaceValues(code, columns.some((c) => !c.startsWith("native:")) ? rows.map(surfaceRowId) : []);
@@ -442,23 +452,28 @@ export function SurfaceTable({
           <Settings2 size={14} /> تنظیم جدول و تب‌ها
         </Link>
       )}
-      {(config.error || values.error) && <p role="alert">دریافت تنظیمات یا اطلاعات ستون‌ها انجام نشد.</p>}
+      <ErrorNotice message={(config.error || values.error) && "دریافت تنظیمات یا اطلاعات ستون‌ها انجام نشد."} />
       {!!tabs.length && (
-        <div className="surface-table-tabs" role="tablist" aria-label="تب‌های جدول">
-          <button type="button" role="tab" aria-selected={!selectedTab} onClick={() => setActiveTab("")}>
-            جدول اصلی
-          </button>
-          {tabs.map((tab) => (
-            <button
-              type="button"
-              key={tab.id}
-              role="tab"
-              aria-selected={selectedTab?.id === tab.id}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              {tab.title}
-            </button>
-          ))}
+        <div className="surface-table-tabbar">
+          <div className="surface-table-tabs" role="tablist" aria-label="تب‌های جدول">
+            {mainVisible && (
+              <button type="button" role="tab" aria-selected={!selectedTab} onClick={() => setActiveTab("")}>
+                جدول اصلی
+              </button>
+            )}
+            {visibleTabs.map((tab) => (
+              <button
+                type="button"
+                key={tab.id}
+                role="tab"
+                aria-selected={selectedTab?.id === tab.id}
+                onClick={() => setActiveTab(tab.id)}
+              >
+                {tab.title}
+              </button>
+            ))}
+          </div>
+          <TableTabPicker tabs={tabs} hidden={tabView.hidden} onChange={tabView.setHidden} />
         </div>
       )}
       <table {...props}>

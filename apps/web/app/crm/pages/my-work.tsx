@@ -1,3 +1,4 @@
+import { ErrorState } from "../error-state";
 import { useState } from "react";
 import { CalendarClock, Check, CheckCheck, ArrowUpLeft, LayoutDashboard, List, ListTodo } from "lucide-react";
 import { zonedDateTime } from "@plane/ui";
@@ -156,7 +157,7 @@ export default function MyWorkPage() {
           </div>
         </div>
         <div className="my-work-filters">
-          <TabBar items={items} active={tab} onChange={setTab} />
+          <TabBar chooserKey="my-work-status" items={items} active={tab} onChange={setTab} />
           <SearchBox value={query} onChange={setQuery} placeholder="جستجوی عنوان، شناسه یا فرستنده…" />
         </div>
         <div className="my-work-results" role="status">
@@ -167,9 +168,7 @@ export default function MyWorkPage() {
         {isLoading || userLoading ? (
           <Skeleton rows={5} />
         ) : (isAdmin ? currentIssues.error : history.error) ? (
-          <p className="my-work-error" role="alert">
-            دریافت کارها انجام نشد. صفحه را دوباره بارگذاری کنید.
-          </p>
+          <ErrorState message="دریافت کارها انجام نشد." />
         ) : !visible.length ? (
           <EmptyState
             icon={Check}

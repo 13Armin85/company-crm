@@ -1,3 +1,4 @@
+import { ErrorState } from "../error-state";
 import {
   displayPersianDate,
   jalaliToDateOnly,
@@ -12,7 +13,6 @@ import { jalaaliMonthLength } from "jalaali-js";
 import { useState } from "react";
 import { Link } from "react-router";
 import { errorMessage } from "../api";
-import { Button } from "../components";
 import { persianDate } from "../utils";
 import { useWidgetData } from "./api";
 import type { DashboardWidget } from "./types";
@@ -111,12 +111,10 @@ export function DashboardCalendar({ widget }: { widget: DashboardWidget }) {
         />
       </div>
       {result.isError ? (
-        <div className="dashboard-widget-error">
-          <p>{errorMessage(result.error, "دریافت تقویم انجام نشد")}</p>
-          <Button variant="secondary" onClick={() => result.refetch()}>
-            تلاش دوباره
-          </Button>
-        </div>
+        <ErrorState
+          message={errorMessage(result.error, "دریافت تقویم انجام نشد")}
+          onRetry={() => void result.refetch()}
+        />
       ) : (
         <>
           <div className="dashboard-calendar-weekdays" aria-hidden="true">

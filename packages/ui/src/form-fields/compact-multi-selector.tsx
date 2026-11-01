@@ -63,7 +63,13 @@ export function CompactMultiSelector({
             انتخاب {label} · {selected.length.toLocaleString("fa-IR")} انتخاب ⌄
           </PopoverButton>
         )}
-        <PopoverPanel static={expanded} className="selector-panel" focus={!expanded}>
+        <PopoverPanel
+          static={expanded}
+          className={`selector-panel${expanded ? "" : " selector-multi-options"}`}
+          focus={false}
+          anchor={expanded ? undefined : "bottom start"}
+          portal={!expanded}
+        >
           <label className="selector-search">
             <span className="sr-only">جستجو در {label}</span>
             <input

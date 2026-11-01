@@ -1,3 +1,4 @@
+import { ErrorNotice } from "../error-state";
 import { SearchableSelect } from "@plane/ui";
 import { useEffect, useMemo, useState } from "react";
 import { Building2, ChevronDown, ChevronLeft, Edit3, Plus, Power, Trash2, UsersRound } from "lucide-react";
@@ -156,7 +157,16 @@ export default function OrganizationPage() {
                 title={unit.isActive ? "غیرفعال کردن" : "فعال کردن"}
                 aria-label={unit.isActive ? "غیرفعال کردن" : "فعال کردن"}
                 disabled={saveUnit.isPending}
-                onClick={() => saveUnit.mutate({ id: unit.id, isActive: !unit.isActive })}
+                onClick={() => {
+                  const hasChildren = units.some((item) => item.parentId === unit.id && item.isActive);
+                  if (
+                    unit.isActive &&
+                    hasChildren &&
+                    !confirm(`با غیرفعال کردن «${unit.title}»، همه زیرمجموعه‌های آن هم غیرفعال می‌شوند. ادامه می‌دهید؟`)
+                  )
+                    return;
+                  saveUnit.mutate({ id: unit.id, isActive: !unit.isActive });
+                }}
               >
                 <Power size={16} aria-hidden="true" />
               </button>
@@ -234,7 +244,7 @@ export default function OrganizationPage() {
             واحد «{deleting.title}» حذف می‌شود و اعضا و جانشینان از این واحد دسترسی نمی‌گیرند. واحد دارای زیرواحد یا قانون
             فعال ابتدا باید تعیین تکلیف شود.
           </p>
-          {remove.error && <p role="alert">{errorMessage(remove.error, "حذف واحد انجام نشد.")}</p>}
+          <ErrorNotice message={remove.error && errorMessage(remove.error, "حذف واحد انجام نشد.")} />
           <footer>
             <Button variant="secondary" disabled={remove.isPending} onClick={() => setDeleting(undefined)}>
               انصراف
@@ -249,7 +259,7 @@ export default function OrganizationPage() {
           </footer>
         </AccessModal>
       )}
-      {saveUnit.error && <p role="alert">{errorMessage(saveUnit.error, "ذخیره واحد انجام نشد.")}</p>}
+      <ErrorNotice message={saveUnit.error && errorMessage(saveUnit.error, "ذخیره واحد انجام نشد.")} />
       {form && (
         <AccessModal
           title={form.id ? "ویرایش واحد" : "افزودن واحد"}
@@ -290,7 +300,7 @@ export default function OrganizationPage() {
                     .map((unit) => ({
                       id: unit.id,
                       title: unit.title,
-                      description: unit.isActive ? undefined : "واحد غیرفعال؛ وضعیت فرزندان مستقل است.",
+                      description: unit.isActive ? undefined : "واحد غیرفعال؛ زیرمجموعه‌هایش هم غیرفعال هستند.",
                     })),
                 ]}
               />
@@ -328,7 +338,7 @@ export default function OrganizationPage() {
                 disabled: member.isActive === false,
               }))}
             />
-            {saveUnit.error && <p role="alert">{errorMessage(saveUnit.error, "ذخیره واحد انجام نشد.")}</p>}
+            <ErrorNotice message={saveUnit.error && errorMessage(saveUnit.error, "ذخیره واحد انجام نشد.")} />
             <footer>
               <Button variant="secondary" disabled={saveUnit.isPending} onClick={() => setForm(undefined)}>
                 انصراف

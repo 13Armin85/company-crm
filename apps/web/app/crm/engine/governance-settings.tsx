@@ -1,3 +1,4 @@
+import { ErrorNotice } from "../error-state";
 import { useState } from "react";
 import { Hash, Plus, ShieldCheck } from "lucide-react";
 import { SearchableSelect } from "@plane/ui";
@@ -102,7 +103,7 @@ export function EntityRules({ code, mode: panel = "all" }: { code: string; mode?
               {(unique.data?.results.length || 0).toLocaleString("fa-IR")} قاعده
             </span>
           </header>
-          {unique.error && <p role="alert">{errorMessage(unique.error, "دریافت قواعد یکتایی انجام نشد.")}</p>}
+          <ErrorNotice message={unique.error && errorMessage(unique.error, "دریافت قواعد یکتایی انجام نشد.")} />
           <div className="engine-rules-card-body">
             <div className="engine-rules-existing">
               <h4>قواعد موجود</h4>
@@ -229,7 +230,7 @@ export function EntityRules({ code, mode: panel = "all" }: { code: string; mode?
               >
                 ثبت گروه یکتا
               </Button>
-              {uniqueError && <p role="alert">{uniqueError}</p>}
+              <ErrorNotice message={uniqueError} />
               {conflicts.length > 0 && (
                 <div role="alert" className="engine-rules-conflict">
                   <p>گروه‌های تکراری موجود:</p>
@@ -267,7 +268,7 @@ export function EntityRules({ code, mode: panel = "all" }: { code: string; mode?
               {(numbering.data?.results.length || 0).toLocaleString("fa-IR")} ستون
             </span>
           </header>
-          {numbering.error && <p role="alert">{errorMessage(numbering.error, "دریافت شماره‌گذاری انجام نشد.")}</p>}
+          <ErrorNotice message={numbering.error && errorMessage(numbering.error, "دریافت شماره‌گذاری انجام نشد.")} />
           <div className="engine-rules-card-body">
             <div className="engine-rules-existing">
               <h4>ستون‌های موجود</h4>
@@ -454,7 +455,7 @@ export function EntityRules({ code, mode: panel = "all" }: { code: string; mode?
                   </Button>
                 </div>
               )}
-              {mutation.error && <p role="alert">{errorMessage(mutation.error, "عملیات انجام نشد.")}</p>}
+              <ErrorNotice message={mutation.error && errorMessage(mutation.error, "عملیات انجام نشد.")} />
             </div>
           </div>
         </section>
@@ -502,7 +503,7 @@ export function GovernanceSettings({ generalOnly = false }: { generalOnly?: bool
             ذخیره سقف جدول‌ها
           </Button>
           {(settings.error || mutation.error) && (
-            <p role="alert">{errorMessage(settings.error || mutation.error, "ذخیره تنظیمات انجام نشد.")}</p>
+            <ErrorNotice message={errorMessage(settings.error || mutation.error, "ذخیره تنظیمات انجام نشد.")} />
           )}
         </div>
       )}

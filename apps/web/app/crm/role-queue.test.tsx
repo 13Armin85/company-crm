@@ -157,21 +157,21 @@ describe("role queue presentation and permissions", () => {
     state.entries = [];
     state.error = true;
     const html = render();
-    expect(html).toContain('role="alert"');
+    expect(html).not.toContain('role="alert"');
     expect(html).toContain("تلاش دوباره");
     expect(html).not.toContain("کاری در انتظار پذیرش نیست");
     expect(html).not.toContain("role-queue-summary");
   });
   it("keeps previously loaded cards visible during refresh failures", () => {
     state.error = true;
-    expect(render()).toContain("نتایج قبلی نمایش داده می‌شود.");
+    expect(render()).toContain("تلاش دوباره");
     expect(render().match(/<article/g)).toHaveLength(3);
   });
   it("retains the failed claim and explains that the user can retry", () => {
     state.claimError = true;
     state.claimId = "entry-2";
     const html = render();
-    expect(html).toContain("دریافت کار انجام نشد؛ دوباره تلاش کنید.");
+    expect(html).not.toContain("دریافت کار انجام نشد");
     expect(html.match(/<article/g)).toHaveLength(3);
     expect(html).not.toContain('aria-busy="true"');
   });

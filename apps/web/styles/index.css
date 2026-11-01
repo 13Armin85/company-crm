@@ -5,6 +5,7 @@
 @import "./page-studio.css";
 @import "./my-work.css";
 @import "./inbox.css";
+@import "./forms.css";
 * {
   box-sizing: border-box;
 }
@@ -248,6 +249,21 @@ a {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 12px;
+}
+.workspace-name {
+  max-width: 240px;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workspace-switch-field {
+  display: grid;
+  max-width: 360px;
+  gap: 6px;
+  margin-top: 16px;
 }
 .breadcrumb {
   display: flex;
@@ -549,15 +565,15 @@ a {
 }
 .stat-icon.blue {
   color: var(--blue);
-  background: #eff6ff;
+  background: color-mix(in srgb, var(--blue) 12%, transparent);
 }
 .stat-icon.green {
   color: var(--green);
-  background: #ecfdf5;
+  background: color-mix(in srgb, var(--green) 12%, transparent);
 }
 .stat-icon.orange {
   color: var(--orange);
-  background: #fffbeb;
+  background: color-mix(in srgb, var(--orange) 12%, transparent);
 }
 :root[data-theme="dark"] .stat-icon {
   background: var(--surface-soft);
@@ -949,35 +965,35 @@ a {
 }
 .status-todo {
   color: #64748b;
-  background: #f1f5f9;
+  background: var(--surface-soft);
 }
 .status-todo i {
   background: #94a3b8;
 }
 .status-in-progress {
   color: #2563eb;
-  background: #eff6ff;
+  background: color-mix(in srgb, var(--blue) 12%, transparent);
 }
 .status-in-progress i {
   background: #3b82f6;
 }
 .status-review {
   color: #7c3aed;
-  background: #f5f3ff;
+  background: color-mix(in srgb, var(--purple) 12%, transparent);
 }
 .status-review i {
   background: #8b5cf6;
 }
 .status-done {
   color: #059669;
-  background: #ecfdf5;
+  background: color-mix(in srgb, var(--green) 12%, transparent);
 }
 .status-done i {
   background: #10b981;
 }
 .status-blocked {
   color: #dc2626;
-  background: #fef2f2;
+  background: color-mix(in srgb, var(--red) 12%, transparent);
 }
 .status-blocked i {
   background: #ef4444;
@@ -1908,15 +1924,15 @@ a {
 }
 .team-stats article > span.online {
   color: var(--green);
-  background: #ecfdf5;
+  background: color-mix(in srgb, var(--green) 12%, transparent);
 }
 .team-stats article > span.admin {
   color: var(--purple);
-  background: #f5f3ff;
+  background: color-mix(in srgb, var(--purple) 12%, transparent);
 }
 .team-stats article > span.pending {
   color: var(--orange);
-  background: #fffbeb;
+  background: color-mix(in srgb, var(--orange) 12%, transparent);
 }
 .team-stats strong {
   display: block;
@@ -1953,7 +1969,7 @@ a {
 }
 .role-مدیر {
   color: var(--purple);
-  background: #f5f3ff;
+  background: color-mix(in srgb, var(--purple) 12%, transparent);
 }
 .presence i {
   width: 6px;
@@ -2556,11 +2572,11 @@ a {
 }
 .state-pill.is-on {
   color: var(--green);
-  background: #ecfdf5;
+  background: color-mix(in srgb, var(--green) 12%, transparent);
 }
 .state-pill.is-off {
   color: var(--red);
-  background: #fef2f2;
+  background: color-mix(in srgb, var(--red) 12%, transparent);
 }
 .organization-modal {
   max-height: min(720px, 90vh);
@@ -2728,8 +2744,8 @@ a {
   place-items: center;
   border: 1px solid var(--border);
   border-radius: 7px;
-  color: #475569;
-  background: #f8fafc;
+  color: var(--text-secondary);
+  background: var(--surface-soft);
 }
 .preview-dark {
   color: #cbd5e1;
@@ -3034,9 +3050,10 @@ a {
 }
 .toast-region {
   position: fixed;
-  z-index: 100;
+  z-index: 1000;
   left: 18px;
   bottom: 18px;
+  max-width: 360px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -3054,7 +3071,8 @@ a {
   color: var(--text-primary);
   background: var(--surface);
   box-shadow: 0 15px 40px #0002;
-  font-size: 9px;
+  font-size: 12px;
+  line-height: 1.7;
   cursor: pointer;
 }
 .toast-success > svg:first-child {
@@ -4279,7 +4297,7 @@ canvas {
   overflow-wrap: anywhere;
 }
 .toast-region {
-  max-width: calc(100vw - 24px);
+  max-width: min(360px, calc(100vw - 24px));
 }
 
 @media (max-width: 1024px) {
@@ -5027,4 +5045,18 @@ canvas {
   .page-header h1 {
     font-size: 21px;
   }
+}
+.error-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 96px;
+  padding: 16px;
+}
+.duplicate-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0;
+  font-size: 13px;
 }

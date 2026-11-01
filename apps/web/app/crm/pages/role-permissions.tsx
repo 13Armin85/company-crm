@@ -1,3 +1,4 @@
+import { ErrorNotice, ErrorState } from "../error-state";
 import { useEffect, useState } from "react";
 import { Link, Navigate, useParams } from "react-router";
 import { CompactMultiSelector } from "@plane/ui";
@@ -43,7 +44,7 @@ export default function RolePermissionsPage() {
   if (accessLoading || isLoading) return <Skeleton rows={6} />;
   if (!access || (!access.can("Role.View") && !access.can("Role.Permission.Assign")))
     return <Navigate to="/my-work" replace />;
-  if (error || !role) return <p role="alert">عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید.</p>;
+  if (error || !role) return <ErrorState message={"عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید."} />;
   const canEdit = access.can("Role.Permission.Assign");
   return (
     <div>
@@ -58,7 +59,7 @@ export default function RolePermissionsPage() {
         }
       />
       {permissionsError ? (
-        <p role="alert">عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید.</p>
+        <ErrorNotice message={"عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید."} />
       ) : loadingPermissions ? (
         <Skeleton rows={6} />
       ) : (
@@ -104,7 +105,7 @@ export default function RolePermissionsPage() {
               ]}
             />
           </SurfaceFields>
-          {save.error && <p role="alert">{errorMessage(save.error, "ذخیره مجوزها انجام نشد.")}</p>}
+          <ErrorNotice message={save.error && errorMessage(save.error, "ذخیره مجوزها انجام نشد.")} />
           {canEdit && (
             <footer className="row-actions">
               <Button

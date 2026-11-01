@@ -1,3 +1,4 @@
+import { ErrorNotice } from "../error-state";
 import { useState } from "react";
 import { Link, useNavigate, useParams, useLocation } from "react-router";
 import { ArrowLeft, Box, CalendarDays, CheckSquare2, FolderKanban, Layers3, Settings2, Ticket } from "lucide-react";
@@ -66,7 +67,7 @@ export function EntityDirectoryPage() {
       {isLoading ? (
         <Skeleton rows={4} cards />
       ) : error ? (
-        <p role="alert">{errorMessage(error, "دریافت موجودیت‌ها انجام نشد.")}</p>
+        <ErrorNotice message={errorMessage(error, "دریافت موجودیت‌ها انجام نشد.")} />
       ) : !visible.length ? (
         <EmptyState
           title={entities.length ? "فرمی پیدا نشد" : "هنوز فرمی در دسترس نیست"}

@@ -1,3 +1,4 @@
+import { ErrorState } from "../error-state";
 import { useState } from "react";
 import {
   AtSign,
@@ -116,6 +117,7 @@ export default function InboxPage() {
           <SearchBox value={query} onChange={setQuery} placeholder="جست‌وجو در اعلان‌ها…" />
         </div>
         <TabBar
+          chooserKey="inbox-status"
           items={[
             { id: "all", label: "همه", count: data.length },
             { id: "unread", label: "خوانده‌نشده", count: unreadCount },
@@ -131,12 +133,7 @@ export default function InboxPage() {
           </div>
         )}
         {isError ? (
-          <div role="alert" className="inline-error">
-            اعلان‌ها دریافت نشدند.
-            <Button variant="secondary" onClick={() => void refetch()}>
-              تلاش دوباره
-            </Button>
-          </div>
+          <ErrorState message="اعلان‌ها دریافت نشدند." onRetry={() => void refetch()} />
         ) : isLoading ? (
           <Skeleton rows={5} />
         ) : shown.length ? (

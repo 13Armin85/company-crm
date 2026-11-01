@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from "react";
+import { ErrorNotice } from "../error-notice";
 import { Popover, PopoverButton, PopoverPanel } from "@headlessui/react";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import jalaali from "jalaali-js";
@@ -193,7 +194,7 @@ export function PersianDatePicker({
           onInvalid={() => document.getElementById(controlId)?.focus()}
         />
       )}
-      {(error || (value && !chosen)) && <p role="alert">{error || "تاریخ واردشده معتبر نیست."}</p>}
+      <ErrorNotice message={error || (value && !chosen ? "تاریخ واردشده معتبر نیست." : "")} />
     </div>
   );
 }

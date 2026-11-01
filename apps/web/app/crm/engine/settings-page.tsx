@@ -16,7 +16,7 @@ export default function EngineSettingsPage() {
       ) : access?.can("FormDesigner.View") ? (
         <DesignWorkspace />
       ) : (
-        <p role="alert">مجوز مشاهده و تغییر طراحی فرم‌ها را ندارید؛ از مدیر سامانه دسترسی بگیرید.</p>
+        <p role="status">برای طراحی فرم‌ها و جدول‌ها از مدیر سامانه دسترسی بگیرید.</p>
       )}
     </div>
   );

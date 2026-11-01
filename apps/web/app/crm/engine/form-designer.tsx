@@ -14,7 +14,7 @@ import { ArrowUp, GripVertical, LockKeyhole, Plus, RotateCcw, Save, Send, Trash2
 import { CompactMultiSelector, SchemaDrivenForm, SearchableSelect, normalizePersianSearch } from "@plane/ui";
 import type { EntityFormSchema, FieldBinding, FormLayoutSchema, FormValues, SchemaField } from "@plane/ui";
 import { Button, Skeleton } from "../components";
-import { errorMessage, useOrganizationRoles, useWorkspaceAccess } from "../api";
+import { useOrganizationRoles, useWorkspaceAccess } from "../api";
 import { useUIStore } from "../store";
 import { persianDate } from "../utils";
 import { useEngineForm, useEngineMutation, useEngineDefinitions } from "./api";
@@ -205,14 +205,7 @@ export function FormDesigner({
     return result.revision;
   };
   const publish = async (rollback?: number) => {
-    if (
-      !window.confirm(
-        rollback
-          ? `فرم از نسخه ${rollback} بازیابی و به‌عنوان نسخه جدید منتشر شود؟`
-          : "این فرم برای همه کاربران منتشر شود؟"
-      )
-    )
-      return;
+    if (rollback && !window.confirm(`فرم به نسخه ${rollback.toLocaleString("fa-IR")} برگردد؟`)) return;
     try {
       const current = dirty && !rollback ? await saveDraft() : revision;
       const result = (await mutation.mutateAsync({
@@ -227,8 +220,19 @@ export function FormDesigner({
       /* Surface server validation or conflict; keep local changes. */
     }
   };
+  const canPublish = Boolean(access?.can("FormDesigner.Publish"));
+  const unpublished =
+    !dirty && Boolean(form.data) && JSON.stringify(form.data?.draft) !== JSON.stringify(form.data?.published);
   if (form.isLoading || (revision === null && !form.error)) return <Skeleton rows={5} />;
-  if (form.error) return <p role="alert">{errorMessage(form.error, "دریافت فرم انجام نشد.")}</p>;
+  if (form.error)
+    return (
+      <div className="engine-empty-selection">
+        <strong>فرم بارگذاری نشد</strong>
+        <Button variant="secondary" onClick={() => void form.refetch()}>
+          تلاش دوباره
+        </Button>
+      </div>
+    );
   return (
     <div className="engine-designer">
       <div className="engine-designer-toolbar">
@@ -236,27 +240,32 @@ export function FormDesigner({
           <span className="engine-eyebrow">فرم فعال</span>
           <div className="engine-designer-title-row">
             <strong>{entity.title}</strong>
-            <span className={`engine-status${dirty ? " is-dirty" : ""}`}>
-              {dirty ? "تغییر ذخیره‌نشده" : "پیش‌نویس ذخیره‌شده"}
+            <span className={`engine-status${dirty || unpublished ? " is-dirty" : ""}`}>
+              {dirty ? "تغییرات ذخیره نشده" : unpublished ? "هنوز روی فرم اعمال نشده" : "روی فرم اعمال شده"}
             </span>
           </div>
-          <small>نسخه منتشرشده: {form.data?.versions[0]?.number.toLocaleString("fa-IR") || "هنوز منتشر نشده"}</small>
+          <small>
+            {canPublish
+              ? "با «ذخیره و اعمال روی فرم» تغییرات بلافاصله در فرم اصلی دیده می‌شود."
+              : "تغییرات شما ذخیره می‌شود و پس از تأیید مدیر روی فرم اعمال می‌شود."}
+          </small>
         </div>
         <div className="engine-actions">
-          <Button variant="secondary" disabled={mutation.isPending} onClick={() => void saveDraft().catch(() => {})}>
-            <Save size={16} aria-hidden="true" />
-            ذخیره پیش‌نویس
-          </Button>
-          {access?.can("FormDesigner.Publish") && (
-            <Button disabled={mutation.isPending} onClick={() => void publish()}>
+          {canPublish ? (
+            <Button disabled={mutation.isPending || (!dirty && !unpublished)} onClick={() => void publish()}>
               <Send size={16} aria-hidden="true" />
-              انتشار فرم
+              ذخیره و اعمال روی فرم
+            </Button>
+          ) : (
+            <Button disabled={mutation.isPending || !dirty} onClick={() => void saveDraft().catch(() => {})}>
+              <Save size={16} aria-hidden="true" />
+              ذخیره تغییرات
             </Button>
           )}
           <Button
             variant="ghost"
             onClick={async () => {
-              if (dirty && !window.confirm("تغییرات ذخیره‌نشده کنار گذاشته و فرم تازه بارگذاری شود؟")) return;
+              if (dirty && !window.confirm("تغییرات ذخیره‌نشده کنار گذاشته شود؟")) return;
               const fresh = await form.refetch();
               if (fresh.data) {
                 setDraft(fresh.data.draft);
@@ -265,11 +274,10 @@ export function FormDesigner({
             }}
           >
             <RotateCcw size={16} aria-hidden="true" />
-            بارگذاری دوباره
+            لغو تغییرات
           </Button>
         </div>
       </div>
-      {mutation.error && <p role="alert">{errorMessage(mutation.error, "ذخیره یا انتشار فرم انجام نشد.")}</p>}
       {(creatingField || editingField) && (
         <div
           className="engine-field-drawer-backdrop"
@@ -314,7 +322,7 @@ export function FormDesigner({
             <div>
               <span className="engine-step-badge">مرحله ۱</span>
               <h3>ورودی‌های فرم {entity.title}</h3>
-              <p>تعریف ورودی و تنظیم جایگاه آن جدا هستند. برای نام، نوع و اعتبارسنجی «ویرایش ورودی» را بزنید.</p>
+              <p>هر ورودی یک خانه از فرم است. برای تغییر نام، نوع یا قواعد آن «ویرایش» را بزنید.</p>
             </div>
             {access?.can("Field.Create") && (
               <Button onClick={() => setCreatingField(true)}>
@@ -326,7 +334,6 @@ export function FormDesigner({
           <label className="engine-search-field">
             <span>جستجوی ورودی</span>
             <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="نام یا کد ورودی…" />
-            <small>فهرست را بر اساس نام نمایشی یا کد فنی محدود کنید.</small>
           </label>
           <div className="engine-input-grid">
             {fields
@@ -342,10 +349,10 @@ export function FormDesigner({
                     <strong>{field.title}</strong>
                     <small dir="ltr">{field.code}</small>
                   </div>
-                  <span>{attached.has(field.code) || inheritedCodes.has(field.code) ? "در فرم" : "در کتابخانه"}</span>
+                  <span>{inheritedCodes.has(field.code) ? "از فرم اصلی" : "در فرم"}</span>
                   {access?.can("Field.Edit") && (
                     <Button variant="secondary" onClick={() => setEditingField(field)}>
-                      ویرایش ورودی
+                      ویرایش
                     </Button>
                   )}
                   {!attached.has(field.code) && !inheritedCodes.has(field.code) && (
@@ -368,18 +375,18 @@ export function FormDesigner({
               <div className="engine-side-panel-heading">
                 <span className="engine-step-badge">۱</span>
                 <div>
-                  <h3>کتابخانه فیلدها</h3>
-                  <p>فیلد موردنظر را پیدا و به فرم اضافه کنید.</p>
+                  <h3>ورودی‌های آماده</h3>
+                  <p>روی هر ورودی بزنید تا به فرم اضافه شود.</p>
                 </div>
               </div>
               <label className="engine-search-field">
-                <span>جستجوی فیلد</span>
-                <input placeholder="نام یا کد فیلد…" value={query} onChange={(e) => setQuery(e.target.value)} />
+                <span>جستجوی ورودی</span>
+                <input placeholder="نام یا کد ورودی…" value={query} onChange={(e) => setQuery(e.target.value)} />
               </label>
               {access?.can("Field.Create") && (
                 <Button variant="secondary" onClick={() => setCreatingField(true)}>
                   <Plus size={15} aria-hidden="true" />
-                  ساخت فیلد همین‌جا
+                  ساخت ورودی جدید
                 </Button>
               )}
               {fields
@@ -413,8 +420,8 @@ export function FormDesigner({
                 <div className="engine-side-panel-heading">
                   <span className="engine-step-badge">۲</span>
                   <div>
-                    <h3>بوم چیدمان فرم</h3>
-                    <p>بخش‌ها را بسازید و ترتیب نمایش فیلدها را مشخص کنید.</p>
+                    <h3>چیدمان فرم</h3>
+                    <p>ورودی‌ها را بکشید تا ترتیبشان عوض شود؛ برای دسته‌بندی، بخش یا تب اضافه کنید.</p>
                   </div>
                 </div>
                 <Button variant="secondary" onClick={addSection}>
@@ -425,7 +432,7 @@ export function FormDesigner({
               <div className="engine-tab-creator">
                 <label>
                   <span>
-                    تب جدید <small>(اختیاری)</small>
+                    نام تب جدید <small>(اختیاری؛ برای فرم‌های طولانی)</small>
                   </span>
                   <input placeholder="مثلاً اطلاعات تکمیلی" value={newTab} onChange={(e) => setNewTab(e.target.value)} />
                 </label>
@@ -493,7 +500,9 @@ export function FormDesigner({
                           }
                         />
                       </label>
-                      <span className="engine-field-count">{section.bindings.length.toLocaleString("fa-IR")} فیلد</span>
+                      <span className="engine-field-count">
+                        {section.bindings.length.toLocaleString("fa-IR")} ورودی
+                      </span>
                       <button
                         type="button"
                         aria-label="حذف بخش"
@@ -509,9 +518,9 @@ export function FormDesigner({
                     <div className="engine-section-options">
                       <SearchableSelect
                         showLabel
-                        label="تعداد ستون"
+                        label="چند ورودی در یک ردیف"
                         value={String(section.columns)}
-                        options={[1, 2, 3].map((v) => ({ id: String(v), title: `${v.toLocaleString("fa-IR")} ستون` }))}
+                        options={[1, 2, 3].map((v) => ({ id: String(v), title: `${v.toLocaleString("fa-IR")} ورودی` }))}
                         onChange={(v) =>
                           setDraft({
                             ...draft,
@@ -523,9 +532,9 @@ export function FormDesigner({
                       />
                       <SearchableSelect
                         showLabel
-                        label="تب بخش"
+                        label="نمایش در تب"
                         value={section.tab || ""}
-                        options={[{ id: "", title: "بدون تب" }, ...draft.tabs]}
+                        options={[{ id: "", title: "همه تب‌ها / بدون تب" }, ...draft.tabs]}
                         onChange={(v) =>
                           setDraft({
                             ...draft,
@@ -586,11 +595,13 @@ export function FormDesigner({
                         </button>
                         <button
                           type="button"
-                          aria-label="حذف اتصال فیلد"
+                          aria-label="حذف از فرم"
+                          title="حذف از فرم"
                           disabled={form.data?.locked_fields?.includes(binding.field)}
                           onClick={() =>
                             setDraft({
                               ...draft,
+                              // eslint-disable-next-line oxc/no-map-spread -- React state must be copied, not mutated.
                               sections: draft.sections.map((s) =>
                                 s.id === section.id
                                   ? { ...s, bindings: s.bindings.filter((b) => b.field !== binding.field) }
@@ -604,7 +615,9 @@ export function FormDesigner({
                       </DragItem>
                     ))}
                     {!section.bindings.length && (
-                      <p className="engine-drop-hint">فیلد را از کتابخانه اضافه یا به این بخش منتقل کنید.</p>
+                      <p className="engine-drop-hint">
+                        از «ورودی‌های آماده» یک ورودی اضافه کنید یا آن را به اینجا بکشید.
+                      </p>
                     )}
                   </div>
                 </DragItem>
@@ -614,28 +627,29 @@ export function FormDesigner({
               <div className="engine-side-panel-heading">
                 <span className="engine-step-badge">۳</span>
                 <div>
-                  <h3>تنظیمات فیلد</h3>
-                  <p>نحوه نمایش و رفتار فیلد انتخاب‌شده را تنظیم کنید.</p>
+                  <h3>تنظیمات ورودی</h3>
+                  <p>رفتار ورودی انتخاب‌شده را فقط در همین فرم تغییر دهید.</p>
                 </div>
               </div>
               {selectedBinding && selectedField ? (
                 <>
                   <div className="engine-selected-field">
-                    <span>فیلد انتخاب‌شده</span>
+                    <span>ورودی انتخاب‌شده</span>
                     <strong>{selectedField.title}</strong>
                     <small dir="ltr">{selectedField.code}</small>
                   </div>
                   <label>
-                    عنوان جایگزین
+                    عنوان در این فرم (اختیاری)
                     <input
+                      placeholder={selectedField.title}
                       value={selectedBinding.title || ""}
                       onChange={(e) => updateBinding({ title: e.target.value })}
                     />
                   </label>
                   {[
-                    ["required", "اجباری"],
-                    ["hidden", "مخفی"],
-                    ["readonly", "فقط‌خواندنی"],
+                    ["required", "پر کردن آن اجباری است"],
+                    ["hidden", "در این فرم نمایش داده نشود"],
+                    ["readonly", "فقط نمایشی (قابل تغییر نیست)"],
                   ].map(([key, title]) => (
                     <label className="engine-checkbox" key={key}>
                       <input
@@ -669,11 +683,11 @@ export function FormDesigner({
                     className="button button-ghost"
                     onClick={() => updateBinding({ default: undefined })}
                   >
-                    بازگشت به پیش‌فرض کتابخانه
+                    حذف مقدار اولیه این فرم
                   </button>
                   <SearchableSelect
                     showLabel
-                    label="پیش‌فرض پویا در اتصال"
+                    label="پر شدن خودکار"
                     value={
                       selectedBinding.default &&
                       typeof selectedBinding.default === "object" &&
@@ -682,7 +696,7 @@ export function FormDesigner({
                         : ""
                     }
                     options={[
-                      { id: "", title: "ثابت / ارث‌بری" },
+                      { id: "", title: "خودکار پر نشود" },
                       { id: "current_user", title: "کاربر جاری" },
                       { id: "today", title: "امروز" },
                       { id: "now", title: "زمان جاری" },
@@ -691,27 +705,22 @@ export function FormDesigner({
                       updateBinding({ default: v ? { dynamic: v as "today" | "now" | "current_user" } : undefined })
                     }
                   />
-                  <label>
-                    مرحله مرتبط (زیرساخت گردش کار)
-                    <input
-                      value={selectedBinding.stage || ""}
-                      onChange={(e) => updateBinding({ stage: e.target.value })}
-                    />
-                  </label>
                   {(["view_roles", "edit_roles"] as const).map((key) => (
                     <fieldset key={key}>
-                      <legend>{key === "view_roles" ? "نقش‌های مجاز مشاهده" : "نقش‌های مجاز ویرایش"}</legend>
+                      <legend>
+                        {key === "view_roles" ? "چه کسانی این ورودی را ببینند؟" : "چه کسانی بتوانند آن را تغییر دهند؟"}
+                      </legend>
                       <label className="engine-checkbox">
                         <input
                           type="checkbox"
                           checked={selectedBinding[key] == null}
                           onChange={(e) => updateBinding({ [key]: e.target.checked ? null : [] })}
                         />
-                        طبق مجوز عملیات رکورد
+                        همه کسانی که به رکورد دسترسی دارند
                       </label>
                       {selectedBinding[key] != null && (
                         <CompactMultiSelector
-                          label={key === "view_roles" ? "مشاهده" : "ویرایش"}
+                          label={key === "view_roles" ? "نقش‌های مجاز مشاهده" : "نقش‌های مجاز ویرایش"}
                           options={roles.map((r) => ({ id: r.id, title: r.name }))}
                           selected={selectedBinding[key] || []}
                           onChange={(v) => updateBinding({ [key]: v })}
@@ -720,14 +729,14 @@ export function FormDesigner({
                     </fieldset>
                   ))}
                   <ConditionEditor
-                    label="اجباری شرطی در اتصال"
+                    label="فقط در شرایط خاص اجباری شود"
                     value={selectedBinding.required_if}
                     fields={fields}
                     lookupValues={lookupValues}
                     onChange={(required_if) => updateBinding({ required_if })}
                   />
                   <ConditionEditor
-                    label="نمایش شرطی در اتصال"
+                    label="فقط در شرایط خاص نمایش داده شود"
                     value={selectedBinding.visible_if}
                     fields={fields}
                     lookupValues={lookupValues}
@@ -736,8 +745,8 @@ export function FormDesigner({
                 </>
               ) : (
                 <div className="engine-empty-selection">
-                  <strong>هنوز فیلدی انتخاب نشده</strong>
-                  <p>یکی از فیلدهای بوم میانی را انتخاب کنید تا تنظیمات آن در این قسمت نمایش داده شود.</p>
+                  <strong>ورودی‌ای انتخاب نشده</strong>
+                  <p>روی یکی از ورودی‌های چیدمان بزنید تا تنظیماتش اینجا نمایش داده شود.</p>
                 </div>
               )}
             </aside>
@@ -745,22 +754,22 @@ export function FormDesigner({
         </DndContext>
       </div>
       <section className="engine-live-preview" hidden={viewMode !== "preview"}>
-        <h3>پیش‌نمایش زنده فرم</h3>
-        <p>این داده آزمایشی ذخیره نمی‌شود. کاربران تا انتشار، نسخه قبلی را می‌بینند.</p>
+        <h3>پیش‌نمایش فرم</h3>
+        <p>فرم را همان‌طور که کاربران می‌بینند امتحان کنید؛ چیزی ذخیره نمی‌شود.</p>
         <SchemaDrivenForm schema={liveSchema} values={preview} onChange={setPreview} {...transport} />
       </section>
       <section className="engine-version-history" hidden={viewMode !== "versions"}>
-        <h3>نسخه‌های منتشرشده</h3>
+        <h3>نسخه‌های قبلی فرم</h3>
         <label>
-          توضیح تغییر
-          <input value={note} onChange={(e) => setNote(e.target.value)} />
+          توضیح تغییر بعدی (اختیاری)
+          <input placeholder="مثلاً افزودن شماره تماس" value={note} onChange={(e) => setNote(e.target.value)} />
         </label>
         {form.data?.versions.map((version) => (
           <div key={version.id}>
             <strong>نسخه {version.number.toLocaleString("fa-IR")}</strong>
             <span>{persianDate(version.created_at)}</span>
-            <span>{version.change_note}</span>
-            {access?.can("FormDesigner.Publish") && (
+            <span>{version.change_note || "بدون توضیح"}</span>
+            {canPublish && version.number !== form.data?.versions[0]?.number && (
               <Button variant="secondary" disabled={mutation.isPending} onClick={() => void publish(version.number)}>
                 بازگشت به این نسخه
               </Button>

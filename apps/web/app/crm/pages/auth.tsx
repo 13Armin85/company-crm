@@ -1,3 +1,5 @@
+import { ErrorNotice } from "../error-state";
+import { ToastRegion } from "../components";
 import { useEffect, useState } from "react";
 import { ArrowLeft, LockKeyhole } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router";
@@ -64,6 +66,7 @@ export default function AuthPage() {
       <section className="auth-form-side">
         <LoginForm csrf={csrf} errorKey={errorKey} failed={failed} />
       </section>
+      <ToastRegion />
     </main>
   );
 }
@@ -90,16 +93,8 @@ export function LoginForm({
           <p>برای ادامه وارد فضای کاری خود شوید.</p>
         </div>
       </header>
-      {errorKey && (
-        <div className="auth-message error" role="alert">
-          {authErrors[errorKey] ?? "ورود انجام نشد؛ دوباره تلاش کنید."}
-        </div>
-      )}
-      {failed && (
-        <div className="auth-message error" role="alert">
-          اتصال به سرور برقرار نشد؛ صفحه را دوباره بارگذاری کنید.
-        </div>
-      )}
+      <ErrorNotice message={errorKey && (authErrors[errorKey] ?? "ورود انجام نشد؛ دوباره تلاش کنید.")} />
+      <ErrorNotice message={failed && "اتصال به سرور برقرار نشد؛ صفحه را دوباره بارگذاری کنید."} />
       <label>
         <span>ایمیل یا نام کاربری</span>
         <input name="email" dir="ltr" autoComplete="username" required />

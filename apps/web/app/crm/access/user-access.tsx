@@ -1,3 +1,4 @@
+import { ErrorNotice } from "../error-state";
 import { useState } from "react";
 import { normalizePersianSearch, PersianDateTimePicker, SearchableSelect } from "@plane/ui";
 import { useCurrentUser, useOrganizationPermissions, useWorkspaceAccess, errorMessage } from "../api";
@@ -107,7 +108,7 @@ export function UserAccessPanel({ userId }: { userId: string }) {
             <input type="search" value={roleQuery} onChange={(event) => setRoleQuery(event.target.value)} />
           </label>
           {effectiveQuery.error ? (
-            <p role="alert">عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید.</p>
+            <ErrorNotice message={"عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید."} />
           ) : effectiveQuery.isLoading ? (
             <Skeleton rows={4} />
           ) : !visibleGrants.length ? (
@@ -283,7 +284,7 @@ export function UserAccessPanel({ userId }: { userId: string }) {
             </div>
           )}
           {(formError || mutation.error) && (
-            <p role="alert">{formError || errorMessage(mutation.error, "ذخیره دسترسی انجام نشد.")}</p>
+            <ErrorNotice message={formError || errorMessage(mutation.error, "ذخیره دسترسی انجام نشد.")} />
           )}
           <footer>
             <Button
@@ -308,7 +309,7 @@ export function UserAccessPanel({ userId }: { userId: string }) {
             <input type="search" value={directQuery} onChange={(event) => setDirectQuery(event.target.value)} />
           </label>
           {exceptionQuery.error ? (
-            <p role="alert">عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید.</p>
+            <ErrorNotice message={"عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید."} />
           ) : exceptionQuery.isLoading ? (
             <Skeleton rows={4} />
           ) : !direct.length ? (

@@ -27,9 +27,9 @@
 .custom-dashboard input,
 .custom-dashboard textarea {
   min-height: 38px;
-  border: 1px solid var(--border-color, #d9dce5);
+  border: 1px solid var(--border);
   border-radius: 9px;
-  background: var(--card-bg, #fff);
+  background: var(--surface);
   color: inherit;
   padding: 0.4rem 0.65rem;
   font: inherit;
@@ -37,17 +37,17 @@
 .dashboard-tabbar {
   flex-wrap: wrap;
   padding: 0.5rem 0 1.2rem;
-  border-bottom: 1px solid var(--border-color, #d9dce5);
+  border-bottom: 1px solid var(--border);
 }
 .dashboard-tab {
-  border: 1px solid var(--border-color, #d9dce5);
+  border: 1px solid var(--border);
   border-radius: 11px;
-  background: var(--card-bg, #fff);
+  background: var(--surface);
   padding: 0.15rem 0.3rem;
 }
 .dashboard-tab.active {
-  border-color: #5865d9;
-  background: color-mix(in srgb, #5865d9 8%, transparent);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 .dashboard-tab button,
 .dashboard-new-tab button,
@@ -66,7 +66,7 @@
   cursor: grab;
 }
 .dashboard-tab-tools {
-  border-inline-start: 1px solid var(--border-color, #d9dce5);
+  border-inline-start: 1px solid var(--border);
 }
 .dashboard-tab-tools button {
   padding: 0.3rem;
@@ -80,7 +80,7 @@
 .dashboard-editbar {
   justify-content: space-between;
   padding: 0.85rem 0;
-  color: var(--text-secondary, #596270);
+  color: var(--text-secondary);
 }
 .dashboard-widget-grid {
   display: grid;
@@ -92,9 +92,9 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
-  background: var(--card-bg, #fff);
-  color: var(--text-primary, #182132);
-  border: 1px solid var(--border-color, #d9dce5);
+  background: var(--surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
   border-radius: 16px;
   box-shadow: 0 3px 18px #1018280a;
   overflow: hidden;
@@ -102,7 +102,7 @@
 .dashboard-widget > header {
   justify-content: space-between;
   padding: 0.85rem 1rem;
-  border-bottom: 1px solid var(--border-color, #e7e9ef);
+  border-bottom: 1px solid var(--border);
 }
 .dashboard-widget > header h2 {
   font-size: 1rem;
@@ -113,7 +113,7 @@
 }
 .dashboard-widget > header button:hover,
 .dashboard-tab button:hover {
-  color: #5865d9;
+  color: var(--accent);
 }
 .dashboard-widget > header button:disabled {
   opacity: 0.4;
@@ -134,13 +134,13 @@
   border: 0;
   border-radius: 8px;
   padding: 0.5rem 1rem;
-  background: #5865d9;
+  background: var(--accent);
   color: white;
   cursor: pointer;
 }
 .dashboard-resize {
   margin-top: auto;
-  border-top: 1px solid var(--border-color, #e7e9ef);
+  border-top: 1px solid var(--border);
   padding: 0.4rem 0.8rem;
   font-size: 0.78rem;
 }
@@ -149,7 +149,7 @@
 .dashboard-error {
   padding: 2rem;
   text-align: center;
-  color: var(--text-secondary, #667085);
+  color: var(--text-secondary);
 }
 .dashboard-widget-skeleton {
   display: grid;
@@ -159,7 +159,7 @@
 .dashboard-widget-skeleton span {
   height: 34px;
   border-radius: 8px;
-  background: linear-gradient(90deg, #eff0f4, #f9fafb, #eff0f4);
+  background: linear-gradient(90deg, var(--surface-soft), var(--border), var(--surface-soft));
   background-size: 200% 100%;
   animation: dashboard-shimmer 1.2s infinite;
 }
@@ -189,11 +189,11 @@
 .dashboard-counter strong,
 .dashboard-progress strong {
   font-size: 2.8rem;
-  color: #5865d9;
+  color: var(--accent);
 }
 .dashboard-counter span,
 .dashboard-progress small {
-  color: var(--text-secondary, #667085);
+  color: var(--text-secondary);
 }
 .dashboard-progress > span,
 .team-workload {
@@ -202,13 +202,13 @@
   height: 9px;
   overflow: hidden;
   border-radius: 99px;
-  background: #e9ebf2;
+  background: var(--border);
 }
 .dashboard-progress i,
 .team-workload i {
   display: block;
   height: 100%;
-  background: #5865d9;
+  background: var(--accent);
 }
 .dashboard-chart {
   min-height: 220px;
@@ -229,15 +229,15 @@
 .dashboard-mini-table th,
 .dashboard-mini-table td {
   padding: 0.55rem 0.7rem;
-  border-bottom: 1px solid var(--border-color, #eceef3);
+  border-bottom: 1px solid var(--border);
 }
 .dashboard-mini-table > div {
-  border-bottom: 1px solid var(--border-color, #eceef3);
+  border-bottom: 1px solid var(--border);
   padding: 0.7rem 0.2rem;
 }
 .dashboard-mini-table a,
 .dashboard-detail-actions a {
-  color: #5865d9;
+  color: var(--accent);
   text-decoration: none;
 }
 .dashboard-note {
@@ -252,7 +252,7 @@
 }
 .dashboard-links a,
 .dashboard-age button {
-  border: 1px solid var(--border-color, #d9dce5);
+  border: 1px solid var(--border);
   border-radius: 9px;
   padding: 0.7rem;
   color: inherit;
@@ -271,10 +271,10 @@
 .dashboard-shared-label {
   padding: 0.6rem 0.9rem;
   border-radius: 8px;
-  background: color-mix(in srgb, #5865d9 9%, transparent);
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
 }
 .dashboard-shared button {
-  border: 1px solid var(--border-color, #d9dce5);
+  border: 1px solid var(--border);
   border-radius: 8px;
   margin-inline-end: 0.5rem;
 }
@@ -297,8 +297,8 @@ body:has(.dashboard-overlay) .selector-single-options {
   width: min(560px, 100vw);
   height: 100%;
   overflow: auto;
-  background: var(--card-bg, #fff);
-  color: var(--text-primary, #182132);
+  background: var(--surface);
+  color: var(--text-primary);
   padding: 1.2rem;
   box-shadow: 0 0 30px #0002;
 }
@@ -353,7 +353,7 @@ body:has(.dashboard-overlay) .selector-single-options {
   display: grid;
   gap: 0.3rem;
   min-height: 86px;
-  border: 1px solid var(--border-color, #d9dce5);
+  border: 1px solid var(--border);
   border-radius: 12px;
   background: transparent;
   color: inherit;
@@ -364,14 +364,14 @@ body:has(.dashboard-overlay) .selector-single-options {
 .dashboard-gallery-preview {
   display: block;
   font-size: 1.4rem;
-  color: #5865d9;
+  color: var(--accent);
   line-height: 1;
 }
 .dashboard-gallery button:hover {
-  border-color: #5865d9;
+  border-color: var(--accent);
 }
 .dashboard-gallery small {
-  color: var(--text-secondary, #667085);
+  color: var(--text-secondary);
 }
 .dashboard-team {
   padding: 0.8rem;
@@ -392,7 +392,7 @@ body:has(.dashboard-overlay) .selector-single-options {
   min-height: 0;
 }
 .dashboard-team-toolbar button {
-  border: 1px solid var(--border-color, #d9dce5);
+  border: 1px solid var(--border);
   border-radius: 7px;
 }
 .dashboard-team-summary {
@@ -406,7 +406,7 @@ body:has(.dashboard-overlay) .selector-single-options {
   cursor: pointer;
 }
 .dashboard-team-summary button.active {
-  outline: 2px solid #5865d9;
+  outline: 2px solid var(--accent);
 }
 .dashboard-team-task-tray {
   display: flex;
@@ -417,7 +417,7 @@ body:has(.dashboard-overlay) .selector-single-options {
 .dashboard-team-task-tray span {
   flex: none;
   padding: 0.35rem 0.65rem;
-  border: 1px solid var(--border-color, #d9dce5);
+  border: 1px solid var(--border);
   border-radius: 8px;
   cursor: grab;
 }
@@ -436,17 +436,17 @@ body:has(.dashboard-overlay) .selector-single-options {
   display: grid;
   gap: 0.55rem;
   text-align: right;
-  border: 1px solid var(--border-color, #d9dce5);
+  border: 1px solid var(--border);
   border-right-width: 5px;
   border-radius: 12px;
-  background: var(--card-bg, #fff);
+  background: var(--surface);
   color: inherit;
   padding: 0.8rem;
   cursor: pointer;
 }
 .dashboard-team-card small {
   display: block;
-  color: var(--text-secondary, #667085);
+  color: var(--text-secondary);
 }
 .dashboard-team-card p {
   margin: 0;
@@ -457,7 +457,7 @@ body:has(.dashboard-overlay) .selector-single-options {
   font-size: 0.82rem;
 }
 .team-active-tasks a {
-  color: #5865d9;
+  color: var(--accent);
   text-decoration: none;
 }
 .team-avatar {
@@ -466,7 +466,7 @@ body:has(.dashboard-overlay) .selector-single-options {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: #e3e7f7;
+  background: var(--accent-soft);
   overflow: hidden;
 }
 .team-avatar img {
@@ -512,13 +512,13 @@ body:has(.dashboard-overlay) .selector-single-options {
   color: #3e68a7;
 }
 .dashboard-team-card.team-green {
-  background: color-mix(in srgb, #2c9e73 7%, var(--card-bg, #fff));
+  background: color-mix(in srgb, #2c9e73 7%, var(--surface));
 }
 .dashboard-team-card.team-red {
-  background: color-mix(in srgb, #d65e67 7%, var(--card-bg, #fff));
+  background: color-mix(in srgb, #d65e67 7%, var(--surface));
 }
 .dashboard-team-card.team-gray {
-  background: color-mix(in srgb, #aab1bd 9%, var(--card-bg, #fff));
+  background: color-mix(in srgb, #aab1bd 9%, var(--surface));
 }
 .dashboard-team-card.compact {
   min-height: 75px;
@@ -538,7 +538,7 @@ body:has(.dashboard-overlay) .selector-single-options {
   gap: 0.3rem;
   align-items: center;
   padding: 0.7rem 0;
-  border-bottom: 1px solid var(--border-color, #d9dce5);
+  border-bottom: 1px solid var(--border);
 }
 .dashboard-rule input,
 .dashboard-rule select {

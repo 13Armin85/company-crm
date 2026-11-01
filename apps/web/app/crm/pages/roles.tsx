@@ -1,3 +1,4 @@
+import { ErrorNotice } from "../error-state";
 import { useEffect, useState } from "react";
 import { Link, Navigate, useSearchParams } from "react-router";
 import {
@@ -48,8 +49,8 @@ export default function RolesPage() {
         }
       />
       <SearchBox value={query} onChange={setQuery} placeholder="جستجوی نام یا توضیح نقش…" />
-      {error && <p role="alert">عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید.</p>}
-      {save.error && !editing && <p role="alert">{errorMessage(save.error, "تغییر وضعیت انجام نشد.")}</p>}
+      <ErrorNotice message={error && "عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید."} />
+      <ErrorNotice message={save.error && !editing && errorMessage(save.error, "تغییر وضعیت انجام نشد.")} />
       {isLoading ? (
         <Skeleton rows={5} />
       ) : (
@@ -157,7 +158,7 @@ export default function RolesPage() {
                 onChange={(event) => setEditing({ ...editing, description: event.target.value })}
               />
             </label>
-            {save.error && <p role="alert">{errorMessage(save.error, "ذخیره نقش انجام نشد.")}</p>}
+            <ErrorNotice message={save.error && errorMessage(save.error, "ذخیره نقش انجام نشد.")} />
             <footer>
               <Button variant="secondary" disabled={save.isPending} onClick={() => setEditing(undefined)}>
                 انصراف
@@ -175,7 +176,7 @@ export default function RolesPage() {
             نقش «{deleting.name}» حذف می‌شود و مجوزهای آن از {(deleting.userCount ?? 0).toLocaleString("fa-IR")} کاربر
             گرفته می‌شود. مجوزهای نقش‌های دیگر و دسترسی‌های مستقیم حفظ می‌شوند.
           </p>
-          {remove.error && <p role="alert">{errorMessage(remove.error, "حذف نقش انجام نشد.")}</p>}
+          <ErrorNotice message={remove.error && errorMessage(remove.error, "حذف نقش انجام نشد.")} />
           <footer>
             <Button variant="secondary" disabled={remove.isPending} onClick={() => setDeleting(undefined)}>
               انصراف

@@ -143,7 +143,7 @@ function NewField({
                 onChange={(event) => setTitle(event.target.value)}
               />
               {titleError && (
-                <small className="studio-input-error" id="studio-title-error">
+                <small className="sr-only" id="studio-title-error">
                   {titleError}
                 </small>
               )}
@@ -172,7 +172,7 @@ function NewField({
                   rows={5}
                 />
                 <small id="studio-options-help" className={optionsError ? "studio-input-error" : ""}>
-                  {optionsError || `هر گزینه در یک خط؛ حداکثر ${toFa(designer.limits.options)} گزینه متفاوت.`}
+                  {`هر گزینه در یک خط؛ حداکثر ${toFa(designer.limits.options)} گزینه متفاوت.`}
                 </small>
               </label>
             )}

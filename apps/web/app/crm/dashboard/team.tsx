@@ -1,3 +1,4 @@
+import { ErrorState } from "../error-state";
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -69,6 +70,7 @@ export function TeamWidget() {
     const timer = window.setTimeout(() => {
       api
         .post(`${dashboardUrl(slug)}team/settings/`, { rules })
+        // eslint-disable-next-line promise/always-return -- the preview only updates state.
         .then((response) => {
           setRulePreview(
             Object.fromEntries(
@@ -149,9 +151,7 @@ export function TeamWidget() {
     );
   if (data.isError)
     return (
-      <div className="dashboard-widget-error">
-        {errorMessage(data.error, "دریافت تیم انجام نشد")} <Button onClick={() => data.refetch()}>تلاش دوباره</Button>
-      </div>
+      <ErrorState message={errorMessage(data.error, "دریافت تیم انجام نشد")} onRetry={() => void data.refetch()} />
     );
   return (
     <div className="dashboard-team">
@@ -242,6 +242,7 @@ export function TeamWidget() {
           {cards.map((card) => (
             <article
               key={card.id}
+              // eslint-disable-next-line jsx-a11y/prefer-tag-over-role -- the card contains its own buttons.
               role="button"
               tabIndex={0}
               style={{ "--unit-depth": card.unit_depth } as CSSProperties}
@@ -309,7 +310,7 @@ export function TeamWidget() {
         <div className="dashboard-empty-small">{data.data?.empty || "کارتی با این فیلتر پیدا نشد."}</div>
       )}
       {selected && (
-        <div className="dashboard-overlay" onMouseDown={() => setSelected("")}>
+        <div className="dashboard-overlay" role="presentation" onMouseDown={() => setSelected("")}>
           <aside className="dashboard-drawer" onMouseDown={(event) => event.stopPropagation()}>
             <header>
               <h2>{details.data?.card.name || "جزئیات عضو"}</h2>
@@ -380,7 +381,7 @@ export function TeamWidget() {
         </div>
       )}
       {rulesOpen && (
-        <div className="dashboard-overlay" onMouseDown={() => setRulesOpen(false)}>
+        <div className="dashboard-overlay" role="presentation" onMouseDown={() => setRulesOpen(false)}>
           <aside className="dashboard-drawer" onMouseDown={(event) => event.stopPropagation()}>
             <header>
               <h2>قواعد رنگ کارت</h2>
@@ -392,6 +393,7 @@ export function TeamWidget() {
             {rules.map((rule, index) => (
               <div
                 className="dashboard-rule"
+                // eslint-disable-next-line react/no-array-index-key -- rule order is the identity while dragging.
                 key={index}
                 draggable
                 onDragStart={(event) => event.dataTransfer.setData("rule-index", String(index))}

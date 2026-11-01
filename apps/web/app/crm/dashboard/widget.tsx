@@ -1,3 +1,4 @@
+import { ErrorState } from "../error-state";
 import { Link, useNavigate } from "react-router";
 import {
   Bar,
@@ -15,7 +16,6 @@ import {
 } from "recharts";
 import { persianDate, persianDateValue } from "../utils";
 import { errorMessage } from "../api";
-import { Button } from "../components";
 import { useWidgetData } from "./api";
 import { DashboardCalendar } from "./calendar";
 import { TeamWidget } from "./team";
@@ -62,12 +62,7 @@ function DataWidget({ widget }: { widget: DashboardWidget }) {
     );
   if (result.isError)
     return (
-      <div className="dashboard-widget-error">
-        <p>{errorMessage(result.error, "دریافت ویجت انجام نشد")}</p>
-        <Button variant="secondary" onClick={() => result.refetch()}>
-          تلاش دوباره
-        </Button>
-      </div>
+      <ErrorState message={errorMessage(result.error, "دریافت ویجت انجام نشد")} onRetry={() => void result.refetch()} />
     );
   const data = result.data || {};
   if (data.hidden) return <div className="dashboard-empty-small">دادهٔ این ویجت در دسترسی شما نیست.</div>;
@@ -163,6 +158,7 @@ function DataWidget({ widget }: { widget: DashboardWidget }) {
                 onClick={(point) => openPoint(point)}
               >
                 {points.map((_, index) => (
+                  // eslint-disable-next-line react/no-array-index-key -- chart cells follow the data order.
                   <Cell fill={colors[index % colors.length]} key={index} />
                 ))}
               </Pie>
@@ -234,6 +230,7 @@ function DataWidget({ widget }: { widget: DashboardWidget }) {
       <div className="dashboard-links">
         {Array.isArray(data.value)
           ? (data.value as { title: string; href: string }[]).map((link, index) => (
+              // eslint-disable-next-line react/no-array-index-key -- saved links have no ids.
               <Link key={index} to={link.href}>
                 {link.title}
               </Link>
@@ -246,6 +243,7 @@ function DataWidget({ widget }: { widget: DashboardWidget }) {
       <div className="dashboard-mini-table">
         {items.length
           ? items.map((item, index) => (
+              // eslint-disable-next-line react/no-array-index-key -- activity entries have no ids.
               <div key={index}>
                 {String(item.event)} · {displayDate(item.at)}
               </div>
@@ -258,6 +256,7 @@ function DataWidget({ widget }: { widget: DashboardWidget }) {
       <div className="dashboard-mini-table">
         {items.length
           ? items.map((item, index) => (
+              // eslint-disable-next-line react/no-array-index-key -- absence rows can repeat a user.
               <div key={index}>
                 <Link to={`/entities/leave/${String(item.id)}`}>{String(item.name)}</Link> ·{" "}
                 {String(item.reason || "بدون دلیل")} · بازگشت {displayDate(item.return_at)} · جانشین{" "}

@@ -1,3 +1,4 @@
+import { ErrorState } from "../error-state";
 import { useEffect, useMemo, useState } from "react";
 import { Save, UserRound } from "lucide-react";
 import { Navigate, useParams } from "react-router";
@@ -40,7 +41,7 @@ export default function UserProfilePage() {
   }, [isDirty, setFormDirty]);
   if (accessLoading) return <Skeleton rows={6} />;
   if (!access?.can("User.View")) return <Navigate to="/my-work" replace />;
-  if (error) return <p role="alert">عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید.</p>;
+  if (error) return <ErrorState message={"عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید."} />;
   if (isLoading || !form) return <Skeleton rows={7} />;
   const canEdit = access.can("User.Edit");
   const canSave = canEdit || access.can("User.Role.Assign") || access.can("OrganizationUnit.Member.Manage");

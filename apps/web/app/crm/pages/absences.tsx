@@ -1,3 +1,4 @@
+import { ErrorNotice } from "../error-state";
 import { EngineRecordForm } from "../engine/record-form";
 import { useState } from "react";
 import { Navigate } from "react-router";
@@ -45,7 +46,7 @@ export default function AbsencesPage() {
           )
         }
       />
-      {error && <p role="alert">عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید.</p>}
+      <ErrorNotice message={error && "عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید."} />
       <SearchBox value={query} onChange={setQuery} placeholder="جستجوی نام کاربر یا علت عدم حضور…" />
       {isLoading ? (
         <Skeleton rows={5} />

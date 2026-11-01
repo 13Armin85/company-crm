@@ -2,11 +2,15 @@ import { useState } from "react";
 import { SearchableSelect } from "@plane/ui";
 import { DefaultValueEditor, dynamicDefaultsFor } from "./default-value-editor";
 import type { FieldConfig, FieldKind } from "@plane/ui";
-import { useOrganizationPermissions, errorMessage } from "../api";
+import { useOrganizationPermissions } from "../api";
 import { Button } from "../components";
 import { useEngineMutation, useEngineDefinitions, useEngineCatalog } from "./api";
 import type { EntityDefinition, FieldDefinition, LookupDefinition, LookupOptionDefinition } from "./api";
 import { ConditionEditor, FormulaEditor } from "./rule-editors";
+
+const textKinds = new Set(["short_text", "long_text", "email", "phone", "url"]);
+const numberKinds = new Set(["integer", "decimal", "money", "percent"]);
+const choiceKinds = new Set(["select", "multi_select", "relation"]);
 
 export type DefinitionKind = "entities" | "fields" | "lookups" | "values";
 export type EditableDefinition = Partial<
@@ -62,7 +66,7 @@ export function DefinitionEditor({
       : "constant");
   const names: Record<DefinitionKind, string> = {
     entities: "موجودیت",
-    fields: "فیلد",
+    fields: "ورودی فرم",
     lookups: "لیست پایه",
     values: "مقدار لیست",
   };
@@ -148,22 +152,33 @@ export function DefinitionEditor({
           بستن
         </Button>
       </header>
-      {mutation.error && <p role="alert">{errorMessage(mutation.error, "تعریف ذخیره نشد.")}</p>}
       <div className="engine-editor-grid">
         <label>
-          عنوان فارسی
-          <input required value={data.title || ""} onChange={(e) => set("title", e.target.value)} />
+          {kind === "fields" ? "نام ورودی (همان چیزی که کاربر می‌بیند)" : "عنوان"}
+          <input
+            required
+            value={data.title || ""}
+            placeholder={kind === "fields" ? "مثلاً شماره تماس مشتری" : undefined}
+            onChange={(e) => set("title", e.target.value)}
+          />
         </label>
         <label>
-          کد یکتا
+          کد یکتا (انگلیسی)
           <input
             required
             dir="ltr"
-            pattern="[a-z][a-z0-9_-]*"
-            disabled={Boolean(row?.id)}
+            pattern="[a-z][a-z0-9_\-]*"
+            title="با حرف کوچک انگلیسی شروع شود؛ فقط حرف، عدد، خط تیره یا زیرخط"
+            placeholder="customer_phone"
+            disabled={Boolean(row?.id) && (kind !== "fields" || locked)}
             value={data.code || ""}
-            onChange={(e) => set("code", e.target.value)}
+            onChange={(e) => set("code", e.target.value.toLowerCase().replace(/\s+/g, "_"))}
           />
+          <small>
+            {kind === "fields" && locked
+              ? "این ورودی داده ثبت‌شده دارد؛ کد آن ثابت می‌ماند."
+              : "برای گزارش‌ها و اتصال‌ها استفاده می‌شود و در فرم دیده نمی‌شود."}
+          </small>
         </label>
       </div>
       {(kind === "entities" || kind === "lookups") && (
@@ -181,7 +196,7 @@ export function DefinitionEditor({
               set("is_active", e.target.checked);
           }}
         />{" "}
-        فعال
+        {kind === "fields" ? "این ورودی فعال است" : "فعال"}
       </label>
       {kind === "entities" && (
         <>
@@ -311,7 +326,7 @@ export function DefinitionEditor({
         <>
           {locked && <p className="engine-notice">این فیلد استفاده شده است؛ نوع و قواعد اصلی آن قابل تغییر نیستند.</p>}
           <SearchableSelect
-            label="نوع فیلد"
+            label="نوع ورودی"
             value={data.kind || "short_text"}
             disabled={locked}
             options={catalog?.field_kinds.map((k) => ({ id: k.code, title: k.title })) || []}
@@ -323,18 +338,24 @@ export function DefinitionEditor({
             }}
           />
           <label>
-            راهنما
-            <textarea value={data.help_text || ""} onChange={(e) => set("help_text", e.target.value)} />
+            راهنمای کوتاه زیر ورودی (اختیاری)
+            <textarea
+              value={data.help_text || ""}
+              placeholder="مثلاً شماره را با ۰۹ شروع کنید"
+              onChange={(e) => set("help_text", e.target.value)}
+            />
           </label>
-          <label>
-            متن جایگزین ورودی
-            <input value={data.placeholder || ""} onChange={(e) => set("placeholder", e.target.value)} />
-          </label>
+          {textKinds.has(data.kind || "") && (
+            <label>
+              متن نمونه داخل کادر (اختیاری)
+              <input value={data.placeholder || ""} onChange={(e) => set("placeholder", e.target.value)} />
+            </label>
+          )}
           <fieldset disabled={locked} className="engine-config-fields">
-            <legend>قواعد و رفتار</legend>
+            <legend>قواعد پر کردن</legend>
             {["select", "multi_select"].includes(data.kind || "") && (
               <SearchableSelect
-                label="لیست پایه"
+                label="گزینه‌ها از کدام لیست پایه خوانده شوند؟"
                 disabled={locked}
                 value={data.lookup || ""}
                 options={lookups.map((l) => ({ id: l.id, title: l.title }))}
@@ -344,7 +365,7 @@ export function DefinitionEditor({
             {data.kind === "relation" && (
               <>
                 <SearchableSelect
-                  label="موجودیت مقصد"
+                  label="به کدام بخش متصل شود؟"
                   disabled={locked}
                   value={data.relation_entity || ""}
                   options={catalog?.entities.filter((e) => !e.parent).map((e) => ({ id: e.id, title: e.title })) || []}
@@ -356,16 +377,15 @@ export function DefinitionEditor({
                     checked={config.multiple || false}
                     onChange={(e) => updateConfig({ multiple: e.target.checked })}
                   />
-                  چندرکوردی
+                  امکان انتخاب چند مورد
                 </label>
               </>
             )}
             <div className="engine-editor-grid">
               {[
-                ["required", "اجباری"],
-                ["readonly", "فقط‌خواندنی"],
-                ["hidden", "مخفی"],
-                ["unique", "مقدار یکتا"],
+                ["required", "پر کردن آن اجباری است"],
+                ["readonly", "فقط نمایشی (کاربر نمی‌تواند تغییر دهد)"],
+                ["unique", "مقدار تکراری ثبت نشود"],
               ].map(([key, title]) => (
                 <label className="engine-checkbox" key={key}>
                   <input
@@ -383,48 +403,41 @@ export function DefinitionEditor({
                 checked={config.editable_after_create !== false}
                 onChange={(e) => updateConfig({ editable_after_create: e.target.checked })}
               />
-              قابل ویرایش پس از ثبت
+              بعد از ثبت هم قابل ویرایش باشد
             </label>
             <div className="engine-editor-grid">
               {[
-                ["min", "حداقل مقدار"],
-                ["max", "حداکثر مقدار"],
-                ["min_length", "حداقل طول"],
-                ["max_length", "حداکثر طول"],
-              ].map(([key, title]) => (
-                <label key={key}>
-                  {title}
-                  <input
-                    type="number"
-                    value={
-                      typeof config[key as keyof FieldConfig] === "number"
-                        ? Number(config[key as keyof FieldConfig])
-                        : ""
-                    }
-                    onChange={(e) => {
-                      const next = { ...config };
-                      if (e.target.value === "") delete next[key as "min"];
-                      else next[key as "min"] = Number(e.target.value);
-                      set("config", next);
-                    }}
-                  />
-                </label>
-              ))}
+                ["min", "کمترین مقدار مجاز"],
+                ["max", "بیشترین مقدار مجاز"],
+                ["min_length", "کمترین تعداد حرف"],
+                ["max_length", "بیشترین تعداد حرف"],
+              ]
+                .filter(([key]) =>
+                  key.endsWith("_length") ? textKinds.has(data.kind || "") : numberKinds.has(data.kind || "")
+                )
+                .map(([key, title]) => (
+                  <label key={key}>
+                    {title}
+                    <input
+                      type="number"
+                      value={
+                        typeof config[key as keyof FieldConfig] === "number"
+                          ? Number(config[key as keyof FieldConfig])
+                          : ""
+                      }
+                      onChange={(e) => {
+                        const next = { ...config };
+                        if (e.target.value === "") delete next[key as "min"];
+                        else next[key as "min"] = Number(e.target.value);
+                        set("config", next);
+                      }}
+                    />
+                  </label>
+                ))}
             </div>
-            <label>
-              الگوی اعتبارسنجی متن
-              <input dir="ltr" value={config.regex || ""} onChange={(e) => updateConfig({ regex: e.target.value })} />
-            </label>
-            <label>
-              پیام خطای الگو
-              <input
-                value={config.regex_message || ""}
-                onChange={(e) => updateConfig({ regex_message: e.target.value })}
-              />
-            </label>
             {data.kind === "money" && (
               <label>
-                واحد مبلغ
+                واحد پول (مثلاً ریال)
                 <input value={config.unit || ""} onChange={(e) => updateConfig({ unit: e.target.value })} />
               </label>
             )}
@@ -443,7 +456,7 @@ export function DefinitionEditor({
             {data.kind === "file" && (
               <>
                 <label>
-                  پسوندهای مجاز (جداشده با ویرگول)
+                  نوع فایل‌های مجاز (مثلاً pdf، jpg)
                   <input
                     dir="ltr"
                     value={config.extensions?.join(", ") || ""}
@@ -458,37 +471,40 @@ export function DefinitionEditor({
                   />
                 </label>
                 <label>
-                  حداکثر حجم به بایت
+                  حداکثر حجم هر فایل (مگابایت)
                   <input
                     type="number"
                     min={1}
-                    value={config.max_file_size ?? 5242880}
-                    onChange={(e) => updateConfig({ max_file_size: Number(e.target.value) })}
+                    step={1}
+                    value={Math.round((config.max_file_size ?? 5242880) / 1048576)}
+                    onChange={(e) => updateConfig({ max_file_size: Math.max(1, Number(e.target.value)) * 1048576 })}
                   />
                 </label>
               </>
             )}
-            <SearchableSelect
-              label="فیلد والد برای انتخاب وابسته"
-              disabled={locked}
-              value={config.depends_on || ""}
-              options={[
-                { id: "", title: "مستقل" },
-                ...fields.filter((f) => f.code !== data.code).map((f) => ({ id: f.code, title: f.title })),
-              ]}
-              onChange={(v) => updateConfig({ depends_on: v || undefined })}
-            />
+            {choiceKinds.has(data.kind || "") && (
+              <SearchableSelect
+                label="گزینه‌ها به انتخاب کدام ورودی وابسته باشد؟"
+                disabled={locked}
+                value={config.depends_on || ""}
+                options={[
+                  { id: "", title: "وابسته نیست" },
+                  ...fields.filter((f) => f.code !== data.code).map((f) => ({ id: f.code, title: f.title })),
+                ]}
+                onChange={(v) => updateConfig({ depends_on: v || undefined })}
+              />
+            )}
             {data.kind === "computed" ? (
               <FormulaEditor value={config.formula} onChange={(formula) => updateConfig({ formula })} fields={fields} />
             ) : (
               <fieldset>
-                <legend>مقدار پیش‌فرض</legend>
+                <legend>مقدار اولیه</legend>
                 <SearchableSelect
-                  label="روش مقدار پیش‌فرض"
+                  label="ورودی با چه مقداری پر شود؟"
                   disabled={locked}
                   value={defaultMode}
                   options={[
-                    { id: "constant", title: "ثابت / بدون پیش‌فرض" },
+                    { id: "constant", title: "خالی یا یک مقدار ثابت" },
                     { id: "current_user", title: "کاربر جاری" },
                     { id: "today", title: "امروز" },
                     { id: "now", title: "زمان جاری" },
@@ -518,14 +534,14 @@ export function DefinitionEditor({
               </fieldset>
             )}
             <ConditionEditor
-              label="اجباری شرطی"
+              label="فقط در شرایط خاص اجباری شود"
               value={config.required_if}
               onChange={(required_if) => updateConfig({ required_if })}
               fields={fields}
               lookupValues={lookupValues}
             />
             <ConditionEditor
-              label="نمایش شرطی"
+              label="فقط در شرایط خاص نمایش داده شود"
               value={config.visible_if}
               onChange={(visible_if) => updateConfig({ visible_if })}
               fields={fields}
@@ -533,7 +549,7 @@ export function DefinitionEditor({
             />
           </fieldset>
           <fieldset>
-            <legend>قابلیت‌های نمایش</legend>
+            <legend>نمایش در جدول و جستجو</legend>
             <label className="engine-checkbox">
               <input
                 type="checkbox"
@@ -549,13 +565,13 @@ export function DefinitionEditor({
                     set("hidden_from_form", e.target.checked);
                 }}
               />
-              مخفی از فرم؛ حفظ داده‌های قبلی در جدول
+              دیگر در فرم نمایش داده نشود (داده‌های قبلی حفظ می‌شود)
             </label>
             {[
-              ["show_in_summary", "نمایش در خلاصه اطلاعات"],
-              ["searchable", "قابل جستجو"],
-              ["filterable", "قابل فیلتر"],
-              ["table_visible", "قابل نمایش در جدول"],
+              ["show_in_summary", "در خلاصه رکورد نمایش داده شود"],
+              ["searchable", "در جستجو پیدا شود"],
+              ["filterable", "در فیلترها قابل انتخاب باشد"],
+              ["table_visible", "به‌عنوان ستون جدول قابل انتخاب باشد"],
             ].map(([key, title]) => (
               <label className="engine-checkbox" key={key}>
                 <input

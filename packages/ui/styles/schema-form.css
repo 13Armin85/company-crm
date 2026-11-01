@@ -277,3 +277,10 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+.schema-field.has-error input:not([type="checkbox"]):not([type="file"]),
+.schema-field.has-error textarea,
+.schema-field.has-error select,
+.schema-field.has-error .searchable-select input {
+  border-color: var(--red, #ef4444);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--red, #ef4444) 14%, transparent);
+}

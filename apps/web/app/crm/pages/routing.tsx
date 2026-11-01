@@ -1,3 +1,4 @@
+import { ErrorNotice } from "../error-state";
 import { DialogTitle } from "@headlessui/react";
 import { IdentifierBadge, ModalCore, SearchableSelect } from "@plane/ui";
 import { useEffect, useState } from "react";
@@ -208,7 +209,7 @@ export default function RoutingPage() {
               />
               <span>قانون فعال باشد</span>
             </label>
-            {saveRule.isError && <p role="alert">عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید.</p>}
+            <ErrorNotice message={saveRule.isError && "عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید."} />
             <footer>
               <Button variant="secondary" disabled={saveRule.isPending} onClick={() => setEditing(undefined)}>
                 انصراف

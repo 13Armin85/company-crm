@@ -1,3 +1,4 @@
+import { ErrorNotice } from "../error-state";
 import { useState } from "react";
 import { Link } from "react-router";
 import { Dialog, DialogPanel, DialogTitle } from "@headlessui/react";
@@ -71,7 +72,7 @@ export function RecordSummaryDrawer({
         {summary.isLoading ? (
           <Skeleton rows={5} />
         ) : summary.error ? (
-          <p role="alert">{errorMessage(summary.error, "دریافت خلاصه انجام نشد.")}</p>
+          <ErrorNotice message={errorMessage(summary.error, "دریافت خلاصه انجام نشد.")} />
         ) : (
           summary.data && (
             <>

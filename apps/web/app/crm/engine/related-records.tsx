@@ -1,3 +1,4 @@
+import { ErrorNotice } from "../error-state";
 import { useState } from "react";
 import { Link } from "react-router";
 import { SchemaDrivenForm } from "@plane/ui";
@@ -156,7 +157,7 @@ function RelatedSection({ code, id, field }: { code: string; id: string; field: 
             </>
           )}
           {(rows.error || mutation.error) && (
-            <p role="alert">{errorMessage(rows.error || mutation.error, "عملیات رکوردهای مرتبط انجام نشد.")}</p>
+            <ErrorNotice message={errorMessage(rows.error || mutation.error, "عملیات رکوردهای مرتبط انجام نشد.")} />
           )}
         </>
       )}

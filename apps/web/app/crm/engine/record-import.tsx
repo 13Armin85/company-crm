@@ -1,3 +1,4 @@
+import { ErrorNotice } from "../error-state";
 import { useState } from "react";
 import { Button } from "../components";
 import { errorMessage } from "../api";
@@ -38,7 +39,7 @@ export function RecordImport({ code, subtype }: { code: string; subtype: string 
       >
         ورود داده‌ها
       </Button>
-      {mutation.error && <p role="alert">{errorMessage(mutation.error, "ورود داده انجام نشد.")}</p>}
+      <ErrorNotice message={mutation.error && errorMessage(mutation.error, "ورود داده انجام نشد.")} />
       {result && (
         <>
           <p role="status">

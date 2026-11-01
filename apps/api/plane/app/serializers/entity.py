@@ -33,7 +33,13 @@ class ScopedDefinitionSerializer(serializers.ModelSerializer):
                 "کد باید با حرف کوچک انگلیسی شروع شود و فقط حرف، عدد، خط تیره یا زیرخط داشته باشد."
             )
         if self.instance and value != self.instance.code:
-            raise serializers.ValidationError("کد پایدار پس از ایجاد قابل تغییر نیست.")
+            if self.Meta.model is not FieldDefinition:
+                raise serializers.ValidationError("کد پایدار پس از ایجاد قابل تغییر نیست.")
+            from plane.app.services.field_lifecycle import assert_can_rename
+
+            assert_can_rename(self.instance)
+            if FieldDefinition.objects.filter(workspace=self.instance.workspace, code=value).exists():
+                raise serializers.ValidationError("این کد برای فیلد دیگری استفاده شده است.")
         return value
 
 
@@ -207,3 +213,15 @@ class FieldDefinitionSerializer(ScopedDefinitionSerializer):
         if relation and relation.parent_id:
             raise serializers.ValidationError("مقصد ارتباط باید یک موجودیت اصلی باشد.")
         return attrs
+
+    def update(self, instance, validated_data):
+        from django.db import transaction
+
+        old = instance.code
+        with transaction.atomic():
+            row = super().update(instance, validated_data)
+            if row.code != old:
+                from plane.app.services.field_lifecycle import rename_field_references
+
+                rename_field_references(row, old, row.code)
+        return row

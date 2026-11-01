@@ -159,3 +159,54 @@ def detach_empty_field(field, actor):
                 before,
                 result,
             )
+
+
+def _rename_value(value, old, new):
+    if isinstance(value, str):
+        return new if value == old else value
+    if isinstance(value, list):
+        return [_rename_value(item, old, new) for item in value]
+    if isinstance(value, dict):
+        return {(new if key == old else key): _rename_value(item, old, new) for key, item in value.items()}
+    return value
+
+
+def assert_can_rename(field):
+    workspace = field.workspace
+    for form in FormLayout.objects.filter(entity__workspace=workspace).select_related("entity__parent"):
+        root = form.entity.parent or form.entity
+        if any(
+            b["field"] == field.code and b.get("source") in MANDATORY_SOURCES.get(root.adapter, set())
+            for b in bindings(form.draft)
+        ) or (root.adapter and root.title_field == field.code):
+            raise ValidationError({"code": "کد فیلدهای هسته‌ای سیستم قابل تغییر نیست."})
+    if (
+        field.used_at
+        or EntityRecord.objects.filter(entity__workspace=workspace, data__has_key=field.code).exists()
+        or SurfaceValues.objects.filter(workspace=workspace, values__has_key=field.code).exists()
+    ):
+        raise ValidationError({"code": "برای این فیلد داده ثبت شده است؛ کد آن دیگر قابل تغییر نیست."})
+
+
+def rename_field_references(field, old, new):
+    """Point every layout, rule and saved view that uses a field code at its new code."""
+    from plane.db.models import EntityUniqueRule, FieldDefinition, FormVersion, IssueView, SurfaceConfiguration
+
+    workspace = field.workspace
+    targets = [
+        (FormLayout.objects.filter(entity__workspace=workspace), "draft"),
+        (FormVersion.objects.filter(layout__entity__workspace=workspace), "schema"),
+        (SurfaceConfiguration.objects.filter(workspace=workspace), "definition"),
+        (FieldDefinition.objects.filter(workspace=workspace).exclude(pk=field.pk), "config"),
+        (EntityUniqueRule.objects.filter(entity__workspace=workspace), "fields"),
+        (EntityType.objects.filter(workspace=workspace), "view_settings"),
+        (IssueView.objects.filter(workspace=workspace, engine_definition__isnull=False), "engine_definition"),
+    ]
+    for queryset, attribute in targets:
+        for row in queryset.select_for_update():
+            current = getattr(row, attribute)
+            renamed = _rename_value(current, old, new)
+            if renamed != current:
+                setattr(row, attribute, renamed)
+                row.save(update_fields=[attribute, "updated_at"])
+    EntityType.objects.filter(workspace=workspace, title_field=old).update(title_field=new)

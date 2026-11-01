@@ -1,3 +1,4 @@
+import { ErrorNotice } from "../error-state";
 import { useState } from "react";
 import { SearchableSelect } from "@plane/ui";
 import { Button } from "../components";
@@ -42,7 +43,7 @@ export function EntityFormDirectory() {
         />
       )}
       {(catalog.error || fields.error) && (
-        <p role="alert">{errorMessage(catalog.error || fields.error, "فهرست فرم‌ها دریافت نشد.")}</p>
+        <ErrorNotice message={errorMessage(catalog.error || fields.error, "فهرست فرم‌ها دریافت نشد.")} />
       )}
       {entity && fields.data && (
         <FormDesigner key={entity.id} entity={entity} fields={fields.data} entities={catalog.data?.entities || []} />

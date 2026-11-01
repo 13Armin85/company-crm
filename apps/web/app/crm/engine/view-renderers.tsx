@@ -1,3 +1,4 @@
+import { ErrorNotice } from "../error-state";
 import { useState, useRef } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { Link } from "react-router";
@@ -15,7 +16,7 @@ import { ViewValue, appearance, numberText, icons } from "./view-value";
 import { Button } from "../components";
 import { useEngineSchema, useEngineRecord, useEngineMutation, fieldErrors } from "./api";
 import { useSchemaTransport } from "./record-form";
-import type { ViewDefinition, ViewField, ViewResult, ViewRow, ViewStyle } from "./view-types";
+import type { ViewDefinition, ViewField, ViewResult, ViewRow } from "./view-types";
 import { entityDisplaySchema } from "./presentation";
 import { RelatedListPreview } from "./related-records";
 import { DuplicateFeedback, duplicateDetails } from "./duplicate-feedback";
@@ -77,12 +78,13 @@ export function InlineViewEditor({
         errors={fieldErrors(mutation.error)}
         disabled={mutation.isPending}
       />
-      {mutation.error && (
-        <p role="alert">
-          {Object.values(fieldErrors(mutation.error)).join("، ") ||
-            "ویرایش انجام نشد؛ مجوز و قواعد فیلد را بررسی کنید."}
-        </p>
-      )}
+      <ErrorNotice
+        message={
+          mutation.error &&
+          (Object.values(fieldErrors(mutation.error)).join("، ") ||
+            "ویرایش انجام نشد؛ مجوز و قواعد فیلد را بررسی کنید.")
+        }
+      />
       <DuplicateFeedback details={duplicateDetails(mutation.error)} />
       <Button type="submit" disabled={mutation.isPending || definition.config.readonly}>
         ذخیره
@@ -381,6 +383,7 @@ export function ViewRenderer({
                     : "";
                 return (
                   <div
+                    // eslint-disable-next-line react/no-array-index-key -- calendar cells are positional and never reorder.
                     key={index}
                     className={iso ? "" : "engine-calendar-outside"}
                     onDragOver={(e) => e.preventDefault()}
