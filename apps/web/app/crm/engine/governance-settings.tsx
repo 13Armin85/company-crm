@@ -54,9 +54,9 @@ export function EntityRules({ code, mode: panel = "all" }: { code: string; mode?
   const [number, setNumber] = useState({
     field: "",
     title: "",
-    prefix: "TT",
-    start: 1921,
-    padding: 0,
+    prefix: "",
+    start: 1,
+    padding: 4,
     shared_sequence: true,
     subtype_prefixes: {} as Record<string, string>,
   });
@@ -86,6 +86,18 @@ export function EntityRules({ code, mode: panel = "all" }: { code: string; mode?
     setNumber({ ...number, ...patch });
     setPreview(null);
   };
+  const entity = catalog.data?.entities.find((candidate) => candidate.code === code);
+  const subtypes = (catalog.data?.entities || []).filter((candidate) => candidate.parent === entity?.id);
+  const numbered = new Set(numbering.data?.results.map((rule) => rule.field));
+  // Only empty text columns of this form can carry automatic numbers.
+  const numberableColumns = (schema.data?.fields || []).filter(
+    (field) =>
+      !field.code.includes(".") &&
+      field.code !== entity?.title_field &&
+      !numbered.has(field.code) &&
+      fields.data?.find((definition) => definition.code === field.code)?.kind === "short_text"
+  );
+  const [newColumn, setNewColumn] = useState(false);
   return (
     <div className="engine-rules-layout">
       {panel !== "numbering" && access?.can("UniqueRule.Manage") && (
@@ -97,7 +109,7 @@ export function EntityRules({ code, mode: panel = "all" }: { code: string; mode?
             <div>
               <span className="engine-rules-eyebrow">کنترل کیفیت داده</span>
               <h3 id="unique-rules-title">جلوگیری از رکورد تکراری</h3>
-              <p>ترکیبی از ستون‌ها را یکتا کنید و رفتار سیستم را هنگام ثبت رکورد مشابه تعیین کنید.</p>
+              <p>مثلاً اجازه ندهید دو مشتری با یک کد ملی ثبت شوند.</p>
             </div>
             <span className="engine-rules-count">
               {(unique.data?.results.length || 0).toLocaleString("fa-IR")} قاعده
@@ -180,20 +192,21 @@ export function EntityRules({ code, mode: panel = "all" }: { code: string; mode?
                 </span>
                 <div>
                   <h4>قاعده جدید</h4>
-                  <p>ستون‌هایی را انتخاب کنید که ترکیبشان باید یکتا باشد.</p>
+                  <p>اگر چند ستون انتخاب کنید، ترکیب آن‌ها نباید تکراری باشد.</p>
                 </div>
               </div>
               <label>
-                نام گروه یکتا
+                نام قاعده
                 <input
                   value={title}
                   onChange={(event) => setTitle(event.target.value)}
                   maxLength={255}
-                  placeholder="مثلاً کد ملی و نوع مشتری"
+                  placeholder="مثلاً کد ملی تکراری نباشد"
                 />
               </label>
               <SearchableSelect
-                label="افزودن ستون به گروه"
+                showLabel
+                label="کدام ستون نباید تکراری باشد؟"
                 value=""
                 options={(schema.data?.fields || [])
                   .filter((field) => !field.code.includes(".") && !selected.includes(field.code))
@@ -216,11 +229,12 @@ export function EntityRules({ code, mode: panel = "all" }: { code: string; mode?
                 </div>
               )}
               <SearchableSelect
-                label="روش اجرا"
+                showLabel
+                label="اگر رکورد تکراری ثبت شد"
                 value={mode}
                 options={[
-                  { id: "block", title: "مسدود کن" },
-                  { id: "warn", title: "فقط هشدار بده و اجازه ثبت بده" },
+                  { id: "block", title: "اجازه ثبت نده" },
+                  { id: "warn", title: "هشدار بده ولی اجازه ثبت بده" },
                 ]}
                 onChange={setMode}
               />
@@ -228,7 +242,7 @@ export function EntityRules({ code, mode: panel = "all" }: { code: string; mode?
                 disabled={!title.trim() || !selected.length || mutation.isPending}
                 onClick={() => void saveUnique()}
               >
-                ثبت گروه یکتا
+                ذخیره قاعده
               </Button>
               <ErrorNotice message={uniqueError} />
               {conflicts.length > 0 && (
@@ -262,7 +276,7 @@ export function EntityRules({ code, mode: panel = "all" }: { code: string; mode?
             <div>
               <span className="engine-rules-eyebrow">شناسه‌گذاری رکورد</span>
               <h3 id="numbering-rules-title">ستون‌های شماره‌گذاری خودکار</h3>
-              <p>قالب شماره، پیشوند و توالی رکوردهای جدید را تنظیم کنید.</p>
+              <p>به هر رکورد جدید یک شماره ترتیبی مثل INV-0001 بدهید.</p>
             </div>
             <span className="engine-rules-count">
               {(numbering.data?.results.length || 0).toLocaleString("fa-IR")} ستون
@@ -304,39 +318,60 @@ export function EntityRules({ code, mode: panel = "all" }: { code: string; mode?
                 </span>
                 <div>
                   <h4>{editing ? "ویرایش شماره‌گذاری" : "ستون جدید"}</h4>
-                  <p>پیش‌نمایش را پیش از اعمال روی رکوردهای قدیمی بررسی کنید.</p>
+                  <p>رکوردهای قبلی هم شماره می‌گیرند؛ قبل از تأیید، پیش‌نمایش را ببینید.</p>
                 </div>
               </div>
               <div className="engine-rules-fields">
-                <label>
-                  عنوان ستون
-                  <input
-                    value={number.title}
-                    disabled={Boolean(editing)}
-                    onChange={(event) => updateNumber({ title: event.target.value })}
-                  />
-                </label>
-                {!editing && (
-                  <label>
-                    کد انگلیسی ستون
-                    <input
-                      dir="ltr"
-                      value={number.field}
-                      onChange={(event) => updateNumber({ field: event.target.value })}
+                {editing ? (
+                  <div className="engine-rules-column-readonly">
+                    <span>ستون</span>
+                    <strong>{number.title}</strong>
+                  </div>
+                ) : (
+                  <>
+                    <SearchableSelect
+                      showLabel
+                      label="کدام ستون شماره خودکار بگیرد؟"
+                      value={newColumn ? "__new__" : number.field}
+                      options={[
+                        ...numberableColumns.map((column) => ({ id: column.code, title: column.title })),
+                        { id: "__new__", title: "+ ساخت ستون جدید" },
+                      ]}
+                      onChange={(value) => {
+                        if (value === "__new__") {
+                          setNewColumn(true);
+                          updateNumber({ field: `auto_number_${crypto.randomUUID().slice(0, 6)}`, title: "" });
+                        } else {
+                          setNewColumn(false);
+                          const column = numberableColumns.find((item) => item.code === value);
+                          updateNumber({ field: value, title: column?.title || "" });
+                        }
+                      }}
                     />
-                  </label>
+                    {newColumn && (
+                      <label>
+                        نام ستون جدید
+                        <input
+                          value={number.title}
+                          placeholder="مثلاً شماره قرارداد"
+                          onChange={(event) => updateNumber({ title: event.target.value })}
+                        />
+                      </label>
+                    )}
+                  </>
                 )}
                 <label>
-                  پیشوند
+                  پیشوند (اختیاری)
                   <input
                     dir="ltr"
                     value={number.prefix}
+                    placeholder="INV-"
                     onChange={(event) => updateNumber({ prefix: event.target.value })}
                     maxLength={60}
                   />
                 </label>
                 <label>
-                  شروع توالی
+                  اولین شماره
                   <input
                     type="number"
                     min={1}
@@ -345,7 +380,7 @@ export function EntityRules({ code, mode: panel = "all" }: { code: string; mode?
                   />
                 </label>
                 <label>
-                  تعداد ارقام؛ صفر یعنی بدون صفر پیشرو
+                  حداقل تعداد رقم (با صفر پر می‌شود)
                   <input
                     type="number"
                     min={0}
@@ -354,32 +389,30 @@ export function EntityRules({ code, mode: panel = "all" }: { code: string; mode?
                     onChange={(event) => updateNumber({ padding: Number(event.target.value) })}
                   />
                 </label>
-                {(catalog.data?.entities || [])
-                  .filter(
-                    (entity) =>
-                      entity.parent === catalog.data?.entities.find((candidate) => candidate.code === code)?.id
-                  )
-                  .map((entity) => (
-                    <label key={entity.id}>
-                      پیشوند {entity.title}
-                      <input
-                        value={number.subtype_prefixes[entity.code] ?? number.prefix}
-                        onChange={(event) =>
-                          updateNumber({
-                            subtype_prefixes: { ...number.subtype_prefixes, [entity.code]: event.target.value },
-                          })
-                        }
-                      />
-                    </label>
-                  ))}
-                <label className="engine-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={number.shared_sequence}
-                    onChange={(event) => updateNumber({ shared_sequence: event.target.checked })}
-                  />
-                  توالی عددی مشترک زیرنوع‌ها
-                </label>
+                {subtypes.map((subtype) => (
+                  <label key={subtype.id}>
+                    پیشوند {subtype.title}
+                    <input
+                      dir="ltr"
+                      value={number.subtype_prefixes[subtype.code] ?? number.prefix}
+                      onChange={(event) =>
+                        updateNumber({
+                          subtype_prefixes: { ...number.subtype_prefixes, [subtype.code]: event.target.value },
+                        })
+                      }
+                    />
+                  </label>
+                ))}
+                {subtypes.length > 0 && (
+                  <label className="engine-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={number.shared_sequence}
+                      onChange={(event) => updateNumber({ shared_sequence: event.target.checked })}
+                    />
+                    همه نوع‌های فرعی از یک شمارنده مشترک استفاده کنند
+                  </label>
+                )}
               </div>
               <div className="engine-rules-sample">
                 <span>نمونه شماره</span>
@@ -411,12 +444,7 @@ export function EntityRules({ code, mode: panel = "all" }: { code: string; mode?
                 </>
               ) : (
                 <Button
-                  disabled={
-                    !number.field ||
-                    !number.title ||
-                    mutation.isPending ||
-                    fields.data?.some((field) => field.code === number.field)
-                  }
+                  disabled={!number.field || !number.title.trim() || mutation.isPending}
                   onClick={() =>
                     void mutation
                       .mutateAsync({

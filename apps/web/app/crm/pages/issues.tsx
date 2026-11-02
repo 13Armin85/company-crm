@@ -1,38 +1,35 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { LayoutDashboard, List, Plus } from "lucide-react";
 import { Navigate } from "react-router";
 import { zonedDateTime } from "@plane/ui";
 import {
   useCurrentUser,
-  useIssues,
   useMembers,
   useProjects,
   useUpdateIssueStatus,
   useWorkspaceAccess,
-  useTaskHistory,
   useReassignIssue,
 } from "../api";
 import { Button, EmptyState, PageHeader, SearchBox, Skeleton, TabBar } from "../components";
 import { WorkTable } from "../engine/work-table";
 import { DataFilterButton, IssueFilterDialog } from "../filter-controls";
-import { emptyIssueFilters, filterIssues, issueFilterCount } from "../filter-rules";
+import { deadlineFilterError, emptyIssueFilters, issueFilterCount } from "../filter-rules";
 import { IssueKanbanBoard } from "../kanban";
 import { useUIStore } from "../store";
 import { toFa } from "../utils";
-import { isCurrentReceivedIssue, isPersonalHistoryIssue } from "../task-access";
+import { useTasksTable } from "../table-hooks";
+import { useDebouncedValue, useTablePaging } from "../table-query";
+import { TablePagination } from "../table-pagination";
 
 export default function IssuesPage() {
   const [view, setView] = useState<"list" | "board">("list");
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState(emptyIssueFilters);
+  const [draft, setDraft] = useState(filters);
   const [filterOpen, setFilterOpen] = useState(false);
   const [tab, setTab] = useState("received");
   const { data: access, isLoading: accessLoading } = useWorkspaceAccess();
   const isAdmin = access?.is_admin === true;
-  const currentIssues = useIssues(undefined, undefined, isAdmin);
-  const history = useTaskHistory(Boolean(access) && !isAdmin);
-  const issues = (isAdmin ? currentIssues.data : history.data) ?? [];
-  const isLoading = isAdmin ? currentIssues.isLoading : history.isLoading;
   const { data: projects = [], isLoading: projectsLoading } = useProjects();
   const { data: members = [], isLoading: membersLoading } = useMembers();
   const { data: currentUser } = useCurrentUser();
@@ -41,15 +38,44 @@ export default function IssuesPage() {
   const reassign = useReassignIssue(slug);
   const canCreate = access?.can("Issue.Create") === true;
   const setCreate = useUIStore((state) => state.setCreateOpen);
-  const loading = isLoading || projectsLoading;
   const today = zonedDateTime(new Date(), currentUser?.timeZone)!.date;
-  const received = issues.filter((issue) => isCurrentReceivedIssue(issue, currentUser?.id));
-  const personalHistory = issues.filter((issue) => isPersonalHistoryIssue(issue, currentUser?.id));
-  const sent = issues.filter((issue) => issue.senderId === currentUser?.id && issue.assignee?.id !== currentUser?.id);
-  const tabIssues = isAdmin ? issues : tab === "history" ? personalHistory : tab === "sent" ? sent : received;
-  const filtered = useMemo(
-    () => filterIssues(tabIssues, filters, query, today, currentUser?.timeZone),
-    [tabIssues, query, filters, today, currentUser?.timeZone]
+  const search = useDebouncedValue(query);
+  const activeTab = isAdmin ? "all" : tab;
+  const paging = useTablePaging("issues", [search, activeTab, filters]);
+  const table = useTasksTable({
+    view: "all",
+    tab: activeTab,
+    q: search,
+    filters,
+    today,
+    ...paging,
+    enabled: Boolean(access),
+  });
+  // The filter dialog previews how many tasks its draft would match.
+  const preview = useTasksTable({
+    view: "all",
+    tab: activeTab,
+    q: search,
+    filters: draft,
+    today,
+    page: 1,
+    pageSize: 10,
+    enabled: filterOpen && !deadlineFilterError(draft),
+  });
+  const filtered = table.data?.rows ?? [];
+  const counts = table.data?.tab_counts ?? {};
+  const loading = table.isLoading || projectsLoading;
+  const pager = (
+    <TablePagination
+      page={table.data?.page ?? 1}
+      pages={table.data?.pages ?? 1}
+      count={table.data?.count ?? 0}
+      pageSize={paging.pageSize}
+      onPage={paging.setPage}
+      onPageSize={paging.setPageSize}
+      loading={table.isFetching}
+      label="کار"
+    />
   );
   if (accessLoading) return <Skeleton rows={7} />;
   if (!access?.can("Issue.View")) return <Navigate to="/my-work" replace />;
@@ -73,9 +99,9 @@ export default function IssuesPage() {
           active={tab}
           onChange={setTab}
           items={[
-            { id: "received", label: "دریافتی‌های فعلی", count: received.length },
-            { id: "history", label: "تاریخچهٔ من (همهٔ زمان‌ها)", count: personalHistory.length },
-            { id: "sent", label: "ارسالی‌های من", count: sent.length },
+            { id: "received", label: "دریافتی‌های فعلی", count: counts.received },
+            { id: "history", label: "تاریخچهٔ من (همهٔ زمان‌ها)", count: counts.history },
+            { id: "sent", label: "ارسالی‌های من", count: counts.sent },
           ]}
         />
       )}
@@ -90,24 +116,33 @@ export default function IssuesPage() {
         </div>
         <div className="toolbar-actions">
           <SearchBox value={query} onChange={setQuery} placeholder="جستجو در کارها..." />
-          <DataFilterButton count={issueFilterCount(filters)} open={filterOpen} onClick={() => setFilterOpen(true)} />
+          <DataFilterButton
+            count={issueFilterCount(filters)}
+            open={filterOpen}
+            onClick={() => {
+              setDraft(filters);
+              setFilterOpen(true);
+            }}
+          />
         </div>
       </div>
       {!loading && (
         <p className="filter-results" role="status">
-          {toFa(filtered.length)} از {toFa(tabIssues.length)} کار
+          {toFa(table.data?.count ?? 0)} از {toFa(counts[activeTab] ?? 0)} کار
         </p>
       )}
       {filterOpen && (
         <IssueFilterDialog
           filters={filters}
-          issues={issues}
+          issues={filtered}
           projects={projects}
           members={members}
           query={query}
           today={today}
           timeZone={currentUser?.timeZone}
-          loading={loading || membersLoading}
+          loading={preview.isFetching || membersLoading}
+          serverCount={preview.data?.count ?? 0}
+          onDraftChange={setDraft}
           onClose={() => setFilterOpen(false)}
           onApply={(next) => {
             setFilters(next);
@@ -132,6 +167,7 @@ export default function IssuesPage() {
       ) : view === "list" ? (
         <div className="table-card issue-list-card">
           <WorkTable issues={filtered} readOnly={!isAdmin && tab === "history"} />
+          {pager}
         </div>
       ) : (
         <IssueKanbanBoard
@@ -144,6 +180,7 @@ export default function IssuesPage() {
           onAssigneeChange={(issue, assigneeId) => reassign.mutate({ issue, assigneeId })}
         />
       )}
+      {view === "board" && !loading && filtered.length > 0 && <div className="table-card">{pager}</div>}
     </div>
   );
 }

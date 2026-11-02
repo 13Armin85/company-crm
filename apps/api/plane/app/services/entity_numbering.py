@@ -190,8 +190,22 @@ def create_numbering(entity, actor, data):
         or not re.fullmatch(r"[a-z][a-z0-9_-]{0,79}", code)
     ):
         raise ValidationError("عنوان و کد انگلیسی ستون شماره‌گذاری را وارد کنید.")
-    if FieldDefinition.objects.filter(workspace=entity.workspace, code=code).exists():
-        raise ValidationError("کد این فیلد قبلاً استفاده شده است.")
+    existing = FieldDefinition.objects.filter(workspace=entity.workspace, code=code).first()
+    if existing:
+        # An existing column can carry the numbers only if numbering cannot overwrite data.
+        if existing.kind != "short_text":
+            raise ValidationError("فقط ستون‌های متن کوتاه می‌توانند شماره خودکار بگیرند.")
+        if EntityNumberingRule.objects.filter(field=existing).exists():
+            raise ValidationError("این ستون از قبل شماره‌گذاری خودکار دارد.")
+        if code == (entity.parent or entity).title_field:
+            raise ValidationError("ستون عنوان رکورد نمی‌تواند شماره خودکار بگیرد.")
+        filled = (
+            EntityRecord.objects.filter(entity=entity, **{f"data__{code}__isnull": False})
+            .exclude(**{f"data__{code}": ""})
+            .exists()
+        )
+        if filled:
+            raise ValidationError("این ستون در رکوردهای قبلی مقدار دارد؛ یک ستون خالی یا ستون جدید انتخاب کنید.")
     if EntityRecord.objects.filter(entity=entity).exists():
         try:
             signed = signing.loads(
@@ -220,19 +234,30 @@ def create_numbering(entity, actor, data):
     )
     if not form or not form.published_id:
         raise ValidationError("ابتدا فرم موجودیت را منتشر کنید.")
-    field = FieldDefinition.objects.create(
-        workspace=entity.workspace,
-        code=code,
-        title=title.strip(),
-        kind="short_text",
-        config={"readonly": True, "auto_number": True},
-        show_in_summary=True,
-    )
+    if existing:
+        field = existing
+        field.config = {**field.config, "readonly": True, "auto_number": True}
+        field.save(update_fields=["config", "updated_at"])
+    else:
+        field = FieldDefinition.objects.create(
+            workspace=entity.workspace,
+            code=code,
+            title=title.strip(),
+            kind="short_text",
+            config={"readonly": True, "auto_number": True},
+            show_in_summary=True,
+        )
     rule = EntityNumberingRule.objects.create(entity=entity, field=field, **settings)
     before = deepcopy(form.published.schema)
 
     def attach(layout):
         layout = deepcopy(layout)
+        if any(
+            binding.get("field") == code
+            for section in layout.get("sections", [])
+            for binding in section.get("bindings", [])
+        ):
+            return layout
         layout.setdefault("sections", []).append(
             {
                 "id": f"numbering-{rule.id}",

@@ -87,36 +87,33 @@ export function OfficialTableDesigner({ code }: { code: string }) {
       <div className="engine-panel-heading engine-table-designer-heading">
         <div>
           <span className="engine-step-badge">طراحی جدول</span>
-          <h3>جدول‌های رسمی و ستون‌ها</h3>
-          <p>ساختار جدول، اطلاعات پنل جزئیات و قواعد نمایش اولیه را در بخش‌های جدا تنظیم کنید.</p>
+          <h3>نماهای آماده جدول</h3>
+          <p>ستون‌ها، مرتب‌سازی و فیلتر اولیه‌ای را که کاربران هنگام باز کردن جدول می‌بینند تعیین کنید.</p>
         </div>
         <Button variant="secondary" onClick={() => choose()}>
           <Plus size={16} aria-hidden="true" />
-          جدول رسمی جدید
+          نمای جدید
         </Button>
       </div>
       <div className="engine-table-identity">
         {!!official.length && (
           <SearchableSelect
             showLabel
-            label="جدول رسمی برای ویرایش"
+            label="کدام نما را ویرایش می‌کنید؟"
             value={selected}
-            options={[
-              { id: "", title: "جدول رسمی جدید" },
-              ...official.map((view) => ({ id: view.id, title: view.name })),
-            ]}
+            options={[{ id: "", title: "نمای جدید" }, ...official.map((view) => ({ id: view.id, title: view.name }))]}
             onChange={(id) => choose(official.find((view) => view.id === id))}
           />
         )}
         <label>
-          <span>نام جدول</span>
+          <span>نام نما</span>
           <input
             value={name}
             onChange={(event) => setName(event.target.value)}
             maxLength={255}
             placeholder="مثلاً جدول اصلی مشتریان"
           />
-          <small>این نام در فهرست نماهای رسمی دیده می‌شود.</small>
+          <small>کاربران این نام را در فهرست نماها می‌بینند.</small>
         </label>
       </div>
       <div className="engine-table-design-grid">
@@ -176,7 +173,7 @@ export function OfficialTableDesigner({ code }: { code: string }) {
             <h5>مرتب‌سازی اولیه</h5>
             <SearchableSelect
               showLabel
-              label="فیلد مرتب‌سازی"
+              label="مرتب‌سازی بر اساس"
               value={definition.sort[0]?.field || ""}
               options={[
                 { id: "", title: "بدون مرتب‌سازی" },
@@ -192,11 +189,11 @@ export function OfficialTableDesigner({ code }: { code: string }) {
             {!!definition.sort.length && (
               <SearchableSelect
                 showLabel
-                label="جهت"
+                label="ترتیب"
                 value={definition.sort[0].direction}
                 options={[
-                  { id: "asc", title: "صعودی" },
-                  { id: "desc", title: "نزولی" },
+                  { id: "asc", title: "از کم به زیاد / قدیم به جدید" },
+                  { id: "desc", title: "از زیاد به کم / جدید به قدیم" },
                 ]}
                 onChange={(direction) =>
                   setDefinition({
@@ -208,10 +205,10 @@ export function OfficialTableDesigner({ code }: { code: string }) {
             )}
             <SearchableSelect
               showLabel
-              label="گروه‌بندی"
+              label="دسته‌بندی ردیف‌ها بر اساس"
               value={definition.group || ""}
               options={[
-                { id: "", title: "بدون گروه‌بندی" },
+                { id: "", title: "بدون دسته‌بندی" },
                 ...fields.map((field) => ({ id: field.code, title: field.title })),
               ]}
               onChange={(group) => setDefinition({ ...definition, group: group || null })}
@@ -244,7 +241,7 @@ export function OfficialTableDesigner({ code }: { code: string }) {
         </div>
         <Button disabled={!name.trim() || mutation.isPending} onClick={() => void save()}>
           <Save size={16} aria-hidden="true" />
-          ذخیره جدول رسمی
+          ذخیره نما
         </Button>
       </div>
     </section>

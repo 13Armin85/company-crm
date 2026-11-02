@@ -49,7 +49,6 @@ export function PasswordInput({
       <input
         dir="ltr"
         id={id}
-        type={showPassword ? "text" : "password"}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className={cn(
@@ -61,7 +60,13 @@ export function PasswordInput({
           className
         )}
         placeholder={placeholder}
-        {...(noAutofill ? guard : { autoComplete })}
+        {...(noAutofill
+          ? {
+              ...guard,
+              type: guard.type === "text" || showPassword ? "text" : "password",
+              "data-secret": String(guard.type === "text" && !showPassword),
+            }
+          : { autoComplete, type: showPassword ? "text" : "password" })}
         required={required}
         minLength={minLength}
         disabled={disabled}

@@ -1,8 +1,23 @@
 import { ErrorState } from "../error-state";
+import "../../../styles/team.css";
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, GripVertical, Trash2, X } from "lucide-react";
+import {
+  Bell,
+  CalendarOff,
+  Clock3,
+  GripVertical,
+  LayoutGrid,
+  Network,
+  Palette,
+  Rows3,
+  Search,
+  SlidersHorizontal,
+  Trash2,
+  UsersRound,
+  X,
+} from "lucide-react";
 import { Link } from "react-router";
 import { api, errorMessage, useWorkspaceAccess } from "../api";
 import { Button, Skeleton } from "../components";
@@ -23,6 +38,14 @@ interface TeamSettings {
   alert_enabled: boolean;
   alert_minutes: number;
 }
+const statusNames: Record<string, string> = {
+  green: "در حال کار",
+  red: "بدون کار",
+  gray: "غایب",
+  yellow: "زرد",
+  orange: "نارنجی",
+  blue: "آبی",
+};
 const dateText = (value: string | null) =>
   value ? persianDate(value, { year: "numeric", hour: "2-digit" }) : "ثبت نشده";
 const elapsed = (value: string) => {
@@ -87,6 +110,7 @@ export function TeamWidget() {
   }, [rulesOpen, rules, slug]);
   const cards = data.data?.cards || [];
   const units = [...new Map(cards.map((card) => [card.unit_id, card.unit])).entries()];
+  const trayTasks = [...new Map(cards.flatMap((card) => card.active_tasks).map((task) => [task.id, task])).values()];
   const roles = [
     ...new Map(cards.flatMap((card) => card.roles.map((item) => [item.id, item.name] as const))).entries(),
   ];
@@ -154,13 +178,13 @@ export function TeamWidget() {
       <ErrorState message={errorMessage(data.error, "دریافت تیم انجام نشد")} onRetry={() => void data.refetch()} />
     );
   return (
-    <div className="dashboard-team">
-      <div className="dashboard-team-toolbar">
-        <label>
-          <input type="checkbox" checked={descendants} onChange={(event) => setDescendants(event.target.checked)} /> کل
-          زیرمجموعه
+    <div className="dashboard-team team-v2">
+      <div className="team-toolbar">
+        <label className="team-search">
+          <Search size={15} aria-hidden="true" />
+          <span className="sr-only">جستجوی نام</span>
+          <input placeholder="جستجوی عضو…" value={search} onChange={(event) => setSearch(event.target.value)} />
         </label>
-        <input placeholder="جستجوی نام" value={search} onChange={(event) => setSearch(event.target.value)} />
         <select aria-label="فیلتر واحد" value={unit} onChange={(event) => setUnit(event.target.value)}>
           <option value="">همه واحدها</option>
           {units.map(([id, name]) => (
@@ -178,136 +202,245 @@ export function TeamWidget() {
           ))}
         </select>
         <select aria-label="مرتب‌سازی" value={sort} onChange={(event) => setSort(event.target.value)}>
-          <option value="name">نام</option>
-          <option value="workload">بار کاری</option>
+          <option value="name">مرتب‌سازی: نام</option>
+          <option value="workload">مرتب‌سازی: بار کاری</option>
         </select>
-        <button onClick={() => setView(view === "cards" ? "tree" : "cards")}>
-          {view === "cards" ? "نمای درختی" : "نمای کارت"}
-        </button>
-        <button onClick={() => setCompact(!compact)}>{compact ? "کارت کامل" : "کارت فشرده"}</button>
-        {access?.can("Dashboard.Team.Rules") && <button onClick={() => setRulesOpen(true)}>قواعد رنگ</button>}
-        <label>
-          هشدار پس از{" "}
-          <input
-            aria-label="دقیقه هشدار"
-            type="number"
-            min={5}
-            max={480}
-            defaultValue={settings.data?.alert_minutes || 30}
-            key={settings.data?.alert_minutes}
-            onBlur={async (event) => {
-              try {
-                await api.put(`${dashboardUrl(slug)}team/settings/`, { alert_minutes: Number(event.target.value) });
-                await settings.refetch();
-                toast("فاصله هشدار ذخیره شد", "success");
-              } catch (error) {
-                toast(errorMessage(error, "تنظیم هشدار انجام نشد"), "error");
-              }
-            }}
-          />{" "}
-          دقیقه بدون کار، ساعت کاری ۸ تا ۱۶
-        </label>
-        <button onClick={toggleAlerts}>{settings.data?.alert_enabled ? "خاموش کردن هشدار" : "روشن کردن هشدار"}</button>
-      </div>
-      <div className="dashboard-team-summary">
-        {Object.entries(data.data?.summary || {}).map(([color, count]) => (
-          <button
-            key={color}
-            className={`team-${color} ${status === color ? "active" : ""}`}
-            onClick={() => setStatus(status === color ? "" : color)}
-          >
-            {count}{" "}
-            {({ green: "سبز", red: "قرمز", gray: "غایب", yellow: "زرد", orange: "نارنجی" } as Record<string, string>)[
-              color
-            ] || color}
+        <div className="team-segment" role="group" aria-label="نوع نمایش">
+          <button type="button" aria-pressed={view === "cards"} onClick={() => setView("cards")} title="نمای کارت">
+            <LayoutGrid size={15} aria-hidden="true" />
+            <span>کارت</span>
           </button>
-        ))}
+          <button type="button" aria-pressed={view === "tree"} onClick={() => setView("tree")} title="نمای درختی">
+            <Network size={15} aria-hidden="true" />
+            <span>درختی</span>
+          </button>
+        </div>
+        <button
+          type="button"
+          className="team-icon-toggle"
+          aria-pressed={compact}
+          onClick={() => setCompact(!compact)}
+          title={compact ? "نمایش کارت کامل" : "نمایش کارت فشرده"}
+          aria-label={compact ? "نمایش کارت کامل" : "نمایش کارت فشرده"}
+        >
+          <Rows3 size={16} aria-hidden="true" />
+        </button>
+        <details className="team-more">
+          <summary>
+            <SlidersHorizontal size={15} aria-hidden="true" />
+            تنظیمات
+          </summary>
+          <div className="team-more-panel">
+            <label className="team-check">
+              <input type="checkbox" checked={descendants} onChange={(event) => setDescendants(event.target.checked)} />
+              نمایش همه زیرمجموعه‌ها
+            </label>
+            <label className="team-check">
+              <input type="checkbox" checked={Boolean(settings.data?.alert_enabled)} onChange={toggleAlerts} />
+              هشدار برای اعضای بدون کار
+            </label>
+            <label className="team-alert-minutes">
+              <span>هشدار پس از</span>
+              <input
+                aria-label="دقیقه هشدار"
+                type="number"
+                min={5}
+                max={480}
+                defaultValue={settings.data?.alert_minutes || 30}
+                key={settings.data?.alert_minutes}
+                onBlur={async (event) => {
+                  try {
+                    await api.put(`${dashboardUrl(slug)}team/settings/`, {
+                      alert_minutes: Number(event.target.value),
+                    });
+                    await settings.refetch();
+                    toast("فاصله هشدار ذخیره شد", "success");
+                  } catch (error) {
+                    toast(errorMessage(error, "تنظیم هشدار انجام نشد"), "error");
+                  }
+                }}
+              />
+              <span>دقیقه</span>
+            </label>
+            <small>هشدارها فقط در ساعت کاری ۸ تا ۱۶ ارسال می‌شوند.</small>
+            {access?.can("Dashboard.Team.Rules") && (
+              <Button variant="secondary" icon={Palette} onClick={() => setRulesOpen(true)}>
+                قواعد رنگ وضعیت
+              </Button>
+            )}
+          </div>
+        </details>
       </div>
-      <div className="dashboard-team-task-tray">
-        {[...new Map(cards.flatMap((card) => card.active_tasks).map((task) => [task.id, task])).values()].map(
-          (task) => (
-            <span
-              key={task.id}
-              draggable
-              onDragStart={(event) => event.dataTransfer.setData("task-id", task.id)}
-              title="برای ارجاع روی کارت فرد بکشید"
+      {Object.keys(data.data?.summary || {}).length > 0 && (
+        <div className="team-status-chips" role="group" aria-label="فیلتر وضعیت">
+          {Object.entries(data.data?.summary || {}).map(([color, count]) => (
+            <button
+              type="button"
+              key={color}
+              className={`team-chip team-${color}`}
+              aria-pressed={status === color}
+              onClick={() => setStatus(status === color ? "" : color)}
             >
-              {task.number} · {task.title}
-            </span>
-          )
-        )}
-      </div>
-      {cards.length ? (
-        <div className={`dashboard-team-cards ${view === "tree" ? "tree" : ""}`}>
-          {cards.map((card) => (
-            <article
-              key={card.id}
-              // eslint-disable-next-line jsx-a11y/prefer-tag-over-role -- the card contains its own buttons.
-              role="button"
-              tabIndex={0}
-              style={{ "--unit-depth": card.unit_depth } as CSSProperties}
-              className={`dashboard-team-card team-${rulePreview[card.id]?.color || card.color} ${compact ? "compact" : ""}`}
-              onClick={() => setSelected(card.id)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") setSelected(card.id);
-              }}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => {
-                const taskId = event.dataTransfer.getData("task-id");
-                if (taskId) assign(card, taskId);
-              }}
-            >
-              <div className="team-card-head">
-                <span className="team-avatar">
-                  {card.avatar ? <img src={card.avatar} alt="" /> : card.name.slice(0, 1)}
-                </span>
-                <div>
-                  <strong>{card.name}</strong>
-                  <small>
-                    {card.position} · {view === "tree" ? card.unit_path : card.unit}
-                  </small>
-                </div>
-                <b>{rulePreview[card.id]?.label || card.label}</b>
-              </div>
-              {!compact && (
-                <>
-                  <div className="team-active-tasks">
-                    {card.active_tasks.length
-                      ? card.active_tasks.map((task) => (
-                          <Link
-                            key={task.id}
-                            to={`/entities/ticket/${task.id}`}
-                            onClick={(event) => event.stopPropagation()}
-                          >
-                            {task.number || ""} {task.title} · {elapsed(task.started_at)}
-                          </Link>
-                        ))
-                      : "کار در حال انجام ندارد"}
-                  </div>
-                  <div className="team-counts">
-                    <span>{card.open_count} باز</span>
-                    <span>{card.overdue_count} تأخیری</span>
-                    <span>{card.in_progress_count} در حال انجام</span>
-                  </div>
-                  <div className="team-workload">
-                    <i style={{ width: `${Math.min(100, card.workload_percent)}%` }} />
-                  </div>
-                  <small>
-                    بار کاری {card.workload_percent}٪ · آخرین فعالیت {dateText(card.last_activity)}
-                  </small>
-                  {card.presence === "absent" && (
-                    <small>
-                      دلیل: {card.reason || "ثبت نشده"} · بازگشت: {dateText(card.return_at)} · جانشین:{" "}
-                      {card.substitute?.name || "ندارد"}
-                    </small>
-                  )}
-                </>
-              )}
-            </article>
+              <i aria-hidden="true" />
+              {cards.find((card) => (rulePreview[card.id]?.color || card.color) === color)?.label ||
+                statusNames[color] ||
+                color}
+              <b>{toFa(Number(count))}</b>
+            </button>
           ))}
         </div>
+      )}
+      {trayTasks.length > 0 && (
+        <div className="team-tray">
+          <span className="team-tray-hint">
+            <GripVertical size={14} aria-hidden="true" />
+            برای ارجاع، کار را روی کارت فرد بکشید
+          </span>
+          <div className="team-tray-list">
+            {trayTasks.map((task) => (
+              <span
+                key={task.id}
+                draggable
+                onDragStart={(event) => event.dataTransfer.setData("task-id", task.id)}
+                title={task.title}
+              >
+                <small>{task.number}</small>
+                {task.title}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      {cards.length ? (
+        <div className={`team-grid ${view === "tree" ? "tree" : ""} ${compact ? "compact" : ""}`}>
+          {cards.map((card) => {
+            const color = rulePreview[card.id]?.color || card.color;
+            const workload = Math.min(100, Math.max(0, card.workload_percent));
+            return (
+              <article
+                key={card.id}
+                // eslint-disable-next-line jsx-a11y/prefer-tag-over-role -- the card contains its own links.
+                role="button"
+                tabIndex={0}
+                aria-label={`جزئیات ${card.name}`}
+                style={{ "--unit-depth": card.unit_depth } as CSSProperties}
+                className={`team-member team-${color}`}
+                onClick={() => setSelected(card.id)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") setSelected(card.id);
+                }}
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={(event) => {
+                  const taskId = event.dataTransfer.getData("task-id");
+                  if (taskId) assign(card, taskId);
+                }}
+              >
+                <header className="team-member-head">
+                  <span className="team-member-avatar">
+                    {card.avatar ? <img src={card.avatar} alt="" /> : card.name.slice(0, 1)}
+                    <i
+                      className={`team-presence ${card.presence === "absent" ? "is-absent" : ""}`}
+                      aria-hidden="true"
+                    />
+                  </span>
+                  <div className="team-member-id">
+                    <strong>{card.name}</strong>
+                    <small>
+                      {[card.position, view === "tree" ? card.unit_path : card.unit].filter(Boolean).join(" · ")}
+                    </small>
+                  </div>
+                  <span className="team-member-status">{rulePreview[card.id]?.label || card.label}</span>
+                </header>
+                {!compact && (
+                  <>
+                    <dl className="team-member-stats">
+                      <div>
+                        <dt>باز</dt>
+                        <dd>{toFa(card.open_count)}</dd>
+                      </div>
+                      <div className={card.in_progress_count ? "is-active" : ""}>
+                        <dt>در حال انجام</dt>
+                        <dd>{toFa(card.in_progress_count)}</dd>
+                      </div>
+                      <div className={card.overdue_count ? "is-late" : ""}>
+                        <dt>تأخیری</dt>
+                        <dd>{toFa(card.overdue_count)}</dd>
+                      </div>
+                    </dl>
+                    <div className="team-member-load">
+                      <div>
+                        <span>بار کاری</span>
+                        <b>{toFa(workload)}٪</b>
+                      </div>
+                      <div
+                        className="team-member-bar"
+                        role="progressbar"
+                        aria-label="بار کاری"
+                        aria-valuenow={workload}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                      >
+                        <i style={{ width: `${workload}%` }} />
+                      </div>
+                    </div>
+                    <div className="team-member-tasks">
+                      {card.active_tasks.length ? (
+                        <>
+                          {card.active_tasks.slice(0, 3).map((task) => (
+                            <Link
+                              key={task.id}
+                              to={`/entities/ticket/${task.id}`}
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              <span>{task.title}</span>
+                              <small>{elapsed(task.started_at)}</small>
+                            </Link>
+                          ))}
+                          {card.active_tasks.length > 3 && (
+                            <small className="team-member-more">و {toFa(card.active_tasks.length - 3)} کار دیگر</small>
+                          )}
+                        </>
+                      ) : (
+                        <p className="team-member-idle">کار در حال انجامی ندارد</p>
+                      )}
+                    </div>
+                    {card.presence === "absent" && (
+                      <p className="team-member-absence">
+                        <CalendarOff size={14} aria-hidden="true" />
+                        <span>
+                          {card.reason || "غیبت ثبت‌شده"} · بازگشت {dateText(card.return_at)}
+                          {card.substitute?.name ? ` · جانشین: ${card.substitute.name}` : ""}
+                        </span>
+                      </p>
+                    )}
+                    <footer className="team-member-foot">
+                      <Clock3 size={13} aria-hidden="true" />
+                      آخرین فعالیت: {dateText(card.last_activity)}
+                    </footer>
+                  </>
+                )}
+              </article>
+            );
+          })}
+        </div>
       ) : (
-        <div className="dashboard-empty-small">{data.data?.empty || "کارتی با این فیلتر پیدا نشد."}</div>
+        <div className="team-empty">
+          <UsersRound size={24} aria-hidden="true" />
+          <strong>{data.data?.empty || "عضوی با این فیلترها پیدا نشد"}</strong>
+          {(search || unit || role || status) && (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setSearch("");
+                setUnit("");
+                setRole("");
+                setStatus("");
+              }}
+            >
+              پاک کردن فیلترها
+            </Button>
+          )}
+        </div>
       )}
       {selected && (
         <div className="dashboard-overlay" role="presentation" onMouseDown={() => setSelected("")}>

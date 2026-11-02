@@ -1268,3 +1268,27 @@ body:has(.dashboard-overlay) .selector-single-options {
     left: 16px;
   }
 }
+
+/* Each height step is one grid row, so resizing a widget never stretches its neighbours. */
+.custom-dashboard .dashboard-widget-grid {
+  grid-auto-rows: 72px;
+  grid-auto-flow: row dense;
+  align-items: stretch;
+}
+.custom-dashboard .dashboard-widget {
+  min-height: 0;
+}
+.custom-dashboard .dashboard-widget > :not(header):not(footer) {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+@media (max-width: 760px) {
+  .custom-dashboard .dashboard-widget-grid {
+    grid-auto-rows: auto;
+  }
+  .custom-dashboard .dashboard-widget {
+    grid-row: auto !important;
+    min-height: 220px;
+  }
+}

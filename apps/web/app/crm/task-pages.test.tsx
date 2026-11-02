@@ -26,6 +26,41 @@ vi.mock("./api", async (importOriginal) => ({
   useReassignIssue: () => ({ isPending: false, mutate: vi.fn() }),
   useDeleteIssue: () => ({ isPending: false, mutate: vi.fn() }),
 }));
+vi.mock("./table-hooks", async () => {
+  const { isCurrentReceivedIssue, isPersonalHistoryIssue } = await import("./task-access");
+  // Mirrors the server's tab rules for these rendering tests.
+  return {
+    useTasksTable: ({ view, tab }: { view: "all" | "mine"; tab: string }) => {
+      const mine = state.issues.filter((issue) =>
+        state.admin ? issue.assignee?.id === user.id : isCurrentReceivedIssue(issue, user.id)
+      );
+      const tabs: Record<string, Issue[]> =
+        view === "mine"
+          ? { all: mine.filter((issue) => issue.status !== "Done"), today: [], upcoming: [], done: [] }
+          : state.admin
+            ? { all: state.issues }
+            : {
+                received: state.issues.filter((issue) => isCurrentReceivedIssue(issue, user.id)),
+                history: state.issues.filter((issue) => isPersonalHistoryIssue(issue, user.id)),
+                sent: state.issues.filter((issue) => issue.senderId === user.id && issue.assignee?.id !== user.id),
+              };
+      const rows = tabs[tab] ?? Object.values(tabs)[0];
+      return {
+        data: {
+          rows,
+          count: rows.length,
+          page: 1,
+          pages: 1,
+          page_size: 25,
+          tab_counts: Object.fromEntries(Object.entries(tabs).map(([key, value]) => [key, value.length])),
+          stats: { completed_this_week: 0 },
+        },
+        isLoading: false,
+        isFetching: false,
+      };
+    },
+  };
+});
 import MyWorkPage from "./pages/my-work";
 import IssuesPage from "./pages/issues";
 import { IssueKanbanBoard } from "./kanban";

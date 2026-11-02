@@ -1,24 +1,19 @@
 import { ErrorNotice } from "../error-state";
 import { useEffect, useState } from "react";
 import { Link, Navigate, useSearchParams } from "react-router";
-import {
-  useOrganizationRoles,
-  useSaveOrganizationRole,
-  useDeleteOrganizationObject,
-  useWorkspaceAccess,
-  errorMessage,
-} from "../api";
+import { useSaveOrganizationRole, useDeleteOrganizationObject, useWorkspaceAccess, errorMessage } from "../api";
 import { Button, PageHeader, SearchBox, Skeleton } from "../components";
 import { AccessModal } from "../access/components";
 import { useUIStore } from "../store";
 import type { OrganizationRole } from "../types";
-import { matchesRecordSearch } from "../identifiers";
+import { useRolesTable } from "../table-hooks";
+import { useDebouncedValue, useTablePaging } from "../table-query";
+import { TablePagination } from "../table-pagination";
 import { SurfaceForm, SurfaceTable } from "../engine/surface";
 
 export default function RolesPage() {
   const slug = useUIStore((state) => state.workspaceSlug) ?? "";
   const { data: access, isLoading: accessLoading } = useWorkspaceAccess();
-  const { data: roles = [], isLoading, error } = useOrganizationRoles(undefined, access?.can("Role.View") ?? false);
   const save = useSaveOrganizationRole(slug);
   const remove = useDeleteOrganizationObject(slug, "roles");
   const [editing, setEditing] = useState<OrganizationRole>();
@@ -27,6 +22,11 @@ export default function RolesPage() {
   const [params] = useSearchParams();
   const searchParam = params.get("search") ?? "";
   useEffect(() => setQuery(searchParam), [searchParam]);
+  const search = useDebouncedValue(query);
+  const paging = useTablePaging("roles", search);
+  const table = useRolesTable({ q: search, ...paging, enabled: access?.can("Role.View") ?? false });
+  const roles = table.data?.rows ?? [];
+  const { isLoading, error } = table;
   if (accessLoading) return <Skeleton rows={5} />;
   if (!access?.can("Role.View")) return <Navigate to="/my-work" replace />;
   return (
@@ -67,60 +67,68 @@ export default function RolesPage() {
               </tr>
             </thead>
             <tbody>
-              {roles
-                .filter((role) => matchesRecordSearch(query, [role.id, role.name, role.description]))
-                .map((role) => (
-                  <tr key={role.id}>
-                    <td>
-                      <div className="role-name-cell">
-                        <span>{role.name}</span>
-                        {role.systemKey && <small>سیستمی؛ قابل حذف نیست</small>}
-                      </div>
-                    </td>
-                    <td>{role.description}</td>
-                    <td>{role.isActive ? "فعال" : "غیرفعال"}</td>
-                    <td>{role.permissionIds.length.toLocaleString("fa-IR")}</td>
-                    <td>{(role.userCount ?? 0).toLocaleString("fa-IR")}</td>
-                    <td className="row-actions">
-                      {access.can("Role.Edit") && (
-                        <Button
-                          variant="secondary"
-                          onClick={() => {
-                            save.reset();
-                            setEditing(role);
-                          }}
-                        >
-                          ویرایش اطلاعات
-                        </Button>
-                      )}
-                      <Link className="button button-secondary" to={`/roles/${role.id}/permissions`}>
-                        {access.can("Role.Permission.Assign") ? "مدیریت مجوزها" : "مشاهده مجوزها"}
-                      </Link>
-                      {access.can("Role.Disable") && (
-                        <Button
-                          variant="secondary"
-                          disabled={save.isPending}
-                          onClick={() => save.mutate({ id: role.id, isActive: !role.isActive })}
-                        >
-                          {role.isActive ? "غیرفعال کردن" : "فعال کردن"}
-                        </Button>
-                      )}
-                      {!role.systemKey && access.can("Role.Delete") && (
-                        <Button
-                          variant="danger"
-                          onClick={() => {
-                            remove.reset();
-                            setDeleting(role);
-                          }}
-                        >
-                          حذف نقش
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+              {roles.map((role) => (
+                <tr key={role.id}>
+                  <td>
+                    <div className="role-name-cell">
+                      <span>{role.name}</span>
+                      {role.systemKey && <small>سیستمی؛ قابل حذف نیست</small>}
+                    </div>
+                  </td>
+                  <td>{role.description}</td>
+                  <td>{role.isActive ? "فعال" : "غیرفعال"}</td>
+                  <td>{role.permissionIds.length.toLocaleString("fa-IR")}</td>
+                  <td>{(role.userCount ?? 0).toLocaleString("fa-IR")}</td>
+                  <td className="row-actions">
+                    {access.can("Role.Edit") && (
+                      <Button
+                        variant="secondary"
+                        onClick={() => {
+                          save.reset();
+                          setEditing(role);
+                        }}
+                      >
+                        ویرایش اطلاعات
+                      </Button>
+                    )}
+                    <Link className="button button-secondary" to={`/roles/${role.id}/permissions`}>
+                      {access.can("Role.Permission.Assign") ? "مدیریت مجوزها" : "مشاهده مجوزها"}
+                    </Link>
+                    {access.can("Role.Disable") && (
+                      <Button
+                        variant="secondary"
+                        disabled={save.isPending}
+                        onClick={() => save.mutate({ id: role.id, isActive: !role.isActive })}
+                      >
+                        {role.isActive ? "غیرفعال کردن" : "فعال کردن"}
+                      </Button>
+                    )}
+                    {!role.systemKey && access.can("Role.Delete") && (
+                      <Button
+                        variant="danger"
+                        onClick={() => {
+                          remove.reset();
+                          setDeleting(role);
+                        }}
+                      >
+                        حذف نقش
+                      </Button>
+                    )}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </SurfaceTable>
+          <TablePagination
+            page={table.data?.page ?? 1}
+            pages={table.data?.pages ?? 1}
+            count={table.data?.count ?? 0}
+            pageSize={paging.pageSize}
+            onPage={paging.setPage}
+            onPageSize={paging.setPageSize}
+            loading={table.isFetching}
+            label="نقش"
+          />
         </div>
       )}
       {editing && (

@@ -2,22 +2,15 @@ import { ErrorState } from "../error-state";
 import { useState } from "react";
 import { CalendarClock, Check, CheckCheck, ArrowUpLeft, LayoutDashboard, List, ListTodo } from "lucide-react";
 import { zonedDateTime } from "@plane/ui";
-import {
-  useCurrentUser,
-  useIssues,
-  useTaskHistory,
-  useUpdateIssueStatus,
-  useWorkspaceAccess,
-  useMembers,
-  useReassignIssue,
-} from "../api";
+import { useCurrentUser, useUpdateIssueStatus, useWorkspaceAccess, useMembers, useReassignIssue } from "../api";
 import { EmptyState, PageHeader, SearchBox, Skeleton, TabBar } from "../components";
-import { issueReference, matchesRecordSearch } from "../identifiers";
 import { WorkTable } from "../engine/work-table";
 import { IssueKanbanBoard } from "../kanban";
 import { useUIStore } from "../store";
 import { toFa } from "../utils";
-import { isCurrentReceivedIssue } from "../task-access";
+import { useTasksTable } from "../table-hooks";
+import { useDebouncedValue, useTablePaging } from "../table-query";
+import { TablePagination } from "../table-pagination";
 
 export default function MyWorkPage() {
   const [tab, setTab] = useState("all");
@@ -26,49 +19,35 @@ export default function MyWorkPage() {
   const { data: currentUser, isLoading: userLoading } = useCurrentUser();
   const { data: access } = useWorkspaceAccess();
   const isAdmin = access?.is_admin === true;
-  const currentIssues = useIssues(undefined, undefined, isAdmin);
-  const history = useTaskHistory(Boolean(access) && !isAdmin);
-  const issues = (isAdmin ? currentIssues.data : history.data) ?? [];
-  const isLoading = !access || (isAdmin ? currentIssues.isLoading : history.isLoading);
   const slug = useUIStore((state) => state.workspaceSlug) ?? "";
   const updateStatus = useUpdateIssueStatus(slug);
   const reassign = useReassignIssue(slug);
   const { data: members = [] } = useMembers();
-  const myIssues = currentUser
-    ? issues.filter((issue) =>
-        isAdmin ? issue.assignee?.id === currentUser.id : isCurrentReceivedIssue(issue, currentUser.id)
-      )
-    : [];
   const today = zonedDateTime(new Date(), currentUser?.timeZone)!.date;
-  const dueDay = (date: string) => zonedDateTime(date, currentUser?.timeZone)?.date;
-  const weekAgo = new Date(Date.now() - 7 * 86_400_000);
-  const openIssues = myIssues.filter((issue) => issue.status !== "Done");
-  const dueToday = openIssues.filter((issue) => issue.dueDate && (dueDay(issue.dueDate) || "9999") <= today);
-  const upcoming = openIssues.filter((issue) => !issue.dueDate || (dueDay(issue.dueDate) || "9999") > today);
-  const completedThisWeek = issues.filter(
-    (issue) =>
-      issue.assignee?.id === currentUser?.id &&
-      (isAdmin || issue.senderId !== currentUser?.id) &&
-      issue.completedAt &&
-      new Date(issue.completedAt) >= weekAgo
-  );
-  const selected =
-    tab === "all"
-      ? openIssues
-      : tab === "done"
-        ? myIssues.filter((issue) => issue.status === "Done")
-        : tab === "upcoming"
-          ? upcoming
-          : dueToday;
-  const visible = selected.filter((issue) =>
-    matchesRecordSearch(query, [issue.name, issueReference(issue), issue.projectName, issue.sender?.displayName])
-  );
+  const search = useDebouncedValue(query);
+  const paging = useTablePaging("my-work", [search, tab]);
+  const table = useTasksTable({ view: "mine", tab, q: search, today, ...paging, enabled: Boolean(access) });
+  const visible = table.data?.rows ?? [];
+  const counts = table.data?.tab_counts ?? {};
+  const isLoading = !access || table.isLoading;
   const items = [
-    { id: "all", label: "دریافتی‌های فعلی", count: openIssues.length },
-    { id: "today", label: "امروز و عقب‌افتاده", count: dueToday.length },
-    { id: "upcoming", label: "پیش‌رو", count: upcoming.length },
-    ...(isAdmin ? [{ id: "done", label: "انجام‌شده", count: myIssues.filter((i) => i.status === "Done").length }] : []),
+    { id: "all", label: "دریافتی‌های فعلی", count: counts.all },
+    { id: "today", label: "امروز و عقب‌افتاده", count: counts.today },
+    { id: "upcoming", label: "پیش‌رو", count: counts.upcoming },
+    ...(isAdmin ? [{ id: "done", label: "انجام‌شده", count: counts.done }] : []),
   ];
+  const pager = (
+    <TablePagination
+      page={table.data?.page ?? 1}
+      pages={table.data?.pages ?? 1}
+      count={table.data?.count ?? 0}
+      pageSize={paging.pageSize}
+      onPage={paging.setPage}
+      onPageSize={paging.setPageSize}
+      loading={table.isFetching}
+      label="کار"
+    />
+  );
   return (
     <div className="my-work-page">
       <PageHeader
@@ -81,7 +60,7 @@ export default function MyWorkPage() {
           {
             id: "all",
             title: "کارهای باز",
-            count: openIssues.length,
+            count: counts.all ?? 0,
             icon: ListTodo,
             tone: "accent",
             note: "دریافتی‌های فعلی شما",
@@ -89,7 +68,7 @@ export default function MyWorkPage() {
           {
             id: "today",
             title: "امروز و عقب‌افتاده",
-            count: dueToday.length,
+            count: counts.today ?? 0,
             icon: CalendarClock,
             tone: "warm",
             note: "نیازمند توجه شما",
@@ -97,7 +76,7 @@ export default function MyWorkPage() {
           {
             id: "upcoming",
             title: "پیش‌رو",
-            count: upcoming.length,
+            count: counts.upcoming ?? 0,
             icon: ArrowUpLeft,
             tone: "blue",
             note: "موعدهای بعدی و بدون موعد",
@@ -126,7 +105,7 @@ export default function MyWorkPage() {
           </span>
           <span className="my-work-stat-copy">
             <span>انجام‌شده این هفته</span>
-            <strong>{isLoading || userLoading ? "—" : toFa(completedThisWeek.length)}</strong>
+            <strong>{isLoading || userLoading ? "—" : toFa(table.data?.stats?.completed_this_week ?? 0)}</strong>
             <small>در هفت روز گذشته</small>
           </span>
         </div>
@@ -163,11 +142,11 @@ export default function MyWorkPage() {
         <div className="my-work-results" role="status">
           {isLoading || userLoading
             ? "در حال دریافت کارها…"
-            : `${toFa(visible.length)} کار${query ? ` از ${toFa(selected.length)} کار` : ""}`}
+            : `${toFa(table.data?.count ?? 0)} کار${search ? ` از ${toFa(counts[tab] ?? 0)} کار` : ""}`}
         </div>
         {isLoading || userLoading ? (
           <Skeleton rows={5} />
-        ) : (isAdmin ? currentIssues.error : history.error) ? (
+        ) : table.error ? (
           <ErrorState message="دریافت کارها انجام نشد." />
         ) : !visible.length ? (
           <EmptyState
@@ -192,6 +171,7 @@ export default function MyWorkPage() {
         ) : (
           <WorkTable issues={visible} code="task" readOnly={!isAdmin} allowTransfer personal />
         )}
+        {!isLoading && visible.length > 0 && pager}
       </section>
     </div>
   );

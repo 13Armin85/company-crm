@@ -3,7 +3,7 @@ import { Children, cloneElement, isValidElement, useEffect, useState } from "rea
 import type { FormEvent, FormHTMLAttributes, ReactElement, ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
-import { Settings2 } from "lucide-react";
+import { Settings2, Table2 } from "lucide-react";
 import { SchemaDrivenForm, validateSchemaValues, fieldVisible } from "@plane/ui";
 import type {
   EntityFormSchema,
@@ -22,7 +22,7 @@ import { Button } from "../components";
 import { EntityViewsPage } from "./view-page";
 import type { SavedViewList } from "./view-types";
 import { RecordSummaryDrawer } from "./record-drawer";
-import { MAIN_TABLE_TAB, TableTabPicker, useVisibleTableTabs } from "./table-tab-picker";
+import { MAIN_TABLE_TAB, TableTabPicker, useLocalTabs, useVisibleTableTabs } from "./table-tab-picker";
 
 export interface NativeField {
   code: string;
@@ -406,7 +406,8 @@ export function SurfaceTable({
     children?: ReactNode;
   }>[];
   const [activeTab, setActiveTab] = useState("");
-  const tabs = config.data?.definition.table_tabs || [];
+  const [ownTabs, setOwnTabs] = useLocalTabs(code);
+  const tabs = [...(config.data?.definition.table_tabs || []), ...ownTabs];
   const tabView = useVisibleTableTabs(
     code,
     tabs.map((tab) => tab.id)
@@ -416,10 +417,23 @@ export function SurfaceTable({
   const currentTab =
     activeTab && tabView.isVisible(activeTab) ? activeTab : mainVisible ? "" : visibleTabs[0]?.id || "";
   const selectedTab = tabs.find((tab) => tab.id === currentTab);
-  const columns =
-    selectedTab?.columns || config.data?.definition.columns || headings.map((h) => `native:${textOf(h) || "عملیات"}`);
+  const baseColumns = config.data?.definition.columns || headings.map((h) => `native:${textOf(h) || "عملیات"}`);
+  const columns = selectedTab?.columns || baseColumns;
   const values = useSurfaceValues(code, columns.some((c) => !c.startsWith("native:")) ? rows.map(surfaceRowId) : []);
   const fields = [...(config.data?.schema.fields || []), ...(config.data?.engine_fields || [])];
+  const columnChoices = [
+    ...new Set([
+      ...baseColumns,
+      ...headings.map((h) => `native:${textOf(h) || "عملیات"}`),
+      ...(config.data?.schema.fields || []).filter((f) => f.is_active).map((f) => `field:${f.code}`),
+      ...(config.data?.engine_fields || []).filter((f) => f.is_active).map((f) => `engine:${f.code}`),
+    ]),
+  ].map((id) => ({
+    id,
+    title: id.startsWith("native:")
+      ? id.slice("native:".length)
+      : fields.find((f) => f.code === id.slice(id.indexOf(":") + 1))?.title || id,
+  }));
   const showPersonal =
     personalMode ?? Boolean(saved.data?.default_id && saved.data.default_id !== saved.data.official_id);
   if (showPersonal && engineCode)
@@ -442,40 +456,59 @@ export function SurfaceTable({
           onSelect={setSummaryId}
         />
       )}
-      {engineCode && access?.can("View.Personal.Create") && (
-        <Button variant="secondary" onClick={() => setPersonalMode(true)}>
-          جدول من
-        </Button>
-      )}
-      {access?.can("FormDesigner.Publish") && (
-        <Link className="surface-config-link" to={`/settings/engine?page=${code}&mode=columns`}>
-          <Settings2 size={14} /> تنظیم جدول و تب‌ها
-        </Link>
-      )}
       <ErrorNotice message={(config.error || values.error) && "دریافت تنظیمات یا اطلاعات ستون‌ها انجام نشد."} />
-      {!!tabs.length && (
-        <div className="surface-table-tabbar">
-          <div className="surface-table-tabs" role="tablist" aria-label="تب‌های جدول">
-            {mainVisible && (
-              <button type="button" role="tab" aria-selected={!selectedTab} onClick={() => setActiveTab("")}>
-                جدول اصلی
-              </button>
-            )}
-            {visibleTabs.map((tab) => (
-              <button
-                type="button"
-                key={tab.id}
-                role="tab"
-                aria-selected={selectedTab?.id === tab.id}
-                onClick={() => setActiveTab(tab.id)}
-              >
-                {tab.title}
-              </button>
-            ))}
-          </div>
-          <TableTabPicker tabs={tabs} hidden={tabView.hidden} onChange={tabView.setHidden} />
+      <div className="surface-table-toolbar">
+        <div className="surface-table-tabs" role="tablist" aria-label="تب‌های جدول">
+          {mainVisible && (
+            <button type="button" role="tab" aria-selected={!selectedTab} onClick={() => setActiveTab("")}>
+              جدول اصلی
+            </button>
+          )}
+          {visibleTabs.map((tab) => (
+            <button
+              type="button"
+              key={tab.id}
+              role="tab"
+              aria-selected={selectedTab?.id === tab.id}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {tab.title}
+            </button>
+          ))}
         </div>
-      )}
+        <div className="surface-table-actions">
+          <TableTabPicker
+            tabs={tabs}
+            hidden={tabView.hidden}
+            onChange={tabView.setHidden}
+            columns={columnChoices}
+            onCreateTab={(tab) => {
+              setOwnTabs([...ownTabs, tab]);
+              setActiveTab(tab.id);
+            }}
+            onDeleteTab={(id) => {
+              setOwnTabs(ownTabs.filter((tab) => tab.id !== id));
+              tabView.setHidden(tabView.hidden.filter((item) => item !== id));
+            }}
+          />
+          {engineCode && access?.can("View.Personal.Create") && (
+            <button type="button" className="surface-table-action" onClick={() => setPersonalMode(true)}>
+              <Table2 size={15} aria-hidden="true" />
+              جدول من
+            </button>
+          )}
+          {access?.can("FormDesigner.Publish") && (
+            <Link
+              className="surface-table-action is-icon"
+              to={`/settings/engine?page=${code}&mode=columns`}
+              title="تنظیم ستون‌ها و تب‌های این جدول برای همه"
+              aria-label="تنظیم ستون‌ها و تب‌های این جدول برای همه"
+            >
+              <Settings2 size={15} aria-hidden="true" />
+            </Link>
+          )}
+        </div>
+      </div>
       <table {...props}>
         <thead>
           <tr>

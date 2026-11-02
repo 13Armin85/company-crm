@@ -125,6 +125,27 @@ vi.mock("./api", () => ({
     ],
   }),
 }));
+const tablePage = vi.hoisted(() => ({
+  page: <T,>(rows: T[], extra = {}) => ({
+    data: { rows, count: rows.length, page: 1, pages: 1, page_size: 25, ...extra },
+    isLoading: false,
+    isFetching: false,
+  }),
+}));
+vi.mock("../table-hooks", async () => {
+  const api = await import("../api");
+  const access = await import("./api");
+  const { page } = tablePage;
+  return {
+    useRolesTable: () => page(api.useOrganizationRoles().data ?? []),
+    useMembersTable: () => page(api.useMembers().data ?? []),
+    useAbsencesTable: () => {
+      const data = access.useAbsences(true).data;
+      return page(data?.absences ?? [], { manageable_user_ids: data?.manageable_user_ids ?? [] });
+    },
+    useUserExceptionsTable: () => page(access.useUserExceptions("user", true).data ?? []),
+  };
+});
 vi.mock("../components", () => ({
   PageHeader: ({ title, actions }: { title: string; actions?: ReactNode }) => (
     <header>

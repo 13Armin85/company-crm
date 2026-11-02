@@ -112,6 +112,8 @@ export function IssueFilterDialog({
   loading,
   onClose,
   onApply,
+  serverCount,
+  onDraftChange,
 }: {
   filters: IssueFilters;
   issues: Issue[];
@@ -123,8 +125,15 @@ export function IssueFilterDialog({
   loading: boolean;
   onClose: () => void;
   onApply: (filters: IssueFilters) => void;
+  /** Count from the server for paged tables; otherwise the loaded rows are counted. */
+  serverCount?: number;
+  onDraftChange?: (draft: IssueFilters) => void;
 }) {
-  const [draft, setDraft] = useState(filters);
+  const [draft, setDraftState] = useState(filters);
+  const setDraft = (next: IssueFilters) => {
+    setDraftState(next);
+    onDraftChange?.(next);
+  };
   const statuses = Object.keys(statusFa) as Status[];
   const priorities = Object.keys(priorityFa) as Priority[];
   return (
@@ -132,7 +141,7 @@ export function IssueFilterDialog({
       isOpen
       title="فیلتر کارها"
       description="فیلترهای بخش‌های مختلف هم‌زمان اعمال می‌شوند. جستجوی صفحه نیز در نتایج لحاظ می‌شود."
-      resultCount={filterIssues(issues, draft, query, today, timeZone).length}
+      resultCount={serverCount ?? filterIssues(issues, draft, query, today, timeZone).length}
       resultLabel="کار مطابق انتخاب‌ها"
       validationMessage={deadlineFilterError(draft)}
       loading={loading}
@@ -192,6 +201,8 @@ export function ProjectFilterDialog({
   loading,
   onClose,
   onApply,
+  serverCount,
+  onDraftChange,
 }: {
   filters: ProjectFilters;
   projects: Project[];
@@ -204,15 +215,22 @@ export function ProjectFilterDialog({
   loading: boolean;
   onClose: () => void;
   onApply: (filters: ProjectFilters) => void;
+  /** Count from the server for paged tables; otherwise the loaded rows are counted. */
+  serverCount?: number;
+  onDraftChange?: (draft: ProjectFilters) => void;
 }) {
-  const [draft, setDraft] = useState(filters);
+  const [draft, setDraftState] = useState(filters);
+  const setDraft = (next: ProjectFilters) => {
+    setDraftState(next);
+    onDraftChange?.(next);
+  };
   const id = useId();
   return (
     <FilterDialog
       isOpen
       title="فیلتر پروژه‌ها"
       description={`نتایج در تب «${tabLabel}» و با توجه به جستجوی صفحه نمایش داده می‌شوند.`}
-      resultCount={filterProjects(projects, draft, query, tab, today, timeZone).length}
+      resultCount={serverCount ?? filterProjects(projects, draft, query, tab, today, timeZone).length}
       resultLabel="پروژه مطابق انتخاب‌ها"
       validationMessage={projectFilterError(draft)}
       loading={loading}

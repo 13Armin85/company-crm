@@ -87,3 +87,38 @@ def test_field_code_rename_rejects_duplicates_and_used_fields(session_client, en
     assert session_client.patch(field_url(workspace, field), {"code": "fresh_code"}, format="json").status_code == 400
     field.refresh_from_db()
     assert field.code == "first_code"
+
+
+def numbering_url(workspace, code):
+    return f"/api/workspaces/{workspace.slug}/engine/entities/{code}/numbering-rules/"
+
+
+def test_numbering_can_use_an_existing_empty_text_column(session_client, engine):
+    workspace = engine
+    entity = EntityType.objects.create(workspace=workspace, code="contract", title="قرارداد")
+    FieldDefinition.objects.create(workspace=workspace, code="contract_no", title="شماره قرارداد", kind="short_text")
+    FieldDefinition.objects.create(workspace=workspace, code="amount_due", title="مبلغ", kind="integer")
+    layout = {
+        "tabs": [],
+        "sections": [{"id": "main", "columns": 1, "bindings": [{"field": "contract_no"}, {"field": "amount_due"}]}],
+    }
+    form = FormLayout.objects.create(entity=entity, draft=layout)
+    form.published = FormVersion.objects.create(layout=form, number=1, schema=layout)
+    form.save()
+    settings = {"prefix": "C-", "start": 1, "padding": 3, "shared_sequence": True, "subtype_prefixes": {}}
+
+    rejected = session_client.post(
+        numbering_url(workspace, "contract"), {"field": "amount_due", "title": "مبلغ", **settings}, format="json"
+    )
+    assert rejected.status_code == 400
+
+    response = session_client.post(
+        numbering_url(workspace, "contract"),
+        {"field": "contract_no", "title": "شماره قرارداد", **settings},
+        format="json",
+    )
+    assert response.status_code == 201, response.data
+    form.refresh_from_db()
+    codes = [b["field"] for s in form.published.schema["sections"] for b in s["bindings"]]
+    assert codes.count("contract_no") == 1
+    assert FieldDefinition.objects.get(workspace=workspace, code="contract_no").config["auto_number"] is True

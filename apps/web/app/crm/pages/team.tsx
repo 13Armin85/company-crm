@@ -1,12 +1,14 @@
 import { ErrorNotice } from "../error-state";
-import { useMemo, useState } from "react";
+import { useMembersTable } from "../table-hooks";
+import { useDebouncedValue, useTablePaging } from "../table-query";
+import { TablePagination } from "../table-pagination";
+import { useState } from "react";
 import { PasswordInput, useNoAutofill } from "@plane/ui";
 import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import { MoreHorizontal, UserPlus } from "lucide-react";
 import { Link, Navigate } from "react-router";
 import {
   useCreateWorkspaceUser,
-  useMembers,
   useOrganizationRoles,
   useOrganizationUnits,
   useWorkspaceAccess,
@@ -18,7 +20,6 @@ import { Avatar, Button, EmptyState, PageHeader, SearchBox, Skeleton } from "../
 import { useUIStore } from "../store";
 import type { Member } from "../types";
 import { toFa } from "../utils";
-import { matchesRecordSearch } from "../identifiers";
 import { SurfaceForm, SurfaceTable } from "../engine/surface";
 
 export function UserActionItems({
@@ -72,18 +73,15 @@ export default function TeamPage() {
   const [confirmation, setConfirmation] = useState("");
   const slug = useUIStore((state) => state.workspaceSlug) ?? "";
   const { data: access, isLoading: accessLoading } = useWorkspaceAccess();
-  const { data: members = [], isLoading, error } = useMembers();
+  const search = useDebouncedValue(query);
+  const paging = useTablePaging("users", search);
+  const table = useMembersTable({ q: search, ...paging });
+  const filtered = table.data?.rows ?? [];
+  const { isLoading, error } = table;
   const { data: roles = [] } = useOrganizationRoles(undefined, access?.can("User.Role.Assign") ?? false);
   const { data: units = [] } = useOrganizationUnits(undefined, access?.can("OrganizationUnit.Member.Manage") ?? false);
   const createUser = useCreateWorkspaceUser(slug);
   const mutation = useAccessMutation();
-  const filtered = useMemo(
-    () =>
-      members.filter((member) =>
-        matchesRecordSearch(query, [member.id, member.membershipId, member.displayName, member.email])
-      ),
-    [members, query]
-  );
   const closePassword = () => {
     mutation.reset();
     setPasswordUser(undefined);
@@ -97,7 +95,9 @@ export default function TeamPage() {
       <PageHeader
         eyebrow="فضای کاری"
         title="اعضای تیم"
-        description={`${toFa(members.length)} عضو در شرکت`}
+        description={
+          table.data ? `${toFa(table.data.count)} عضو${search ? " با این جستجو" : " در شرکت"}` : "اعضای شرکت"
+        }
         actions={
           access.can("User.Create") && (
             <Button icon={UserPlus} onClick={() => setCreateOpen(true)}>
@@ -177,6 +177,16 @@ export default function TeamPage() {
             </tbody>
           </SurfaceTable>
         )}
+        <TablePagination
+          page={table.data?.page ?? 1}
+          pages={table.data?.pages ?? 1}
+          count={table.data?.count ?? 0}
+          pageSize={paging.pageSize}
+          onPage={paging.setPage}
+          onPageSize={paging.setPageSize}
+          loading={table.isFetching}
+          label="عضو"
+        />
       </div>
       {createOpen && (
         <AccessModal
@@ -247,7 +257,6 @@ export default function TeamPage() {
               <input
                 required
                 disabled={createUser.isPending}
-                type="password"
                 dir="ltr"
                 minLength={8}
                 {...passwordGuard}

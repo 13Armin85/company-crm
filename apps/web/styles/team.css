@@ -1,0 +1,566 @@
+/* My team widget on the home dashboard. */
+.team-v2 {
+  --tc: var(--text-muted);
+  display: grid;
+  gap: 14px;
+  padding: 4px 2px 2px;
+}
+.team-v2 .team-green {
+  --tc: var(--green);
+}
+.team-v2 .team-red {
+  --tc: var(--red);
+}
+.team-v2 .team-gray {
+  --tc: var(--text-muted);
+}
+.team-v2 .team-yellow {
+  --tc: var(--yellow);
+}
+.team-v2 .team-orange {
+  --tc: var(--orange);
+}
+.team-v2 .team-blue {
+  --tc: var(--blue);
+}
+
+/* Toolbar */
+.team-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.team-toolbar select,
+.team-search {
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background-color: var(--surface);
+  color: var(--text-primary);
+  font-size: 12.5px;
+}
+.team-toolbar select {
+  padding: 0 10px;
+  cursor: pointer;
+}
+.team-search {
+  display: flex;
+  flex: 1 1 180px;
+  align-items: center;
+  gap: 6px;
+  min-width: 160px;
+  padding: 0 10px;
+  color: var(--text-muted);
+}
+.team-search:focus-within,
+.team-toolbar select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+.team-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12.5px;
+}
+.team-segment {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-soft);
+}
+.team-segment button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+.team-segment button[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: 0 1px 3px rgb(15 23 42 / 12%);
+}
+.team-icon-toggle {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.team-icon-toggle[aria-pressed="true"],
+.team-icon-toggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.team-more {
+  position: relative;
+}
+.team-more > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  list-style: none;
+  cursor: pointer;
+}
+.team-more > summary::-webkit-details-marker {
+  display: none;
+}
+.team-more[open] > summary {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.team-more-panel {
+  position: absolute;
+  z-index: 20;
+  inset-inline-end: 0;
+  top: calc(100% + 6px);
+  display: grid;
+  gap: 10px;
+  width: 280px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 18px 44px rgb(0 0 0 / 18%);
+}
+.team-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.team-alert-minutes {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+}
+.team-alert-minutes input {
+  width: 72px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-primary);
+  text-align: center;
+}
+.team-more-panel > small {
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+
+/* Status chips */
+.team-status-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.team-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+.team-chip i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--tc);
+}
+.team-chip b {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--tc) 14%, transparent);
+  color: var(--text-primary);
+  font-size: 11.5px;
+  text-align: center;
+}
+.team-chip[aria-pressed="true"] {
+  border-color: var(--tc);
+  background: color-mix(in srgb, var(--tc) 10%, var(--surface));
+  color: var(--text-primary);
+}
+
+/* Drag tray */
+.team-tray {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+.team-tray-hint {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+.team-tray-list {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.team-tray-list span {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  max-width: 220px;
+  padding: 5px 10px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: grab;
+}
+.team-tray-list small {
+  color: var(--accent);
+  font-size: 11px;
+  direction: ltr;
+}
+
+/* Member cards */
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 12px;
+}
+.team-grid.tree {
+  grid-template-columns: 1fr;
+}
+.team-grid.tree .team-member {
+  margin-inline-start: calc(min(var(--unit-depth, 0), 6) * 22px);
+}
+.team-member {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 14px 14px 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+.team-member::before {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 3px;
+  background: var(--tc);
+  content: "";
+}
+.team-member:hover {
+  border-color: color-mix(in srgb, var(--tc) 45%, var(--border));
+  box-shadow: 0 10px 26px rgb(15 23 42 / 8%);
+  transform: translateY(-1px);
+}
+.team-member:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+.team-member-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.team-member-avatar {
+  position: relative;
+  display: grid;
+  flex: 0 0 40px;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 4px color-mix(in srgb, var(--tc) 55%, transparent);
+  color: var(--accent);
+  font-weight: 700;
+}
+.team-member-avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.team-presence {
+  position: absolute;
+  inset-block-end: -1px;
+  inset-inline-end: -1px;
+  width: 11px;
+  height: 11px;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--green);
+}
+.team-presence.is-absent {
+  background: var(--text-muted);
+}
+.team-member-id {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.team-member-id strong {
+  overflow: hidden;
+  font-size: 13.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.team-member-id small {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.team-member-status {
+  flex: 0 0 auto;
+  max-width: 45%;
+  padding: 3px 9px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--tc) 14%, transparent);
+  color: color-mix(in srgb, var(--tc) 75%, var(--text-primary));
+  font-size: 11px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.team-member-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin: 0;
+}
+.team-member-stats > div {
+  display: grid;
+  gap: 2px;
+  padding: 8px 6px;
+  border-radius: 10px;
+  background: var(--surface-soft);
+  text-align: center;
+}
+.team-member-stats dt {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.team-member-stats dd {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+.team-member-stats .is-active dd {
+  color: var(--green);
+}
+.team-member-stats .is-late {
+  background: color-mix(in srgb, var(--red) 10%, var(--surface-soft));
+}
+.team-member-stats .is-late dd {
+  color: var(--red);
+}
+.team-member-load {
+  display: grid;
+  gap: 5px;
+}
+.team-member-load > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+.team-member-load b {
+  color: var(--text-primary);
+}
+.team-member-bar {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: var(--border);
+}
+.team-member-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 60%, var(--tc)));
+}
+.team-member-tasks {
+  display: grid;
+  gap: 4px;
+}
+.team-member-tasks a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--surface-soft);
+  font-size: 12px;
+}
+.team-member-tasks a:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.team-member-tasks a span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.team-member-tasks a small {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.team-member-more,
+.team-member-idle {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+.team-member-absence {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  padding: 8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--text-muted) 12%, transparent);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  line-height: 1.7;
+}
+.team-member-foot {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.team-grid.compact {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+}
+.team-grid.compact .team-member {
+  padding: 10px 12px;
+}
+.team-empty {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 32px 16px;
+  border: 1px dashed var(--border);
+  border-radius: 14px;
+  color: var(--text-muted);
+  text-align: center;
+}
+.team-empty strong {
+  color: var(--text-primary);
+  font-size: 13.5px;
+}
+@media (max-width: 640px) {
+  .team-toolbar select {
+    flex: 1 1 140px;
+  }
+  .team-tray {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .team-member {
+    transition: none;
+  }
+  .team-member:hover {
+    transform: none;
+  }
+}
+
+/* Keep older dashboard rules (status colors, generic inputs) out of the redesigned widget. */
+.custom-dashboard .team-v2 :is(.team-member, .team-chip) {
+  border-color: var(--border);
+  color: var(--text-primary);
+}
+.custom-dashboard .team-v2 .team-chip[aria-pressed="true"] {
+  border-color: var(--tc);
+}
+.custom-dashboard .team-v2 .team-member:hover {
+  border-color: color-mix(in srgb, var(--tc) 45%, var(--border));
+}
+.custom-dashboard .team-v2 .team-toolbar select {
+  min-height: 36px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  font-size: 12.5px;
+}
+.custom-dashboard .team-v2 .team-search input {
+  min-height: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.custom-dashboard .team-v2 .team-search input:focus-visible {
+  outline: none;
+}
+.custom-dashboard .team-v2 .team-alert-minutes input {
+  min-height: 32px;
+  height: 32px;
+}

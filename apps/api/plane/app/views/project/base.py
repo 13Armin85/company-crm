@@ -8,7 +8,8 @@ import json
 
 # Django imports
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db.models import Exists, F, OuterRef, Prefetch, Q, Subquery, Count
+from django.db.models import Case, Count, Exists, F, IntegerField, OuterRef, Prefetch, Q, Subquery, Value, When
+from django.db.models.functions import Cast, Coalesce, Round
 from django.utils import timezone
 
 # Third Party imports
@@ -21,6 +22,8 @@ from plane.app.permissions.crm import require_permission, ProjectScopePermission
 from plane.app.services.project_visibility import visible_projects
 from plane.app.services.task_policy import is_workspace_administrator
 from plane.app.services.access_control import has_permission
+from plane.app.services.table_filters import UNASSIGNED, deadline_q
+from plane.app.services.table_page import list_values, paginate, search_q, search_terms
 from plane.app.serializers import (
     DeployBoardSerializer,
     ProjectListSerializer,
@@ -33,6 +36,7 @@ from plane.db.models import (
     UserFavorite,
     DeployBoard,
     Intake,
+    Issue,
     Project,
     ProjectIdentifier,
     ProjectMember,
@@ -103,6 +107,71 @@ class ProjectViewSet(BaseViewSet):
             .distinct()
         )
         return visible_projects(queryset, self.request.user, self.kwargs["slug"])
+
+    @require_permission("Project.View")
+    def list_table(self, request, slug):
+        """One page of the projects table, filtered and counted on the server."""
+
+        def issue_count(**extra):
+            return Coalesce(
+                Subquery(
+                    Issue.issue_objects.filter(project_id=OuterRef("pk"), **extra)
+                    .values("project_id")
+                    .annotate(total=Count("id"))
+                    .values("total")[:1]
+                ),
+                0,
+            )
+
+        projects = self.get_queryset().annotate(
+            total_issue_count=issue_count(),
+            completed_issue_count=issue_count(state__group="completed"),
+        )
+        projects = projects.annotate(
+            progress=Case(
+                When(total_issue_count=0, then=Value(0)),
+                default=Cast(
+                    Round(F("completed_issue_count") * 100.0 / F("total_issue_count")), output_field=IntegerField()
+                ),
+                output_field=IntegerField(),
+            )
+        )
+        tabs = {
+            "all": Q(archived_at__isnull=True),
+            "active": Q(archived_at__isnull=True, progress__lt=100),
+            "completed": Q(progress=100),
+            "archived": Q(archived_at__isnull=False),
+        }
+        projects = projects.filter(search_q(search_terms(request), ["name", "identifier", "description"]))
+        member_ids = list_values(request, "member_ids")
+        if member_ids:
+            projects = projects.filter(
+                id__in=ProjectMember.objects.filter(member_id__in=member_ids, is_active=True).values("project_id")
+            )
+        lead_ids = list_values(request, "lead_ids")
+        if lead_ids:
+            projects = projects.filter(
+                Q(project_lead_id__in=[value for value in lead_ids if value != UNASSIGNED])
+                | (Q(project_lead__isnull=True) if UNASSIGNED in lead_ids else Q(pk__in=[]))
+            )
+        for param, lookup in (("progress_min", "progress__gte"), ("progress_max", "progress__lte")):
+            if request.query_params.get(param, "").isdigit():
+                projects = projects.filter(**{lookup: int(request.query_params[param])})
+        projects = projects.filter(deadline_q(request, "target_date", completed=Q(progress=100)))
+        counts = {key: projects.filter(query).count() for key, query in tabs.items()}
+        tab = request.query_params.get("tab", "all")
+        projects = projects.filter(tabs.get(tab, tabs["all"])).order_by("sort_order", "name", "id")
+
+        def serialize(rows):
+            rows = list(rows)
+            data = ProjectListSerializer(rows, many=True).data
+            for row, project in zip(data, rows):
+                row["total_issue_count"] = project.total_issue_count
+                row["completed_issue_count"] = project.completed_issue_count
+                row["progress"] = project.progress
+            return data
+
+        return paginate(request, projects, serialize, extra={"tab_counts": counts})
 
     @require_permission("Project.View")
     def list_detail(self, request, slug):

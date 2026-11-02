@@ -37,7 +37,7 @@ const mapOrganizationPermission = (item: Record<string, unknown>): OrganizationP
   isActive: Boolean(item.is_active),
 });
 
-const mapOrganizationRole = (item: Record<string, unknown>): OrganizationRole => ({
+export const mapOrganizationRole = (item: Record<string, unknown>): OrganizationRole => ({
   id: String(item.id),
   name: String(item.name),
   description: String(item.description ?? ""),
@@ -61,7 +61,7 @@ const mapOrganizationUnit = (item: Record<string, unknown>): OrganizationUnit =>
   updatedAt: item.updated_at ? String(item.updated_at) : undefined,
 });
 
-const mapTicketRoutingRule = (item: Record<string, unknown>): TicketRoutingRule => ({
+export const mapTicketRoutingRule = (item: Record<string, unknown>): TicketRoutingRule => ({
   id: String(item.id),
   name: String(item.name),
   unitId: String(item.unit_id),
@@ -135,7 +135,7 @@ api.interceptors.response.use(
   }
 );
 
-const unwrap = <T>(payload: T | { results?: T; data?: T }): T => {
+export const unwrap = <T>(payload: T | { results?: T; data?: T }): T => {
   if (payload && typeof payload === "object" && "results" in payload && payload.results) return payload.results;
   if (payload && typeof payload === "object" && "data" in payload && payload.data) return payload.data;
   return payload as T;
@@ -147,7 +147,7 @@ const initials = (name: string) =>
     .slice(0, 2)
     .map((word) => word[0])
     .join(" ");
-const mapMember = (row: Record<string, unknown>, index = 0): Member => {
+export const mapMember = (row: Record<string, unknown>, index = 0): Member => {
   const person = (row.member ?? row) as Record<string, unknown>;
   const name = String(person.display_name ?? `${person.first_name ?? ""} ${person.last_name ?? ""}`).trim() || "کاربر";
   return {
@@ -166,14 +166,14 @@ const mapMember = (row: Record<string, unknown>, index = 0): Member => {
     avatarColor: ["#4f46e5", "#ec4899", "#0ea5e9", "#f59e0b"][index % 4],
   };
 };
-const mapState = (item: Record<string, unknown>): ProjectState => ({
+export const mapState = (item: Record<string, unknown>): ProjectState => ({
   id: String(item.id),
   name: stateNameFa(item.name ?? "بدون وضعیت"),
   group: String(item.group ?? "unstarted"),
   color: String(item.color ?? "#9ca3af"),
   status: issueStatusFromState(item.group, item.name),
 });
-const mapProject = (item: Record<string, unknown>): Project => {
+export const mapProject = (item: Record<string, unknown>): Project => {
   const lead =
     item.project_lead && typeof item.project_lead === "object"
       ? mapMember(item.project_lead as Record<string, unknown>)
@@ -206,7 +206,7 @@ const mapProject = (item: Record<string, unknown>): Project => {
     memberIds: Array.isArray(item.members) ? item.members.map(String) : [],
   };
 };
-const mapIssue = (
+export const mapIssue = (
   item: Record<string, unknown>,
   projectId: string,
   states: ProjectState[] = [],
@@ -296,7 +296,7 @@ const workspaceTaskStatus: Record<string, Status> = {
   done: "Done",
   blocked: "Blocked",
 };
-const mapWorkspaceTask = (item: Record<string, unknown>, members: Member[]): Issue => {
+export const mapWorkspaceTask = (item: Record<string, unknown>, members: Member[]): Issue => {
   const assigneeRaw = item.assignee_detail;
   const assigneeId = item.assignee_id ? String(item.assignee_id) : undefined;
   const rawPriority = String(item.priority ?? "none").toLowerCase();

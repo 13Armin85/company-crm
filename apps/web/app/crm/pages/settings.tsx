@@ -538,7 +538,6 @@ function SecuritySettings() {
         <span>رمز عبور فعلی</span>
         <input
           disabled={changePassword.isPending}
-          type="password"
           dir="ltr"
           {...oldPasswordGuard}
           value={oldPassword}
@@ -549,7 +548,6 @@ function SecuritySettings() {
       <label>
         <span>رمز عبور جدید</span>
         <input
-          type="password"
           dir="ltr"
           disabled={changePassword.isPending}
           minLength={8}

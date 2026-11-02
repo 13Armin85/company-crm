@@ -4,6 +4,7 @@
 
 from django.urls import path
 from plane.app.views.workspace.task_history import TaskHistoryEndpoint
+from plane.app.views.workspace.task_table import TaskTableEndpoint
 from plane.app.views.workspace.access import (
     AccessMeEndpoint,
     EffectivePermissionsEndpoint,
@@ -147,6 +148,11 @@ urlpatterns = [
         "workspaces/<str:slug>/tasks/",
         WorkspaceTaskListEndpoint.as_view(),
         name="workspace-tasks",
+    ),
+    path(
+        "workspaces/<str:slug>/tasks/table/",
+        TaskTableEndpoint.as_view(),
+        name="task-table",
     ),
     path(
         "workspaces/<str:slug>/tasks/history/",

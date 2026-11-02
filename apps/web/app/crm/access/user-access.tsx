@@ -1,3 +1,6 @@
+import { useUserExceptionsTable } from "../table-hooks";
+import { useDebouncedValue, useTablePaging } from "../table-query";
+import { TablePagination } from "../table-pagination";
 import { ErrorNotice } from "../error-state";
 import { useState } from "react";
 import { normalizePersianSearch, PersianDateTimePicker, SearchableSelect } from "@plane/ui";
@@ -53,22 +56,24 @@ export function UserAccessPanel({ userId }: { userId: string }) {
       `${row.name} ${row.category} ${row.description} ${row.code} ${row.role_names?.join(" ")}`
     ).includes(normalizePersianSearch(roleQuery))
   );
-  const direct = exceptions
-    .map((row) => ({
-      row,
-      permission: present(
-        row.permission,
-        row.permission_code,
-        row.permission_name,
-        row.permission_category,
-        row.permission_description
-      ),
-    }))
-    .filter(({ permission: item }) =>
-      normalizePersianSearch(`${item.name} ${item.category} ${item.description} ${item.code}`).includes(
-        normalizePersianSearch(directQuery)
-      )
-    );
+  const directSearch = useDebouncedValue(directQuery);
+  const directPaging = useTablePaging("exceptions", directSearch);
+  const directTable = useUserExceptionsTable({
+    userId,
+    q: directSearch,
+    ...directPaging,
+    enabled: access?.can("Access.UserException.View") ?? false,
+  });
+  const direct = (directTable.data?.rows ?? []).map((row) => ({
+    row,
+    permission: present(
+      row.permission,
+      row.permission_code,
+      row.permission_name,
+      row.permission_category,
+      row.permission_description
+    ),
+  }));
   const now = Date.now();
   const activeNow = (row: PermissionException) =>
     (!row.starts_at || Date.parse(row.starts_at) <= now) && (!row.ends_at || Date.parse(row.ends_at) > now);
@@ -308,9 +313,9 @@ export function UserAccessPanel({ userId }: { userId: string }) {
             <span>جستجوی دسترسی‌های مستقیم</span>
             <input type="search" value={directQuery} onChange={(event) => setDirectQuery(event.target.value)} />
           </label>
-          {exceptionQuery.error ? (
+          {directTable.error ? (
             <ErrorNotice message={"عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید."} />
-          ) : exceptionQuery.isLoading ? (
+          ) : directTable.isLoading ? (
             <Skeleton rows={4} />
           ) : !direct.length ? (
             <p role="status">دسترسی مستقیمی برای این جستجو وجود ندارد.</p>
@@ -327,73 +332,74 @@ export function UserAccessPanel({ userId }: { userId: string }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {direct
-                    // eslint-disable-next-line unicorn/no-array-sort -- This filtered copy supports browsers without Array.toSorted.
-                    .sort((a, b) => a.permission.category.localeCompare(b.permission.category, "fa"))
-                    .map(({ row, permission: item }) => {
-                      const final = effectiveQuery.data?.explanations.find(
-                        (entry) => entry.code === row.permission_code
-                      );
-                      return (
-                        <tr key={row.id}>
-                          <td>
-                            <small>{item.category}</small>
-                            <b>{item.name}</b>
-                          </td>
-                          <td>{row.effect === "ALLOW" ? "اجازه" : "منع"}</td>
-                          <td>
-                            {activeNow(row)
-                              ? "فعال"
-                              : row.ends_at && Date.parse(row.ends_at) <= now
-                                ? "منقضی"
-                                : "آینده"}
-                            {(row.starts_at || row.ends_at) && (
-                              <small>
-                                {row.starts_at
-                                  ? persianDate(row.starts_at, {
-                                      year: "numeric",
-                                      hour: "2-digit",
-                                      timeZone: currentUser?.timeZone,
-                                    })
-                                  : "بدون شروع"}{" "}
-                                —{" "}
-                                {row.ends_at
-                                  ? persianDate(row.ends_at, {
-                                      year: "numeric",
-                                      hour: "2-digit",
-                                      timeZone: currentUser?.timeZone,
-                                    })
-                                  : "بدون پایان"}
-                              </small>
-                            )}
-                          </td>
-                          <td>
-                            {final ? (final.granted ? "مجاز" : "غیرمجاز") : "نیاز به مجوز مشاهدهٔ نتیجه"}
-                            {final?.has_conflict && <small>تعارض اجازه و منع؛ منع اولویت دارد.</small>}
-                          </td>
-                          <td className="row-actions">
-                            {access.can("Access.UserException.Manage") && (
-                              <>
-                                <Button variant="secondary" disabled={mutation.isPending} onClick={() => edit(row)}>
-                                  ویرایش دسترسی
-                                </Button>
-                                <Button
-                                  variant="danger"
-                                  disabled={mutation.isPending}
-                                  onClick={() =>
-                                    mutation.mutate({ path: `users/${userId}/exceptions/${row.id}/`, method: "delete" })
-                                  }
-                                >
-                                  حذف دسترسی
-                                </Button>
-                              </>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
+                  {direct.map(({ row, permission: item }) => {
+                    const final = effectiveQuery.data?.explanations.find((entry) => entry.code === row.permission_code);
+                    return (
+                      <tr key={row.id}>
+                        <td>
+                          <small>{item.category}</small>
+                          <b>{item.name}</b>
+                        </td>
+                        <td>{row.effect === "ALLOW" ? "اجازه" : "منع"}</td>
+                        <td>
+                          {activeNow(row) ? "فعال" : row.ends_at && Date.parse(row.ends_at) <= now ? "منقضی" : "آینده"}
+                          {(row.starts_at || row.ends_at) && (
+                            <small>
+                              {row.starts_at
+                                ? persianDate(row.starts_at, {
+                                    year: "numeric",
+                                    hour: "2-digit",
+                                    timeZone: currentUser?.timeZone,
+                                  })
+                                : "بدون شروع"}{" "}
+                              —{" "}
+                              {row.ends_at
+                                ? persianDate(row.ends_at, {
+                                    year: "numeric",
+                                    hour: "2-digit",
+                                    timeZone: currentUser?.timeZone,
+                                  })
+                                : "بدون پایان"}
+                            </small>
+                          )}
+                        </td>
+                        <td>
+                          {final ? (final.granted ? "مجاز" : "غیرمجاز") : "نیاز به مجوز مشاهدهٔ نتیجه"}
+                          {final?.has_conflict && <small>تعارض اجازه و منع؛ منع اولویت دارد.</small>}
+                        </td>
+                        <td className="row-actions">
+                          {access.can("Access.UserException.Manage") && (
+                            <>
+                              <Button variant="secondary" disabled={mutation.isPending} onClick={() => edit(row)}>
+                                ویرایش دسترسی
+                              </Button>
+                              <Button
+                                variant="danger"
+                                disabled={mutation.isPending}
+                                onClick={() =>
+                                  mutation.mutate({ path: `users/${userId}/exceptions/${row.id}/`, method: "delete" })
+                                }
+                              >
+                                حذف دسترسی
+                              </Button>
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </SurfaceTable>
+              <TablePagination
+                page={directTable.data?.page ?? 1}
+                pages={directTable.data?.pages ?? 1}
+                count={directTable.data?.count ?? 0}
+                pageSize={directPaging.pageSize}
+                onPage={directPaging.setPage}
+                onPageSize={directPaging.setPageSize}
+                loading={directTable.isFetching}
+                label="دسترسی"
+              />
             </div>
           )}
         </section>

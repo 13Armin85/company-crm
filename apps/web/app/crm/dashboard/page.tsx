@@ -384,7 +384,7 @@ export default function DashboardPage() {
               <article
                 key={widget.id}
                 className={`dashboard-widget dashboard-widget-${widget.type} ${fullId === widget.id ? "dashboard-widget-full" : ""}`}
-                style={{ gridColumn: `span ${Math.min(12, widget.w)}`, minHeight: `${Math.max(2, widget.h) * 88}px` }}
+                style={{ gridColumn: `span ${Math.min(12, widget.w)}`, gridRow: `span ${Math.max(2, widget.h)}` }}
                 draggable={editing && !sharedActive}
                 onDragStart={(event) => event.dataTransfer.setData("dashboard-widget", widget.id)}
                 onDragOver={(event) => event.preventDefault()}

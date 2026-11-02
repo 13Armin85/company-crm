@@ -185,14 +185,24 @@ export function DesignWorkspace() {
                 <>
                   {surface?.native_columns.length ? (
                     <section className="engine-design-section-card">
-                      <h4>ستون‌ها و تب‌های صفحه</h4>
-                      <p>این تنظیمات روی جدول اصلی همین صفحه اعمال می‌شوند.</p>
+                      <h4>ستون‌ها و تب‌های جدول</h4>
+                      <p>برای همه کاربران اعمال می‌شود. هر کاربر می‌تواند از «تب‌های من» تب‌ها را برای خودش پنهان کند.</p>
                       <PageEditor key={surfaceCode} code={surfaceCode} embedded tableOnly />
                     </section>
                   ) : null}
-                  <section className="engine-design-section-card">
-                    <OfficialTableDesigner key={code} code={code} />
-                  </section>
+                  {surface?.native_columns.length ? (
+                    <details className="engine-design-section-card engine-optional-section">
+                      <summary>
+                        <strong>نماهای آماده «جدول من»</strong>
+                        <small>اختیاری؛ فقط وقتی کاربران «جدول من» را باز می‌کنند استفاده می‌شود.</small>
+                      </summary>
+                      <OfficialTableDesigner key={code} code={code} />
+                    </details>
+                  ) : (
+                    <section className="engine-design-section-card">
+                      <OfficialTableDesigner key={code} code={code} />
+                    </section>
+                  )}
                 </>
               )}
               {tab === "rules" && (

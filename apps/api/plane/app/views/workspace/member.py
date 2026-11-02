@@ -20,6 +20,7 @@ from plane.app.permissions import WorkspaceEntityPermission, allow_permission, R
 from plane.app.permissions.crm import require_permission, require_any_permission
 from plane.app.services.access_control import has_permission, sync_plane_membership
 from plane.app.services.user_identity import can_release_username, reserve_username
+from plane.app.services.table_page import paginate, search_q, search_terms, wants_page
 from plane.app.services.project_visibility import visible_projects
 from plane.app.services.access_mutations import access_transaction, audit_access, remove_workspace_user, sync_user_roles
 from .organization import _sync_user_units
@@ -188,14 +189,18 @@ class WorkSpaceMemberViewSet(BaseViewSet):
             workspace_members = workspace_members.filter(is_active=True, member__is_active=True)
             if not has_permission(request.user, slug, "Issue.Assign", request=request):
                 workspace_members = workspace_members.filter(Q(member_id__in=colleague_ids) | Q(member=request.user))
-        if has_permission(request.user, slug, "User.View", request=request):
-            serializer = WorkspaceMemberAdminSerializer(workspace_members, fields=("id", "member", "role"), many=True)
-        else:
-            serializer = WorkSpaceMemberSerializer(workspace_members, fields=("id", "member", "role"), many=True)
-        data = serializer.data
-        if isinstance(data, list):
+        admin_view = has_permission(request.user, slug, "User.View", request=request)
+
+        def serialize(rows):
+            rows = list(rows)
+            serializer_class = WorkspaceMemberAdminSerializer if admin_view else WorkSpaceMemberSerializer
+            data = serializer_class(rows, fields=("id", "member", "role"), many=True).data
             assignments = UserOrganizationRole.objects.filter(
-                workspace__slug=slug, is_active=True, role__is_active=True, role__deleted_at__isnull=True
+                workspace__slug=slug,
+                user_id__in=[row.member_id for row in rows],
+                is_active=True,
+                role__is_active=True,
+                role__deleted_at__isnull=True,
             ).select_related("role")
             roles_by_user = {}
             for assignment in assignments:
@@ -206,14 +211,30 @@ class WorkSpaceMemberViewSet(BaseViewSet):
                         "system_key": assignment.role.system_key,
                     }
                 )
-            memberships_by_user = {str(row.member_id): row for row in workspace_members}
+            memberships_by_user = {str(row.member_id): row for row in rows}
             for row in data:
                 user_id = str(row["member"]["id"])
                 row["organization_roles"] = roles_by_user.get(user_id, [])
                 row["is_active"] = (
                     memberships_by_user[user_id].is_active and memberships_by_user[user_id].member.is_active
                 )
-        return Response(data, status=status.HTTP_200_OK)
+            return data
+
+        if wants_page(request):
+            workspace_members = workspace_members.filter(
+                search_q(
+                    search_terms(request),
+                    [
+                        "member__display_name",
+                        "member__first_name",
+                        "member__last_name",
+                        "member__email",
+                        "member__username",
+                    ],
+                )
+            ).order_by("-is_active", "member__display_name", "id")
+            return paginate(request, workspace_members, serialize)
+        return Response(serialize(workspace_members), status=status.HTTP_200_OK)
 
     @require_any_permission("Issue.View", "User.View")
     def retrieve(self, request, slug, pk):

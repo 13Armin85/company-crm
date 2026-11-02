@@ -8,7 +8,6 @@ import {
   useOrganizationRoles,
   useOrganizationUnits,
   useSaveTicketRoutingRule,
-  useTicketRoutingRules,
   useWorkspaceAccess,
 } from "../api";
 import { Button, EmptyState, PageHeader, SearchBox, Skeleton } from "../components";
@@ -16,7 +15,9 @@ import { useUIStore } from "../store";
 import type { TicketRoutingRule } from "../types";
 import { RoleQueue } from "../role-queue";
 import { Navigate, useSearchParams } from "react-router";
-import { matchesRecordSearch } from "../identifiers";
+import { useRoutingRulesTable } from "../table-hooks";
+import { useDebouncedValue, useTablePaging } from "../table-query";
+import { TablePagination } from "../table-pagination";
 
 type RuleForm = Pick<TicketRoutingRule, "name" | "unitId" | "requiredRoleId" | "isActive"> & {
   id?: string;
@@ -27,10 +28,6 @@ export default function RoutingPage() {
   const setFormDirty = useUIStore((state) => state.setFormDirty);
   const { data: access, isLoading: accessLoading } = useWorkspaceAccess();
   const canManage = access?.can("Routing.Manage") === true;
-  const { data: rules = [], isLoading: rulesLoading } = useTicketRoutingRules(
-    undefined,
-    access?.can("Routing.View") ?? false
-  );
   const { data: units = [] } = useOrganizationUnits(undefined, canManage);
   const { data: roles = [] } = useOrganizationRoles(undefined, canManage);
   const saveRule = useSaveTicketRoutingRule(slug);
@@ -40,9 +37,11 @@ export default function RoutingPage() {
   const [params] = useSearchParams();
   const searchParam = params.get("search") ?? "";
   useEffect(() => setQuery(searchParam), [searchParam]);
-  const visibleRules = rules.filter((rule) =>
-    matchesRecordSearch(query, [rule.id, rule.unitId, rule.requiredRoleId, rule.name, rule.unitTitle, rule.roleName])
-  );
+  const search = useDebouncedValue(query);
+  const paging = useTablePaging("routing", search);
+  const table = useRoutingRulesTable({ q: search, ...paging, enabled: canManage });
+  const visibleRules = table.data?.rows ?? [];
+  const rulesLoading = table.isLoading;
 
   useEffect(() => {
     setFormDirty("ticket-routing-rule", Boolean(editing));
@@ -90,14 +89,14 @@ export default function RoutingPage() {
               <Skeleton rows={4} />
             ) : !visibleRules.length ? (
               <EmptyState
-                title={rules.length ? "قانونی پیدا نشد" : "قانونی تعریف نشده"}
-                description={rules.length ? "عبارت جست‌وجو را بررسی کنید." : "برای اتصال واحد و نقش یک قانون بسازید."}
+                title={search ? "قانونی پیدا نشد" : "قانونی تعریف نشده"}
+                description={search ? "عبارت جست‌وجو را بررسی کنید." : "برای اتصال واحد و نقش یک قانون بسازید."}
               />
             ) : (
               <SurfaceTable code="routing">
                 <thead>
                   <tr>
-                    <th>نام</th>
+                    <th>نام قانون</th>
                     <th>واحد شروع</th>
                     <th>نقش مورد نیاز</th>
                     <th>وضعیت</th>
@@ -136,6 +135,16 @@ export default function RoutingPage() {
                 </tbody>
               </SurfaceTable>
             )}
+            <TablePagination
+              page={table.data?.page ?? 1}
+              pages={table.data?.pages ?? 1}
+              count={table.data?.count ?? 0}
+              pageSize={paging.pageSize}
+              onPage={paging.setPage}
+              onPageSize={paging.setPageSize}
+              loading={table.isFetching}
+              label="قانون"
+            />
           </div>
         </section>
       )}
@@ -173,33 +182,29 @@ export default function RoutingPage() {
                 disabled={saveRule.isPending}
               />
             </label>
-            <label htmlFor="crm-routing-select-1">
-              <span>واحد شروع</span>
-              <SearchableSelect
-                id="crm-routing-select-1"
-                label="واحد شروع"
-                value={editing.unitId}
-                onChange={(unitId) => setEditing({ ...editing, unitId })}
-                disabled={saveRule.isPending}
-                options={units.map((unit) => ({ id: unit.id, title: unit.title, disabled: !unit.isActive }))}
-              />
-            </label>
-            <label htmlFor="crm-routing-select-2">
-              <span>نقش مورد نیاز</span>
-              <SearchableSelect
-                id="crm-routing-select-2"
-                label="نقش مورد نیاز"
-                value={editing.requiredRoleId}
-                onChange={(requiredRoleId) => setEditing({ ...editing, requiredRoleId })}
-                disabled={saveRule.isPending}
-                options={roles.map((role) => ({
-                  id: role.id,
-                  title: role.name,
-                  description: role.description,
-                  disabled: !role.isActive,
-                }))}
-              />
-            </label>
+            <SearchableSelect
+              showLabel
+              id="crm-routing-select-1"
+              label="واحد شروع"
+              value={editing.unitId}
+              onChange={(unitId) => setEditing({ ...editing, unitId })}
+              disabled={saveRule.isPending}
+              options={units.map((unit) => ({ id: unit.id, title: unit.title, disabled: !unit.isActive }))}
+            />
+            <SearchableSelect
+              showLabel
+              id="crm-routing-select-2"
+              label="نقش مورد نیاز"
+              value={editing.requiredRoleId}
+              onChange={(requiredRoleId) => setEditing({ ...editing, requiredRoleId })}
+              disabled={saveRule.isPending}
+              options={roles.map((role) => ({
+                id: role.id,
+                title: role.name,
+                description: role.description,
+                disabled: !role.isActive,
+              }))}
+            />
             <label className="active-toggle">
               <input
                 type="checkbox"

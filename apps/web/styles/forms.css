@@ -120,7 +120,7 @@
     .quick-create-form,
     .auth-card
   )
-  :is(input, select, textarea):is(:disabled, [readonly]:not([data-no-autofill])) {
+  :is(input, select, textarea):is(:disabled, [readonly]) {
   background-color: var(--surface-soft);
   color: var(--text-secondary);
   box-shadow: none;
@@ -782,5 +782,379 @@
 @media (max-width: 640px) {
   .tab-bar-with-chooser {
     flex-wrap: wrap;
+  }
+}
+
+/* Secret fields that browsers must not fill: masked text instead of type="password". */
+input[data-secret="true"] {
+  -webkit-text-security: disc;
+  letter-spacing: 0.08em;
+}
+/* Modals whose header sits inside the form (e.g. routing rules, units). */
+:root .create-modal form > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 -22px 4px;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--form-border);
+}
+:root .create-modal form > header h2 {
+  margin: 2px 0 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+:root .create-modal form > header > svg {
+  flex: 0 0 auto;
+  color: var(--accent);
+}
+:root .create-modal form > footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin: 4px -22px -22px;
+  padding: 14px 22px;
+  border-top: 1px solid var(--form-border);
+}
+:root .create-modal form {
+  display: grid;
+  gap: var(--form-gap);
+}
+.table-tab-picker-panel {
+  width: min(320px, calc(100vw - 24px));
+  max-height: min(520px, var(--anchor-max-height, 520px));
+}
+.table-tab-picker-panel li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.table-tab-picker-panel li > label {
+  flex: 1;
+  min-width: 0;
+}
+.table-tab-own {
+  margin-inline-start: auto;
+  padding: 1px 7px;
+  border-radius: 99px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+}
+.table-tab-delete {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.table-tab-delete:hover {
+  background: color-mix(in srgb, var(--red) 12%, transparent);
+  color: var(--red);
+}
+.table-tab-creator {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.table-tab-creator > strong {
+  font-size: 13px;
+}
+.table-tab-creator > small {
+  color: var(--text-muted);
+  font-size: 11.5px;
+  line-height: 1.7;
+}
+.table-tab-creator > input {
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 12.5px;
+}
+.table-tab-creator > input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+.table-tab-creator-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 8px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.table-tab-picker-panel .table-tab-creator-columns label {
+  min-height: 32px;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+:root .table-tab-creator .button {
+  min-height: 36px;
+  font-size: 12.5px;
+}
+.surface-table-tabbar > .surface-table-tabs:empty {
+  display: none;
+}
+.surface-table-tabbar:has(> .surface-table-tabs:empty) {
+  justify-content: flex-end;
+}
+/* A lone "main table" tab is noise: show it only once there is a second tab. */
+.surface-table-tabbar > .surface-table-tabs:has(> :only-child) {
+  visibility: hidden;
+}
+
+/* ---------- Table toolbar: tabs on one side, compact actions on the other ---------- */
+.surface-table-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.surface-table-toolbar > .surface-table-tabs {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 4px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+  border: 0;
+  scrollbar-width: thin;
+}
+.surface-table-toolbar > .surface-table-tabs:has(> :only-child) {
+  visibility: hidden;
+}
+.surface-table-toolbar > .surface-table-tabs button {
+  flex: 0 0 auto;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.surface-table-toolbar > .surface-table-tabs button:hover {
+  color: var(--text-primary);
+  background: var(--surface-soft);
+}
+.surface-table-toolbar > .surface-table-tabs button[aria-selected="true"] {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+.surface-table-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+}
+.surface-table-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+.surface-table-action:hover,
+.surface-table-action[aria-expanded="true"] {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  color: var(--accent);
+}
+.surface-table-action.is-icon {
+  justify-content: center;
+  width: 30px;
+  padding: 0;
+}
+.surface-table-action:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.surface-table-action .table-tab-picker-count {
+  padding: 0 6px;
+  font-size: 11px;
+  line-height: 18px;
+}
+.table-tab-picker-hint {
+  margin: 8px 0 0;
+  padding: 8px;
+  border-radius: 8px;
+  background: var(--surface-soft);
+  color: var(--text-muted);
+  font-size: 11.5px;
+  line-height: 1.7;
+}
+@media (max-width: 640px) {
+  .surface-table-toolbar {
+    flex-wrap: wrap;
+  }
+}
+.engine-rules-column-readonly {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-soft);
+}
+.engine-rules-column-readonly span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.engine-optional-section > summary {
+  display: grid;
+  gap: 4px;
+  cursor: pointer;
+  list-style: none;
+}
+.engine-optional-section > summary::-webkit-details-marker {
+  display: none;
+}
+.engine-optional-section > summary strong::before {
+  display: inline-block;
+  margin-inline-end: 8px;
+  color: var(--text-muted);
+  content: "▸";
+  transition: transform 0.15s ease;
+}
+.engine-optional-section[open] > summary strong::before {
+  transform: rotate(90deg);
+}
+.engine-optional-section > summary small {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.engine-optional-section[open] > summary {
+  margin-bottom: 16px;
+}
+
+/* ---------- Server-side table pagination ---------- */
+.table-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+}
+.table-pagination[aria-busy="true"] {
+  opacity: 0.7;
+}
+.table-pagination-summary {
+  margin: 0;
+}
+.table-pagination-summary b {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.table-pagination-pages {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.table-pagination-pages button {
+  display: grid;
+  place-items: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+.table-pagination-pages button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  color: var(--accent);
+}
+.table-pagination-pages button.is-current {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+.table-pagination-pages button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.table-pagination-pages button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.table-pagination-gap {
+  min-width: 20px;
+  color: var(--text-muted);
+  text-align: center;
+}
+.table-pagination-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.table-pagination-tools label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.table-pagination-tools select,
+.table-pagination-tools input {
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 12.5px;
+}
+.table-pagination-tools select {
+  padding: 0 8px;
+}
+.table-pagination-tools input {
+  width: 56px;
+  padding: 0 6px;
+  text-align: center;
+}
+@media (max-width: 640px) {
+  .table-pagination {
+    justify-content: center;
+  }
+  .table-pagination-summary {
+    width: 100%;
+    text-align: center;
   }
 }

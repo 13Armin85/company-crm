@@ -12,6 +12,7 @@ from rest_framework.response import Response
 
 from plane.app.permissions.crm import require_permission, require_any_permission
 from plane.app.services.access_control import has_permission, sync_plane_membership
+from plane.app.services.table_page import paginate, search_q, search_terms, wants_page
 from plane.app.services.access_mutations import (
     normalize_ids,
     access_transaction,
@@ -133,6 +134,9 @@ class OrganizationRoleListEndpoint(BaseAPIView):
                 )
             )
         )
+        if wants_page(request):
+            rows = rows.filter(search_q(search_terms(request), ["name", "description"])).order_by("name", "id")
+            return paginate(request, rows, lambda chunk: OrganizationRoleSerializer(chunk, many=True).data)
         return Response(OrganizationRoleSerializer(rows, many=True).data)
 
     @require_permission("Role.Create")
@@ -523,6 +527,11 @@ class TicketRoutingRuleListEndpoint(BaseAPIView):
     @require_permission("Routing.View")
     def get(self, request, slug):
         rows = TicketRoutingRule.objects.filter(workspace__slug=slug).select_related("unit", "required_role")
+        if wants_page(request):
+            rows = rows.filter(
+                search_q(search_terms(request), ["name", "unit__title", "required_role__name"])
+            ).order_by("-is_active", "name", "id")
+            return paginate(request, rows, lambda chunk: TicketRoutingRuleSerializer(chunk, many=True).data)
         return Response(TicketRoutingRuleSerializer(rows, many=True).data)
 
     @require_permission("Routing.Manage")

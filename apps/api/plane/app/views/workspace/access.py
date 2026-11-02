@@ -17,6 +17,7 @@ from plane.app.services.access_control import (
     has_permission,
 )
 from plane.app.services.access_mutations import access_transaction, audit_access, remove_workspace_user
+from plane.app.services.table_page import paginate, search_q, search_terms, wants_page
 from plane.app.views.base import BaseAPIView
 from plane.db.models import (
     Workspace,
@@ -130,12 +131,15 @@ class UserExceptionListEndpoint(BaseAPIView):
     @require_permission("Access.UserException.View")
     def get(self, request, slug, user_id):
         workspace, user = workspace_user(slug, user_id)
-        return Response(
-            ExceptionSerializer(
-                UserPermissionException.objects.filter(workspace=workspace, user=user).select_related("permission"),
-                many=True,
-            ).data
-        )
+        rows = UserPermissionException.objects.filter(workspace=workspace, user=user).select_related("permission")
+        if wants_page(request):
+            if request.query_params.get("active") == "1":
+                rows = rows.filter(is_active=True)
+            rows = rows.filter(
+                search_q(search_terms(request), ["permission__name", "permission__code", "permission__category"])
+            ).order_by("permission__category", "permission__code", "id")
+            return paginate(request, rows, lambda chunk: ExceptionSerializer(chunk, many=True).data)
+        return Response(ExceptionSerializer(rows, many=True).data)
 
     @require_permission("Access.UserException.Manage")
     def post(self, request, slug, user_id):
@@ -311,6 +315,14 @@ class AbsenceListEndpoint(BaseAPIView):
     def get(self, request, slug):
         workspace = get_object_or_404(Workspace, slug=slug)
         rows = UserAbsence.objects.filter(workspace=workspace).select_related("user", "workspace")
+        paged = wants_page(request)
+        if paged:
+            rows = rows.filter(
+                search_q(
+                    search_terms(request),
+                    ["user__display_name", "user__first_name", "user__last_name", "user__email", "reason"],
+                )
+            ).order_by("-starts_at", "id")
         if not has_permission(request.user, workspace, "Absence.ManageAll", request=request):
             rows = [
                 row
@@ -318,28 +330,37 @@ class AbsenceListEndpoint(BaseAPIView):
                 if row.user_id == request.user.id
                 or can_manage_absence(request.user, row.user, workspace, "Absence.View", request=request)
             ]
-        return Response(
-            {
-                "absences": AbsenceSerializer(rows, many=True, context={"request": request}).data,
-                "manageable_user_ids": [
-                    user.id
-                    for user in User.objects.filter(
-                        is_active=True,
-                        member_workspace__workspace=workspace,
-                        member_workspace__is_active=True,
-                        member_workspace__deleted_at__isnull=True,
-                    )
-                    if can_manage_absence(request.user, user, workspace, "Absence.Create", request=request)
-                ],
-                "delegations": [
-                    row
-                    for row in delegation_context(workspace).values()
-                    if has_permission(request.user, workspace, "Absence.ManageAll", request=request)
-                    or row["user_id"] == request.user.id
-                    or row["manager_id"] == request.user.id
-                ],
-            }
-        )
+        context = self._absence_context(request, workspace)
+        if paged:
+            return paginate(
+                request,
+                rows,
+                lambda chunk: AbsenceSerializer(chunk, many=True, context={"request": request}).data,
+                extra=context,
+            )
+        return Response({"absences": AbsenceSerializer(rows, many=True, context={"request": request}).data, **context})
+
+    @staticmethod
+    def _absence_context(request, workspace):
+        return {
+            "manageable_user_ids": [
+                user.id
+                for user in User.objects.filter(
+                    is_active=True,
+                    member_workspace__workspace=workspace,
+                    member_workspace__is_active=True,
+                    member_workspace__deleted_at__isnull=True,
+                )
+                if can_manage_absence(request.user, user, workspace, "Absence.Create", request=request)
+            ],
+            "delegations": [
+                row
+                for row in delegation_context(workspace).values()
+                if has_permission(request.user, workspace, "Absence.ManageAll", request=request)
+                or row["user_id"] == request.user.id
+                or row["manager_id"] == request.user.id
+            ],
+        }
 
     @require_permission("Absence.Create")
     def post(self, request, slug):

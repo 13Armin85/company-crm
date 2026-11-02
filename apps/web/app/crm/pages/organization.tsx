@@ -285,45 +285,41 @@ export default function OrganizationPage() {
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
               />
             </label>
-            <label htmlFor="crm-organization-select-1">
-              <span>واحد بالادستی</span>
-              <SearchableSelect
-                id="crm-organization-select-1"
-                label="واحد بالادستی"
-                disabled={saveUnit.isPending || Boolean(form.id && !canEditStructure)}
-                value={form.parentId ?? ""}
-                onChange={(parentId) => setForm({ ...form, parentId })}
-                options={[
-                  { id: "", title: "ریشه سازمان" },
-                  ...units
-                    .filter((unit) => unit.id !== form.id)
-                    .map((unit) => ({
-                      id: unit.id,
-                      title: unit.title,
-                      description: unit.isActive ? undefined : "واحد غیرفعال؛ زیرمجموعه‌هایش هم غیرفعال هستند.",
-                    })),
-                ]}
-              />
-            </label>
-            <label htmlFor="crm-organization-select-2">
-              <span>مدیر فعلی</span>
-              <SearchableSelect
-                id="crm-organization-select-2"
-                label="مدیر فعلی"
-                disabled={saveUnit.isPending || !access.can("OrganizationUnit.Manager.Assign")}
-                value={form.managerId ?? ""}
-                onChange={(managerId) => setForm({ ...form, managerId })}
-                options={[
-                  { id: "", title: "بدون مدیر" },
-                  ...members.map((member) => ({
-                    id: member.id,
-                    title: member.displayName,
-                    description: member.email,
-                    disabled: member.isActive === false,
+            <SearchableSelect
+              showLabel
+              id="crm-organization-select-1"
+              label="واحد بالادستی"
+              disabled={saveUnit.isPending || Boolean(form.id && !canEditStructure)}
+              value={form.parentId ?? ""}
+              onChange={(parentId) => setForm({ ...form, parentId })}
+              options={[
+                { id: "", title: "ریشه سازمان" },
+                ...units
+                  .filter((unit) => unit.id !== form.id)
+                  .map((unit) => ({
+                    id: unit.id,
+                    title: unit.title,
+                    description: unit.isActive ? undefined : "واحد غیرفعال؛ زیرمجموعه‌هایش هم غیرفعال هستند.",
                   })),
-                ]}
-              />
-            </label>
+              ]}
+            />
+            <SearchableSelect
+              showLabel
+              id="crm-organization-select-2"
+              label="مدیر فعلی"
+              disabled={saveUnit.isPending || !access.can("OrganizationUnit.Manager.Assign")}
+              value={form.managerId ?? ""}
+              onChange={(managerId) => setForm({ ...form, managerId })}
+              options={[
+                { id: "", title: "بدون مدیر" },
+                ...members.map((member) => ({
+                  id: member.id,
+                  title: member.displayName,
+                  description: member.email,
+                  disabled: member.isActive === false,
+                })),
+              ]}
+            />
             <MultiSelector
               label="اعضای واحد"
               selected={form.memberIds}
