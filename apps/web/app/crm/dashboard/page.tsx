@@ -6,6 +6,7 @@ import {
   BarChart3,
   CalendarDays,
   Check,
+  ChevronDown,
   Copy,
   Expand,
   GripVertical,
@@ -220,21 +221,29 @@ export default function DashboardPage() {
         actions={
           <div className="dashboard-actions">
             {dashboard.data?.can_manage_defaults && (
-              <select
-                aria-label="انتخاب نقش پیش‌فرض"
-                value={roleId}
-                onChange={(event) => {
-                  setEditing(false);
-                  setRoleId(event.target.value);
-                }}
-              >
-                <option value="">داشبورد شخصی</option>
-                {roles.map((role) => (
-                  <option key={role.id} value={role.id}>
-                    پیش‌فرض: {role.name}
-                  </option>
-                ))}
-              </select>
+              <label className="dashboard-role-picker">
+                <span>نمای داشبورد</span>
+                <select
+                  aria-label="انتخاب نقش پیش‌فرض"
+                  value={roleId}
+                  onChange={(event) => {
+                    setEditing(false);
+                    setSharedActive(null);
+                    setConfiguredId("");
+                    setGallery(false);
+                    setActiveId("");
+                    setRoleId(event.target.value);
+                  }}
+                >
+                  <option value="">داشبورد شخصی</option>
+                  {roles.map((role) => (
+                    <option key={role.id} value={role.id}>
+                      پیش‌فرض: {role.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={15} aria-hidden="true" />
+              </label>
             )}
             {!roleId && (
               <Button variant="ghost" icon={RotateCcw} onClick={reset}>

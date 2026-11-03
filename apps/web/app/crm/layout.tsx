@@ -237,10 +237,10 @@ function AppLayout() {
             <Settings size={19} />
             <span>تنظیمات</span>
           </NavLink>
-          <a href="https://docs.plane.so" target="_blank" rel="noreferrer">
+          <NavLink to="/help" onClick={() => setMobileSidebarOpen(false)}>
             <CircleHelp size={19} />
             <span>راهنما و پشتیبانی</span>
-          </a>
+          </NavLink>
         </div>
         <button className="collapse-button" onClick={() => setCollapsed(!collapsed)}>
           {collapsed ? <ChevronsLeft size={17} /> : <ChevronsRight size={17} />}
@@ -416,11 +416,13 @@ export function AuthenticationBoundary() {
         return undefined;
       });
     };
-    const verify = async () => {
+    const verify = async (background = false) => {
       if (ended) return;
       const current = ++sequence;
-      hidePrivateContent();
-      setVerifying(true);
+      if (!background) {
+        hidePrivateContent();
+        setVerifying(true);
+      }
       const result = await refetch();
       if (!active || ended || current !== sequence) return;
       if (result.isError) {
@@ -448,9 +450,9 @@ export function AuthenticationBoundary() {
     const pageshow = (event: PageTransitionEvent) => {
       if (event.persisted) void verify();
     };
-    const focus = () => void verify();
+    const focus = () => void verify(true);
     const visibility = () => {
-      if (document.visibilityState === "visible") void verify();
+      if (document.visibilityState === "visible") void verify(true);
     };
     const unsubscribe = subscribeToSessionEnd(endSession);
     void verify();
@@ -485,7 +487,7 @@ export function AuthenticationBoundary() {
   if ((error as { response?: { status?: number } } | null)?.response?.status === 401)
     return <Navigate to="/login" replace />;
   if (!user && !isLoading && !error) return <Navigate to="/login" replace />;
-  const pending = isLoading || verifying || verifiedLocation !== location.key || Boolean(error);
+  const pending = (!user && isLoading) || verifying || verifiedLocation !== location.key || (Boolean(error) && !user);
   return (
     <>
       {pending &&

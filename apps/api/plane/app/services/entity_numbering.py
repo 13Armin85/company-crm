@@ -16,6 +16,7 @@ from plane.db.models import (
     FieldDefinition,
     FormLayout,
     FormVersion,
+    SurfaceConfiguration,
     Workspace,
 )
 from .entity_records import emit_definition
@@ -68,6 +69,56 @@ def rule_payload(rule):
         "shared_sequence": rule.shared_sequence,
         "next": render_number(rule, max(value + 1, rule.start)),
     }
+
+
+def numberable_columns(entity):
+    """Return unused, empty text columns published on this entity's form."""
+    from .entity_schema import schema_fields
+
+    _, fields = schema_fields(entity)
+    numbered = set(
+        EntityNumberingRule.objects.filter(field__code__in=fields)
+        .values_list("field__code", flat=True)
+    )
+    return [
+        {"code": code, "title": field["title"]}
+        for code, field in fields.items()
+        if field["kind"] == "short_text"
+        and code != (entity.parent or entity).title_field
+        and code not in numbered
+        and not EntityRecord.objects.filter(entity=entity, **{f"data__{code}__isnull": False})
+        .exclude(**{f"data__{code}": ""})
+        .exists()
+    ]
+
+
+def add_number_to_surface_tables(entity, code):
+    """Show a numbered column in every configured table tab for its native page."""
+    from .surface_config import SURFACES, configuration
+
+    surface_codes = {
+        surface_code
+        for surface_code, spec in SURFACES.items()
+        if spec.get("engine") == entity.code and spec["columns"]
+    }
+    # The task page shares the ticket surface configuration.
+    surface_codes.discard("task")
+    column = f"engine:{code}"
+    for surface_code in surface_codes:
+        row, definition = configuration(entity.workspace, surface_code)
+        if column not in definition["columns"]:
+            definition["columns"].append(column)
+        for tab in definition["table_tabs"]:
+            if column not in tab["columns"]:
+                tab["columns"].append(column)
+        if row:
+            row.definition = definition
+            row.revision += 1
+            row.save(update_fields=["definition", "revision", "updated_at"])
+        else:
+            SurfaceConfiguration.objects.create(
+                workspace=entity.workspace, code=surface_code, definition=definition
+            )
 
 
 def validate_settings(entity, data, rule=None):
@@ -279,6 +330,7 @@ def create_numbering(entity, actor, data):
     )
     form.revision += 1
     form.save()
+    add_number_to_surface_tables(entity, code)
     for row in (
         EntityRecord.objects.filter(entity=entity)
         .select_related("subtype")

@@ -1804,6 +1804,14 @@
   gap: 14px;
   align-content: start;
 }
+.engine-library-list {
+  display: grid;
+  gap: 8px;
+  max-height: min(48vh, 480px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-inline-end: 4px;
+}
 .engine-design-canvas {
   background: color-mix(in srgb, var(--surface-soft) 72%, var(--surface));
 }

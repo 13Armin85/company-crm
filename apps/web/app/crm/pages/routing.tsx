@@ -1,6 +1,6 @@
 import { ErrorNotice } from "../error-state";
 import { DialogTitle } from "@headlessui/react";
-import { IdentifierBadge, ModalCore, SearchableSelect } from "@plane/ui";
+import { ModalCore, SearchableSelect } from "@plane/ui";
 import { useEffect, useState } from "react";
 import { Edit3, GitBranch, Inbox, Plus, XCircle } from "lucide-react";
 import {
@@ -83,7 +83,7 @@ export default function RoutingPage() {
               <p>قانون‌های قابل انتخاب هنگام ساخت کار پروژه.</p>
             </div>
           </header>
-          <SearchBox value={query} onChange={setQuery} placeholder="جستجوی شناسه یا نام قانون ارجاع…" />
+          <SearchBox value={query} onChange={setQuery} placeholder="جستجوی نام قانون ارجاع…" />
           <div className="table-card organization-table">
             {rulesLoading ? (
               <Skeleton rows={4} />
@@ -111,7 +111,6 @@ export default function RoutingPage() {
                           <GitBranch size={17} />
                           {rule.name}
                         </span>
-                        <IdentifierBadge value={rule.id} label="شناسه قانون ارجاع" />
                       </td>
                       <td>{rule.unitTitle}</td>
                       <td>{rule.roleName}</td>

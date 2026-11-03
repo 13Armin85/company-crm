@@ -20,6 +20,7 @@ import { useWidgetData } from "./api";
 import { DashboardCalendar } from "./calendar";
 import { TeamWidget } from "./team";
 import type { DashboardWidget } from "./types";
+import { activityEventLabel, chartLabel, chartNumber, chartTooltipValue } from "./chart-labels";
 
 const colors = ["#5865d9", "#33a187", "#e4a93a", "#d57577", "#8c76d4"];
 const displayDate = (value: unknown) =>
@@ -79,11 +80,11 @@ function DataWidget({ widget }: { widget: DashboardWidget }) {
   if (widget.type === "counter")
     return (
       <button className="dashboard-counter" onClick={() => goTable()}>
-        <strong>{String(data.value ?? 0)}</strong>
+        <strong>{chartNumber(data.value ?? 0)}</strong>
         <span>
           {data.previous === null || data.previous === undefined
             ? "باز کردن جدول"
-            : `دوره قبل: ${String(data.previous)}`}
+            : `دوره قبل: ${chartNumber(data.previous)}`}
         </span>
       </button>
     );
@@ -137,7 +138,9 @@ function DataWidget({ widget }: { widget: DashboardWidget }) {
   if (widget.type === "chart") {
     const points = Array.isArray(data.points) ? (data.points as { label: string; value: number }[]) : [];
     if (!points.length) return <div className="dashboard-empty-small">داده‌ای برای نمودار وجود ندارد.</div>;
-    const displayPoints = points.map((point) => ({ ...point, displayLabel: persianDateValue(point.label) }));
+    const labels = (data.labels || {}) as Record<string, string>;
+    const seriesLabels = (data.series_labels || {}) as Record<string, string>;
+    const displayPoints = points.map((point) => ({ ...point, displayLabel: chartLabel(point.label, labels) }));
     const variant = String(data.chart || "bar");
     const openPoint = (point: { label?: unknown }) => {
       const field = String(widget.config.group_by || "");
@@ -162,7 +165,7 @@ function DataWidget({ widget }: { widget: DashboardWidget }) {
                   <Cell fill={colors[index % colors.length]} key={index} />
                 ))}
               </Pie>
-              <Tooltip />
+              <Tooltip formatter={chartTooltipValue} />
             </PieChart>
           ) : variant === "line" ? (
             <LineChart
@@ -173,9 +176,9 @@ function DataWidget({ widget }: { widget: DashboardWidget }) {
             >
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="displayLabel" />
-              <YAxis />
-              <Tooltip />
-              <Line dataKey="value" stroke="#5865d9" strokeWidth={2} />
+              <YAxis tickFormatter={chartNumber} />
+              <Tooltip formatter={chartTooltipValue} />
+              <Line dataKey="value" name="تعداد" stroke="#5865d9" strokeWidth={2} />
             </LineChart>
           ) : (
             <BarChart
@@ -186,14 +189,20 @@ function DataWidget({ widget }: { widget: DashboardWidget }) {
             >
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="displayLabel" />
-              <YAxis />
-              <Tooltip />
+              <YAxis tickFormatter={chartNumber} />
+              <Tooltip formatter={chartTooltipValue} />
               {variant === "stacked" && Array.isArray(data.series) ? (
                 (data.series as string[]).map((name, index) => (
-                  <Bar key={name} dataKey={name} fill={colors[index % colors.length]} stackId="total" />
+                  <Bar
+                    key={name}
+                    dataKey={name}
+                    name={chartLabel(name, seriesLabels)}
+                    fill={colors[index % colors.length]}
+                    stackId="total"
+                  />
                 ))
               ) : (
-                <Bar dataKey="value" fill="#5865d9" />
+                <Bar dataKey="value" name="تعداد" fill="#5865d9" />
               )}
             </BarChart>
           )}
@@ -204,12 +213,12 @@ function DataWidget({ widget }: { widget: DashboardWidget }) {
   if (widget.type === "progress")
     return (
       <button className="dashboard-progress" onClick={() => goTable()}>
-        <strong>{String(data.value ?? 0)}٪</strong>
+        <strong>{chartNumber(data.value ?? 0)}٪</strong>
         <span>
           <i style={{ width: `${Number(data.value || 0)}%` }} />
         </span>
         <small>
-          {String(data.count ?? 0)} از {String(data.total ?? 0)}
+          {chartNumber(data.count ?? 0)} از {chartNumber(data.total ?? 0)}
         </small>
       </button>
     );
@@ -219,7 +228,7 @@ function DataWidget({ widget }: { widget: DashboardWidget }) {
         {["کمتر از یک روز", "۱ تا ۳ روز", "بیشتر از ۳ روز"].map((label, index) => (
           <button key={label} onClick={() => goTable()}>
             <span>{label}</span>
-            <strong>{String((data.buckets as number[] | undefined)?.[index] ?? 0)}</strong>
+            <strong>{chartNumber((data.buckets as number[] | undefined)?.[index] ?? 0)}</strong>
           </button>
         ))}
       </div>
@@ -245,7 +254,7 @@ function DataWidget({ widget }: { widget: DashboardWidget }) {
           ? items.map((item, index) => (
               // eslint-disable-next-line react/no-array-index-key -- activity entries have no ids.
               <div key={index}>
-                {String(item.event)} · {displayDate(item.at)}
+                {activityEventLabel(item.event)} · {displayDate(item.at)}
               </div>
             ))
           : "فعالیتی ثبت نشده است."}
@@ -272,10 +281,10 @@ function DataWidget({ widget }: { widget: DashboardWidget }) {
         <ResponsiveContainer width="100%" height={210}>
           <BarChart data={items} layout="vertical">
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis type="number" />
+            <XAxis type="number" tickFormatter={chartNumber} />
             <YAxis type="category" dataKey="name" width={90} />
-            <Tooltip />
-            <Bar dataKey="count" fill="#5865d9" />
+            <Tooltip formatter={chartTooltipValue} />
+            <Bar dataKey="count" name="تعداد" fill="#5865d9" />
           </BarChart>
         </ResponsiveContainer>
       </div>

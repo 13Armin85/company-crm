@@ -4,7 +4,9 @@ import pytest
 
 from plane.app.services.entity_schema import initialize_engine
 from plane.app.services.permission_registry import sync_permission_catalog
-from plane.db.models import EntityType, FieldDefinition, FormLayout, FormVersion, OrganizationUnit
+from plane.db.models import EntityType, FieldDefinition, FormLayout, FormVersion, OrganizationUnit, SurfaceConfiguration
+from plane.app.services.entity_numbering import add_number_to_surface_tables
+from plane.app.services.surface_config import configuration
 
 pytestmark = [pytest.mark.django_db, pytest.mark.contract]
 
@@ -107,6 +109,10 @@ def test_numbering_can_use_an_existing_empty_text_column(session_client, engine)
     form.save()
     settings = {"prefix": "C-", "start": 1, "padding": 3, "shared_sequence": True, "subtype_prefixes": {}}
 
+    candidates = session_client.get(numbering_url(workspace, "contract"))
+    assert candidates.status_code == 200, candidates.data
+    assert candidates.data["candidates"] == [{"code": "contract_no", "title": "شماره قرارداد"}]
+
     rejected = session_client.post(
         numbering_url(workspace, "contract"), {"field": "amount_due", "title": "مبلغ", **settings}, format="json"
     )
@@ -122,3 +128,26 @@ def test_numbering_can_use_an_existing_empty_text_column(session_client, engine)
     codes = [b["field"] for s in form.published.schema["sections"] for b in s["bindings"]]
     assert codes.count("contract_no") == 1
     assert FieldDefinition.objects.get(workspace=workspace, code="contract_no").config["auto_number"] is True
+    assert session_client.get(numbering_url(workspace, "contract")).data["candidates"] == []
+
+
+def test_numbering_column_appears_in_native_table_tabs(engine):
+    workspace = engine
+    entity = EntityType.objects.get(workspace=workspace, code="ticket")
+    _, definition = configuration(workspace, "ticket")
+    definition["table_tabs"] = [
+        {"id": "active", "title": "فعال", "columns": ["native:عنوان کار"]},
+        {"id": "closed", "title": "بسته", "columns": ["native:عنوان کار"]},
+    ]
+    SurfaceConfiguration.objects.update_or_create(
+        workspace=workspace, code="ticket", defaults={"definition": definition}
+    )
+
+    add_number_to_surface_tables(entity, "contract_no")
+
+    row = SurfaceConfiguration.objects.get(workspace=workspace, code="ticket")
+    assert row.definition["columns"].count("engine:contract_no") == 1
+    assert all(tab["columns"].count("engine:contract_no") == 1 for tab in row.definition["table_tabs"])
+    add_number_to_surface_tables(entity, "contract_no")
+    row.refresh_from_db()
+    assert row.definition["columns"].count("engine:contract_no") == 1

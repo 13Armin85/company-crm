@@ -22,7 +22,13 @@ import { Button } from "../components";
 import { EntityViewsPage } from "./view-page";
 import type { SavedViewList } from "./view-types";
 import { RecordSummaryDrawer } from "./record-drawer";
-import { MAIN_TABLE_TAB, TableTabPicker, useLocalTabs, useVisibleTableTabs } from "./table-tab-picker";
+import {
+  MAIN_TABLE_TAB,
+  TableTabPicker,
+  useLocalTabs,
+  useTabColumnChoices,
+  useVisibleTableTabs,
+} from "./table-tab-picker";
 
 export interface NativeField {
   code: string;
@@ -407,6 +413,7 @@ export function SurfaceTable({
   }>[];
   const [activeTab, setActiveTab] = useState("");
   const [ownTabs, setOwnTabs] = useLocalTabs(code);
+  const [columnChoicesByTab, setColumnChoicesByTab] = useTabColumnChoices(code);
   const tabs = [...(config.data?.definition.table_tabs || []), ...ownTabs];
   const tabView = useVisibleTableTabs(
     code,
@@ -418,7 +425,10 @@ export function SurfaceTable({
     activeTab && tabView.isVisible(activeTab) ? activeTab : mainVisible ? "" : visibleTabs[0]?.id || "";
   const selectedTab = tabs.find((tab) => tab.id === currentTab);
   const baseColumns = config.data?.definition.columns || headings.map((h) => `native:${textOf(h) || "عملیات"}`);
-  const columns = selectedTab?.columns || baseColumns;
+  const availableColumns = selectedTab?.columns || baseColumns;
+  const activeColumnKey = selectedTab?.id || MAIN_TABLE_TAB;
+  const hiddenColumns = columnChoicesByTab.find((item) => item.tabId === activeColumnKey)?.hidden || [];
+  const columns = availableColumns.filter((column) => !hiddenColumns.includes(column));
   const values = useSurfaceValues(code, columns.some((c) => !c.startsWith("native:")) ? rows.map(surfaceRowId) : []);
   const fields = [...(config.data?.schema.fields || []), ...(config.data?.engine_fields || [])];
   const columnChoices = [
@@ -481,13 +491,21 @@ export function SurfaceTable({
             tabs={tabs}
             hidden={tabView.hidden}
             onChange={tabView.setHidden}
-            columns={columnChoices}
-            onCreateTab={(tab) => {
-              setOwnTabs([...ownTabs, tab]);
-              setActiveTab(tab.id);
-            }}
+            activeTabTitle={selectedTab?.title || "جدول اصلی"}
+            activeColumns={availableColumns.map((id) => ({
+              id,
+              title: columnChoices.find((choice) => choice.id === id)?.title || id,
+            }))}
+            hiddenColumns={hiddenColumns}
+            onHiddenColumnsChange={(hidden) =>
+              setColumnChoicesByTab([
+                ...columnChoicesByTab.filter((item) => item.tabId !== activeColumnKey),
+                { tabId: activeColumnKey, hidden },
+              ])
+            }
             onDeleteTab={(id) => {
               setOwnTabs(ownTabs.filter((tab) => tab.id !== id));
+              setColumnChoicesByTab(columnChoicesByTab.filter((item) => item.tabId !== id));
               tabView.setHidden(tabView.hidden.filter((item) => item !== id));
             }}
           />
@@ -509,6 +527,11 @@ export function SurfaceTable({
           )}
         </div>
       </div>
+      {!columns.length && (
+        <p className="surface-table-empty-columns">
+          ستونی برای نمایش انتخاب نشده است؛ از «تب‌های من» ستون‌ها را دوباره فعال کنید.
+        </p>
+      )}
       <table {...props}>
         <thead>
           <tr>

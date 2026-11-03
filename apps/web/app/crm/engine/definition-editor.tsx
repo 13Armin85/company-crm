@@ -126,6 +126,7 @@ export function DefinitionEditor({
                     "table_visible",
                     "hidden_from_form",
                     "code",
+                    "config",
                   ].includes(key)
                 )
             )
@@ -324,7 +325,12 @@ export function DefinitionEditor({
       )}
       {kind === "fields" && (
         <>
-          {locked && <p className="engine-notice">این فیلد استفاده شده است؛ نوع و قواعد اصلی آن قابل تغییر نیستند.</p>}
+          {locked && (
+            <p className="engine-notice">
+              این فیلد استفاده شده است؛ نوع و قواعد اصلی آن ثابت می‌مانند. نام، نمایش و مقدار اولیه را می‌توانید ویرایش
+              کنید.
+            </p>
+          )}
           <SearchableSelect
             label="نوع ورودی"
             value={data.kind || "short_text"}
@@ -548,6 +554,41 @@ export function DefinitionEditor({
               lookupValues={lookupValues}
             />
           </fieldset>
+          {locked && data.kind !== "computed" && (
+            <fieldset>
+              <legend>مقدار اولیه ورودی</legend>
+              <SearchableSelect
+                label="ورودی با چه مقداری پر شود؟"
+                value={defaultMode}
+                options={[
+                  { id: "constant", title: "خالی یا یک مقدار ثابت" },
+                  { id: "current_user", title: "کاربر جاری" },
+                  { id: "today", title: "امروز" },
+                  { id: "now", title: "زمان جاری" },
+                ].filter((option) => option.id === "constant" || dynamicDefaultsFor(data.kind).includes(option.id))}
+                onChange={(mode) =>
+                  updateConfig({
+                    default_dynamic: mode === "constant" ? "" : (mode as "today" | "now" | "current_user"),
+                    default: null,
+                  })
+                }
+              />
+              {defaultMode === "constant" && (
+                <DefaultValueEditor
+                  field={{
+                    id: row?.id,
+                    code: data.code || "",
+                    kind: data.kind!,
+                    config,
+                    lookup: data.lookup,
+                    relation_entity: data.relation_entity,
+                  }}
+                  value={constant ?? null}
+                  onChange={(value) => updateConfig({ default: value })}
+                />
+              )}
+            </fieldset>
+          )}
           <fieldset>
             <legend>نمایش در جدول و جستجو</legend>
             <label className="engine-checkbox">

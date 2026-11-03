@@ -4,23 +4,53 @@ import { describe, expect, it, vi } from "vitest";
 import { EntityRules } from "./governance-settings";
 import { useUIStore } from "../store";
 
+vi.mock("@plane/ui", async () => ({
+  ...(await vi.importActual<typeof import("@plane/ui")>("@plane/ui")),
+  SearchableSelect: ({
+    label,
+    options,
+    value,
+  }: {
+    label: string;
+    options: { id: string; title: string }[];
+    value: string;
+  }) => (
+    <label>
+      {label}
+      <select value={value} onChange={() => {}}>
+        {options.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.title}
+          </option>
+        ))}
+      </select>
+    </label>
+  ),
+}));
+
 vi.mock("../api", async () => ({
   ...(await vi.importActual<typeof import("../api")>("../api")),
   useWorkspaceAccess: () => ({ data: { can: () => true } }),
 }));
 
-function renderRules(uniqueRules: unknown[], numberingRules: unknown[]) {
+function renderRules(
+  uniqueRules: unknown[],
+  numberingRules: unknown[],
+  candidates: { code: string; title: string }[] = []
+) {
   const client = new QueryClient();
   const slug = "";
   useUIStore.setState({ workspaceSlug: slug });
   const key = (name: string, path: string) => ["entity-engine", slug, name, path];
   client.setQueryData(key("catalog", "catalog/"), { entities: [] });
-  client.setQueryData(key("fields", "definitions/fields/"), []);
   client.setQueryData(key("view-schema", "entities/ticket/view-schema/"), {
     fields: [{ code: "national_id", title: "کد ملی" }],
   });
   client.setQueryData(key("unique-rules", "entities/ticket/unique-rules/"), { results: uniqueRules });
-  client.setQueryData(key("numbering-rules", "entities/ticket/numbering-rules/"), { results: numberingRules });
+  client.setQueryData(key("numbering-rules", "entities/ticket/numbering-rules/"), {
+    results: numberingRules,
+    candidates,
+  });
   const html = renderToStaticMarkup(
     <QueryClientProvider client={client}>
       <EntityRules code="ticket" />
@@ -50,5 +80,11 @@ describe("data rules designer", () => {
     expect(html).toContain("هنوز قاعده‌ای تعریف نشده است.");
     expect(html).toContain("هنوز ستون شماره‌گذاری تعریف نشده است.");
     expect(html).toContain("پیش‌نمایش شماره‌دهی");
+  });
+
+  it("offers the current form's empty columns without requiring field-library access", () => {
+    const html = renderRules([], [], [{ code: "contract_no", title: "شماره قرارداد" }]);
+    expect(html).toContain("شماره قرارداد");
+    expect(html).not.toContain("ستون متن کوتاه خالی در این فرم وجود ندارد");
   });
 });

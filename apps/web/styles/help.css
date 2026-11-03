@@ -1,0 +1,90 @@
+.crm-help {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-bottom: 48px;
+}
+.crm-help-intro {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  padding: 24px;
+  margin: 20px 0;
+  border-radius: 18px;
+  color: var(--text-primary);
+  background: linear-gradient(115deg, color-mix(in srgb, var(--accent) 13%, var(--surface)), var(--surface));
+  border: 1px solid var(--border);
+}
+.crm-help-intro > svg {
+  flex: none;
+  color: var(--accent);
+}
+.crm-help-intro h2,
+.crm-help-card h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.crm-help-intro p,
+.crm-help-card p {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  line-height: 1.9;
+}
+.crm-help-index {
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.crm-help-index a,
+.crm-help-links a {
+  color: var(--accent);
+  text-decoration: none;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 7px 13px;
+  background: var(--surface);
+}
+.crm-help-index a:hover,
+.crm-help-links a:hover {
+  border-color: var(--accent);
+  background: var(--surface-soft);
+}
+.crm-help-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.crm-help-card {
+  scroll-margin-top: 24px;
+  padding: 23px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+}
+.crm-help-card-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-primary);
+}
+.crm-help-card-heading svg {
+  color: var(--accent);
+}
+.crm-help-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 20px;
+}
+.crm-help-footer {
+  margin-top: 22px;
+  color: var(--text-secondary);
+}
+@media (max-width: 700px) {
+  .crm-help-grid {
+    grid-template-columns: 1fr;
+  }
+  .crm-help-card {
+    padding: 18px;
+  }
+}

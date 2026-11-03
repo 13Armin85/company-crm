@@ -97,29 +97,45 @@ describe("native form customization", () => {
     };
     client.setQueryData(["entity-engine", slug, "surface", "surfaces/roles/"], data);
     client.setQueryData(["entity-engine", slug, "surface-values", "roles", id], { [id]: { score: 7 } });
-    const html = renderToStaticMarkup(
-      <QueryClientProvider client={client}>
-        <MemoryRouter>
-          <SurfaceTable code="roles">
-            <thead>
-              <tr>
-                <th>نام نقش</th>
-                <th>توضیح</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr key={id}>
-                <td>پشتیبانی</td>
-                <td>متن مخفی جدول</td>
-              </tr>
-            </tbody>
-          </SurfaceTable>
-        </MemoryRouter>
-      </QueryClientProvider>
-    );
+    const renderTable = () =>
+      renderToStaticMarkup(
+        <QueryClientProvider client={client}>
+          <MemoryRouter>
+            <SurfaceTable code="roles">
+              <thead>
+                <tr>
+                  <th>نام نقش</th>
+                  <th>توضیح</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr key={id}>
+                  <td>پشتیبانی</td>
+                  <td>متن مخفی جدول</td>
+                </tr>
+              </tbody>
+            </SurfaceTable>
+          </MemoryRouter>
+        </QueryClientProvider>
+      );
+    const html = renderTable();
     expect(html).toContain("<td>7</td>");
     expect(html.indexOf("امتیاز")).toBeLessThan(html.indexOf("نام نقش"));
     expect(html).not.toContain("متن مخفی جدول");
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) =>
+        key === "crm-table-tabs:roles:columns"
+          ? JSON.stringify([{ tabId: "__main__", hidden: ["field:score"] }])
+          : null,
+    });
+    try {
+      const filtered = renderTable();
+      expect(filtered).not.toContain("<th>امتیاز</th>");
+      expect(filtered).not.toContain("<td>7</td>");
+      expect(filtered).toContain("<th>نام نقش</th>");
+    } finally {
+      vi.unstubAllGlobals();
+    }
     client.clear();
   });
 });

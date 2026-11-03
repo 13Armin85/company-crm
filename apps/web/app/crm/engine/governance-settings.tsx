@@ -5,7 +5,6 @@ import { SearchableSelect } from "@plane/ui";
 import { Button } from "../components";
 import { errorMessage, useWorkspaceAccess } from "../api";
 import { useEngineCatalog, useEngineQuery, useEngineMutation } from "./api";
-import type { FieldDefinition } from "./api";
 
 type UniqueRule = {
   id: string;
@@ -31,7 +30,6 @@ export function EntityRules({ code, mode: panel = "all" }: { code: string; mode?
   const { data: access } = useWorkspaceAccess();
   const mutation = useEngineMutation();
   const catalog = useEngineCatalog();
-  const fields = useEngineQuery<FieldDefinition[]>("fields", "definitions/fields/", Boolean(access?.can("Field.View")));
   const schema = useEngineQuery<{ fields: { code: string; title: string }[] }>(
     "view-schema",
     `entities/${code}/view-schema/`
@@ -41,7 +39,7 @@ export function EntityRules({ code, mode: panel = "all" }: { code: string; mode?
     `entities/${code}/unique-rules/`,
     Boolean(access?.can("UniqueRule.Manage"))
   );
-  const numbering = useEngineQuery<{ results: NumberingRule[] }>(
+  const numbering = useEngineQuery<{ results: NumberingRule[]; candidates: { code: string; title: string }[] }>(
     "numbering-rules",
     `entities/${code}/numbering-rules/`,
     Boolean(access?.can("NumberingRule.Manage"))
@@ -88,15 +86,7 @@ export function EntityRules({ code, mode: panel = "all" }: { code: string; mode?
   };
   const entity = catalog.data?.entities.find((candidate) => candidate.code === code);
   const subtypes = (catalog.data?.entities || []).filter((candidate) => candidate.parent === entity?.id);
-  const numbered = new Set(numbering.data?.results.map((rule) => rule.field));
-  // Only empty text columns of this form can carry automatic numbers.
-  const numberableColumns = (schema.data?.fields || []).filter(
-    (field) =>
-      !field.code.includes(".") &&
-      field.code !== entity?.title_field &&
-      !numbered.has(field.code) &&
-      fields.data?.find((definition) => definition.code === field.code)?.kind === "short_text"
-  );
+  const numberableColumns = numbering.data?.candidates || [];
   const [newColumn, setNewColumn] = useState(false);
   return (
     <div className="engine-rules-layout">
@@ -322,6 +312,9 @@ export function EntityRules({ code, mode: panel = "all" }: { code: string; mode?
                 </div>
               </div>
               <div className="engine-rules-fields">
+                {!editing && !numberableColumns.length && !numbering.isLoading && (
+                  <p>ستون متن کوتاه خالی در این فرم وجود ندارد؛ می‌توانید ستون جدید بسازید.</p>
+                )}
                 {editing ? (
                   <div className="engine-rules-column-readonly">
                     <span>ستون</span>
@@ -475,7 +468,20 @@ export function EntityRules({ code, mode: panel = "all" }: { code: string; mode?
                             path: `entities/${code}/numbering-rules/`,
                             data: { ...number, confirmation_token: preview.confirmation_token },
                           })
-                          .then(() => setPreview(null))
+                          .then(() => {
+                            setPreview(null);
+                            setNewColumn(false);
+                            setNumber({
+                              field: "",
+                              title: "",
+                              prefix: "",
+                              start: 1,
+                              padding: 4,
+                              shared_sequence: true,
+                              subtype_prefixes: {},
+                            });
+                            return null;
+                          })
                           .catch(() => {});
                     }}
                   >

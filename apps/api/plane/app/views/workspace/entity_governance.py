@@ -20,6 +20,7 @@ from plane.app.services.entity_views import make_query, personal_view_limit
 from .entity import EngineAPIView
 from plane.app.services.entity_numbering import (
     rule_payload,
+    numberable_columns,
     validate_settings,
     preview_backfill,
     create_numbering,
@@ -197,7 +198,8 @@ class EngineNumberingEndpoint(EngineAPIView):
                 "results": [
                     rule_payload(rule)
                     for rule in entity.numbering_rules.select_related("field")
-                ]
+                ],
+                "candidates": numberable_columns(entity),
             }
         )
 

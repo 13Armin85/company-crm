@@ -188,9 +188,16 @@ class FieldDefinitionSerializer(ScopedDefinitionSerializer):
                 raise serializers.ValidationError("تنظیمات این ستون از بخش شماره‌گذاری یا ارتباط مدیریت می‌شود.")
         if self.instance and self.instance.used_at:
             changed = {key for key, value in attrs.items() if value != getattr(self.instance, key)}
+            if "config" in changed:
+                previous = self.instance.config or {}
+                updated = attrs["config"] or {}
+                previous_rules = {key: value for key, value in previous.items() if key not in {"default", "default_dynamic"}}
+                updated_rules = {key: value for key, value in updated.items() if key not in {"default", "default_dynamic"}}
+                if previous_rules == updated_rules:
+                    changed.remove("config")
             if changed - DISPLAY_SETTINGS:
                 raise serializers.ValidationError(
-                    "این فیلد استفاده شده است؛ فقط عنوان، تنظیمات نمایشی و وضعیت فعالیت قابل تغییر هستند."
+                    "این فیلد استفاده شده است؛ فقط عنوان، تنظیمات نمایشی و مقدار اولیه قابل تغییر هستند."
                 )
         kind = attrs.get("kind", self.instance.kind if self.instance else None)
         config = attrs.get("config", self.instance.config if self.instance else {})

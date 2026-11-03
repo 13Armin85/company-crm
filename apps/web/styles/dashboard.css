@@ -579,6 +579,25 @@ body:has(.dashboard-overlay) .selector-single-options {
   --dashboard-shadow: 0 12px 34px rgb(15 23 42 / 5%);
   min-width: 0;
 }
+:root[data-theme="dark"] .custom-dashboard {
+  --surface: #15181e;
+  --surface-soft: #1a1e25;
+  --border: #262b35;
+  --text-primary: #f3f4f6;
+  --text-secondary: #c3c7ce;
+  --text-muted: #7b8491;
+  --dashboard-border: color-mix(in srgb, var(--accent) 13%, var(--border));
+  --dashboard-shadow: 0 12px 34px rgb(0 0 0 / 24%);
+  color: var(--text-primary);
+  color-scheme: dark;
+}
+:root[data-theme="dark"] .custom-dashboard select option {
+  background: var(--surface);
+  color: var(--text-primary);
+}
+:root[data-theme="dark"] .page-content:has(> .custom-dashboard) {
+  background: #0f1115;
+}
 .custom-dashboard .page-header {
   min-height: 174px;
   padding: clamp(24px, 3vw, 36px);
@@ -616,6 +635,43 @@ body:has(.dashboard-overlay) .selector-single-options {
 .dashboard-actions {
   max-width: 100%;
   gap: 8px;
+}
+.dashboard-role-picker {
+  position: relative;
+  display: grid;
+  gap: 3px;
+  min-width: 185px;
+  padding: 5px 11px 5px 30px;
+  border: 1px solid var(--dashboard-border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 4px 14px rgb(15 23 42 / 5%);
+}
+.dashboard-role-picker > span {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+.custom-dashboard .dashboard-role-picker > select {
+  width: 100%;
+  min-height: 22px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-weight: 650;
+  appearance: none;
+  cursor: pointer;
+}
+.dashboard-role-picker > svg {
+  position: absolute;
+  inset-inline-end: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--text-secondary);
+}
+.dashboard-role-picker:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .dashboard-actions .button {
   min-height: 40px;
@@ -1238,7 +1294,7 @@ body:has(.dashboard-overlay) .selector-single-options {
     padding: 2px;
     font-size: 8px;
   }
-  .dashboard-actions > select,
+  .dashboard-actions > .dashboard-role-picker,
   .dashboard-actions > .button,
   .dashboard-editbar > .button {
     width: 100%;

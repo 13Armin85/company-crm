@@ -115,6 +115,16 @@ def _table_display_values(payload, query, request, workspace):
     return payload
 
 
+def _chart_labels(query, path, values):
+    from .entity_view_export import value_labels
+
+    records = [{"values": {path: value}} for value in values]
+    return {
+        key: item["title"]
+        for key, item in value_labels(query, records).get(path, {}).items()
+    }
+
+
 def widget_data(widget, request, workspace):
     kind = widget.get("type")
     if kind not in WIDGETS:
@@ -190,13 +200,17 @@ def widget_data(widget, request, workspace):
             stack_alias = query.scalar(stack)
             grouped = query.rows.order_by().values(alias, stack_alias).annotate(count=Count("id")).order_by(alias, stack_alias)[:500]
             points, series = {}, set()
+            group_values, stack_values = [], []
             for row in grouped:
-                label, category = str(json_value(row[alias]) or "بدون مقدار"), str(json_value(row[stack_alias]) or "بدون مقدار")
+                group_value, stack_value = json_value(row[alias]), json_value(row[stack_alias])
+                group_values.append(group_value)
+                stack_values.append(stack_value)
+                label, category = str(group_value or "بدون مقدار"), str(stack_value or "بدون مقدار")
                 points.setdefault(label, {"label": label})[category] = row["count"]
                 series.add(category)
-            return {"type": kind, "chart": "stacked", "points": list(points.values())[:30], "series": sorted(series), "drilldown": {"entity": entity.code, "view_id": config.get("view_id")}}
+            return {"type": kind, "chart": "stacked", "points": list(points.values())[:30], "series": sorted(series), "labels": _chart_labels(query, path, group_values), "series_labels": _chart_labels(query, stack, stack_values), "drilldown": {"entity": entity.code, "view_id": config.get("view_id")}}
         values = list(query.rows.order_by().values(alias).annotate(count=Count("id")).order_by("-count")[:30])
-        return {"type": kind, "chart": config.get("chart", "bar"), "points": [{"label": json_value(row[alias]), "value": row["count"]} for row in values], "drilldown": {"entity": entity.code, "view_id": config.get("view_id")}}
+        return {"type": kind, "chart": config.get("chart", "bar"), "points": [{"label": json_value(row[alias]), "value": row["count"]} for row in values], "labels": _chart_labels(query, path, [json_value(row[alias]) for row in values]), "drilldown": {"entity": entity.code, "view_id": config.get("view_id")}}
     if kind == "progress":
         from .entity_rules import condition_fields
 

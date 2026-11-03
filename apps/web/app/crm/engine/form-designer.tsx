@@ -340,7 +340,6 @@ export function FormDesigner({
               .filter(
                 (field) =>
                   field.is_active &&
-                  (attached.has(field.code) || inheritedCodes.has(field.code)) &&
                   normalizePersianSearch(field.title + field.code).includes(normalizePersianSearch(query))
               )
               .map((field) => (
@@ -349,7 +348,13 @@ export function FormDesigner({
                     <strong>{field.title}</strong>
                     <small dir="ltr">{field.code}</small>
                   </div>
-                  <span>{inheritedCodes.has(field.code) ? "از فرم اصلی" : "در فرم"}</span>
+                  <span>
+                    {inheritedCodes.has(field.code)
+                      ? "از فرم اصلی"
+                      : attached.has(field.code)
+                        ? "در فرم"
+                        : "آماده افزودن"}
+                  </span>
                   {access?.can("Field.Edit") && (
                     <Button variant="secondary" onClick={() => setEditingField(field)}>
                       ویرایش
@@ -363,9 +368,7 @@ export function FormDesigner({
                 </article>
               ))}
           </div>
-          {!fields.some((field) => field.is_active && (attached.has(field.code) || inheritedCodes.has(field.code))) && (
-            <p>هنوز ورودی‌ای به این فرم وصل نشده است. از «ورودی جدید» یا کتابخانهٔ بخش چیدمان استفاده کنید.</p>
-          )}
+          {!fields.some((field) => field.is_active) && <p>هنوز ورودی‌ای تعریف نشده است. از «ورودی جدید» شروع کنید.</p>}
         </section>
       )}
       <div hidden={viewMode !== "layout"}>
@@ -389,26 +392,28 @@ export function FormDesigner({
                   ساخت ورودی جدید
                 </Button>
               )}
-              {fields
-                .filter(
-                  (f) =>
-                    f.is_active &&
-                    !attached.has(f.code) &&
-                    !inheritedCodes.has(f.code) &&
-                    normalizePersianSearch(f.title + f.code).includes(normalizePersianSearch(query))
-                )
-                .map((field) => (
-                  <button
-                    className="engine-library-field"
-                    key={field.id}
-                    type="button"
-                    onClick={() => addField(field.code)}
-                  >
-                    <span>{field.title}</span>
-                    <small>افزودن به فرم</small>
-                    <b>＋</b>
-                  </button>
-                ))}
+              <div className="engine-library-list">
+                {fields
+                  .filter(
+                    (f) =>
+                      f.is_active &&
+                      !attached.has(f.code) &&
+                      !inheritedCodes.has(f.code) &&
+                      normalizePersianSearch(f.title + f.code).includes(normalizePersianSearch(query))
+                  )
+                  .map((field) => (
+                    <button
+                      className="engine-library-field"
+                      key={field.id}
+                      type="button"
+                      onClick={() => addField(field.code)}
+                    >
+                      <span>{field.title}</span>
+                      <small>افزودن به فرم</small>
+                      <b>＋</b>
+                    </button>
+                  ))}
+              </div>
               {inheritedCodes.size > 0 && (
                 <p className="engine-notice">
                   فیلدهای مشترک از فرم {parent?.title} به ارث می‌رسند و در فرم اصلی ویرایش می‌شوند.

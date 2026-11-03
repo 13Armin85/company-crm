@@ -857,50 +857,46 @@ input[data-secret="true"] {
   background: color-mix(in srgb, var(--red) 12%, transparent);
   color: var(--red);
 }
-.table-tab-creator {
+.table-tab-active-columns {
   display: grid;
-  gap: 8px;
+  gap: 7px;
   margin-top: 10px;
   padding-top: 10px;
   border-top: 1px solid var(--border);
 }
-.table-tab-creator > strong {
+.table-tab-active-columns > strong {
   font-size: 13px;
 }
-.table-tab-creator > small {
+.table-tab-active-columns > small {
   color: var(--text-muted);
   font-size: 11.5px;
   line-height: 1.7;
 }
-.table-tab-creator > input {
-  min-height: 36px;
-  padding: 6px 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--text-primary);
-  font-size: 12.5px;
-}
-.table-tab-creator > input:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
-}
-.table-tab-creator-columns {
+.table-tab-active-column-list {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 2px 8px;
-  max-height: 180px;
+  max-height: 190px;
   overflow-y: auto;
 }
-.table-tab-picker-panel .table-tab-creator-columns label {
+.table-tab-picker-panel .table-tab-active-column-list label {
+  min-width: 0;
   min-height: 32px;
   padding: 4px 6px;
   font-size: 12px;
 }
-:root .table-tab-creator .button {
-  min-height: 36px;
-  font-size: 12.5px;
+.table-tab-active-column-list span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.surface-table-empty-columns {
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  background: var(--surface-soft);
 }
 .surface-table-tabbar > .surface-table-tabs:empty {
   display: none;

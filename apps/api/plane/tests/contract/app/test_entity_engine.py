@@ -199,6 +199,25 @@ def test_configuration_only_crud_defaults_events_and_partial_update(engine):
     )
 
 
+def test_used_default_field_allows_new_initial_value_but_keeps_rules_locked(engine):
+    workspace, _, client = engine
+    entity, _ = make_entity(
+        engine, [{"code": "amount", "title": "مبلغ", "kind": "integer", "config": {"min": 0, "default": 3}}]
+    )
+    first = create_record(engine, entity, {"title": "اول"})
+    field = FieldDefinition.objects.get(workspace=workspace, code="amount")
+    assert field.used_at is not None
+
+    url = endpoint(workspace, f"definitions/fields/{field.id}/")
+    response = client.patch(url, {"config": {"min": 0, "default": 7}}, format="json")
+    assert response.status_code == 200, response.data
+    assert first["values"]["amount"] == 3
+    assert create_record(engine, entity, {"title": "دوم"})["values"]["amount"] == 7
+
+    response = client.patch(url, {"config": {"min": -10, "default": 7}}, format="json")
+    assert response.status_code == 400, response.data
+
+
 def test_conditional_required_visibility_and_validation_cannot_be_bypassed(engine):
     entity, _ = make_entity(
         engine,
