@@ -479,9 +479,22 @@
   color: var(--accent);
   box-shadow: 0 1px 3px rgb(15 23 42 / 10%);
 }
-:root .schema-picker-trigger {
+:root .schema-field :is(.selector-input-row, .selector-trigger, .schema-tag-input) {
   min-height: var(--form-control-height);
   border-radius: var(--form-radius);
+}
+/* The text box inside a select row or tag box is borderless; the row draws the control frame. */
+:root
+  .schema-form
+  .schema-field
+  :is(.selector-input-row, .schema-tag-input)
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="color"]) {
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
 }
 
 /* ---------- Modals ---------- */

@@ -123,67 +123,106 @@
   color: var(--accent);
   border-bottom: 2px solid var(--accent);
 }
+/* Option fields reuse the shared SearchableSelect / CompactMultiSelector look. */
 .schema-picker {
-  position: relative;
   min-width: 0;
 }
-.schema-picker-trigger {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  text-align: start;
-  padding-inline-end: 40px;
-  gap: 8px;
-  overflow-wrap: anywhere;
+.schema-field .selector-input-row,
+.schema-field .selector-trigger {
+  min-height: 46px;
 }
-.schema-picker-trigger > span {
-  flex-shrink: 0;
+.schema-field .selector-input-row:focus-within {
+  outline: 2px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-color: var(--accent);
 }
-.schema-clear {
-  position: absolute;
-  inset-inline-end: 22px;
-  top: 12px;
+.schema-field.has-error .selector-input-row,
+.schema-field.has-error .selector-trigger,
+.schema-field.has-error .schema-tag-input {
+  border-color: var(--schema-error, #dc2626);
+}
+.schema-field .selector-input-row input:not([type="checkbox"]) {
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  outline: none;
+}
+.schema-field .selector-input-row:has(input:disabled),
+.schema-field .selector-trigger:disabled {
+  background: var(--surface-soft);
+  opacity: 0.8;
+  cursor: default;
+}
+.schema-field .selector-input-row button {
   border: 0;
   background: transparent;
+  color: var(--text-secondary);
   cursor: pointer;
+}
+.schema-picker-multi {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.schema-picker-multi .selector-selected {
+  margin: 0;
+}
+.schema-picker-multi .selector-selected button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.schema-picker-status {
+  padding: 8px;
+  font-size: 12px;
   color: var(--text-secondary);
 }
-.schema-picker-panel {
-  position: absolute;
-  z-index: 30;
+.schema-picker-more {
   width: 100%;
-  min-width: min(180px, 100%);
-  max-width: 100%;
-  top: 100%;
-  margin-top: 4px;
   padding: 8px;
-  background: var(--surface);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-}
-.schema-picker-panel [role="listbox"] {
-  max-height: 220px;
-  overflow-y: auto;
-}
-.schema-picker-panel button {
-  display: block;
-  width: 100%;
-  text-align: start;
   border: 0;
   background: transparent;
+  color: var(--accent);
+  font-size: 12px;
   cursor: pointer;
-  border-radius: 6px;
-  padding: 9px;
-  font-size: 12px;
 }
-.schema-picker-panel button:hover,
-.schema-picker-panel button[aria-selected="true"] {
-  background: var(--surface-soft);
+.schema-tag-input {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 46px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-sizing: border-box;
 }
-.schema-picker-panel p {
-  padding: 8px;
-  font-size: 12px;
+.schema-tag-input:focus-within {
+  outline: 2px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-color: var(--accent);
+}
+.schema-tag-input .selector-selected {
+  display: contents;
+}
+.schema-tag-input .selector-selected button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.schema-field .schema-tag-input input:not([type="checkbox"]) {
+  flex: 1;
+  width: auto;
+  min-width: 120px;
+  min-height: 0;
+  padding: 4px;
+  border: 0;
+  background: transparent;
+  outline: none;
 }
 .schema-date-range {
   display: grid;

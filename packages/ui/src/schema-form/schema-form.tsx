@@ -1,26 +1,28 @@
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  Combobox,
+  ComboboxButton,
+  ComboboxInput,
+  ComboboxOption,
+  ComboboxOptions,
+  Popover,
+  PopoverButton,
+  PopoverPanel,
+} from "@headlessui/react";
 import { ErrorNotice } from "../error-notice";
 import type { CSSProperties } from "react";
 import { PersianDatePicker, PersianDateTimePicker } from "../form-fields/persian-date-picker";
 import { fieldRequired, fieldVisible, formDisplayValues } from "./rules";
 import type { FieldValue, SchemaField, SchemaFormProps, SchemaOption } from "./types";
 
-function OptionField({
-  field,
-  value,
-  parent,
-  disabled,
-  loadOptions,
-  onChange,
-}: {
-  field: SchemaField;
-  value: FieldValue | undefined;
-  parent?: string;
-  disabled: boolean;
-  loadOptions: SchemaFormProps["loadOptions"];
-  onChange: (value: FieldValue) => void;
-}) {
-  const [open, setOpen] = useState(false),
+/** Server-backed option list shared by the single and multi option inputs. */
+function useOptionSource(
+  field: SchemaField,
+  loadOptions: SchemaFormProps["loadOptions"],
+  parent: string | undefined,
+  selected: string[]
+) {
+  const [active, setActive] = useState(false),
     [query, setQuery] = useState(""),
     [page, setPage] = useState(1);
   const [options, setOptions] = useState<SchemaOption[]>([]),
@@ -28,13 +30,16 @@ function OptionField({
   const [count, setCount] = useState(0),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
-  const multiple = field.kind === "multi_select" || Boolean(field.config.multiple);
-  const selected = Array.isArray(value) ? value : value ? [String(value)] : [];
   const selectedKey = selected.join(",");
+  // The form rebuilds field objects (and some callers the loader) on every render; key requests on stable values.
+  const latest = useRef({ field, loadOptions });
+  latest.current = { field, loadOptions };
+  const hasLoader = Boolean(loadOptions);
   useEffect(() => {
-    if (!loadOptions || !selectedKey) return;
+    const { field: current, loadOptions: load } = latest.current;
+    if (!load || !selectedKey) return;
     let live = true;
-    void loadOptions(field, "", 1, parent, selectedKey.split(","), true)
+    void load(current, "", 1, parent, selectedKey.split(","), true)
       // eslint-disable-next-line promise/always-return -- only updates local labels.
       .then((data) => {
         if (live) setLabels((old) => ({ ...old, ...Object.fromEntries(data.results.map((r) => [r.id, r.title])) }));
@@ -43,14 +48,16 @@ function OptionField({
     return () => {
       live = false;
     };
-  }, [field, loadOptions, parent, selectedKey]);
+  }, [field.code, hasLoader, parent, selectedKey]);
   useEffect(() => {
-    if (!open || !loadOptions) return;
+    if (!active || !hasLoader) return;
     let live = true;
     const timer = window.setTimeout(() => {
+      const { field: current, loadOptions: load } = latest.current;
+      if (!load) return;
       setBusy(true);
       setError("");
-      void loadOptions(field, query, page, parent)
+      void load(current, query, page, parent)
         // eslint-disable-next-line promise/always-return -- only updates local options.
         .then((data) => {
           if (!live) return;
@@ -71,91 +78,294 @@ function OptionField({
       live = false;
       window.clearTimeout(timer);
     };
-  }, [field, loadOptions, open, page, parent, query]);
+  }, [field.code, hasLoader, active, page, parent, query]);
+  return {
+    options,
+    busy,
+    error,
+    query,
+    hasMore: options.length < count,
+    activate: () => setActive(true),
+    search: (text: string) => {
+      setQuery(text);
+      setPage(1);
+    },
+    more: () => setPage((current) => current + 1),
+    label: (id: string) => labels[id] || "انتخاب ثبت‌شده",
+  };
+}
+
+function OptionStatus({ source }: { source: ReturnType<typeof useOptionSource> }) {
   return (
-    <div className="schema-picker">
-      <button
-        type="button"
-        className="schema-picker-trigger"
-        disabled={disabled}
-        aria-label={field.title}
-        aria-expanded={open}
-        onClick={() => {
-          setOpen(!open);
-          setPage(1);
-        }}
-      >
-        {selected.length
-          ? selected.map((id) => labels[id] || "انتخاب ثبت‌شده").join("، ")
-          : field.placeholder || "انتخاب…"}
-        <span aria-hidden>⌄</span>
-      </button>
-      {selected.length > 0 && !disabled && (
+    <>
+      {source.busy && (
+        <p role="status" className="schema-picker-status">
+          در حال دریافت…
+        </p>
+      )}
+      <ErrorNotice message={source.error} />
+      {!source.busy && !source.error && source.options.length === 0 && (
+        <p role="status" className="schema-picker-status">
+          {source.query ? "نتیجه‌ای یافت نشد." : "گزینه‌ای برای انتخاب وجود ندارد."}
+        </p>
+      )}
+      {source.hasMore && (
         <button
           type="button"
-          className="schema-clear"
-          aria-label={`پاک کردن ${field.title}`}
-          onClick={() => onChange(multiple ? [] : null)}
+          className="schema-picker-more"
+          disabled={source.busy}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={source.more}
         >
-          ×
+          نمایش بیشتر
         </button>
       )}
-      {open && (
-        <div className="schema-picker-panel">
-          <input
-            // eslint-disable-next-line jsx-a11y/no-autofocus -- the picker opens on demand and starts at its search box.
-            autoFocus
-            aria-label={`جستجوی ${field.title}`}
-            value={query}
-            placeholder="جستجو…"
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setPage(1);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") setOpen(false);
-            }}
-          />
-          <div role="listbox" aria-label={field.title} aria-multiselectable={multiple}>
-            {options.map((option) => (
+    </>
+  );
+}
+
+/** Single choice renders like SearchableSelect; multiple choice like CompactMultiSelector. */
+function OptionField({
+  id,
+  field,
+  value,
+  parent,
+  disabled,
+  invalid,
+  loadOptions,
+  onChange,
+}: {
+  id: string;
+  field: SchemaField;
+  value: FieldValue | undefined;
+  parent?: string;
+  disabled: boolean;
+  invalid: boolean;
+  loadOptions: SchemaFormProps["loadOptions"];
+  onChange: (value: FieldValue) => void;
+}) {
+  const multiple = field.kind === "multi_select" || Boolean(field.config.multiple);
+  const selected = Array.isArray(value) ? value : value ? [String(value)] : [];
+  const source = useOptionSource(field, loadOptions, parent, selected);
+  if (!multiple)
+    return (
+      <div className="searchable-select schema-picker" onFocusCapture={source.activate}>
+        <Combobox
+          value={selected[0] ?? null}
+          onChange={(next: string | null) => {
+            if (next !== null) onChange(next);
+          }}
+          disabled={disabled}
+          onClose={() => source.search("")}
+        >
+          <div className="selector-input-row">
+            <ComboboxInput
+              id={id}
+              aria-label={field.title}
+              aria-invalid={invalid}
+              aria-describedby={`${id}-help`}
+              placeholder={field.placeholder || "انتخاب…"}
+              displayValue={(current: string | null) => (current ? source.label(current) : "")}
+              onChange={(event) => source.search(event.target.value)}
+            />
+            {selected.length > 0 && !disabled && (
               <button
-                key={option.id}
                 type="button"
-                role="option"
-                aria-selected={selected.includes(option.id)}
-                disabled={option.disabled}
-                onClick={() => {
-                  onChange(
-                    multiple
-                      ? selected.includes(option.id)
-                        ? selected.filter((v) => v !== option.id)
-                        : [...selected, option.id]
-                      : option.id
-                  );
-                  if (!multiple) setOpen(false);
-                }}
+                className="schema-clear"
+                aria-label={`پاک کردن ${field.title}`}
+                onClick={() => onChange(null)}
               >
-                <span style={{ color: option.color }}>
-                  {selected.includes(option.id) ? "✓ " : ""}
-                  {option.title}
-                </span>
-                {option.disabled && " (غیرفعال)"}
+                ×
               </button>
-            ))}
+            )}
+            <ComboboxButton type="button" aria-label={`باز کردن ${field.title}`} onClick={source.activate}>
+              ⌄
+            </ComboboxButton>
           </div>
-          {busy && <p role="status">در حال دریافت…</p>}
-          <ErrorNotice message={error} />
-          {!busy && !error && options.length === 0 && <p>گزینه‌ای یافت نشد.</p>}
-          {options.length < count && (
-            <button type="button" disabled={busy} onClick={() => setPage(page + 1)}>
-              نمایش بیشتر
-            </button>
-          )}
-          <button type="button" onClick={() => setOpen(false)}>
-            بستن
-          </button>
+          <ComboboxOptions
+            className="selector-panel selector-single-options"
+            anchor="bottom start"
+            portal
+            modal={false}
+            dir="rtl"
+          >
+            {source.options.map((option) => (
+              <ComboboxOption
+                key={option.id}
+                value={option.id}
+                disabled={option.disabled}
+                className="selector-single-option"
+              >
+                <span style={{ color: option.color }}>{option.title}</span>
+                {option.disabled && " (غیرفعال)"}
+              </ComboboxOption>
+            ))}
+            <OptionStatus source={source} />
+          </ComboboxOptions>
+        </Combobox>
+      </div>
+    );
+  const toggle = (optionId: string, checked: boolean) =>
+    onChange(checked ? [...new Set([...selected, optionId])] : selected.filter((v) => v !== optionId));
+  return (
+    <fieldset className="compact-selector schema-picker schema-picker-multi" disabled={disabled}>
+      {selected.length > 0 && (
+        <div className="selector-selected" aria-label="انتخاب‌های فعلی">
+          {selected.map((optionId) => (
+            <span key={optionId}>
+              {source.label(optionId)}
+              {!disabled && (
+                <button
+                  type="button"
+                  aria-label={`حذف انتخاب ${source.label(optionId)}`}
+                  onClick={() => toggle(optionId, false)}
+                >
+                  ×
+                </button>
+              )}
+            </span>
+          ))}
         </div>
       )}
+      <Popover>
+        <PopoverButton
+          id={id}
+          type="button"
+          className="selector-trigger"
+          aria-label={field.title}
+          aria-invalid={invalid}
+          aria-describedby={`${id}-help`}
+          disabled={disabled}
+          onClick={source.activate}
+        >
+          <span>{field.placeholder || `انتخاب ${field.title}`}</span>
+          <span>
+            {selected.length.toLocaleString("fa-IR")} انتخاب <span aria-hidden>⌄</span>
+          </span>
+        </PopoverButton>
+        <PopoverPanel
+          className="selector-panel selector-multi-options"
+          focus={false}
+          anchor="bottom start"
+          portal
+          dir="rtl"
+        >
+          <label className="selector-search">
+            <span className="sr-only">جستجو در {field.title}</span>
+            <input
+              type="search"
+              placeholder="جستجو…"
+              value={source.query}
+              onChange={(event) => source.search(event.target.value)}
+            />
+          </label>
+          <div className="selector-toolbar">
+            <button
+              type="button"
+              onClick={() =>
+                onChange([
+                  ...new Set([...selected, ...source.options.filter((option) => !option.disabled).map((o) => o.id)]),
+                ])
+              }
+            >
+              انتخاب نتایج
+            </button>
+            <button
+              type="button"
+              onClick={() => onChange(selected.filter((v) => !source.options.some((option) => option.id === v)))}
+            >
+              پاک کردن نتایج
+            </button>
+          </div>
+          <div className="selector-options" role="group" aria-label={field.title}>
+            {source.options.map((option) => (
+              <label key={option.id} className="selector-option">
+                <input
+                  type="checkbox"
+                  checked={selected.includes(option.id)}
+                  disabled={Boolean(option.disabled) && !selected.includes(option.id)}
+                  onChange={(event) => toggle(option.id, event.target.checked)}
+                />
+                <span style={{ color: option.color }}>
+                  {option.title}
+                  {option.disabled && <small>غیرفعال</small>}
+                </span>
+              </label>
+            ))}
+          </div>
+          <OptionStatus source={source} />
+        </PopoverPanel>
+      </Popover>
+    </fieldset>
+  );
+}
+
+/** Tags are typed as chips: Enter or a comma adds one, so spaces inside a tag are kept. */
+function TagField({
+  id,
+  field,
+  value,
+  disabled,
+  invalid,
+  onChange,
+}: {
+  id: string;
+  field: SchemaField;
+  value: FieldValue | undefined;
+  disabled: boolean;
+  invalid: boolean;
+  onChange: (value: FieldValue) => void;
+}) {
+  const [draft, setDraft] = useState("");
+  const tags = Array.isArray(value) ? value : [];
+  const commit = (text: string) => {
+    const added = text
+      .split(/[,،]/)
+      .map((v) => v.trim())
+      .filter(Boolean);
+    if (added.length) onChange([...new Set([...tags, ...added])]);
+    setDraft("");
+  };
+  return (
+    <div className="schema-tag-input">
+      {tags.length > 0 && (
+        <div className="selector-selected" aria-label="تگ‌های فعلی">
+          {tags.map((tag) => (
+            <span key={tag}>
+              {tag}
+              {!disabled && (
+                <button
+                  type="button"
+                  aria-label={`حذف تگ ${tag}`}
+                  onClick={() => onChange(tags.filter((v) => v !== tag))}
+                >
+                  ×
+                </button>
+              )}
+            </span>
+          ))}
+        </div>
+      )}
+      <input
+        id={id}
+        disabled={disabled}
+        aria-label={field.title}
+        aria-invalid={invalid}
+        aria-describedby={`${id}-help`}
+        value={draft}
+        placeholder={field.placeholder || "تگ را بنویسید و Enter بزنید"}
+        onChange={(e) => {
+          if (/[,،]/.test(e.target.value)) commit(e.target.value);
+          else setDraft(e.target.value);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            commit(draft);
+          } else if (e.key === "Backspace" && !draft && tags.length) onChange(tags.slice(0, -1));
+        }}
+        onBlur={() => commit(draft)}
+      />
     </div>
   );
 }
@@ -197,9 +407,11 @@ function FormField({
   if (["select", "multi_select", "user", "unit", "role", "relation"].includes(field.kind)) {
     input = (
       <OptionField
+        id={id}
         field={field}
         value={value}
         disabled={disabled}
+        invalid={Boolean(props.errors?.[field.code])}
         loadOptions={props.loadOptions}
         parent={config.depends_on ? String(displayed[config.depends_on] || "") : undefined}
         onChange={onChange}
@@ -276,20 +488,13 @@ function FormField({
     );
   } else if (field.kind === "tags") {
     input = (
-      <input
-        {...common}
-        value={Array.isArray(value) ? value.join("، ") : ""}
-        placeholder="تگ‌ها را با ویرگول جدا کنید"
-        onChange={(e) =>
-          onChange([
-            ...new Set(
-              e.target.value
-                .split(/[,،]/)
-                .map((v) => v.trim())
-                .filter(Boolean)
-            ),
-          ])
-        }
+      <TagField
+        id={id}
+        field={field}
+        value={value}
+        disabled={disabled}
+        invalid={Boolean(props.errors?.[field.code])}
+        onChange={onChange}
       />
     );
   } else if (field.kind === "file") {
@@ -369,6 +574,7 @@ function FormField({
           value={text}
           onChange={(e) => {
             const raw = e.target.value.replace(/[,٬]/g, "").replace(/[۰-۹٠-٩]/g, (d) => String(d.charCodeAt(0) & 15));
+            if (!(field.kind === "integer" ? /^-?\d*$/ : /^-?\d*(\.\d*)?$/).test(raw)) return;
             onChange(raw === "" ? null : raw);
           }}
         />
@@ -398,6 +604,7 @@ function FormField({
                   ? "tel"
                   : "text"
         }
+        dir={["email", "url", "phone"].includes(field.kind) ? "ltr" : undefined}
         value={text}
         onChange={(e) => onChange(e.target.value)}
       />

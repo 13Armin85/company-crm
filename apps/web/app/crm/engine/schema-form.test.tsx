@@ -77,6 +77,15 @@ const schema: EntityFormSchema = {
     },
   ],
 };
+const field = (code: string, kind: EntityFormSchema["fields"][number]["kind"], config = {}) => ({
+  id: code,
+  code,
+  title: code,
+  kind,
+  config,
+  binding: { field: code },
+  is_active: true,
+});
 describe("schema-driven form behavior", () => {
   it("applies conditional visibility and required validation without losing zero/false", () => {
     expect(validateSchemaValues(schema, { urgent: false, number: 0 })).toEqual({});
@@ -101,6 +110,48 @@ describe("schema-driven form behavior", () => {
     expect(moved.sections[1].bindings).toEqual([{ field: "urgent", readonly: true }]);
     expect(moved.sections[0].bindings.some((b) => b.field === "urgent")).toBe(false);
     expect(original.sections[0].bindings[0].field).toBe("urgent");
+  });
+  it("renders each choice kind with the shared select controls", () => {
+    const choices: EntityFormSchema = {
+      ...schema,
+      fields: [
+        field("one", "select"),
+        field("many", "multi_select"),
+        field("people", "user", { multiple: true }),
+        field("owner", "user"),
+        field("labels", "tags"),
+      ],
+      layout: {
+        tabs: [],
+        sections: [
+          {
+            id: "a",
+            columns: 1,
+            bindings: ["one", "many", "people", "owner", "labels"].map((code) => ({ field: code })),
+          },
+        ],
+      },
+    };
+    const html = renderToStaticMarkup(
+      <SchemaDrivenForm
+        schema={choices}
+        values={{ many: ["x"], people: [], labels: ["خیلی فوری", "مشتری"] }}
+        onChange={() => {}}
+      />
+    );
+    const block = (code: string) => html.split(`data-field="${code}"`)[1].split("data-field=")[0];
+    for (const single of ["one", "owner"]) {
+      expect(block(single)).toContain("searchable-select");
+      expect(block(single)).toContain("selector-input-row");
+      expect(block(single)).not.toContain("compact-selector");
+    }
+    for (const multiple of ["many", "people"]) {
+      expect(block(multiple)).toContain("compact-selector");
+      expect(block(multiple)).toContain("selector-trigger");
+    }
+    expect(block("many")).toContain("حذف انتخاب");
+    expect(block("labels")).toContain("schema-tag-input");
+    expect(block("labels")).toContain("خیلی فوری");
   });
   it("compares canonical money decimals exactly and datetime instants across offsets", () => {
     const typed = {
