@@ -4,7 +4,7 @@ import { CloseOutline, SearchOutline } from "@makeplane/propel/icons";
 import { Eye, GitBranch, History, LayoutTemplate, ListChecks, ShieldCheck, Table2 } from "lucide-react";
 import { normalizePersianSearch } from "@plane/ui";
 import { Button, Skeleton } from "../components";
-import { useWorkspaceAccess } from "../api";
+import { errorMessage, useWorkspaceAccess } from "../api";
 import { useUIStore } from "../store";
 import { FormDesigner } from "./form-designer";
 import { PageEditor } from "./page-studio";
@@ -65,6 +65,9 @@ export function DesignWorkspace() {
     return (
       <div className="engine-empty-selection">
         <strong>طراحی فرم‌ها بارگذاری نشد</strong>
+        <p role="alert">
+          {errorMessage(catalog.error || fields.error || surfaces.error, "دریافت اطلاعات طراحی فرم‌ها انجام نشد.")}
+        </p>
         <Button
           variant="secondary"
           onClick={() => {

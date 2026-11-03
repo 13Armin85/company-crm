@@ -186,7 +186,8 @@ if cors_allowed_origins:
     CORS_ALLOWED_ORIGINS = cors_allowed_origins
     secure_origins = False if [origin for origin in cors_allowed_origins if "http:" in origin] else True
 else:
-    CORS_ALLOW_ALL_ORIGINS = True
+    # Credentialed requests from any origin are only acceptable on a debug workstation.
+    CORS_ALLOW_ALL_ORIGINS = bool(DEBUG)
     secure_origins = False
 
 CORS_ALLOW_HEADERS = [*default_headers, "X-API-Key"]

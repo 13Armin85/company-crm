@@ -30,3 +30,25 @@ describe("Persian error messages", () => {
     expect(passwordError("short", "short")).toBe("رمز عبور باید حداقل ۸ نویسه باشد.");
   });
 });
+
+describe("specific failure reasons", () => {
+  it("names the input of a localized server error", () => {
+    expect(errorMessage({ response: { status: 400, data: { code: ["این مقدار قبلاً استفاده شده است."] } } }, "خطا")).toBe(
+      "کد: این مقدار قبلاً استفاده شده است."
+    );
+  });
+  it("explains the HTTP status when the server reason is not Persian", () => {
+    expect(errorMessage({ response: { status: 403, data: { detail: "Forbidden" } } }, "ذخیره جدول انجام نشد.")).toBe(
+      "ذخیره جدول انجام نشد: اجازه انجام این عملیات را ندارید؛ دسترسی لازم را از مدیر سامانه بگیرید."
+    );
+    expect(errorMessage({ response: { status: 502, data: "<html>Bad Gateway</html>" } }, "ذخیره نشد")).toBe(
+      "ذخیره نشد: سرور برنامه در دسترس نیست؛ چند لحظه بعد دوباره تلاش کنید."
+    );
+  });
+  it("reports timeouts and lost connections", () => {
+    expect(errorMessage({ code: "ECONNABORTED" }, "دریافت نشد.")).toMatch(/^دریافت نشد: پاسخ سرور/);
+    expect(errorMessage({ code: "ERR_NETWORK", message: "Network Error" }, "دریافت نشد.")).toBe(
+      "اتصال به سرور برقرار نشد؛ دوباره تلاش کنید."
+    );
+  });
+});

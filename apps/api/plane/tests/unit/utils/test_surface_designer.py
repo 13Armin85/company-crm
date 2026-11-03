@@ -34,5 +34,14 @@ def test_input_is_normalized_without_changing_its_help_text():
 
 def test_nested_framework_errors_are_localized_without_leaking_english():
     result = persian_errors({"title": [ErrorDetail("This field is required.", code="required")]}, 400)
-    assert result["detail"] == "این ورودی را تکمیل کنید."
+    assert result["detail"] == "نام فیلد: این ورودی را تکمیل کنید."
     assert result["errors"] == [{"path": "title", "label": "نام فیلد", "message": "این ورودی را تکمیل کنید."}]
+
+
+def test_unknown_framework_errors_keep_their_specific_reason_and_input():
+    result = persian_errors(
+        {"form": {"sections": [{"columns": [ErrorDetail("Ensure this value is less than or equal to 4.", code="max_value")]}]}},
+        400,
+    )
+    assert result["errors"][0]["path"] == "form.sections.0.columns"
+    assert result["detail"] == "ستون‌های جدول: مقدار باید حداکثر ۴ باشد."

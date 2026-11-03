@@ -79,6 +79,12 @@ class NotificationViewSet(BaseViewSet, BasePaginator):
         type = request.GET.get("type", "all")
         mentioned = request.GET.get("mentioned", False)
         all_notifications = request.GET.get("all_notifications", "false").lower() == "true"
+        if all_notifications and request.GET.get("summary") == "unread":
+            # The navigation badge only needs a count; serializing every notification is wasteful.
+            unread = Notification.objects.filter(
+                workspace__slug=slug, receiver_id=request.user.id, read_at__isnull=True
+            ).count()
+            return Response({"unread": unread}, status=status.HTTP_200_OK)
         q_filters = Q()
 
         intake_issue = Issue.objects.filter(

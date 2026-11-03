@@ -2,6 +2,8 @@ import { ErrorNotice } from "../error-state";
 import { useState } from "react";
 import { Link } from "react-router";
 import { Dialog, DialogPanel, DialogTitle } from "@headlessui/react";
+import { ChevronLeft, ChevronRight, ExternalLink, Lock, Pencil, X } from "lucide-react";
+import { IdentifierBadge } from "@plane/ui";
 import type { FieldValue } from "@plane/ui";
 import { Button, Skeleton } from "../components";
 import { errorMessage } from "../api";
@@ -11,6 +13,8 @@ import { EngineRecordForm } from "./record-form";
 import { ViewValue } from "./view-value";
 import { RelatedRecords } from "./related-records";
 import type { ViewField, ViewResult, ViewRow } from "./view-types";
+
+const editable = (field: ViewField & { field: string }) => !field.config.readonly && !field.field.includes(".");
 
 export function RecordSummaryDrawer({
   code,
@@ -59,95 +63,101 @@ export function RecordSummaryDrawer({
     setDirty(false);
     onPage(direction);
   };
+  const record = summary.data?.record;
   return (
     <Dialog open onClose={() => select(null)} className="engine-view-dialog">
       <div className="engine-view-backdrop" />
       <DialogPanel className="engine-view-drawer engine-record-drawer" dir="rtl">
-        <header className="engine-actions">
-          <DialogTitle>خلاصه اطلاعات</DialogTitle>
-          <Button variant="ghost" onClick={() => select(null)}>
-            بستن
-          </Button>
+        <header className="record-drawer-top">
+          <DialogTitle className="record-drawer-kicker">خلاصه اطلاعات</DialogTitle>
+          <div className="record-drawer-nav">
+            <button
+              type="button"
+              aria-label="رکورد قبلی"
+              title="رکورد قبلی"
+              disabled={index <= 0 && !hasPreviousPage}
+              onClick={() => navigate(-1)}
+            >
+              <ChevronRight size={17} />
+            </button>
+            <button
+              type="button"
+              aria-label="رکورد بعدی"
+              title="رکورد بعدی"
+              disabled={(index < 0 || index >= rows.length - 1) && !hasNextPage}
+              onClick={() => navigate(1)}
+            >
+              <ChevronLeft size={17} />
+            </button>
+            <button type="button" aria-label="بستن" title="بستن" onClick={() => select(null)}>
+              <X size={17} />
+            </button>
+          </div>
         </header>
         {summary.isLoading ? (
           <Skeleton rows={5} />
         ) : summary.error ? (
           <ErrorNotice message={errorMessage(summary.error, "دریافت خلاصه انجام نشد.")} />
         ) : (
-          summary.data && (
+          record && (
             <>
-              <h3>{summary.data.record.title}</h3>
-              <small>{summary.data.record.number}</small>
+              <div className="record-drawer-title">
+                {record.number && <IdentifierBadge value={record.number} label="شماره رکورد" />}
+                <h3>{record.title || "بدون عنوان"}</h3>
+              </div>
+              {!editing && (
+                <div className="record-drawer-actions">
+                  {record.can_edit && summary.data!.fields.some(editable) && (
+                    <Button icon={Pencil} onClick={() => setEditing(true)}>
+                      ویرایش
+                    </Button>
+                  )}
+                  <Link className="button button-secondary" to={`/entities/${code}/${id}`}>
+                    <ExternalLink size={16} /> باز کردن صفحه کامل
+                  </Link>
+                </div>
+              )}
               {editing ? (
-                <EngineRecordForm
-                  code={code}
-                  id={id}
-                  visibleFields={summary.data.fields.map((field) => field.field)}
-                  onDirtyChange={setDirty}
-                  onSaved={() => {
-                    setDirty(false);
-                    setEditing(false);
-                  }}
-                  onCancel={() => {
-                    if (!dirty || window.confirm("تغییرات ذخیره‌نشده کنار گذاشته شوند؟")) {
+                <div className="record-drawer-editor">
+                  <EngineRecordForm
+                    code={code}
+                    id={id}
+                    visibleFields={summary.data!.fields.map((field) => field.field)}
+                    onDirtyChange={setDirty}
+                    onSaved={() => {
                       setDirty(false);
                       setEditing(false);
-                    }
-                  }}
-                />
-              ) : (
-                <>
-                  <section className="engine-record-summary">
-                    {summary.data.fields.map((field) => (
-                      <div key={field.field}>
+                    }}
+                    onCancel={() => {
+                      if (!dirty || window.confirm("تغییرات ذخیره‌نشده کنار گذاشته شوند؟")) {
+                        setDirty(false);
+                        setEditing(false);
+                      }
+                    }}
+                  />
+                </div>
+              ) : null}
+              <dl className="engine-record-summary record-drawer-fields">
+                {summary
+                  .data!.fields.filter((field) => !editing || !editable(field))
+                  .map((field) => (
+                    <div key={field.field}>
+                      <dt>
                         <small>{field.title}</small>
-                        <ViewValue field={field} value={field.value} labels={summary.data.labels[field.field]} />
-                        {field.config.readonly && <small>فقط‌خواندنی</small>}
-                      </div>
-                    ))}
-                  </section>
-                  {summary.data.record.can_edit &&
-                    summary.data.fields.some((field) => !field.config.readonly && !field.field.includes(".")) && (
-                      <Button onClick={() => setEditing(true)}>ویرایش</Button>
-                    )}
-                </>
-              )}
-              {editing && (
-                <section className="engine-record-summary">
-                  {summary.data.fields
-                    .filter((field) => field.config.readonly || field.field.includes("."))
-                    .map((field) => (
-                      <div key={field.field}>
-                        <small>{field.title} · فقط‌خواندنی</small>
-                        <ViewValue field={field} value={field.value} labels={summary.data.labels[field.field]} />
-                      </div>
-                    ))}
-                </section>
-              )}
+                        {!editable(field) && <Lock size={12} aria-label="فقط‌خواندنی" />}
+                      </dt>
+                      <dd>
+                        <ViewValue field={field} value={field.value} labels={summary.data!.labels[field.field]} />
+                      </dd>
+                    </div>
+                  ))}
+              </dl>
+              <div className="record-drawer-related">
+                <RelatedRecords code={code} id={id} />
+              </div>
             </>
           )
         )}
-        <footer className="engine-actions">
-          <RelatedRecords code={code} id={id} />
-          <Button variant="secondary" disabled={index <= 0 && !hasPreviousPage} onClick={() => navigate(-1)}>
-            رکورد قبلی
-          </Button>
-          <Button
-            variant="secondary"
-            disabled={(index < 0 || index >= rows.length - 1) && !hasNextPage}
-            onClick={() => navigate(1)}
-          >
-            رکورد بعدی
-          </Button>
-          <Link
-            to={`/entities/${code}/${id}`}
-            onClick={(event) => {
-              if (dirty && !window.confirm("تغییرات ذخیره‌نشده کنار گذاشته شوند؟")) event.preventDefault();
-            }}
-          >
-            باز کردن صفحه کامل
-          </Link>
-        </footer>
       </DialogPanel>
     </Dialog>
   );

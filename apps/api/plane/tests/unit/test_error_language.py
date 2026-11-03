@@ -61,3 +61,21 @@ def test_only_failed_responses_are_translated():
     factory = APIRequestFactory()
     assert ExampleView.as_view()(factory.get("/")).data == {"name": "English project name"}
     assert ExampleView.as_view()(factory.post("/")).data == {"email": ["این ایمیل ثبت شده است"]}
+
+
+def test_framework_errors_explain_the_specific_reason():
+    from rest_framework.exceptions import ErrorDetail
+
+    result = persian_errors(
+        {
+            "code": [ErrorDetail("field definition with this code already exists.", code="unique")],
+            "kind": [ErrorDetail('"abc" is not a valid choice.', code="invalid_choice")],
+            "title": [ErrorDetail("Ensure this field has no more than 120 characters.", code="max_length")],
+        }
+    )
+    assert result == {
+        "code": ["این مقدار قبلاً ثبت شده است؛ مقدار دیگری وارد کنید."],
+        "kind": ["مقدار «abc» جزو گزینه‌های مجاز نیست."],
+        "title": ["حداکثر ۱۲۰ نویسه مجاز است."],
+    }
+    assert persian_errors({"code": "unique"}) == {"code": "unique"}

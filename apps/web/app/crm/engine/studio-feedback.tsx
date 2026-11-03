@@ -28,13 +28,10 @@ export function studioIssues(error: unknown): StudioIssue[] {
 export const studioInputError = (error: unknown, path: string) =>
   studioIssues(error).find((issue) => issue.path === path)?.message;
 export function studioErrorNotice(error: unknown, fallback: string, preservesDraft = false) {
-  const code = (error as { code?: string })?.code;
-  const message =
-    code === "ECONNABORTED" || code === "ETIMEDOUT"
-      ? "دریافت پاسخ بیش از حد طول کشید؛ اتصال را بررسی و دوباره تلاش کنید."
-      : errorMessage(error, fallback);
+  const message = errorMessage(error, fallback);
+  // The summary already names the first input; list the remaining inputs that need fixing.
   const details = studioIssues(error)
-    .filter((issue) => issue.message !== message)
+    .filter((issue) => !message.includes(issue.message))
     .map((issue) => `${issue.label}: ${issue.message}`);
   return [message, ...details, preservesDraft ? "تغییرات ذخیره‌نشده شما حفظ شده است." : ""].filter(Boolean).join(" · ");
 }

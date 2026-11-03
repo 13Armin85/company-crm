@@ -3,6 +3,16 @@
 		max_size {$FILE_SIZE_LIMIT}
 	}
 
+	# Baseline browser protections for every response, including API and uploaded files.
+	header {
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+		Content-Security-Policy "frame-ancestors 'self'; base-uri 'self'; object-src 'none'"
+		-Server
+		-X-Powered-By
+	}
+
   redir /spaces /spaces/ permanent
 	reverse_proxy /spaces/* space:3000
 

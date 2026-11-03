@@ -30,7 +30,7 @@ import {
 import {
   useAppearance,
   useCurrentUser,
-  useNotifications,
+  useUnreadNotificationCount,
   useProjects,
   useUpdateAppearance,
   useWorkspaceAccess,
@@ -92,8 +92,7 @@ function AppLayout() {
   const { data: appearance } = useAppearance();
   const updateAppearance = useUpdateAppearance();
   const { data: projects = [] } = useProjects();
-  const { data: notifications = [] } = useNotifications(undefined, true);
-  const unreadCount = notifications.filter((item) => !item.read).length;
+  const { data: unreadCount = 0 } = useUnreadNotificationCount();
   const { data: currentUser } = useCurrentUser();
   const { data: access, error: accessError } = useWorkspaceAccess();
   const canCreate = access?.can("Issue.Create") === true && location.pathname.replace(/\/+$/, "") !== "/my-work";
@@ -205,9 +204,7 @@ function AppLayout() {
               >
                 <Icon size={19} />
                 <span>{label}</span>
-                {to === "/inbox" && notifications.some((item) => !item.read) && (
-                  <b>{toFa(notifications.filter((item) => !item.read).length)}</b>
-                )}
+                {to === "/inbox" && unreadCount > 0 && <b>{toFa(unreadCount)}</b>}
               </NavLink>
             ))}
         </nav>

@@ -6,7 +6,6 @@ import {
   BarChart3,
   CalendarDays,
   Check,
-  ChevronDown,
   Copy,
   Expand,
   GripVertical,
@@ -23,8 +22,9 @@ import {
   UsersRound,
   X,
 } from "lucide-react";
-import { api, errorMessage, useOrganizationRoles, useWorkspaceAccess } from "../api";
-import { Button, PageHeader, Skeleton } from "../components";
+import { api, errorMessage, useCurrentUser, useOrganizationRoles, useWorkspaceAccess } from "../api";
+import { SearchableSelect } from "@plane/ui";
+import { Button, Skeleton } from "../components";
 import { useEngineCatalog } from "../engine/api";
 import { useUIStore } from "../store";
 import { dashboardUrl, useAddDashboardWidget, useDashboard, useSaveDashboard } from "./api";
@@ -101,6 +101,8 @@ export default function DashboardPage() {
   const [sharingId, setSharingId] = useState("");
   const [fullId, setFullId] = useState("");
   const [newTab, setNewTab] = useState("");
+  const [addingTab, setAddingTab] = useState(false);
+  const { data: user } = useCurrentUser();
   const [sharedActive, setSharedActive] = useState<(DashboardTab & { mode: "read" | "copy"; owner: string }) | null>(
     null
   );
@@ -112,6 +114,10 @@ export default function DashboardPage() {
     if (dashboard.data.default_updated) toast("داشبورد پیش‌فرض به‌روز شد", "info");
   }, [dashboard.data, editing, toast]);
   const active = sharedActive || tabs.find((tab) => tab.id === activeId);
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "صبح بخیر" : hour < 17 ? "روز بخیر" : "عصر بخیر";
+  const now = new Date();
+  const today = `${now.toLocaleDateString("fa-IR", { weekday: "long" })}، ${now.toLocaleDateString("fa-IR-u-ca-persian", { day: "numeric", month: "long", year: "numeric" })}`;
   const configured = tabs.flatMap((tab) => tab.widgets).find((widget) => widget.id === configuredId);
   const sharing = tabs.find((tab) => tab.id === sharingId);
   const galleryItems = (dashboard.data?.gallery || []).filter(
@@ -159,6 +165,7 @@ export default function DashboardPage() {
     setSharedActive(null);
     setActiveId(tab.id);
     setNewTab("");
+    setAddingTab(false);
     // A draft with other unsaved edits is saved together with the new tab.
     try {
       const result = await save.mutateAsync({ tabs: next, revision });
@@ -213,65 +220,68 @@ export default function DashboardPage() {
   if (dashboard.isError)
     return <ErrorState message="دریافت داشبورد انجام نشد." onRetry={() => void dashboard.refetch()} />;
   return (
-    <div className="custom-dashboard" dir="rtl">
-      <PageHeader
-        eyebrow="میز کار"
-        title={roleId ? "داشبورد پیش‌فرض نقش" : "داشبورد من"}
-        description="چیدمان و داده‌های کاری خود را در یک نگاه ببینید"
-        actions={
-          <div className="dashboard-actions">
-            {dashboard.data?.can_manage_defaults && (
-              <label className="dashboard-role-picker">
-                <span>نمای داشبورد</span>
-                <select
-                  aria-label="انتخاب نقش پیش‌فرض"
-                  value={roleId}
-                  onChange={(event) => {
-                    setEditing(false);
-                    setSharedActive(null);
-                    setConfiguredId("");
-                    setGallery(false);
-                    setActiveId("");
-                    setRoleId(event.target.value);
-                  }}
-                >
-                  <option value="">داشبورد شخصی</option>
-                  {roles.map((role) => (
-                    <option key={role.id} value={role.id}>
-                      پیش‌فرض: {role.name}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown size={15} aria-hidden="true" />
-              </label>
-            )}
-            {!roleId && (
-              <Button variant="ghost" icon={RotateCcw} onClick={reset}>
-                بازگشت به پیش‌فرض
+    <div className={`custom-dashboard ${editing ? "is-editing" : ""}`} dir="rtl">
+      <header className="dashboard-hero">
+        <div className="dashboard-hero-text">
+          <span className="dashboard-hero-date">
+            <CalendarDays size={14} aria-hidden="true" />
+            {today}
+          </span>
+          <h1>{roleId ? "داشبورد پیش‌فرض نقش" : `${greeting}${user?.displayName ? `، ${user.displayName}` : ""}`}</h1>
+          <p>
+            {roleId
+              ? `چیدمانی که اعضای نقش «${roles.find((role) => role.id === roleId)?.name || ""}» در ابتدا می‌بینند.`
+              : "کارها، تیم و اطلاعات مهم شما در یک نگاه"}
+          </p>
+        </div>
+        <div className="dashboard-actions">
+          {dashboard.data?.can_manage_defaults && (
+            <div className="dashboard-view-switch">
+              <span>نمای داشبورد</span>
+              <SearchableSelect
+                label="انتخاب نمای داشبورد"
+                value={roleId}
+                options={[
+                  { id: "", title: "داشبورد شخصی من", description: "فقط برای خودتان" },
+                  ...roles.map((role) => ({ id: role.id, title: role.name, description: "پیش‌فرض نقش" })),
+                ]}
+                onChange={(next) => {
+                  setEditing(false);
+                  setSharedActive(null);
+                  setConfiguredId("");
+                  setGallery(false);
+                  setActiveId("");
+                  setRoleId(next);
+                }}
+              />
+            </div>
+          )}
+          {!roleId && !editing && !sharedActive && (
+            <Button variant="ghost" icon={RotateCcw} onClick={reset}>
+              بازگشت به پیش‌فرض
+            </Button>
+          )}
+          {sharedActive ? (
+            <Button variant="secondary" onClick={() => setSharedActive(null)}>
+              بازگشت به داشبورد من
+            </Button>
+          ) : editing ? (
+            <>
+              <Button variant="secondary" icon={X} onClick={cancel}>
+                انصراف
               </Button>
-            )}
-            {sharedActive ? (
-              <Button variant="secondary" onClick={() => setSharedActive(null)}>
-                بازگشت به داشبورد من
+              <Button icon={Check} onClick={commit} disabled={save.isPending}>
+                ذخیره
               </Button>
-            ) : editing ? (
-              <>
-                <Button variant="secondary" icon={X} onClick={cancel}>
-                  انصراف
-                </Button>
-                <Button icon={Check} onClick={commit} disabled={save.isPending}>
-                  ذخیره
-                </Button>
-              </>
-            ) : (
-              <Button icon={Pencil} onClick={() => setEditing(true)}>
-                ویرایش چیدمان
-              </Button>
-            )}
-          </div>
-        }
-      />
-      <div className="dashboard-tabbar" role="tablist">
+            </>
+          ) : (
+            <Button icon={Pencil} onClick={() => setEditing(true)}>
+              ویرایش چیدمان
+            </Button>
+          )}
+        </div>
+      </header>
+      <nav className="dashboard-tabbar" role="tablist" aria-label="تب‌های داشبورد">
         {tabs.map((tab, index) => (
           <div
             key={tab.id}
@@ -301,7 +311,8 @@ export default function DashboardPage() {
                 setActiveId(tab.id);
               }}
             >
-              {tab.title}
+              <span>{tab.title}</span>
+              <small aria-hidden="true">{tab.widgets.length.toLocaleString("fa-IR")}</small>
             </button>
             {editing && (
               <div className="dashboard-tab-tools">
@@ -349,42 +360,49 @@ export default function DashboardPage() {
             )}
           </div>
         ))}
-        {!sharedActive && (
-          <div className="dashboard-new-tab">
-            <input
-              aria-label="نام تب جدید"
-              placeholder="تب جدید"
-              value={newTab}
-              onChange={(event) => setNewTab(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") void createTab();
-              }}
-            />
-            <button aria-label="افزودن تب" title="افزودن تب" disabled={save.isPending} onClick={() => void createTab()}>
-              <Plus size={17} />
+        {!sharedActive &&
+          (addingTab ? (
+            <div className="dashboard-new-tab">
+              <input
+                ref={(input) => input?.focus()}
+                aria-label="نام تب جدید"
+                placeholder="نام تب جدید"
+                value={newTab}
+                onChange={(event) => setNewTab(event.target.value)}
+                onBlur={() => !newTab.trim() && setAddingTab(false)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") void createTab();
+                  if (event.key === "Escape") setAddingTab(false);
+                }}
+              />
+              <button
+                aria-label="افزودن تب"
+                title="افزودن تب"
+                disabled={save.isPending}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => void createTab()}
+              >
+                <Check size={16} />
+              </button>
+            </div>
+          ) : (
+            <button className="dashboard-add-tab" onClick={() => setAddingTab(true)}>
+              <Plus size={15} aria-hidden="true" /> تب جدید
             </button>
-          </div>
-        )}
-      </div>
+          ))}
+      </nav>
       {editing && (
         <div className="dashboard-editbar">
-          <span>برای جابه‌جایی، ویجت‌ها را بکشید. اندازه را زیر هر ویجت تغییر دهید.</span>
+          <span>
+            <GripVertical size={16} aria-hidden="true" />
+            ویجت‌ها را بکشید تا جابه‌جا شوند و اندازه را از پایین هر ویجت تغییر دهید.
+          </span>
           <Button variant="secondary" icon={Plus} onClick={() => setGallery(true)}>
             افزودن ویجت
           </Button>
         </div>
       )}
       {sharedActive && <p className="dashboard-shared-label">تب اشتراکی: {sharedActive.title} · فقط‌خواندنی</p>}
-      {active && (
-        <div className="dashboard-content-heading">
-          <div>
-            <span className="dashboard-content-kicker">نمای فعال</span>
-            <h2>{active.title}</h2>
-            <p>اطلاعات و ابزارهای این بخش در یک نگاه</p>
-          </div>
-          <span className="dashboard-widget-count">{active.widgets.length.toLocaleString("fa-IR")} ویجت</span>
-        </div>
-      )}
       {active && (
         <div className="dashboard-widget-grid">
           {active.widgets.map((widget) => {

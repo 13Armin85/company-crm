@@ -466,7 +466,12 @@ export function SurfaceTable({
           onSelect={setSummaryId}
         />
       )}
-      <ErrorNotice message={(config.error || values.error) && "دریافت تنظیمات یا اطلاعات ستون‌ها انجام نشد."} />
+      <ErrorNotice
+        message={
+          (config.error || values.error) &&
+          errorMessage(config.error || values.error, "دریافت تنظیمات یا اطلاعات ستون‌ها انجام نشد.")
+        }
+      />
       <div className="surface-table-toolbar">
         <div className="surface-table-tabs" role="tablist" aria-label="تب‌های جدول">
           {mainVisible && (

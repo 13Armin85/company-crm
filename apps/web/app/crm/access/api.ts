@@ -9,7 +9,8 @@ export const useAccess = (providedSlug?: string) => {
     queryKey: ["workspace-access", slug],
     enabled: Boolean(slug),
     retry: false,
-    staleTime: 0,
+    // Components mounting together share one request; polling and focus still refresh revoked access.
+    staleTime: 10_000,
     refetchInterval: 30_000,
     refetchOnWindowFocus: true,
     queryFn: async ({ signal }): Promise<EffectiveAccess> => {

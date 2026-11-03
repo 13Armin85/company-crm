@@ -718,12 +718,10 @@ const notificationIcons = {
 export function NotificationDrawer() {
   const open = useUIStore((state) => state.notificationOpen);
   const setOpen = useUIStore((state) => state.setNotificationOpen);
-  const { data = [], isLoading, isError, refetch } = useNotifications();
+  // The full list is only downloaded while the drawer is open; the badge polls a count.
+  const { data = [], isLoading, isError, refetch } = useNotifications(undefined, false, open);
   const [tab, setTab] = useState<"all" | "unread">("all");
   const shown = tab === "unread" ? data.filter((item) => !item.read) : data;
-  useEffect(() => {
-    if (open) void refetch();
-  }, [open, refetch]);
   const [selected, setSelected] = useState<NotificationItem>();
   const markRead = useMarkNotificationRead();
   const markAll = useMarkAllNotificationsRead();
@@ -845,7 +843,8 @@ export function CommandPalette() {
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
   const { data: projects = [] } = useProjects();
-  const { data: issues = [] } = useIssues();
+  // Every project's issues are only needed while the palette is open.
+  const { data: issues = [] } = useIssues(undefined, undefined, open);
   const { data: access } = useWorkspaceAccess();
   const { data: members = [] } = useMembers(undefined, undefined, open && access?.can("User.View") === true);
   const { data: roles = [] } = useOrganizationRoles(undefined, open && access?.can("Role.View") === true);

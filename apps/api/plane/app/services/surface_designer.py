@@ -71,8 +71,15 @@ def new_field_data(payload):
     }
 
 
+DEFAULT_LABEL = "تنظیمات"
+FALLBACK = "عملیات انجام نشد؛ دوباره تلاش کنید."
+
+
 def persian_errors(data, status):
+    from plane.app.services.error_language import FIELD_LABELS, translate_message
+
     labels = {
+        **FIELD_LABELS,
         "title": "نام فیلد",
         "kind": "نوع فیلد",
         "options": "گزینه‌ها",
@@ -107,11 +114,21 @@ def persian_errors(data, status):
                     "null": "برای این ورودی مقدار وارد کنید.",
                     "max_length": "طول مقدار واردشده بیش از حد مجاز است.",
                     "invalid": "مقدار این ورودی معتبر نیست.",
-                }.get(getattr(value, "code", ""), defaults.get(status, "انجام عملیات ممکن نشد؛ دوباره تلاش کنید."))
-            details.append({"path": path, "label": labels.get(path.split(".")[0], "تنظیمات"), "message": message})
+                }.get(getattr(value, "code", "")) or translate_message(value) or defaults.get(status, FALLBACK)
+            # The most specific known segment names the input, e.g. "form.sections.0.title" -> title.
+            parts = [part for part in path.split(".") if part and not part.isdigit()]
+            label = next((labels[part] for part in reversed(parts) if part in labels), DEFAULT_LABEL)
+            details.append({"path": path, "label": label, "message": message})
 
     visit(data)
+    first = details[0] if details else None
     return {
-        "detail": details[0]["message"] if details else defaults.get(status, "عملیات انجام نشد؛ دوباره تلاش کنید."),
+        "detail": (
+            f"{first['label']}: {first['message']}"
+            if first and first["label"] != DEFAULT_LABEL and not first["message"].startswith(first["label"])
+            else first["message"]
+            if first
+            else defaults.get(status, FALLBACK)
+        ),
         "errors": details,
     }

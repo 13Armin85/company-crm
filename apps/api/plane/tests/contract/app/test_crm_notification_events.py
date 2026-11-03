@@ -294,3 +294,21 @@ def test_all_event_feed_orders_newest_first(session_client, workspace, create_us
     )
     response = session_client.get(f"/api/workspaces/{workspace.slug}/users/notifications/?all_notifications=true")
     assert [str(row["id"]) for row in response.data] == [str(latest.id), str(first.id)]
+
+
+def test_unread_summary_counts_without_serializing_notifications(session_client, workspace, create_user):
+    task = create_task(session_client, workspace, member(workspace, "summary-peer"))
+    for read_at in (None, None, timezone.now()):
+        Notification.objects.create(
+            workspace=workspace,
+            receiver=create_user,
+            entity_identifier=task.id,
+            entity_name="workspace_task",
+            title="کار",
+            read_at=read_at,
+        )
+    response = session_client.get(
+        f"/api/workspaces/{workspace.slug}/users/notifications/?all_notifications=true&summary=unread"
+    )
+    assert response.status_code == 200
+    assert response.data == {"unread": 2}

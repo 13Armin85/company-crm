@@ -184,11 +184,6 @@
   gap: 12px;
   margin-block: 8px;
 }
-@media (max-width: 1024px) {
-  .engine-record-drawer {
-    width: 100vw;
-  }
-}
 .engine-view-settings {
   display: grid;
   gap: 16px;
@@ -3468,4 +3463,150 @@
   .engine-relations-lookup-guide {
     padding: 15px;
   }
+}
+
+/* Record summary drawer ("خلاصه اطلاعات"): identity first, then a scannable field list. */
+.engine-view-backdrop {
+  background: rgb(15 23 42 / 45%);
+  backdrop-filter: blur(2px);
+}
+.engine-record-drawer {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: min(560px, 100vw);
+  padding: 0 0 28px;
+  border-inline-start: 1px solid var(--border);
+}
+.record-drawer-top {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: blur(8px);
+}
+.record-drawer-kicker {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 650;
+}
+.record-drawer-nav {
+  display: flex;
+  gap: 4px;
+}
+.record-drawer-nav button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.record-drawer-nav button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.record-drawer-nav button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.engine-record-drawer > :not(.record-drawer-top) {
+  margin-inline: 22px;
+}
+.record-drawer-title {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+.record-drawer-title h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 20px;
+  font-weight: 750;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.record-drawer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.record-drawer-actions a.button {
+  text-decoration: none;
+}
+.engine-record-summary.record-drawer-fields {
+  display: grid;
+  gap: 0;
+  margin: 0 22px;
+  padding: 4px 16px;
+  border-radius: 14px;
+  background: var(--surface-soft);
+}
+.record-drawer-fields > div {
+  display: grid;
+  grid-template-columns: minmax(96px, 34%) minmax(0, 1fr);
+  align-items: baseline;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.record-drawer-fields > div:last-child {
+  border-bottom: 0;
+}
+.record-drawer-fields dt {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  color: var(--text-secondary);
+}
+.record-drawer-fields dt small {
+  font-size: 12px;
+}
+.record-drawer-fields dt svg {
+  color: var(--text-muted);
+}
+.record-drawer-fields dd {
+  min-width: 0;
+  margin: 0;
+  justify-self: stretch;
+  text-align: start;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.record-drawer-editor {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+.record-drawer-related:empty {
+  display: none;
+}
+.record-drawer-related h3 {
+  margin: 4px 0 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+@media (max-width: 520px) {
+  .record-drawer-fields > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+}
+.record-drawer-fields dd > * {
+  justify-content: flex-start;
+  text-align: start;
 }

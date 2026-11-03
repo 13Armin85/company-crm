@@ -25,9 +25,7 @@ describe("designer error feedback", () => {
     );
   });
   it("explains connection timeouts in Persian", () => {
-    expect(studioErrorNotice({ code: "ECONNABORTED" }, "عملیات انجام نشد.")).toContain(
-      "دریافت پاسخ بیش از حد طول کشید"
-    );
+    expect(studioErrorNotice({ code: "ECONNABORTED" }, "عملیات انجام نشد.")).toContain("پاسخ سرور بیش از حد طول کشید");
   });
   it("does not expose malformed or English server diagnostics", () => {
     expect(

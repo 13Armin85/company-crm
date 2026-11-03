@@ -8,7 +8,7 @@ import { publishSessionEnd } from "./access/session-events";
 import { combineRequestSignals } from "./access/request-signals";
 import { presentNotification } from "./notification-presentation";
 import { issueStatusFromState, stateNameFa } from "./issue-status";
-import { firstError, localizeError } from "./error-messages";
+import { describeError } from "./error-messages";
 import type {
   ActivityItem,
   Cycle,
@@ -335,11 +335,7 @@ export const mapWorkspaceTask = (item: Record<string, unknown>, members: Member[
     labels: [],
   };
 };
-export const errorMessage = (error: unknown, fallback: string) => {
-  if (error instanceof Error && !(error as AxiosError).response) return localizeError(error.message, fallback);
-  const data = (error as AxiosError<Record<string, unknown>>)?.response?.data;
-  return localizeError(firstError(data) ?? fallback, fallback);
-};
+export const errorMessage = (error: unknown, fallback: string) => describeError(error, fallback);
 const useSlug = (provided?: string) => useUIStore((state) => provided || state.workspaceSlug);
 
 export const useWorkspaces = () =>
@@ -466,6 +462,8 @@ export interface AppearancePreferences {
   accent: string;
   density: "comfortable" | "compact";
   lastWorkspaceId?: string;
+  /** The stored profile theme, kept so a save never drops keys this client does not know about. */
+  raw?: Record<string, unknown>;
 }
 export const useAppearance = () =>
   useQuery({
@@ -484,6 +482,7 @@ export const useAppearance = () =>
         accent: String(value.hamkar_accent ?? "#4F46E5"),
         density: value.hamkar_density === "compact" ? "compact" : "comfortable",
         lastWorkspaceId: data.last_workspace_id ? String(data.last_workspace_id) : undefined,
+        raw: value,
       };
     },
   });
@@ -491,9 +490,30 @@ export const useAppearance = () =>
 export const useUpdateAppearance = () => {
   const client = useQueryClient();
   return useMutation({
+    // Saves run one after another so quick clicks cannot overwrite each other's theme.
+    scope: { id: "appearance" },
+    onMutate: async (payload: Partial<AppearancePreferences> & { custom_values?: FormValues }) => {
+      await client.cancelQueries({ queryKey: ["appearance"] });
+      const previous = client.getQueryData<AppearancePreferences>(["appearance"]);
+      client.setQueryData<AppearancePreferences>(["appearance"], (current) =>
+        current
+          ? {
+              ...current,
+              ...(payload.theme ? { theme: payload.theme } : {}),
+              ...(payload.accent ? { accent: payload.accent } : {}),
+              ...(payload.density ? { density: payload.density } : {}),
+            }
+          : current
+      );
+      return { previous };
+    },
     mutationFn: async (payload: Partial<AppearancePreferences> & { custom_values?: FormValues }) => {
-      const current = (await api.get("/api/users/me/profile/")).data as { theme?: Record<string, unknown> };
-      const theme = { ...current.theme };
+      const cached = client.getQueryData<AppearancePreferences>(["appearance"]);
+      const theme = cached?.raw
+        ? { ...cached.raw }
+        : { ...((await api.get("/api/users/me/profile/")).data as { theme?: Record<string, unknown> }).theme };
+      if (cached)
+        Object.assign(theme, { theme: cached.theme, hamkar_accent: cached.accent, hamkar_density: cached.density });
       if (payload.theme) theme.theme = payload.theme;
       if (payload.accent) theme.hamkar_accent = payload.accent;
       if (payload.density) theme.hamkar_density = payload.density;
@@ -502,14 +522,20 @@ export const useUpdateAppearance = () => {
         { theme, custom_values: payload.custom_values },
         { headers: { "X-CRM-Workspace": useUIStore.getState().workspaceSlug } }
       );
+      client.setQueryData<AppearancePreferences>(["appearance"], (current) =>
+        current ? { ...current, raw: theme } : current
+      );
       return payload;
     },
-    onSuccess: () => {
-      client.invalidateQueries({ queryKey: ["appearance"] });
-      client.invalidateQueries({ queryKey: ["entity-engine"] });
+    onSuccess: (_result, payload) => {
+      // Only custom appearance fields affect engine schemas.
+      if (payload.custom_values) client.invalidateQueries({ queryKey: ["entity-engine"] });
       useUIStore.getState().toast("تغییرات با موفقیت انجام شد");
     },
-    onError: (error) => useUIStore.getState().toast(errorMessage(error, "ذخیره ترجیحات انجام نشد"), "error"),
+    onError: (error, _payload, context) => {
+      if (context?.previous) client.setQueryData(["appearance"], context.previous);
+      useUIStore.getState().toast(errorMessage(error, "ذخیره ترجیحات انجام نشد"), "error");
+    },
   });
 };
 
@@ -635,16 +661,17 @@ export const useStates = (projectId?: string, providedSlug?: string) => {
 };
 export const useIssues = (providedSlug?: string, projectId?: string, enabled = true) => {
   const slug = useSlug(providedSlug),
+    client = useQueryClient(),
     projectsQuery = useProjects(slug);
   return useQuery({
     queryKey: ["issues", slug, projectId ?? "all", projectsQuery.data?.map((p) => p.id).join(",")],
     enabled: enabled && Boolean(slug && (projectId || projectsQuery.data)),
     queryFn: async (): Promise<Issue[]> => {
-      const [memberResponse, workspaceTaskResponse] = await Promise.all([
-        api.get(`/api/workspaces/${slug}/members/`),
+      const [members, workspaceTaskResponse] = await Promise.all([
+        // Shares the cached member list instead of downloading it once per issue query.
+        client.ensureQueryData({ queryKey: ["members", slug, "workspace"], queryFn: () => workspaceMembers(slug) }),
         projectId ? Promise.resolve({ data: [] }) : api.get(`/api/workspaces/${slug}/tasks/`),
       ]);
-      const members = unwrap<Record<string, unknown>[]>(memberResponse.data).map(mapMember);
       const projectIssues = (
         await Promise.all(
           (projectId ? [projectId] : (projectsQuery.data ?? []).map((p) => p.id)).map(async (id) => {
@@ -690,22 +717,22 @@ export const useTaskHistory = (enabled = true) => {
   });
 };
 
+const workspaceMembers = async (slug?: string): Promise<Member[]> =>
+  unwrap<Record<string, unknown>[]>((await api.get(`/api/workspaces/${slug}/members/`)).data).map(mapMember);
 export const useMembers = (providedSlug?: string, projectId?: string, enabled = true) => {
   const slug = useSlug(providedSlug);
   return useQuery({
     queryKey: ["members", slug, projectId ?? "workspace"],
     enabled: Boolean(slug) && enabled,
     queryFn: async (): Promise<Member[]> => {
-      const workspaceRows = unwrap<Record<string, unknown>[]>((await api.get(`/api/workspaces/${slug}/members/`)).data);
-      if (!projectId) return workspaceRows.map(mapMember);
-
-      const workspaceMembers = workspaceRows.map(mapMember);
+      if (!projectId) return workspaceMembers(slug);
+      const members = await workspaceMembers(slug);
       const projectRows = unwrap<Record<string, unknown>[]>(
         (await api.get(`/api/workspaces/${slug}/projects/${projectId}/members/`)).data
       );
       return projectRows.flatMap((membership) => {
         const memberId = String(membership.member ?? "");
-        const member = workspaceMembers.find((candidate) => candidate.id === memberId);
+        const member = members.find((candidate) => candidate.id === memberId);
         if (!member) return [];
         return [{ ...member, membershipId: String(membership.id) }];
       });
@@ -713,11 +740,11 @@ export const useMembers = (providedSlug?: string, projectId?: string, enabled = 
   });
 };
 export const mapNotification = presentNotification;
-export const useNotifications = (providedSlug?: string, live = false) => {
+export const useNotifications = (providedSlug?: string, live = false, enabled = true) => {
   const slug = useSlug(providedSlug);
   return useQuery({
     queryKey: ["notifications", slug],
-    enabled: Boolean(slug),
+    enabled: Boolean(slug) && enabled,
     staleTime: 5_000,
     refetchInterval: live ? 15_000 : false,
     refetchIntervalInBackground: false,
@@ -727,6 +754,27 @@ export const useNotifications = (providedSlug?: string, live = false) => {
       unwrap<Record<string, unknown>[]>(
         (await api.get(`/api/workspaces/${slug}/users/notifications/?all_notifications=true`, { signal })).data
       ).map(mapNotification),
+  });
+};
+// The navigation badge polls a count instead of downloading every notification.
+export const useUnreadNotificationCount = (providedSlug?: string) => {
+  const slug = useSlug(providedSlug);
+  return useQuery({
+    queryKey: ["notifications", slug, "unread-count"],
+    enabled: Boolean(slug),
+    staleTime: 5_000,
+    refetchInterval: 15_000,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: "always",
+    queryFn: async ({ signal }): Promise<number> =>
+      Number(
+        (
+          await api.get<{ unread?: number }>(
+            `/api/workspaces/${slug}/users/notifications/?all_notifications=true&summary=unread`,
+            { signal }
+          )
+        ).data.unread ?? 0
+      ),
   });
 };
 export const useNotificationDetails = (id?: string, providedSlug?: string) => {

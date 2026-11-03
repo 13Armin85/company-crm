@@ -5060,3 +5060,44 @@ canvas {
   margin: 0;
   font-size: 13px;
 }
+
+/* Compact density ("فشرده و کاربردی") tightens every shared surface, not only a few lists. */
+:root[data-density="compact"] {
+  --form-control-height: 36px;
+  --form-gap: 12px;
+}
+:root[data-density="compact"] .page-content {
+  padding: 16px 20px 32px;
+}
+:root[data-density="compact"] .page-header {
+  padding: 14px 20px;
+  margin-bottom: 16px;
+}
+:root[data-density="compact"] .page-header h1 {
+  font-size: 21px;
+}
+:root[data-density="compact"] :is(.table-card, .engine-table, .surface-table-wrap) :is(td, th) {
+  height: auto;
+  padding-block: 7px;
+}
+:root[data-density="compact"] :is(.panel, .settings-section, .engine-panel) {
+  padding: 14px;
+}
+:root[data-density="compact"] :is(.schema-form, .schema-grid) {
+  gap: 16px;
+}
+:root[data-density="compact"] .schema-field .selector-input-row,
+:root[data-density="compact"] .schema-field .selector-trigger,
+:root[data-density="compact"] .schema-field input:not([type="checkbox"]):not([type="radio"]):not([type="file"]) {
+  min-height: 36px;
+}
+:root[data-density="compact"] .dashboard-widget-grid {
+  gap: 10px;
+  padding-top: 10px;
+}
+:root[data-density="compact"] .dashboard-widget > header {
+  padding-block: 8px;
+}
+:root[data-density="compact"] .button {
+  min-height: 32px;
+}

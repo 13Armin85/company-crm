@@ -29,7 +29,7 @@ from plane.authentication.session import BaseSessionAuthentication
 from plane.utils.exception_logger import log_exception
 from plane.utils.paginator import BasePaginator
 from plane.utils.core.mixins import ReadReplicaControlMixin
-from plane.app.services.error_language import persian_errors
+from plane.app.services.error_language import database_error_message, persian_errors, validation_error_message
 from plane.app.services.entity_legacy import EntityPolicyMixin
 from plane.app.services.surface_config import SurfacePolicyMixin
 
@@ -89,13 +89,13 @@ class BaseViewSet(SurfacePolicyMixin, EntityPolicyMixin, PersianErrorMixin, Time
             (print(e, traceback.format_exc()) if settings.DEBUG else print("Server Error"))
             if isinstance(e, IntegrityError):
                 return Response(
-                    {"error": "محتوای درخواست معتبر نیست."},
+                    {"error": database_error_message(e)},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
             if isinstance(e, ValidationError):
                 return Response(
-                    {"error": "لطفاً جزئیات معتبری ارائه دهید."},
+                    {"error": validation_error_message(e)},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -185,13 +185,13 @@ class BaseAPIView(SurfacePolicyMixin, EntityPolicyMixin, PersianErrorMixin, Time
         except Exception as e:
             if isinstance(e, IntegrityError):
                 return Response(
-                    {"error": "محتوای درخواست معتبر نیست."},
+                    {"error": database_error_message(e)},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
             if isinstance(e, ValidationError):
                 return Response(
-                    {"error": "لطفاً جزئیات معتبری ارائه دهید."},
+                    {"error": validation_error_message(e)},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 

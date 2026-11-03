@@ -207,21 +207,34 @@ def lookup_used(value):
 class EngineCatalogEndpoint(EngineAPIView):
     def get(self, request, slug):
         workspace = self.workspace(slug)
-        entities = EntityType.objects.filter(workspace=workspace).exclude(code="task", parent__isnull=True).select_related("parent")
+        # Load every entity with its workspace and parent once; permission() reads entity.workspace.
+        entities = list(
+            EntityType.objects.filter(workspace=workspace)
+            .exclude(code="task", parent__isnull=True)
+            .select_related("workspace", "parent", "parent__workspace")
+        )
+        designer = has_permission(request.user, workspace, "EntityType.View", request=request) or has_permission(
+            request.user, workspace, "FormDesigner.View", request=request
+        )
+        visible = [e for e in entities if designer or permission(e.parent or e, request.user, "view", request)]
+        serialized = EntityTypeSerializer(visible, many=True, context={"workspace": workspace}).data
         rows = [
-            dict(
-                EntityTypeSerializer(e, context={"workspace": workspace}).data,
-                can_create=permission(e.parent or e, request.user, "create", request),
-            )
-            for e in entities
-            if has_permission(request.user, workspace, "EntityType.View", request=request)
-            or has_permission(request.user, workspace, "FormDesigner.View", request=request)
-            or permission(e.parent or e, request.user, "view", request)
+            dict(data, can_create=permission(e.parent or e, request.user, "create", request))
+            for e, data in zip(visible, serialized)
         ]
         choices = {"priority": [], "task_status": []}
         roles = role_ids(request.user, workspace)
+        # Only entities whose published form binds a choice field need their full schema.
+        published = {
+            form.entity_id: form.published.schema
+            for form in FormLayout.objects.filter(
+                entity__in=[e for e in entities if not e.parent_id], published__isnull=False
+            ).select_related("published")
+        }
         for entity in entities:
-            if entity.parent_id or not permission(entity, request.user, "view", request):
+            if entity.parent_id or not {b.get("field") for b in bindings(published.get(entity.id, {}))} & set(choices):
+                continue
+            if not permission(entity, request.user, "view", request):
                 continue
             _, fields = schema_fields(entity)
             for code in choices:

@@ -598,80 +598,9 @@ body:has(.dashboard-overlay) .selector-single-options {
 :root[data-theme="dark"] .page-content:has(> .custom-dashboard) {
   background: #0f1115;
 }
-.custom-dashboard .page-header {
-  min-height: 174px;
-  padding: clamp(24px, 3vw, 36px);
-  border-color: color-mix(in srgb, var(--accent) 24%, var(--border));
-  border-radius: 22px;
-  background:
-    radial-gradient(circle at 8% 14%, color-mix(in srgb, var(--accent) 17%, transparent), transparent 32%),
-    linear-gradient(115deg, color-mix(in srgb, var(--accent) 11%, var(--surface)), var(--surface) 66%);
-  box-shadow: 0 18px 40px color-mix(in srgb, var(--accent) 8%, transparent);
-}
-.custom-dashboard .page-header::after {
-  position: absolute;
-  inset-block-end: -72px;
-  inset-inline-end: 12%;
-  width: 230px;
-  height: 230px;
-  border: 1px solid color-mix(in srgb, var(--accent) 14%, transparent);
-  border-radius: 50%;
-  box-shadow:
-    0 0 0 27px color-mix(in srgb, var(--accent) 3%, transparent),
-    0 0 0 65px color-mix(in srgb, var(--accent) 2%, transparent);
-  pointer-events: none;
-  content: "";
-}
-.custom-dashboard .page-header > * {
-  position: relative;
-  z-index: 1;
-}
-.custom-dashboard .page-header h1 {
-  font-size: clamp(26px, 2.5vw, 36px);
-}
-.custom-dashboard .page-header p {
-  font-size: 13px;
-}
 .dashboard-actions {
   max-width: 100%;
   gap: 8px;
-}
-.dashboard-role-picker {
-  position: relative;
-  display: grid;
-  gap: 3px;
-  min-width: 185px;
-  padding: 5px 11px 5px 30px;
-  border: 1px solid var(--dashboard-border);
-  border-radius: 12px;
-  background: var(--surface);
-  box-shadow: 0 4px 14px rgb(15 23 42 / 5%);
-}
-.dashboard-role-picker > span {
-  color: var(--text-secondary);
-  font-size: 11px;
-}
-.custom-dashboard .dashboard-role-picker > select {
-  width: 100%;
-  min-height: 22px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  font-weight: 650;
-  appearance: none;
-  cursor: pointer;
-}
-.dashboard-role-picker > svg {
-  position: absolute;
-  inset-inline-end: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  pointer-events: none;
-  color: var(--text-secondary);
-}
-.dashboard-role-picker:focus-within {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
 }
 .dashboard-actions .button {
   min-height: 40px;
@@ -770,38 +699,6 @@ body:has(.dashboard-overlay) .selector-single-options {
   background: color-mix(in srgb, var(--accent) 4%, var(--surface));
   font-size: 12px;
   line-height: 1.8;
-}
-.dashboard-content-heading {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 25px 2px 0;
-}
-.dashboard-content-kicker {
-  color: var(--accent);
-  font-size: 10px;
-  font-weight: 800;
-}
-.dashboard-content-heading h2 {
-  margin: 3px 0 1px;
-  color: var(--text-primary);
-  font-size: 21px;
-  line-height: 1.5;
-}
-.dashboard-content-heading p {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 11px;
-}
-.dashboard-widget-count {
-  flex: none;
-  padding: 6px 11px;
-  border: 1px solid var(--dashboard-border);
-  border-radius: 999px;
-  background: var(--surface);
-  color: var(--text-secondary);
-  font-size: 11px;
 }
 .dashboard-widget-grid {
   gap: 16px;
@@ -1346,5 +1243,225 @@ body:has(.dashboard-overlay) .selector-single-options {
   .custom-dashboard .dashboard-widget {
     grid-row: auto !important;
     min-height: 220px;
+  }
+}
+
+/* Home dashboard: compact greeting header, view switcher, underline tabs and quiet widget cards. */
+.dashboard-hero {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px 24px;
+  margin-bottom: 18px;
+  padding: 22px 26px;
+  overflow: hidden;
+  border: 1px solid var(--dashboard-border);
+  border-radius: 20px;
+  background:
+    radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--accent) 13%, transparent), transparent 55%),
+    var(--surface);
+  box-shadow: var(--dashboard-shadow);
+}
+.dashboard-hero-text {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.dashboard-hero-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 9%, var(--surface));
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 650;
+}
+.dashboard-hero h1 {
+  margin: 4px 0 0;
+  color: var(--text-primary);
+  font-size: clamp(22px, 2.2vw, 28px);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.dashboard-hero p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.8;
+}
+.dashboard-hero .dashboard-actions {
+  align-items: flex-end;
+}
+.dashboard-view-switch {
+  display: grid;
+  gap: 4px;
+  width: min(250px, 100%);
+}
+.dashboard-view-switch > span {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+.custom-dashboard .dashboard-view-switch .selector-input-row {
+  min-height: 40px;
+  border-color: var(--dashboard-border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.custom-dashboard .dashboard-view-switch .selector-input-row input {
+  min-height: 0;
+  padding-block: 0;
+  border: 0;
+  background: transparent;
+  font-weight: 650;
+}
+.custom-dashboard .dashboard-view-switch .selector-input-row input:focus-visible {
+  outline: none;
+}
+.dashboard-view-switch .selector-input-row:focus-within {
+  outline: 2px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-color: var(--accent);
+}
+
+.custom-dashboard .dashboard-tabbar {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  flex-wrap: nowrap;
+  gap: 2px;
+  padding: 0 4px;
+  overflow-x: auto;
+  border: 0;
+  border-bottom: 1px solid var(--dashboard-border);
+  border-radius: 0;
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  box-shadow: none;
+  backdrop-filter: blur(8px);
+  scrollbar-width: thin;
+}
+.custom-dashboard .dashboard-tab {
+  flex: none;
+  min-height: 46px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.custom-dashboard .dashboard-tab:hover {
+  background: transparent;
+}
+.custom-dashboard .dashboard-tab.active {
+  border-bottom-color: var(--accent);
+  background: transparent;
+  box-shadow: none;
+}
+.custom-dashboard .dashboard-tab > button[role="tab"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+}
+.custom-dashboard .dashboard-tab > button[role="tab"]:hover {
+  color: var(--text-primary);
+}
+.dashboard-tab > button[role="tab"] small {
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+}
+.dashboard-tab.active > button[role="tab"] small {
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  color: var(--accent);
+}
+.dashboard-add-tab {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 5px;
+  margin-inline-start: 6px;
+  padding: 6px 10px;
+  border: 1px dashed var(--dashboard-border);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.dashboard-add-tab:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.custom-dashboard .dashboard-new-tab input {
+  width: 150px;
+  min-height: 34px;
+}
+.custom-dashboard .dashboard-new-tab button {
+  width: 32px;
+  height: 32px;
+}
+.dashboard-editbar > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Widget actions stay out of the way until the card is hovered or focused. */
+.custom-dashboard .dashboard-widget:hover {
+  transform: none;
+}
+.custom-dashboard .dashboard-widget > header {
+  min-height: 54px;
+  padding: 9px 14px;
+}
+.custom-dashboard .dashboard-widget-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+}
+.custom-dashboard .dashboard-widget > header > div:last-child {
+  gap: 2px;
+  opacity: 0.35;
+  transition: opacity 150ms;
+}
+.custom-dashboard .dashboard-widget:is(:hover, :focus-within) > header > div:last-child,
+.custom-dashboard.is-editing .dashboard-widget > header > div:last-child {
+  opacity: 1;
+}
+.custom-dashboard.is-editing .dashboard-widget {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+}
+@media (hover: none) {
+  .custom-dashboard .dashboard-widget > header > div:last-child {
+    opacity: 1;
+  }
+}
+@media (max-width: 760px) {
+  .dashboard-hero {
+    padding: 18px;
+  }
+  .dashboard-hero .dashboard-actions,
+  .dashboard-view-switch {
+    width: 100%;
+  }
+  .dashboard-hero .dashboard-actions {
+    justify-content: flex-start;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .custom-dashboard .dashboard-widget > header > div:last-child {
+    transition: none;
   }
 }
