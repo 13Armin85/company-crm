@@ -6,7 +6,8 @@ import { useOrganizationPermissions } from "../api";
 import { Button } from "../components";
 import { useEngineMutation, useEngineDefinitions, useEngineCatalog } from "./api";
 import type { EntityDefinition, FieldDefinition, LookupDefinition, LookupOptionDefinition } from "./api";
-import { ConditionEditor, FormulaEditor } from "./rule-editors";
+import { ConditionEditor, FormulaEditor, conditionProblems } from "./rule-editors";
+import { useUIStore } from "../store";
 
 const textKinds = new Set(["short_text", "long_text", "email", "phone", "url"]);
 const numberKinds = new Set(["integer", "decimal", "money", "percent"]);
@@ -57,6 +58,8 @@ export function DefinitionEditor({
   const config = data.config || {},
     updateConfig = (patch: Partial<FieldConfig>) => set("config", { ...config, ...patch });
   const locked = Boolean(row?.used_at);
+  // A field may not depend on itself, and retired fields no longer appear on forms.
+  const conditionFields = fields.filter((f) => f.is_active && f.code !== data.code && f.code !== row?.code);
   const constant =
     config.default && typeof config.default === "object" && "dynamic" in config.default ? null : config.default;
   const defaultMode =
@@ -75,6 +78,16 @@ export function DefinitionEditor({
       className="engine-definition-editor"
       onSubmit={async (event) => {
         event.preventDefault();
+        if (kind === "fields") {
+          const problems = [
+            ...conditionProblems(config.required_if, conditionFields),
+            ...conditionProblems(config.visible_if, conditionFields),
+          ];
+          if (problems.length) {
+            useUIStore.getState().toast(`شرط‌های این ورودی کامل نیست: ${problems[0]}`, "error");
+            return;
+          }
+        }
         const keys =
           kind === "entities"
             ? [
@@ -541,16 +554,18 @@ export function DefinitionEditor({
             )}
             <ConditionEditor
               label="فقط در شرایط خاص اجباری شود"
+              description="بدون شرط، اجباری بودن فقط از گزینه «اجباری» بالا پیروی می‌کند."
               value={config.required_if}
               onChange={(required_if) => updateConfig({ required_if })}
-              fields={fields}
+              fields={conditionFields}
               lookupValues={lookupValues}
             />
             <ConditionEditor
               label="فقط در شرایط خاص نمایش داده شود"
+              description="بدون شرط، این ورودی همیشه در فرم دیده می‌شود."
               value={config.visible_if}
               onChange={(visible_if) => updateConfig({ visible_if })}
-              fields={fields}
+              fields={conditionFields}
               lookupValues={lookupValues}
             />
           </fieldset>

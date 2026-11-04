@@ -21,7 +21,7 @@ import { useEngineForm, useEngineMutation, useEngineDefinitions } from "./api";
 import type { EntityDefinition, FieldDefinition, LookupDefinition, LookupOptionDefinition } from "./api";
 import { DefinitionEditor } from "./definition-editor";
 import { DefaultValueEditor, dynamicDefaultsFor } from "./default-value-editor";
-import { ConditionEditor } from "./rule-editors";
+import { ConditionEditor, conditionProblems } from "./rule-editors";
 import { useSchemaTransport } from "./record-form";
 
 export function moveBinding(
@@ -116,6 +116,12 @@ export function FormDesigner({
     .find((s) => s.id === selected?.section)
     ?.bindings.find((b) => b.field === selected?.field);
   const selectedField = fields.find((f) => f.code === selected?.field);
+  // Conditions may only compare inputs that are on this form, never the input they belong to.
+  const formFieldCodes = new Set(
+    [...(inherited?.sections || []), ...draft.sections].flatMap((s) => s.bindings.map((b) => b.field))
+  );
+  const conditionFieldsFor = (code: string) =>
+    fields.filter((f) => f.is_active && f.code !== code && formFieldCodes.has(f.code));
   const updateBinding = (patch: Partial<FieldBinding>) =>
     setDraft((old) => ({
       ...old,
@@ -195,6 +201,18 @@ export function FormDesigner({
     }
   };
   const saveDraft = async () => {
+    const incomplete = draft.sections
+      .flatMap((section) => section.bindings)
+      .find(
+        (binding) =>
+          conditionProblems(binding.required_if, conditionFieldsFor(binding.field)).length ||
+          conditionProblems(binding.visible_if, conditionFieldsFor(binding.field)).length
+      );
+    if (incomplete) {
+      const title = fields.find((f) => f.code === incomplete.field)?.title || incomplete.field;
+      useUIStore.getState().toast(`شرط‌های ورودی «${title}» کامل نیست؛ آن را کامل یا حذف کنید.`, "error");
+      throw new Error("Incomplete form conditions");
+    }
     const result = (await mutation.mutateAsync({
       path: `forms/${entity.code}/`,
       method: "put",
@@ -735,15 +753,17 @@ export function FormDesigner({
                   ))}
                   <ConditionEditor
                     label="فقط در شرایط خاص اجباری شود"
+                    description="بدون شرط، اجباری بودن فقط از تنظیم «اجباری» پیروی می‌کند."
                     value={selectedBinding.required_if}
-                    fields={fields}
+                    fields={conditionFieldsFor(selectedBinding.field)}
                     lookupValues={lookupValues}
                     onChange={(required_if) => updateBinding({ required_if })}
                   />
                   <ConditionEditor
                     label="فقط در شرایط خاص نمایش داده شود"
+                    description="بدون شرط، این ورودی همیشه در فرم دیده می‌شود."
                     value={selectedBinding.visible_if}
-                    fields={fields}
+                    fields={conditionFieldsFor(selectedBinding.field)}
                     lookupValues={lookupValues}
                     onChange={(visible_if) => updateBinding({ visible_if })}
                   />

@@ -3610,3 +3610,284 @@
   justify-content: flex-start;
   text-align: start;
 }
+
+/* Condition editor (required if / visible if) */
+.engine-condition {
+  display: grid;
+  gap: 12px;
+  margin-block: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.engine-condition-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.engine-condition-header strong {
+  display: block;
+  font-size: 13.5px;
+  color: var(--text-primary);
+}
+.engine-condition-header p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
+.engine-condition-note {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--surface-soft);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.engine-condition-link {
+  flex: none;
+  border: 0;
+  background: none;
+  padding: 4px 6px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.engine-condition-link.danger:hover {
+  color: var(--red);
+  background: color-mix(in srgb, var(--red) 10%, transparent);
+}
+.engine-condition-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 6px 12px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.engine-condition-add:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.engine-condition-add:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.engine-condition-add.primary {
+  justify-self: start;
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  color: var(--accent);
+}
+.engine-condition-group {
+  display: grid;
+  gap: 10px;
+}
+.engine-condition-group.depth-1,
+.engine-condition-group.depth-2,
+.engine-condition-group.depth-3 {
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border));
+  border-inline-start: 3px solid color-mix(in srgb, var(--accent) 55%, var(--border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 3%, var(--surface));
+}
+.engine-condition-group-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.engine-condition-group-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.engine-condition-group-head .engine-condition-icon {
+  margin-inline-start: auto;
+}
+.engine-condition-mode {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface-soft);
+}
+.engine-condition-mode button {
+  border: 0;
+  background: transparent;
+  padding: 5px 10px;
+  border-radius: 7px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.engine-condition-mode button.active {
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: 0 1px 3px rgb(15 23 42 / 12%);
+}
+.engine-condition-mode small {
+  opacity: 0.7;
+}
+.engine-condition-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.engine-condition-list > li {
+  display: grid;
+  gap: 8px;
+}
+.engine-condition-joiner {
+  justify-self: start;
+  margin-inline-start: 10px;
+  padding: 1px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.engine-condition-rule {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 4px 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.engine-condition-rule.invalid {
+  border-color: color-mix(in srgb, var(--red) 45%, var(--border));
+}
+.engine-condition-number {
+  align-self: center;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--surface-soft);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.engine-condition-cells {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+.engine-condition-cell {
+  min-width: 0;
+}
+.engine-condition-cell.value {
+  grid-column: span 1;
+}
+.engine-condition-cell label,
+.engine-condition-text > span {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.engine-condition-text {
+  display: block;
+}
+.engine-condition-text input {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-primary);
+}
+.engine-condition-text input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.engine-condition-date {
+  display: grid;
+  gap: 8px;
+}
+.engine-condition-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.engine-condition-icon:hover {
+  color: var(--red);
+  background: color-mix(in srgb, var(--red) 10%, transparent);
+}
+.engine-condition-error {
+  grid-column: 2 / -1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0 0;
+  font-size: 11.5px;
+  color: var(--red);
+}
+.engine-condition-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.engine-condition-actions small {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.engine-condition-summary {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--surface-soft);
+  color: var(--text-primary);
+  font-size: 12.5px;
+  line-height: 1.9;
+}
+.engine-condition-summary span {
+  font-weight: 600;
+  color: var(--accent);
+}
+.engine-condition-problems {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--red) 9%, transparent);
+  color: var(--red);
+  font-size: 12px;
+}
+@media (max-width: 640px) {
+  .engine-condition-rule {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .engine-condition-number {
+    display: none;
+  }
+  .engine-condition-error {
+    grid-column: 1 / -1;
+  }
+}
