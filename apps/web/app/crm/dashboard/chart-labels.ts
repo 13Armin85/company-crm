@@ -1,3 +1,4 @@
+import { stateNameFa } from "../issue-status";
 import { persianDateValue, toFa } from "../utils";
 
 const knownLabels: Record<string, string> = {
@@ -31,6 +32,37 @@ const eventLabels: Record<string, string> = {
 
 export function activityEventLabel(value: unknown): string {
   return eventLabels[String(value)] || "فعالیت ثبت شد";
+}
+
+/** "" means the field was empty; null/undefined means the server could not show the value. */
+const readableValue = (value: unknown): string | undefined => {
+  if (value === "") return "";
+  if (value === null || value === undefined) return undefined;
+  if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") return undefined;
+  const raw = String(value);
+  if (/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(raw)) return undefined;
+  return stateNameFa(chartLabel(raw)).slice(0, 80);
+};
+
+export function activityDescription(item: Record<string, unknown>): string {
+  const actor = String(item.actor || "کاربر");
+  const record = String(item.record || "رکورد").slice(0, 100);
+  const target = `«${record}»`;
+  if (item.event === "record.created") return `${actor} ${target} را ایجاد کرد`;
+  if (item.event === "record.deleted") return `${actor} ${target} را حذف کرد`;
+  if (item.event === "surface.values.updated") return `${actor} اطلاعات فرم ${target} را ویرایش کرد`;
+  if (item.event === "record.field_changed" || item.event === "record.status_changed") {
+    const field = String(item.field || (item.event === "record.status_changed" ? "وضعیت" : "یکی از فیلدها"));
+    const before = readableValue(item.before);
+    const after = readableValue(item.after);
+    if (before && after && before !== after)
+      return `${actor} ${field} ${target} را از «${before}» به «${after}» تغییر داد`;
+    if (before === "" && after) return `${actor} ${field} ${target} را «${after}» تعیین کرد`;
+    if (before && after === "") return `${actor} ${field} ${target} را پاک کرد (مقدار قبلی: «${before}»)`;
+    if (after) return `${actor} ${field} ${target} را به «${after}» تغییر داد`;
+    return `${actor} ${field} ${target} را تغییر داد`;
+  }
+  return `${actor} ${target} را ویرایش کرد`;
 }
 
 export function chartLabel(value: unknown, labels: Record<string, string> = {}): string {

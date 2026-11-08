@@ -2,7 +2,7 @@ import { ErrorNotice } from "../error-state";
 import { EngineRecordForm } from "../engine/record-form";
 import { useState } from "react";
 import { Navigate } from "react-router";
-import { useCurrentUser, useWorkspaceAccess } from "../api";
+import { useCurrentUser, useWorkspaceAccess, errorMessage } from "../api";
 import { useAccessMutation } from "../access/api";
 import { AccessModal } from "../access/components";
 import type { Absence } from "../access/types";
@@ -51,7 +51,7 @@ export default function AbsencesPage() {
           )
         }
       />
-      <ErrorNotice message={error && "عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید."} />
+      <ErrorNotice message={error && errorMessage(error, "دریافت فهرست عدم حضورها انجام نشد")} />
       <SearchBox value={query} onChange={setQuery} placeholder="جستجوی نام کاربر یا علت عدم حضور…" />
       {isLoading ? (
         <Skeleton rows={5} />

@@ -14,6 +14,7 @@ import { ArrowUp, GripVertical, LockKeyhole, Plus, RotateCcw, Save, Send, Trash2
 import { CompactMultiSelector, SchemaDrivenForm, SearchableSelect, normalizePersianSearch } from "@plane/ui";
 import type { EntityFormSchema, FieldBinding, FormLayoutSchema, FormValues, SchemaField } from "@plane/ui";
 import { Button, Skeleton } from "../components";
+import { browserId } from "../browser-id";
 import { useOrganizationRoles, useWorkspaceAccess } from "../api";
 import { useUIStore } from "../store";
 import { persianDate } from "../utils";
@@ -163,16 +164,13 @@ export function FormDesigner({
   const addSection = () =>
     setDraft((old) => ({
       ...old,
-      sections: [
-        ...old.sections,
-        { id: `section-${crypto.randomUUID()}`, title: "بخش جدید", columns: 2, bindings: [] },
-      ],
+      sections: [...old.sections, { id: `section-${browserId()}`, title: "بخش جدید", columns: 2, bindings: [] }],
     }));
   const addField = (code: string) => {
     if (!draft.sections.length) {
       setDraft({
         ...draft,
-        sections: [{ id: `section-${crypto.randomUUID()}`, title: "اطلاعات", columns: 2, bindings: [{ field: code }] }],
+        sections: [{ id: `section-${browserId()}`, title: "اطلاعات", columns: 2, bindings: [{ field: code }] }],
       });
       return;
     }
@@ -466,7 +464,7 @@ export function FormDesigner({
                     if (newTab.trim()) {
                       setDraft({
                         ...draft,
-                        tabs: [...draft.tabs, { id: `tab-${crypto.randomUUID()}`, title: newTab.trim() }],
+                        tabs: [...draft.tabs, { id: `tab-${browserId()}`, title: newTab.trim() }],
                       });
                       setNewTab("");
                     }

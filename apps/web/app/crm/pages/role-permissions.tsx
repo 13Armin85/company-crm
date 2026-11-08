@@ -44,7 +44,8 @@ export default function RolePermissionsPage() {
   if (accessLoading || isLoading) return <Skeleton rows={6} />;
   if (!access || (!access.can("Role.View") && !access.can("Role.Permission.Assign")))
     return <Navigate to="/my-work" replace />;
-  if (error || !role) return <ErrorState message={"عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید."} />;
+  if (error || !role)
+    return <ErrorState message={errorMessage(error, "نقش موردنظر پیدا نشد یا دریافت اطلاعات آن انجام نشد")} />;
   const canEdit = access.can("Role.Permission.Assign");
   return (
     <div>
@@ -59,7 +60,7 @@ export default function RolePermissionsPage() {
         }
       />
       {permissionsError ? (
-        <ErrorNotice message={"عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید."} />
+        <ErrorNotice message={errorMessage(permissionsError, "دریافت فهرست مجوزهای این نقش انجام نشد")} />
       ) : loadingPermissions ? (
         <Skeleton rows={6} />
       ) : (

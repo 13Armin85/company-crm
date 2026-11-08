@@ -127,6 +127,37 @@ export const useEngineRecord = (code: string, id: string) =>
 export const useEngineDefinitions = <T>(kind: string, enabled = true) =>
   useEngineQuery<T[]>(kind, `definitions/${kind}/`, enabled);
 
+const engineTargets: [RegExp, string][] = [
+  [/(^|\/)unique-rules\//, "قانون یکتایی"],
+  [/(^|\/)numbering-rules\//, "قانون شماره‌گذاری"],
+  [/(^|\/)lookup-columns\//, "ستون‌های فهرست انتخابی"],
+  [/(^|\/)related\//, "رکورد مرتبط"],
+  [/(^|\/)records\//, "رکورد"],
+  [/(^|\/)views\//, "نمای جدول"],
+  [/(^|\/)import\//, "درون‌ریزی فایل"],
+  [/(^|\/)exports\//, "خروجی گرفتن"],
+  [/(^|\/)bulk\//, "ویرایش گروهی رکوردها"],
+  [/(^|\/)presentation\//, "نمایش بخش"],
+  [/^forms\//, "فرم"],
+  [/^surfaces\/[^/]+\/fields\//, "فیلدهای فرم"],
+  [/^surfaces\//, "صفحهٔ فرم"],
+  [/^definitions\/fields\//, "تعریف فیلد"],
+  [/^definitions\//, "تعریف"],
+  [/^relations\//, "ارتباط بین بخش‌ها"],
+  [/^users\/[^/]+\/password\//, "رمز عبور کاربر"],
+  [/^users\/[^/]+\/membership\//, "عضویت کاربر"],
+  [/^absences\//, "عدم حضور"],
+  [/^settings\//, "تنظیمات"],
+  [/^entities\//, "بخش"],
+];
+
+/** Name the failed engine request, e.g. "حذف قانون یکتایی انجام نشد", instead of a generic failure. */
+export function engineActionLabel(path: string, method: "post" | "put" | "patch" | "delete" = "post"): string {
+  const target = engineTargets.find(([pattern]) => pattern.test(path))?.[1] || "تغییرات";
+  const verb = method === "delete" ? "حذف" : method === "post" ? "ثبت" : "ذخیرهٔ";
+  return `${verb} ${target} انجام نشد`;
+}
+
 export function useEngineMutation(successMessage = "تغییرات ذخیره شد") {
   const slug = useEngineSlug(),
     client = useQueryClient();
@@ -155,8 +186,8 @@ export function useEngineMutation(successMessage = "تغییرات ذخیره ش
       }
       useUIStore.getState().toast(successMessage);
     },
-    onError: (error) =>
-      useUIStore.getState().toast(errorMessage(error, "عملیات انجام نشد؛ اطلاعات را بررسی کنید."), "error"),
+    onError: (error, variables) =>
+      useUIStore.getState().toast(errorMessage(error, engineActionLabel(variables.path, variables.method)), "error"),
   });
 }
 

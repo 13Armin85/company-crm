@@ -5,6 +5,11 @@ export function stateNameFa(name: unknown): string {
   const label = String(name ?? "").trim();
   if (/^backlog$/i.test(label)) return "فهرست انتظار";
   if (/^(?:cancelled|canceled|cancceled)$/i.test(label)) return "لغوشده";
+  if (/^to[\s-]?do$/i.test(label)) return "برای انجام";
+  if (/^in[\s-]?progress$/i.test(label)) return "در حال انجام";
+  if (/^(?:in[\s-]?)?review$/i.test(label)) return "بازبینی";
+  if (/^(?:done|completed)$/i.test(label)) return "انجام‌شده";
+  if (/^blocked$/i.test(label)) return "مسدود";
   return label;
 }
 

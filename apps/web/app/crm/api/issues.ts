@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Issue, Status } from "../types";
 import { api, toastError, toastSuccess, unwrap, useSlug } from "./client";
 import { mapIssue, mapState, mapWorkspaceTask } from "./mappers";
+import { statusFa } from "../utils";
 import { useProjects } from "./projects";
 import { workspaceMembers } from "./workspace";
 
@@ -125,17 +126,22 @@ export const useUpdateIssueStatus = (slug: string) => {
         (await api.get(`/api/workspaces/${slug}/projects/${issue.projectId}/states/`)).data
       ).map(mapState);
       const target = states.find((state) => (nativeValue ? state.id === nativeValue : state.status === status));
-      if (!target) throw new Error("The operation failed. Please try again.");
+      if (!target)
+        throw new Error(
+          `پروژهٔ «${issue.projectName || issue.projectIdentifier}» وضعیتی از نوع «${statusFa[status]}» ندارد؛ در تنظیمات پروژه، بخش وضعیت‌ها، آن را اضافه کنید یا کار را به ستون دیگری ببرید.`
+        );
       await api.patch(`/api/workspaces/${slug}/projects/${issue.projectId}/issues/${issue.id}/`, {
         state_id: target.id,
       });
       return { issue, status };
     },
-    onMutate: async ({ issue, status }) => {
+    onMutate: async ({ issue, status, nativeValue }) => {
       await client.cancelQueries({ queryKey: ["issues", slug] });
       const snapshots = client.getQueriesData<Issue[]>({ queryKey: ["issues", slug] });
-      client.setQueriesData<Issue[]>({ queryKey: ["issues", slug] }, (old = []) =>
-        old.map((item) => (item.id === issue.id ? { ...item, status } : item))
+      // Project boards group cards by state id, so move that too or the card snaps back until refetch.
+      const moved = issue.scope === "project" && nativeValue ? { status, stateId: nativeValue } : { status };
+      client.setQueriesData<Issue[]>({ queryKey: ["issues", slug] }, (old) =>
+        Array.isArray(old) ? old.map((item) => (item.id === issue.id ? { ...item, ...moved } : item)) : old
       );
       return { snapshots };
     },

@@ -92,6 +92,28 @@ def test_personal_dashboard_and_widget_query_share_entity_layer(engine):
     assert client.post(dashboard_path(workspace, "widgets/data/"), {"widget": tab["widgets"][0]}, format="json").data["value"] == 1
 
 
+def test_activity_widget_identifies_actor_record_and_field(engine):
+    from plane.app.services.entity_records import emit
+
+    workspace, actor, client = engine
+    entity, _ = make_entity(engine)
+    record = create_record(engine, entity, {"title": "پیگیری فاکتور"})
+    emit(entity, actor, "record.field_changed", record["id"], "title", "پیش‌نویس", "پیگیری فاکتور")
+
+    response = client.post(dashboard_path(workspace, "widgets/data/"), {
+        "widget": {"type": "activity", "config": {"entity": "sample"}}
+    }, format="json")
+
+    assert response.status_code == 200, response.data
+    changed = next(item for item in response.data["items"] if item["event"] == "record.field_changed")
+    assert changed["record"] == "پیگیری فاکتور"
+    assert changed["actor"] == actor.display_name
+    assert changed["field"] == "عنوان"
+    assert changed["before"] == "پیش‌نویس"
+    assert changed["after"] == "پیگیری فاکتور"
+    assert all(item["event"] != "record.updated" for item in response.data["items"])
+
+
 def test_adding_widget_persists_immediately_in_backend(engine):
     workspace, _, client = engine
     opened = client.get(dashboard_path(workspace)).data

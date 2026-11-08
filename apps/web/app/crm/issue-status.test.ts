@@ -8,6 +8,11 @@ describe("Persian state labels", () => {
     ["Cancelled", "لغوشده"],
     ["Canceled", "لغوشده"],
     ["cancceled", "لغوشده"],
+    ["Todo", "برای انجام"],
+    ["In Progress", "در حال انجام"],
+    ["Review", "بازبینی"],
+    ["Done", "انجام‌شده"],
+    ["Blocked", "مسدود"],
     ["Custom state", "Custom state"],
   ])("shows %s as %s without changing its stored state", (name, expected) => {
     expect(stateNameFa(name)).toBe(expected);

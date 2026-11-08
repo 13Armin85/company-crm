@@ -6,6 +6,7 @@ vi.mock("./api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./api")>()),
   useProject: () => ({ data: { id: "revoked", name: "Previously cached project" }, isError: true, isLoading: false }),
   useIssues: () => ({ data: [] }),
+  useStates: () => ({ data: [] }),
   useMembers: () => ({ data: [] }),
   useWorkspaceAccess: () => ({ data: { is_admin: false, can: () => true } }),
   useCurrentUser: () => ({ data: { id: "member" } }),

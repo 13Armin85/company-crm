@@ -29,6 +29,7 @@ vi.mock("./api", async (importOriginal) => ({
       } as Issue,
     ],
   }),
+  useStates: () => ({ data: [] }),
   useMembers: () => ({
     data: ["assignee", "recipient"].map((id) => ({
       id,

@@ -168,15 +168,16 @@ function RelatedSection({ code, id, field }: { code: string; id: string; field: 
 export function RelatedRecords({ code, id }: { code: string; id: string }) {
   const { data: access } = useWorkspaceAccess();
   const schema = useEngineSchema(code, "", id);
-  if (!access?.can("Relation.View")) return null;
+  const fields = schema.data?.fields.filter(
+    (field) => field.kind === "relation" && !(["ticket", "task"].includes(code) && field.code === "project")
+  );
+  if (!access?.can("Relation.View") || !fields?.length) return null;
   return (
     <section aria-label="رکوردهای مرتبط">
       <h3>رکوردهای مرتبط</h3>
-      {schema.data?.fields
-        .filter((field) => field.kind === "relation")
-        .map((field) => (
-          <RelatedSection key={`${id}:${field.code}`} code={code} id={id} field={field} />
-        ))}
+      {fields.map((field) => (
+        <RelatedSection key={`${id}:${field.code}`} code={code} id={id} field={field} />
+      ))}
     </section>
   );
 }

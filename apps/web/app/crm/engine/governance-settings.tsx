@@ -3,8 +3,9 @@ import { useState } from "react";
 import { Hash, Plus, ShieldCheck } from "lucide-react";
 import { SearchableSelect } from "@plane/ui";
 import { Button } from "../components";
+import { browserId } from "../browser-id";
 import { errorMessage, useWorkspaceAccess } from "../api";
-import { useEngineCatalog, useEngineQuery, useEngineMutation } from "./api";
+import { useEngineCatalog, useEngineQuery, useEngineMutation, engineActionLabel } from "./api";
 
 type UniqueRule = {
   id: string;
@@ -333,7 +334,7 @@ export function EntityRules({ code, mode: panel = "all" }: { code: string; mode?
                       onChange={(value) => {
                         if (value === "__new__") {
                           setNewColumn(true);
-                          updateNumber({ field: `auto_number_${crypto.randomUUID().slice(0, 6)}`, title: "" });
+                          updateNumber({ field: `auto_number_${browserId().slice(0, 6)}`, title: "" });
                         } else {
                           setNewColumn(false);
                           const column = numberableColumns.find((item) => item.code === value);
@@ -489,7 +490,17 @@ export function EntityRules({ code, mode: panel = "all" }: { code: string; mode?
                   </Button>
                 </div>
               )}
-              <ErrorNotice message={mutation.error && errorMessage(mutation.error, "عملیات انجام نشد.")} />
+              <ErrorNotice
+                message={
+                  mutation.error &&
+                  errorMessage(
+                    mutation.error,
+                    mutation.variables
+                      ? engineActionLabel(mutation.variables.path, mutation.variables.method)
+                      : "ذخیرهٔ تنظیمات ستون‌های فهرست انتخابی انجام نشد"
+                  )
+                }
+              />
             </div>
           </div>
         </section>

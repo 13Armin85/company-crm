@@ -113,7 +113,7 @@ export function UserAccessPanel({ userId }: { userId: string }) {
             <input type="search" value={roleQuery} onChange={(event) => setRoleQuery(event.target.value)} />
           </label>
           {effectiveQuery.error ? (
-            <ErrorNotice message={"عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید."} />
+            <ErrorNotice message={errorMessage(effectiveQuery.error, "دریافت مجوزهای مؤثر این کاربر انجام نشد")} />
           ) : effectiveQuery.isLoading ? (
             <Skeleton rows={4} />
           ) : !visibleGrants.length ? (
@@ -314,7 +314,7 @@ export function UserAccessPanel({ userId }: { userId: string }) {
             <input type="search" value={directQuery} onChange={(event) => setDirectQuery(event.target.value)} />
           </label>
           {directTable.error ? (
-            <ErrorNotice message={"عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید."} />
+            <ErrorNotice message={errorMessage(directTable.error, "دریافت دسترسی‌های مستقیم این کاربر انجام نشد")} />
           ) : directTable.isLoading ? (
             <Skeleton rows={4} />
           ) : !direct.length ? (

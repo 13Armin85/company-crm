@@ -8,6 +8,7 @@ import {
   useOrganizationUserProfile,
   useUpdateOrganizationUserProfile,
   useWorkspaceAccess,
+  errorMessage,
 } from "../api";
 import { MultiSelector } from "../access/components";
 import { UserAccessPanel } from "../access/user-access";
@@ -41,7 +42,7 @@ export default function UserProfilePage() {
   }, [isDirty, setFormDirty]);
   if (accessLoading) return <Skeleton rows={6} />;
   if (!access?.can("User.View")) return <Navigate to="/my-work" replace />;
-  if (error) return <ErrorState message={"عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید."} />;
+  if (error) return <ErrorState message={errorMessage(error, "دریافت پروفایل این کاربر انجام نشد")} />;
   if (isLoading || !form) return <Skeleton rows={7} />;
   const canEdit = access.can("User.Edit");
   const canSave = canEdit || access.can("User.Role.Assign") || access.can("OrganizationUnit.Member.Manage");

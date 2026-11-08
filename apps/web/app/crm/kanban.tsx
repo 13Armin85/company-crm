@@ -1,11 +1,22 @@
 import { useCurrentUser, useWorkspaceAccess, useProjects, useMembers } from "./api";
 import { canChangeIssueStatus, canTransferIssue } from "./task-access";
 import { SearchableSelect } from "@plane/ui";
-import { DndContext, PointerSensor, useDraggable, useDroppable, useSensor, useSensors } from "@dnd-kit/core";
-import type { DragEndEvent, UniqueIdentifier } from "@dnd-kit/core";
+import { useState } from "react";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  pointerWithin,
+  rectIntersection,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import type { CollisionDetection, DragEndEvent, DragStartEvent, UniqueIdentifier } from "@dnd-kit/core";
 import { GripVertical, Plus } from "lucide-react";
 import { Avatar, IssueActionsMenu, PriorityBadge } from "./components";
-import type { Issue, Member, Project, Status } from "./types";
+import type { Issue, Member, Project, ProjectState, Status } from "./types";
 import { statusFa, toFa } from "./utils";
 
 export const ISSUE_STATUS_COLUMNS: { id: Status; color: string }[] = [
@@ -18,6 +29,34 @@ export const ISSUE_STATUS_COLUMNS: { id: Status; color: string }[] = [
 
 export const statusFromDropTarget = (id: UniqueIdentifier | undefined): Status | undefined =>
   ISSUE_STATUS_COLUMNS.find((column) => column.id === id)?.id;
+
+/** Prefer the column under the pointer; fall back to overlap when the pointer sits between columns. */
+export const kanbanCollision: CollisionDetection = (args) => {
+  const hits = pointerWithin(args);
+  return hits.length ? hits : rectIntersection(args);
+};
+
+const issueTitle = (id: UniqueIdentifier, issues: Issue[]) =>
+  `«${issues.find((issue) => issue.id === id)?.name || "کار"}»`;
+const columnTitle = (id: UniqueIdentifier | undefined, columns: { id: string; title: string }[]) =>
+  `«${columns.find((column) => column.id === id)?.title || "ستون"}»`;
+
+export const kanbanColumns = (states?: ProjectState[]) =>
+  states?.length
+    ? states.map((state) => ({
+        id: `state:${state.id}`,
+        status: state.status,
+        title: state.name,
+        color: state.color,
+        stateId: state.id,
+      }))
+    : ISSUE_STATUS_COLUMNS.map((column) => ({
+        id: column.id,
+        color: column.color,
+        status: column.id,
+        title: statusFa[column.id],
+        stateId: undefined,
+      }));
 
 function KanbanCard({
   issue,
@@ -47,7 +86,7 @@ function KanbanCard({
   const canTransfer =
     (!readOnly || allowTransfer) &&
     canTransferIssue(issue, user?.id, (code) => access?.can(code) === true, project ? [project] : projects);
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: issue.id,
     disabled: !canChangeStatus,
     data: { issue },
@@ -56,8 +95,12 @@ function KanbanCard({
   return (
     <article
       ref={setNodeRef}
-      className={`kanban-card ${isDragging ? "dragging" : ""}`}
-      style={{ transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined }}
+      className={`kanban-card ${isDragging ? "is-drag-source" : ""} ${canChangeStatus ? "" : "is-locked"}`}
+      title={
+        readOnly || canChangeStatus
+          ? undefined
+          : "فقط مسئول این کار یا کاربری با دسترسی ویرایش کارها می‌تواند وضعیت آن را با کشیدن تغییر دهد."
+      }
       {...listeners}
       {...cardAttributes}
     >
@@ -132,6 +175,7 @@ function KanbanCard({
 
 function KanbanColumn({
   id,
+  title,
   color,
   issues,
   project,
@@ -143,7 +187,8 @@ function KanbanColumn({
   readOnly = false,
   allowTransfer = false,
 }: {
-  id: Status;
+  id: string;
+  title: string;
   color: string;
   issues: Issue[];
   project?: Project;
@@ -161,10 +206,10 @@ function KanbanColumn({
       <header>
         <span>
           <i style={{ background: color }} />
-          {statusFa[id]} <b>{toFa(issues.length)}</b>
+          {title} <b>{toFa(issues.length)}</b>
         </span>
         {onCreate && (
-          <button type="button" onClick={onCreate} aria-label={`افزودن کار به ${statusFa[id]}`}>
+          <button type="button" onClick={onCreate} aria-label={`افزودن کار به ${title}`}>
             <Plus size={16} />
           </button>
         )}
@@ -194,6 +239,7 @@ export function IssueKanbanBoard({
   project,
   transferPresentation = "menu",
   onStatusChange,
+  states,
   onCreate,
   transferMembers,
   transferDisabled,
@@ -204,7 +250,8 @@ export function IssueKanbanBoard({
   issues: Issue[];
   project?: Project;
   transferPresentation?: "inline" | "menu";
-  onStatusChange: (issue: Issue, status: Status) => void;
+  onStatusChange: (issue: Issue, status: Status, nativeValue?: string) => void;
+  states?: ProjectState[];
   onCreate?: () => void;
   transferMembers?: Member[];
   transferDisabled?: boolean;
@@ -215,27 +262,54 @@ export function IssueKanbanBoard({
   const { data: user } = useCurrentUser();
   const { data: access } = useWorkspaceAccess();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  const columns = kanbanColumns(project ? states : undefined);
+  const [moving, setMoving] = useState<Issue | null>(null);
+  const dragStart = ({ active }: DragStartEvent) => setMoving((active.data.current?.issue as Issue) ?? null);
   const dragEnd = ({ active, over }: DragEndEvent) => {
+    setMoving(null);
     const issue = active.data.current?.issue as Issue | undefined;
-    const status = statusFromDropTarget(over?.id);
+    const target = columns.find((column) => column.id === over?.id);
     if (
       !readOnly &&
       issue &&
-      status &&
-      issue.status !== status &&
+      target &&
+      (target.stateId ? issue.stateId !== target.stateId : issue.status !== target.status) &&
       canChangeIssueStatus(issue, user?.id, (code) => access?.can(code) === true)
     )
-      onStatusChange(issue, status);
+      onStatusChange(issue, target.status, target.stateId);
   };
 
   return (
-    <DndContext sensors={sensors} onDragEnd={dragEnd}>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={kanbanCollision}
+      accessibility={{
+        screenReaderInstructions: {
+          draggable: "برای جابه‌جایی، کارت را بگیرید و روی ستون وضعیت دیگری رها کنید.",
+        },
+        announcements: {
+          onDragStart: ({ active }) => `کار ${issueTitle(active.id, issues)} برداشته شد.`,
+          onDragOver: ({ active, over }) =>
+            over ? `کار ${issueTitle(active.id, issues)} روی ستون ${columnTitle(over.id, columns)} است.` : undefined,
+          onDragEnd: ({ active, over }) =>
+            over
+              ? `کار ${issueTitle(active.id, issues)} در ستون ${columnTitle(over.id, columns)} رها شد.`
+              : `کار ${issueTitle(active.id, issues)} رها شد.`,
+          onDragCancel: ({ active }) => `جابه‌جایی کار ${issueTitle(active.id, issues)} لغو شد.`,
+        },
+      }}
+      onDragStart={dragStart}
+      onDragEnd={dragEnd}
+      onDragCancel={() => setMoving(null)}
+    >
       <div className="kanban-board">
-        {ISSUE_STATUS_COLUMNS.map((column) => (
+        {columns.map((column) => (
           <KanbanColumn
             key={column.id}
             {...column}
-            issues={issues.filter((issue) => issue.status === column.id)}
+            issues={issues.filter((issue) =>
+              column.stateId ? issue.stateId === column.stateId : issue.status === column.status
+            )}
             project={project}
             transferPresentation={transferPresentation}
             onCreate={readOnly ? undefined : onCreate}
@@ -247,6 +321,20 @@ export function IssueKanbanBoard({
           />
         ))}
       </div>
+      <DragOverlay dropAnimation={null}>
+        {moving ? (
+          <article className="kanban-card dragging kanban-card-overlay" dir="rtl">
+            <div className="kanban-card-top">
+              <span dir="ltr">
+                {moving.projectIdentifier}-{toFa(moving.sequenceId)}
+              </span>
+              <GripVertical size={16} />
+            </div>
+            <h3>{moving.name}</h3>
+            <p className="issue-people">مسئول: {moving.assignee?.displayName || "بدون مسئول"}</p>
+          </article>
+        ) : null}
+      </DragOverlay>
     </DndContext>
   );
 }

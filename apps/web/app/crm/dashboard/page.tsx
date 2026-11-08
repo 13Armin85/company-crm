@@ -32,8 +32,9 @@ import type { DashboardTab, DashboardWidget, WidgetType } from "./types";
 import { WidgetContent } from "./widget";
 import { DashboardWidgetSettings } from "./settings";
 import "../../../styles/dashboard.css";
+import { browserId } from "../browser-id";
 
-const identifier = () => crypto.randomUUID();
+const identifier = browserId;
 const duplicate = <T,>(value: T): T => structuredClone(value);
 const galleryGroup: Record<WidgetType, string> = {
   counter: "شاخص و نمودار",
@@ -171,7 +172,6 @@ export default function DashboardPage() {
       const result = await save.mutateAsync({ tabs: next, revision });
       setTabs(duplicate(result.tabs));
       setRevision(result.revision);
-      setEditing(false);
       toast(`تب «${title}» ساخته شد`, "success");
     } catch (error) {
       setEditing(true);
@@ -186,7 +186,6 @@ export default function DashboardPage() {
       setActiveId(result.tab_id);
       setConfiguredId(result.widget_id);
       setGallery(false);
-      setEditing(false);
       toast("ویجت افزوده و ذخیره شد", "success");
     } catch (error) {
       toast(errorMessage(error, "افزودن ویجت انجام نشد"), "error");
@@ -218,7 +217,15 @@ export default function DashboardPage() {
   }
   if (dashboard.isLoading) return <Skeleton rows={6} cards />;
   if (dashboard.isError)
-    return <ErrorState message="دریافت داشبورد انجام نشد." onRetry={() => void dashboard.refetch()} />;
+    return (
+      <ErrorState
+        message={errorMessage(
+          dashboard.error,
+          roleId ? "دریافت داشبورد پیش‌فرض نقش انجام نشد" : "دریافت داشبورد شخصی انجام نشد"
+        )}
+        onRetry={() => void dashboard.refetch()}
+      />
+    );
   return (
     <div className={`custom-dashboard ${editing ? "is-editing" : ""}`} dir="rtl">
       <header className="dashboard-hero">

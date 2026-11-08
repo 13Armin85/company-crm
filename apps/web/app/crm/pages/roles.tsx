@@ -49,7 +49,7 @@ export default function RolesPage() {
         }
       />
       <SearchBox value={query} onChange={setQuery} placeholder="جستجوی نام یا توضیح نقش…" />
-      <ErrorNotice message={error && "عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید."} />
+      <ErrorNotice message={error && errorMessage(error, "دریافت فهرست نقش‌های سازمانی انجام نشد")} />
       <ErrorNotice message={save.error && !editing && errorMessage(save.error, "تغییر وضعیت انجام نشد.")} />
       {isLoading ? (
         <Skeleton rows={5} />

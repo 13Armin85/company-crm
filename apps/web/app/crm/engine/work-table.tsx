@@ -170,8 +170,14 @@ export function WorkTable({
                 <span>{issue.assignee?.displayName || "بدون مسئول"}</span>
               </div>
             </td>
-            <td>
-              <IssueActionsMenu issue={issue} readOnly={readOnly} allowTransfer={allowTransfer} project={project} />
+            <td className="surface-work-actions">
+              <IssueActionsMenu
+                issue={issue}
+                readOnly={readOnly}
+                allowTransfer={allowTransfer}
+                project={project}
+                showStatus={false}
+              />
             </td>
           </tr>
         ))}

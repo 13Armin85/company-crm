@@ -9,6 +9,7 @@ import {
   useOrganizationUnits,
   useSaveTicketRoutingRule,
   useWorkspaceAccess,
+  errorMessage,
 } from "../api";
 import { Button, EmptyState, PageHeader, SearchBox, Skeleton } from "../components";
 import { useUIStore } from "../store";
@@ -213,7 +214,7 @@ export default function RoutingPage() {
               />
               <span>قانون فعال باشد</span>
             </label>
-            <ErrorNotice message={saveRule.isError && "عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید."} />
+            <ErrorNotice message={saveRule.isError && errorMessage(saveRule.error, "ذخیرهٔ قانون ارجاع انجام نشد")} />
             <footer>
               <Button variant="secondary" disabled={saveRule.isPending} onClick={() => setEditing(undefined)}>
                 انصراف

@@ -20,7 +20,7 @@ import { useWidgetData } from "./api";
 import { DashboardCalendar } from "./calendar";
 import { TeamWidget } from "./team";
 import type { DashboardWidget } from "./types";
-import { activityEventLabel, chartLabel, chartNumber, chartTooltipValue } from "./chart-labels";
+import { activityDescription, chartLabel, chartNumber, chartTooltipValue } from "./chart-labels";
 
 const colors = ["#5865d9", "#33a187", "#e4a93a", "#d57577", "#8c76d4"];
 const displayDate = (value: unknown) =>
@@ -30,6 +30,8 @@ const displayDate = (value: unknown) =>
         ...(String(value).includes("T") ? { hour: "2-digit" as const } : {}),
       })
     : "ثبت نشده";
+const activityTime = (value: unknown) =>
+  value ? persianDate(String(value), { year: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
 
 export function WidgetContent({ widget }: { widget: DashboardWidget }) {
   return widget.type === "team-cards" ? (
@@ -63,7 +65,10 @@ function DataWidget({ widget }: { widget: DashboardWidget }) {
     );
   if (result.isError)
     return (
-      <ErrorState message={errorMessage(result.error, "دریافت ویجت انجام نشد")} onRetry={() => void result.refetch()} />
+      <ErrorState
+        message={errorMessage(result.error, `دریافت ویجت «${widget.title || widget.type}» انجام نشد`)}
+        onRetry={() => void result.refetch()}
+      />
     );
   const data = result.data || {};
   if (data.hidden) return <div className="dashboard-empty-small">دادهٔ این ویجت در دسترسی شما نیست.</div>;
@@ -251,10 +256,14 @@ function DataWidget({ widget }: { widget: DashboardWidget }) {
     return (
       <div className="dashboard-mini-table">
         {items.length
-          ? items.map((item, index) => (
-              // eslint-disable-next-line react/no-array-index-key -- activity entries have no ids.
-              <div key={index}>
-                {activityEventLabel(item.event)} · {displayDate(item.at)}
+          ? items.map((item) => (
+              <div key={String(item.id)} className="dashboard-activity-item">
+                {item.event === "record.deleted" ? (
+                  <span>{activityDescription(item)}</span>
+                ) : (
+                  <Link to={`/entities/${entity}/${String(item.record_id)}`}>{activityDescription(item)}</Link>
+                )}{" "}
+                · <time dateTime={String(item.at)}>{activityTime(item.at)}</time>
               </div>
             ))
           : "فعالیتی ثبت نشده است."}

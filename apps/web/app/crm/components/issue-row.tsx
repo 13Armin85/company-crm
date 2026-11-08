@@ -4,7 +4,17 @@ import { Popover, PopoverButton, PopoverPanel } from "@headlessui/react";
 import { useContext, useMemo } from "react";
 import { ChoiceLabelsContext } from "../choice-label-context";
 import { Link, useNavigate } from "react-router";
-import { CircleDot, Clock3, FolderKanban, Inbox, MoreHorizontal } from "lucide-react";
+import {
+  Check,
+  CircleDot,
+  Clock3,
+  FileText,
+  FolderKanban,
+  Inbox,
+  MoreHorizontal,
+  Trash2,
+  UserRoundCog,
+} from "lucide-react";
 import {
   useCurrentUser,
   useDeleteIssue,
@@ -155,6 +165,7 @@ export function IssueActionsMenu({
   transferDisabled = false,
   onAssigneeChange,
   statusMutation,
+  showStatus = true,
 }: {
   issue: Issue;
   project?: Project;
@@ -164,6 +175,8 @@ export function IssueActionsMenu({
   transferDisabled?: boolean;
   onAssigneeChange?: (issue: Issue, assigneeId: string) => void;
   statusMutation?: ReturnType<typeof useUpdateIssueStatus>;
+  /** Tables already show an editable status column, so their menu skips the duplicate list. */
+  showStatus?: boolean;
 }) {
   const slug = useUIStore((state) => state.workspaceSlug) ?? "";
   const { data: access } = useWorkspaceAccess();
@@ -225,30 +238,54 @@ export function IssueActionsMenu({
             <MoreHorizontal size={16} />
           </PopoverButton>
           <PopoverPanel className="action-menu issue-action-menu" role="menu" anchor="bottom end" portal dir="rtl">
-            <Link to={`/edit/${issue.scope === "project" ? "ticket" : "task"}/${issue.id}`} onClick={() => close()}>
+            <header className="issue-action-head">
+              <strong title={issue.name}>{issue.name}</strong>
+              <small dir="ltr">{issueReference(issue)}</small>
+            </header>
+            <Link
+              className="issue-action-item"
+              to={`/edit/${issue.scope === "project" ? "ticket" : "task"}/${issue.id}`}
+              onClick={() => close()}
+            >
+              <FileText size={15} aria-hidden="true" />
               جزئیات و فرم کامل
             </Link>
-            {canChangeStatus && <small>تغییر وضعیت</small>}
-            {canChangeStatus &&
-              statusChoices.map((option) => (
-                <button
-                  key={option.id}
-                  disabled={option.id === (issue.stateId || issue.statusCode || issue.status) || updateStatus.isPending}
-                  onClick={() => {
-                    updateStatus.mutate({
-                      issue,
-                      status: option.status,
-                      ...(option.id !== option.status ? { nativeValue: option.id } : {}),
-                    });
-                    close();
-                  }}
-                >
-                  {option.title}
-                </button>
-              ))}
+            {canChangeStatus && showStatus && (
+              <section className="issue-action-section" aria-label="تغییر وضعیت">
+                <small>تغییر وضعیت</small>
+                <div className="issue-action-statuses">
+                  {statusChoices.map((option) => {
+                    const current = option.id === (issue.stateId || issue.statusCode || issue.status);
+                    return (
+                      <button
+                        key={option.id}
+                        role="menuitemradio"
+                        aria-checked={current}
+                        className={current ? "is-current" : undefined}
+                        disabled={current || updateStatus.isPending}
+                        onClick={() => {
+                          updateStatus.mutate({
+                            issue,
+                            status: option.status,
+                            ...(option.id !== option.status ? { nativeValue: option.id } : {}),
+                          });
+                          close();
+                        }}
+                      >
+                        {current && <Check size={13} aria-hidden="true" />}
+                        {option.title}
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
             {canTransfer && (
-              <div className="issue-transfer-control">
-                <label htmlFor={`issue-transfer-${issue.id}`}>انتقال به شخص دیگر</label>
+              <section className="issue-action-section issue-transfer-control">
+                <label htmlFor={`issue-transfer-${issue.id}`}>
+                  <UserRoundCog size={14} aria-hidden="true" />
+                  انتقال به شخص دیگر
+                </label>
                 <SearchableSelect
                   id={`issue-transfer-${issue.id}`}
                   label="انتقال به عضو دیگر"
@@ -267,17 +304,18 @@ export function IssueActionsMenu({
                   }}
                   options={transferOptions}
                 />
-              </div>
+              </section>
             )}
             {canDelete && (
               <button
-                className="danger-action"
+                className="danger-action issue-action-item"
                 disabled={deleteIssue.isPending}
                 onClick={() => {
                   if (window.confirm(`کار «${issue.name}» حذف شود؟`)) deleteIssue.mutate(issue);
                   close();
                 }}
               >
+                <Trash2 size={15} aria-hidden="true" />
                 حذف کار
               </button>
             )}

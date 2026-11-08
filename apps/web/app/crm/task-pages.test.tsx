@@ -124,6 +124,13 @@ describe("member task pages", () => {
     expect(html).toContain("ارسالی‌های من");
     expect(html).toContain("کار جدید");
   });
+  it("keeps task actions in one compact table column", () => {
+    const html = renderPage(<IssuesPage />);
+    expect(html).toContain("<th>عملیات</th>");
+    expect(html).toContain('class="surface-work-actions"');
+    expect(html).toContain('aria-label="عملیات کار"');
+    expect(html).not.toContain("has-inline-transfer");
+  });
   it("disables dragging and creation on read-only kanban cards", () => {
     const html = renderToStaticMarkup(
       <MemoryRouter>

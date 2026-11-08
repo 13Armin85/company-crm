@@ -1518,8 +1518,16 @@ a {
 }
 .kanban-card.dragging {
   z-index: 50;
-  opacity: 0.75;
+  opacity: 0.95;
   box-shadow: 0 15px 35px #1118272b;
+  cursor: grabbing;
+}
+.kanban-card.is-drag-source {
+  opacity: 0.35;
+  border-style: dashed;
+}
+.kanban-card.is-locked {
+  cursor: default;
 }
 .kanban-card-top {
   display: flex;
@@ -4134,6 +4142,82 @@ a {
   display: block;
   padding: 7px 9px;
   color: var(--text-muted);
+}
+.issue-action-menu {
+  width: min(270px, calc(100vw - 24px));
+  padding: 4px;
+}
+.issue-action-head {
+  display: grid;
+  gap: 2px;
+  padding: 8px 9px 7px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid var(--border);
+}
+.issue-action-head strong {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.issue-action-head small {
+  justify-self: end;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+.action-menu .issue-action-item {
+  gap: 8px;
+  padding: 8px 9px;
+  font-size: 12px;
+}
+.issue-action-item svg {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+.issue-action-section {
+  display: grid;
+  gap: 6px;
+  padding: 8px 9px;
+  border-top: 1px solid var(--border);
+}
+.issue-action-section > small,
+.issue-action-section > label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.issue-action-statuses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.action-menu .issue-action-statuses button {
+  width: auto;
+  gap: 4px;
+  padding: 4px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 11px;
+}
+.action-menu .issue-action-statuses button.is-current {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+  opacity: 1;
+}
+.action-menu .issue-action-item.danger-action {
+  margin-top: 2px;
+  color: var(--red);
+}
+.action-menu .issue-action-item.danger-action svg {
+  color: var(--red);
+}
+.surface-work-table th:last-child,
+.surface-work-actions {
+  width: 56px;
+  text-align: center;
 }
 .issue-action-menu .danger-action {
   color: var(--red);

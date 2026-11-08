@@ -106,7 +106,7 @@ export default function TeamPage() {
           )
         }
       />
-      <ErrorNotice message={error && "عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید."} />
+      <ErrorNotice message={error && errorMessage(error, "دریافت فهرست اعضای تیم انجام نشد")} />
       <div className="table-card team-table">
         <div className="table-toolbar">
           <h2>فهرست اعضا</h2>

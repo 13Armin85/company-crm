@@ -3,6 +3,7 @@
 from datetime import date, timedelta
 
 from django.db.models import Avg, Case, Count, F, IntegerField, Q, Sum, Value, When
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
@@ -123,6 +124,44 @@ def _chart_labels(query, path, values):
         key: item["title"]
         for key, item in value_labels(query, records).get(path, {}).items()
     }
+
+
+
+def _activity_value_labels(query, rows, fields):
+    """Readable titles for stored choice, user, relation and state values in activity events."""
+    from .entity_view_export import value_labels
+
+    samples = [
+        {"values": {row.field: value}}
+        for row in rows if row.field in fields
+        for value in (row.before, row.after) if value not in (None, "", [])
+    ]
+    if not samples:
+        return {}
+    try:
+        return {path: {key: item["title"] for key, item in found.items()} for path, found in value_labels(query, samples).items()}
+    except (KeyError, TypeError, ValueError):
+        return {}
+
+
+def _activity_value(value, labels):
+    """A short, readable form of one stored value; None when it cannot be shown meaningfully."""
+    if value in (None, "", []):
+        return ""
+    if isinstance(value, bool):
+        return "بله" if value else "خیر"
+    if isinstance(value, list):
+        parts = [_activity_value(item, labels) for item in value[:5]]
+        parts = [part for part in parts if part]
+        return "، ".join(parts) or None
+    if isinstance(value, (str, int, float)):
+        text = str(value)
+        if text in labels:
+            return str(labels[text])[:80]
+        if len(text) == 36 and text.count("-") == 4:
+            return None  # An unresolved identifier says nothing to a reader.
+        return text[:80]
+    return None
 
 
 def widget_data(widget, request, workspace):
@@ -256,8 +295,42 @@ def widget_data(widget, request, workspace):
         rows = query.rows.filter(**{f"{alias}__gte": first, f"{alias}__lt": last}).order_by(alias).values(*fields)[:100]
         return {"type": kind, "items": [{"id": str(row["source_id"]), "date": json_value(row[alias]), "title": str(row[title_alias]) if title_alias else ""} for row in rows]}
     if kind == "activity":
-        rows = EntityEvent.objects.filter(workspace=workspace, entity=entity, record_id__in=query.rows.values("source_id")).order_by("-created_at")[:30]
-        return {"type": kind, "items": [{"id": str(row.id), "event": row.event_type, "at": row.created_at.isoformat(), "record_id": str(row.record_id)} for row in rows]}
+        rows = list(EntityEvent.objects.filter(
+            workspace=workspace, entity=entity,
+            record_id__in=query.rows.annotate(public_id=Coalesce("source_id", "id")).values("public_id"),
+        ).exclude(event_type="record.updated").select_related("created_by").order_by("-created_at")[:30])
+        title_path = entity.title_field or "title"
+        title_alias = query.scalar(title_path) if query.path_allowed(title_path) else None
+        record_rows = query.rows.filter(
+            Q(source_id__in=[row.record_id for row in rows]) | Q(id__in=[row.record_id for row in rows])
+        ).values(*(("id", "source_id", "number", "data", title_alias) if title_alias else ("id", "source_id", "number", "data")))
+        records = {
+            str(item["source_id"] or item["id"]): (item["number"], item["data"], item.get(title_alias) if title_alias else None)
+            for item in record_rows
+        }
+        fields = {row.field for row in rows if row.field and query.path_allowed(row.field)}
+        labels = _activity_value_labels(query, rows, fields)
+        items = []
+        for row in rows:
+            number, data, native_title = records.get(str(row.record_id), ("", {}, None))
+            field = row.field if row.field in fields else ""
+            field_title = query.describe(field)["title"] if field else ""
+            # Deleted records are gone from the table; their last snapshot still carries the title.
+            snapshot = data if isinstance(data, dict) and data else (row.before if isinstance(row.before, dict) else {})
+            if not snapshot and isinstance(row.after, dict):
+                snapshot = row.after
+            title = native_title or snapshot.get(title_path) or snapshot.get("title") or snapshot.get("name")
+            if not title_alias:
+                title = None
+            actor = (row.created_by.display_name or row.created_by.email) if row.created_by else "سیستم"
+            items.append({
+                "id": str(row.id), "event": row.event_type, "at": row.created_at.isoformat(),
+                "record_id": str(row.record_id), "record": str(title or (f"شماره {number}" if number else "رکورد بدون عنوان")),
+                "entity": entity.title, "actor": actor, "field": field_title,
+                "before": _activity_value(row.before, labels.get(field, {})) if field else None,
+                "after": _activity_value(row.after, labels.get(field, {})) if field else None,
+            })
+        return {"type": kind, "items": items}
     if kind == "absences":
         if entity.code != "leave":
             raise ValidationError("برای ویجت عدم حضور، منبع «عدم حضور» را انتخاب کنید.")

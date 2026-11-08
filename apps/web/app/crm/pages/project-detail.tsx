@@ -33,9 +33,11 @@ import {
   useProject,
   useRemoveProjectMember,
   useReassignIssue,
+  useStates,
   useUpdateIssueStatus,
   useWorkspaceAccess,
   useCycles,
+  errorMessage,
 } from "../api";
 import { Avatar, AvatarStack, Button, EmptyState, IssueRow, PersianDateInput, Skeleton, TabBar } from "../components";
 import { IssueCalendar } from "../issue-calendar";
@@ -65,6 +67,7 @@ export default function ProjectDetailPage() {
   const setCreate = useUIStore((state) => state.setCreateOpen);
   const projectQuery = useProject(id);
   const issuesQuery = useIssues(undefined, id);
+  const statesQuery = useStates(id);
   const membersQuery = useMembers(undefined, id);
   const workspaceMembersQuery = useMembers();
   const { data: access } = useWorkspaceAccess();
@@ -201,7 +204,8 @@ export default function ProjectDetailPage() {
         <IssueKanbanBoard
           issues={issues}
           project={project}
-          onStatusChange={(issue, status) => updateStatus.mutate({ issue, status })}
+          states={statesQuery.data}
+          onStatusChange={(issue, status, nativeValue) => updateStatus.mutate({ issue, status, nativeValue })}
           transferPresentation="inline"
           onCreate={access?.can("Issue.Create") ? () => setCreate(true, "issue") : undefined}
           transferMembers={members}
@@ -451,9 +455,7 @@ function CyclesTab({
             />
           </label>
           <ErrorNotice message={start && end && end <= start && "پایان چرخه باید بعد از شروع آن باشد."} />
-          <ErrorNotice
-            message={createCycle.isError && "عملیات انجام نشد؛ اطلاعات واردشده را بررسی و دوباره تلاش کنید."}
-          />
+          <ErrorNotice message={createCycle.isError && errorMessage(createCycle.error, "ساخت چرخهٔ پروژه انجام نشد")} />
           <Button type="submit" icon={Plus} disabled={createCycle.isPending || Boolean(start && end && end <= start)}>
             ساخت چرخه
           </Button>
