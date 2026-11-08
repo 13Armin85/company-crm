@@ -21,7 +21,7 @@ import { persianDate } from "../utils";
 import { useEngineForm, useEngineMutation, useEngineDefinitions } from "./api";
 import type { EntityDefinition, FieldDefinition, LookupDefinition, LookupOptionDefinition } from "./api";
 import { DefinitionEditor } from "./definition-editor";
-import { DefaultValueEditor, dynamicDefaultsFor } from "./default-value-editor";
+import { DefaultValueEditor, automaticDefaultMode, dynamicDefaultsFor } from "./default-value-editor";
 import { ConditionEditor, conditionProblems } from "./rule-editors";
 import { useSchemaTransport } from "./record-form";
 
@@ -68,12 +68,14 @@ export function FormDesigner({
   fields,
   entities,
   onFieldCreated,
+  onManageLookups,
   viewMode = "layout",
 }: {
   entity: EntityDefinition;
   fields: FieldDefinition[];
   entities: EntityDefinition[];
   onFieldCreated?: () => void;
+  onManageLookups?: () => void;
   viewMode?: "fields" | "layout" | "preview" | "versions";
 }) {
   const form = useEngineForm(entity.code),
@@ -328,6 +330,15 @@ export function FormDesigner({
                 if (creatingField && created?.code) addField(created.code);
                 onFieldCreated?.();
               }}
+              onManageLookups={
+                onManageLookups
+                  ? () => {
+                      setCreatingField(false);
+                      setEditingField(null);
+                      onManageLookups();
+                    }
+                  : undefined
+              }
             />
           </div>
         </div>
@@ -704,28 +715,27 @@ export function FormDesigner({
                     className="button button-ghost"
                     onClick={() => updateBinding({ default: undefined })}
                   >
-                    حذف مقدار اولیه این فرم
+                    بازگشت به مقدار اولیهٔ تنظیمات ورودی
                   </button>
                   <SearchableSelect
                     showLabel
-                    label="پر شدن خودکار"
-                    value={
-                      selectedBinding.default &&
-                      typeof selectedBinding.default === "object" &&
-                      "dynamic" in selectedBinding.default
-                        ? selectedBinding.default.dynamic
-                        : ""
-                    }
+                    label="پر شدن خودکار هنگام ثبت رکورد جدید"
+                    value={automaticDefaultMode(selectedBinding, selectedField.config)}
                     options={[
-                      { id: "", title: "خودکار پر نشود" },
+                      { id: "", title: "بدون مقدار اولیهٔ خودکار" },
                       { id: "current_user", title: "کاربر جاری" },
                       { id: "today", title: "امروز" },
                       { id: "now", title: "زمان جاری" },
                     ].filter((option) => !option.id || dynamicDefaultsFor(selectedField.kind).includes(option.id))}
                     onChange={(v) =>
-                      updateBinding({ default: v ? { dynamic: v as "today" | "now" | "current_user" } : undefined })
+                      updateBinding({ default: v ? { dynamic: v as "today" | "now" | "current_user" } : null })
                     }
                   />
+                  <p>
+                    این مقدار فقط هنگام ساخت رکورد جدید از کاربر واردشده، تاریخ امروز یا زمان جاری گرفته می‌شود؛ رکوردهای
+                    قبلی و ویرایش‌های بعدی را تغییر نمی‌دهد. «بدون مقدار اولیهٔ خودکار» پیش‌فرض این فرم را پاک می‌کند؛ دکمهٔ
+                    بالا تنظیم اصلی ورودی را دوباره اعمال می‌کند.
+                  </p>
                   {(["view_roles", "edit_roles"] as const).map((key) => (
                     <fieldset key={key}>
                       <legend>

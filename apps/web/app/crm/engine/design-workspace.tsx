@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import { CloseOutline, SearchOutline } from "@makeplane/propel/icons";
-import { Eye, GitBranch, History, LayoutTemplate, ListChecks, ShieldCheck, Table2 } from "lucide-react";
+import { Eye, GitBranch, History, LayoutTemplate, ListChecks, ListPlus, ShieldCheck, Table2 } from "lucide-react";
 import { normalizePersianSearch } from "@plane/ui";
 import { Button, Skeleton } from "../components";
 import { errorMessage, useWorkspaceAccess } from "../api";
@@ -11,14 +11,16 @@ import { PageEditor } from "./page-studio";
 import { OfficialTableDesigner } from "./official-table-designer";
 import { EntityRules, GovernanceSettings } from "./governance-settings";
 import { FieldLifecycleSettings } from "./field-lifecycle-settings";
+import { LookupSettings } from "./lookup-settings";
 import { RelationSettings } from "./relation-settings";
 import { useEngineCatalog, useEngineDefinitions, useEngineForm, useEngineQuery } from "./api";
 import type { FieldDefinition } from "./api";
 
-type DesignTab = "fields" | "layout" | "preview" | "versions" | "table" | "rules" | "relations";
+type DesignTab = "fields" | "choices" | "layout" | "preview" | "versions" | "table" | "rules" | "relations";
 type Surface = { code: string; path: string; title: string; native_columns: string[] };
 const tabs: { id: DesignTab; label: string; hint: string; icon: typeof ListChecks }[] = [
   { id: "fields", label: "ورودی‌های فرم", hint: "چه اطلاعاتی از کاربر گرفته شود", icon: ListChecks },
+  { id: "choices", label: "لیست‌های انتخابی", hint: "گزینه‌های انتخاب تکی، چندتایی و وابسته", icon: ListPlus },
   { id: "layout", label: "چیدمان فرم", hint: "ترتیب ورودی‌ها، بخش‌ها و تب‌ها", icon: LayoutTemplate },
   { id: "preview", label: "پیش‌نمایش", hint: "امتحان فرم همان‌طور که کاربر می‌بیند", icon: Eye },
   { id: "versions", label: "نسخه‌های قبلی", hint: "بازگشت به چیدمان‌های قبلی", icon: History },
@@ -180,7 +182,8 @@ export function DesignWorkspace() {
                     entity={entity}
                     fields={fields.data}
                     entities={entities}
-                    viewMode={tab === "table" || tab === "rules" || tab === "relations" ? "layout" : tab}
+                    viewMode={tab === "fields" || tab === "preview" || tab === "versions" ? tab : "layout"}
+                    onManageLookups={() => setTab("choices")}
                   />
                 )}
               </div>
@@ -215,6 +218,7 @@ export function DesignWorkspace() {
                 </div>
               )}
               {tab === "relations" && <RelationSettings key={code} entityCode={code} />}
+              {tab === "choices" && <LookupSettings />}
             </section>
           </>
         ) : (

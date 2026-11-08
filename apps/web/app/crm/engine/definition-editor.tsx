@@ -8,10 +8,11 @@ import { useEngineMutation, useEngineDefinitions, useEngineCatalog } from "./api
 import type { EntityDefinition, FieldDefinition, LookupDefinition, LookupOptionDefinition } from "./api";
 import { ConditionEditor, FormulaEditor, conditionProblems } from "./rule-editors";
 import { useUIStore } from "../store";
+import { browserId } from "../browser-id";
 
 const textKinds = new Set(["short_text", "long_text", "email", "phone", "url"]);
 const numberKinds = new Set(["integer", "decimal", "money", "percent"]);
-const choiceKinds = new Set(["select", "multi_select", "relation"]);
+const choiceKinds = new Set(["select", "multi_select"]);
 
 export type DefinitionKind = "entities" | "fields" | "lookups" | "values";
 export type EditableDefinition = Partial<
@@ -23,11 +24,13 @@ export function DefinitionEditor({
   row,
   onClose,
   onSaved,
+  onManageLookups,
 }: {
   kind: DefinitionKind;
   row?: EditableDefinition;
   onClose: () => void;
   onSaved?: (row?: EditableDefinition) => void;
+  onManageLookups?: () => void;
 }) {
   const { data: catalog } = useEngineCatalog();
   const { data: fields = [] } = useEngineDefinitions<FieldDefinition>("fields", kind === "fields");
@@ -41,8 +44,11 @@ export function DefinitionEditor({
   );
   const { data: permissions = [] } = useOrganizationPermissions(undefined, kind === "entities");
   const mutation = useEngineMutation();
-  const [data, setData] = useState<EditableDefinition>({
-    code: "",
+  const [data, setData] = useState<EditableDefinition>(() => ({
+    code:
+      kind === "lookups" || kind === "values"
+        ? `${kind === "lookups" ? "list" : "option"}_${browserId().replaceAll("-", "").slice(0, 10)}`
+        : "",
     title: "",
     description: "",
     is_active: true,
@@ -52,7 +58,7 @@ export function DefinitionEditor({
     position: 0,
     numbering: { prefix: "REC", padding: 5 },
     ...row,
-  });
+  }));
   const set = <K extends keyof EditableDefinition>(key: K, value: EditableDefinition[K]) =>
     setData((old) => ({ ...old, [key]: value }));
   const config = data.config || {},
@@ -313,7 +319,7 @@ export function DefinitionEditor({
             </label>
           </div>
           <SearchableSelect
-            label="مقدار والد"
+            label="مقدار والد (برای لیست وابسته)"
             value={data.parent || ""}
             options={[
               { id: "", title: "بدون والد" },
@@ -326,6 +332,9 @@ export function DefinitionEditor({
             ]}
             onChange={(v) => set("parent", v || null)}
           />
+          <small>
+            برای گزینهٔ مستقل «بدون والد» را نگه دارید؛ برای گزینهٔ وابسته، مقدار متناظر از لیست والد را انتخاب کنید.
+          </small>
           <label className="engine-checkbox">
             <input
               type="checkbox"
@@ -373,13 +382,26 @@ export function DefinitionEditor({
           <fieldset disabled={locked} className="engine-config-fields">
             <legend>قواعد پر کردن</legend>
             {["select", "multi_select"].includes(data.kind || "") && (
-              <SearchableSelect
-                label="گزینه‌ها از کدام لیست پایه خوانده شوند؟"
-                disabled={locked}
-                value={data.lookup || ""}
-                options={lookups.map((l) => ({ id: l.id, title: l.title }))}
-                onChange={(v) => set("lookup", v || null)}
-              />
+              <div>
+                <SearchableSelect
+                  label="منبع گزینه‌ها (لیست پایه)"
+                  showLabel
+                  disabled={locked}
+                  value={data.lookup || ""}
+                  options={lookups
+                    .filter((item) => item.is_active || item.id === data.lookup)
+                    .map((item) => ({ id: item.id, title: item.is_active ? item.title : `${item.title} (غیرفعال)` }))}
+                  onChange={(v) => set("lookup", v || null)}
+                />
+                <small>
+                  هر گزینه یک مقدار در این لیست است. ابتدا لیست و گزینه‌ها را بسازید، سپس لیست را اینجا انتخاب کنید.
+                </small>
+                {onManageLookups && !locked && (
+                  <Button variant="secondary" onClick={onManageLookups}>
+                    ساخت یا ویرایش لیست و گزینه‌ها
+                  </Button>
+                )}
+              </div>
             )}
             {data.kind === "relation" && (
               <>
@@ -502,16 +524,26 @@ export function DefinitionEditor({
               </>
             )}
             {choiceKinds.has(data.kind || "") && (
-              <SearchableSelect
-                label="گزینه‌ها به انتخاب کدام ورودی وابسته باشد؟"
-                disabled={locked}
-                value={config.depends_on || ""}
-                options={[
-                  { id: "", title: "وابسته نیست" },
-                  ...fields.filter((f) => f.code !== data.code).map((f) => ({ id: f.code, title: f.title })),
-                ]}
-                onChange={(v) => updateConfig({ depends_on: v || undefined })}
-              />
+              <div>
+                <SearchableSelect
+                  label="فیلد والد برای محدود کردن گزینه‌ها"
+                  showLabel
+                  disabled={locked}
+                  value={config.depends_on || ""}
+                  options={[
+                    { id: "", title: "وابسته نیست؛ همهٔ گزینه‌های لیست نمایش داده شوند" },
+                    ...fields
+                      .filter((f) => f.is_active && f.kind === "select" && f.lookup && f.code !== data.code)
+                      .map((f) => ({ id: f.code, title: f.title })),
+                  ]}
+                  onChange={(v) => updateConfig({ depends_on: v || undefined })}
+                />
+                <small>
+                  «وابسته نیست» یعنی انتخاب این فیلد از فیلد دیگری تأثیر نمی‌گیرد. برای وابستگی، فیلد والد باید از نوع
+                  انتخاب تکی و در همین فرم باشد؛ برای هر گزینهٔ فرزند هم «مقدار والد» را در تب لیست‌های انتخابی تعیین
+                  کنید.
+                </small>
+              </div>
             )}
             {data.kind === "computed" ? (
               <FormulaEditor value={config.formula} onChange={(formula) => updateConfig({ formula })} fields={fields} />

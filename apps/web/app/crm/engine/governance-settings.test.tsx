@@ -80,11 +80,15 @@ describe("data rules designer", () => {
     expect(html).toContain("هنوز قاعده‌ای تعریف نشده است.");
     expect(html).toContain("هنوز ستون شماره‌گذاری تعریف نشده است.");
     expect(html).toContain("پیش‌نمایش شماره‌دهی");
+    expect(html).toContain("ستون تازه‌ای برای شماره‌گذاری ساخته می‌شود");
+    expect(html).toContain("نام ستون جدید");
+    expect(html).not.toContain("کدام ستون شماره خودکار بگیرد؟");
   });
 
   it("offers the current form's empty columns without requiring field-library access", () => {
     const html = renderRules([], [], [{ code: "contract_no", title: "شماره قرارداد" }]);
     expect(html).toContain("شماره قرارداد");
+    expect(html).toContain("کدام ستون شماره خودکار بگیرد؟");
     expect(html).not.toContain("ستون متن کوتاه خالی در این فرم وجود ندارد");
   });
 });

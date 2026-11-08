@@ -1,5 +1,13 @@
 import { SchemaDrivenForm } from "@plane/ui";
-import type { EntityFormSchema, FieldConfig, FieldKind, FieldValue, OptionsLoader, SchemaOption } from "@plane/ui";
+import type {
+  EntityFormSchema,
+  FieldBinding,
+  FieldConfig,
+  FieldKind,
+  FieldValue,
+  OptionsLoader,
+  SchemaOption,
+} from "@plane/ui";
 import { api, useMembers, useOrganizationRoles, useOrganizationUnits } from "../api";
 import { useEngineCatalog, useEngineDefinitions, useEngineSlug, enginePath } from "./api";
 import type { LookupOptionDefinition, EnginePage } from "./api";
@@ -20,6 +28,12 @@ export function dynamicDefaultsFor(kind: FieldKind | undefined) {
     ...(["date", "date_range", "datetime", "short_text", "long_text"].includes(kind || "") ? ["today"] : []),
     ...(["datetime", "short_text", "long_text"].includes(kind || "") ? ["now"] : []),
   ];
+}
+
+export function automaticDefaultMode(binding: FieldBinding, config: FieldConfig) {
+  const value = binding.default === undefined ? config.default : binding.default;
+  if (value && typeof value === "object" && "dynamic" in value) return value.dynamic;
+  return binding.default === undefined ? config.default_dynamic || "" : "";
 }
 
 export function DefaultValueEditor({

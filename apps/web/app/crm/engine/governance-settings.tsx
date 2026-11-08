@@ -89,6 +89,11 @@ export function EntityRules({ code, mode: panel = "all" }: { code: string; mode?
   const subtypes = (catalog.data?.entities || []).filter((candidate) => candidate.parent === entity?.id);
   const numberableColumns = numbering.data?.candidates || [];
   const [newColumn, setNewColumn] = useState(false);
+  const [newColumnCode, setNewColumnCode] = useState(() => `auto_number_${browserId().slice(0, 8)}`);
+  const creatingNewColumn = !editing && (newColumn || (!numbering.isLoading && !numberableColumns.length));
+  const numberSettings = creatingNewColumn
+    ? { ...number, field: newColumn ? number.field || newColumnCode : newColumnCode }
+    : number;
   return (
     <div className="engine-rules-layout">
       {panel !== "numbering" && access?.can("UniqueRule.Manage") && (
@@ -308,13 +313,16 @@ export function EntityRules({ code, mode: panel = "all" }: { code: string; mode?
                   <Plus size={17} />
                 </span>
                 <div>
-                  <h4>{editing ? "ویرایش شماره‌گذاری" : "ستون جدید"}</h4>
-                  <p>رکوردهای قبلی هم شماره می‌گیرند؛ قبل از تأیید، پیش‌نمایش را ببینید.</p>
+                  <h4>{editing ? "ویرایش شماره‌گذاری" : "افزودن شماره‌گذاری خودکار"}</h4>
+                  <p>
+                    فرم باید منتشر شده باشد. شماره‌های جدید به‌ترتیب ساخته می‌شوند و رکوردهای قبلی پس از تأیید پیش‌نمایش
+                    شماره می‌گیرند.
+                  </p>
                 </div>
               </div>
               <div className="engine-rules-fields">
                 {!editing && !numberableColumns.length && !numbering.isLoading && (
-                  <p>ستون متن کوتاه خالی در این فرم وجود ندارد؛ می‌توانید ستون جدید بسازید.</p>
+                  <p>ستون متن کوتاه خالی در این فرم وجود ندارد؛ ستون تازه‌ای برای شماره‌گذاری ساخته می‌شود.</p>
                 )}
                 {editing ? (
                   <div className="engine-rules-column-readonly">
@@ -323,26 +331,29 @@ export function EntityRules({ code, mode: panel = "all" }: { code: string; mode?
                   </div>
                 ) : (
                   <>
-                    <SearchableSelect
-                      showLabel
-                      label="کدام ستون شماره خودکار بگیرد؟"
-                      value={newColumn ? "__new__" : number.field}
-                      options={[
-                        ...numberableColumns.map((column) => ({ id: column.code, title: column.title })),
-                        { id: "__new__", title: "+ ساخت ستون جدید" },
-                      ]}
-                      onChange={(value) => {
-                        if (value === "__new__") {
-                          setNewColumn(true);
-                          updateNumber({ field: `auto_number_${browserId().slice(0, 6)}`, title: "" });
-                        } else {
-                          setNewColumn(false);
-                          const column = numberableColumns.find((item) => item.code === value);
-                          updateNumber({ field: value, title: column?.title || "" });
-                        }
-                      }}
-                    />
-                    {newColumn && (
+                    {numbering.isLoading && <p>در حال دریافت ستون‌های قابل شماره‌گذاری…</p>}
+                    {!numbering.isLoading && !!numberableColumns.length && (
+                      <SearchableSelect
+                        showLabel
+                        label="کدام ستون شماره خودکار بگیرد؟"
+                        value={newColumn ? "__new__" : number.field}
+                        options={[
+                          ...numberableColumns.map((column) => ({ id: column.code, title: column.title })),
+                          { id: "__new__", title: "+ ساخت ستون جدید" },
+                        ]}
+                        onChange={(value) => {
+                          if (value === "__new__") {
+                            setNewColumn(true);
+                            updateNumber({ field: newColumnCode, title: "" });
+                          } else {
+                            setNewColumn(false);
+                            const column = numberableColumns.find((item) => item.code === value);
+                            updateNumber({ field: value, title: column?.title || "" });
+                          }
+                        }}
+                      />
+                    )}
+                    {creatingNewColumn && (
                       <label>
                         نام ستون جدید
                         <input
@@ -438,12 +449,14 @@ export function EntityRules({ code, mode: panel = "all" }: { code: string; mode?
                 </>
               ) : (
                 <Button
-                  disabled={!number.field || !number.title.trim() || mutation.isPending}
+                  disabled={
+                    !numberSettings.field || !numberSettings.title.trim() || mutation.isPending || numbering.isLoading
+                  }
                   onClick={() =>
                     void mutation
                       .mutateAsync({
                         path: `entities/${code}/numbering-rules/`,
-                        data: { ...number, action: "preview" },
+                        data: { ...numberSettings, action: "preview" },
                       })
                       .then((result) => setPreview(result as NonNullable<typeof preview>))
                       .catch(() => {})
@@ -467,11 +480,12 @@ export function EntityRules({ code, mode: panel = "all" }: { code: string; mode?
                         void mutation
                           .mutateAsync({
                             path: `entities/${code}/numbering-rules/`,
-                            data: { ...number, confirmation_token: preview.confirmation_token },
+                            data: { ...numberSettings, confirmation_token: preview.confirmation_token },
                           })
                           .then(() => {
                             setPreview(null);
                             setNewColumn(false);
+                            setNewColumnCode(`auto_number_${browserId().slice(0, 8)}`);
                             setNumber({
                               field: "",
                               title: "",
