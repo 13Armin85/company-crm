@@ -36,18 +36,33 @@ vi.mock("../api", async () => ({
 import { DefinitionEditor } from "./definition-editor";
 import { LookupSettings } from "./lookup-settings";
 
-function render(element: ReactNode) {
+function render(element: ReactNode, empty = false) {
   const client = new QueryClient();
   useUIStore.setState({ workspaceSlug: "" });
   const cache = (kind: string, rows: unknown[]) =>
     client.setQueryData(["entity-engine", "", kind, `definitions/${kind}/`], rows);
-  cache("lookups", [
-    { id: "countries", code: "countries", title: "کشورها", is_active: true },
-    { id: "cities", code: "cities", title: "شهرها", is_active: true },
-  ]);
+  cache(
+    "lookups",
+    empty
+      ? []
+      : [
+          { id: "cities", code: "cities", title: "شهرها", is_active: true },
+          { id: "countries", code: "countries", title: "کشورها", is_active: true },
+        ]
+  );
   cache("values", [
     { id: "iran", category: "countries", code: "iran", title: "ایران", position: 0, is_active: true },
-    { id: "tehran", category: "cities", code: "tehran", title: "تهران", parent: "iran", position: 0, is_active: true },
+    {
+      id: "tehran",
+      category: "cities",
+      code: "tehran",
+      title: "تهران",
+      parent: "iran",
+      position: 0,
+      is_active: true,
+      is_default: true,
+    },
+    { id: "shiraz", category: "cities", code: "shiraz", title: "شیراز", position: 1, is_active: false },
   ]);
   cache("fields", [
     { id: "country", code: "country", title: "کشور", kind: "select", lookup: "countries", is_active: true },
@@ -60,12 +75,19 @@ function render(element: ReactNode) {
 }
 
 describe("choice lists in form design", () => {
-  it("shows where options are added and how dependent options are linked", () => {
+  it("shows searchable lists, option status, parent, and edit controls", () => {
     const html = render(<LookupSettings />);
     expect(html).toContain("ساخت لیست جدید");
     expect(html).toContain("افزودن گزینه به این لیست");
     expect(html).toContain("ایران");
     expect(html).toContain("مقدار والد");
+    expect(html).toContain("جست‌وجوی لیست");
+    expect(html).toContain("جست‌وجوی گزینه در شهرها");
+    expect(html).toContain("والد: ایران");
+    expect(html).toContain("پیش‌فرض");
+    expect(html).toContain("غیرفعال");
+    expect(html).toContain('aria-pressed="true"');
+    expect(html).toContain('aria-label="ویرایش گزینهٔ تهران"');
   });
 
   it("only offers single-choice list fields as dependency parents", () => {
@@ -82,5 +104,12 @@ describe("choice lists in form design", () => {
     expect(html).toContain('<option value="country">کشور</option>');
     expect(html).not.toContain('<option value="description">');
     expect(html).not.toContain('<option value="tags">');
+  });
+
+  it("guides the user to create the first list when none exists", () => {
+    const html = render(<LookupSettings />, true);
+    expect(html).toContain("اولین لیست انتخابی را بسازید");
+    expect(html).toContain("ساخت لیست جدید");
+    expect(html).not.toContain("افزودن گزینه به این لیست");
   });
 });

@@ -174,11 +174,25 @@ export function DefinitionEditor({
       </header>
       <div className="engine-editor-grid">
         <label>
-          {kind === "fields" ? "نام ورودی (همان چیزی که کاربر می‌بیند)" : "عنوان"}
+          {kind === "fields"
+            ? "نام ورودی (همان چیزی که کاربر می‌بیند)"
+            : kind === "lookups"
+              ? "نام لیست"
+              : kind === "values"
+                ? "متن گزینه (همان چیزی که کاربر می‌بیند)"
+                : "عنوان"}
           <input
             required
             value={data.title || ""}
-            placeholder={kind === "fields" ? "مثلاً شماره تماس مشتری" : undefined}
+            placeholder={
+              kind === "fields"
+                ? "مثلاً شماره تماس مشتری"
+                : kind === "lookups"
+                  ? "مثلاً شهرها"
+                  : kind === "values"
+                    ? "مثلاً تهران"
+                    : undefined
+            }
             onChange={(e) => set("title", e.target.value)}
           />
         </label>
@@ -197,7 +211,9 @@ export function DefinitionEditor({
           <small>
             {kind === "fields" && locked
               ? "این ورودی داده ثبت‌شده دارد؛ کد آن ثابت می‌ماند."
-              : "برای گزارش‌ها و اتصال‌ها استفاده می‌شود و در فرم دیده نمی‌شود."}
+              : kind === "lookups" || kind === "values"
+                ? "کد به‌صورت خودکار ساخته شده است؛ فقط در صورت نیاز آن را تغییر دهید."
+                : "برای گزارش‌ها و اتصال‌ها استفاده می‌شود و در فرم دیده نمی‌شود."}
           </small>
         </label>
       </div>
@@ -318,6 +334,16 @@ export function DefinitionEditor({
               <input value={data.icon || ""} onChange={(e) => set("icon", e.target.value)} />
             </label>
           </div>
+          <label>
+            جایگاه نمایش
+            <input
+              type="number"
+              step={1}
+              value={data.position ?? 0}
+              onChange={(e) => set("position", Number(e.target.value))}
+            />
+            <small>گزینه‌های دارای جایگاه کمتر، زودتر نمایش داده می‌شوند.</small>
+          </label>
           <SearchableSelect
             label="مقدار والد (برای لیست وابسته)"
             value={data.parent || ""}
