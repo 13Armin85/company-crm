@@ -27,6 +27,7 @@ import {
 import { useUIStore } from "../store";
 import type { Issue, Member, Project, Status } from "../types";
 import { persianDate, statusFa } from "../utils";
+import { stateNameFa } from "../issue-status";
 import { issueReference, matchesRecordSearch } from "../identifiers";
 import { canChangeIssueStatus, canTransferIssue } from "../task-access";
 import { Avatar, StatusBadge, PriorityBadge } from "./primitives";
@@ -219,13 +220,13 @@ export function IssueActionsMenu({
   };
   const statusChoices =
     issue.scope === "project" && issue.statusOptions?.length
-      ? issue.statusOptions.map((option) => ({ ...option, title: statusFa[option.title as Status] || option.title }))
+      ? issue.statusOptions.map((option) => ({ ...option, title: stateNameFa(option.title) }))
       : businessChoices.task_status.length
         ? businessChoices.task_status
             .filter((option) => !option.disabled)
             .map((option) => ({
               id: option.id,
-              title: option.title,
+              title: stateNameFa(option.title),
               status: semanticStatus[option.id] || ("Todo" as Status),
             }))
         : statuses.map((status) => ({ id: status, title: statusFa[status], status }));

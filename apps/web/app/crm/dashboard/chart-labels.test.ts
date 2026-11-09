@@ -1,7 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { activityDescription, activityEventLabel, chartLabel, chartNumber, chartTooltipValue } from "./chart-labels";
+import {
+  activityDescription,
+  activityEventLabel,
+  chartLabel,
+  chartNumber,
+  chartTooltipValue,
+  tableValueLabel,
+} from "./chart-labels";
 
 describe("Persian dashboard chart labels", () => {
+  it("shows readable status values in table widgets, including cached raw values", () => {
+    expect(tableValueLabel("task_status", "وضعیت", "in_progress")).toBe("در حال انجام");
+    expect(tableValueLabel("ticket_state", "وضعیت", "state-id", "In Progress")).toBe("در حال انجام");
+    expect(tableValueLabel("ticket_state", "وضعیت", "state-id", "مرحله سفارشی")).toBe("مرحله سفارشی");
+    expect(tableValueLabel("ticket_state", "وضعیت", "12345678-1234-1234-1234-123456789012")).toBe("وضعیت نامشخص");
+    expect(tableValueLabel("title", "عنوان", "یادداشت")).toBe("یادداشت");
+  });
   it("uses the configured choice title and Persian digits", () => {
     expect(chartLabel("custom-code", { "custom-code": "مرحله 2" })).toBe("مرحله ۲");
     expect(chartLabel("in_progress")).toBe("در حال انجام");

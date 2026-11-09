@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { SchemaDrivenForm } from "@plane/ui";
 import type { SchemaField } from "@plane/ui";
+import { stateNameFa } from "../issue-status";
 import { Button } from "../components";
 import { errorMessage, useWorkspaceAccess } from "../api";
 import { useEngineQuery, useEngineRecord, useEngineMutation, useEngineSchema } from "./api";
@@ -217,9 +218,11 @@ export function RelatedListPreview({
                       <Link to={`/entities/${rows.data?.entity}/${row.id}`}>{row.title}</Link>
                       <small>
                         {status
-                          ? rows.data?.labels.task_status?.[String(status)]?.title ||
-                            rows.data?.labels.ticket_state?.[String(status)]?.title ||
-                            String(status)
+                          ? stateNameFa(
+                              rows.data?.labels.task_status?.[String(status)]?.title ||
+                                rows.data?.labels.ticket_state?.[String(status)]?.title ||
+                                String(status)
+                            )
                           : "—"}
                       </small>
                     </span>

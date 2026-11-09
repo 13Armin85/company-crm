@@ -14,13 +14,13 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { persianDate, persianDateValue, plainText } from "../utils";
+import { persianDate, plainText } from "../utils";
 import { errorMessage } from "../api";
 import { useWidgetData } from "./api";
 import { DashboardCalendar } from "./calendar";
 import { TeamWidget } from "./team";
 import type { DashboardWidget } from "./types";
-import { activityDescription, chartLabel, chartNumber, chartTooltipValue } from "./chart-labels";
+import { activityDescription, chartLabel, chartNumber, chartTooltipValue, tableValueLabel } from "./chart-labels";
 
 const colors = ["#5865d9", "#33a187", "#e4a93a", "#d57577", "#8c76d4"];
 const displayDate = (value: unknown) =>
@@ -111,8 +111,12 @@ function DataWidget({ widget }: { widget: DashboardWidget }) {
               <tr key={row.id} draggable onDragStart={(event) => event.dataTransfer.setData("task-id", row.id)}>
                 {headers.map((header) => (
                   <td key={header.field}>
-                    {plainText(row.display_values?.[header.field] ?? persianDateValue(row.values?.[header.field])) ||
-                      "—"}
+                    {tableValueLabel(
+                      header.field,
+                      header.title,
+                      row.values?.[header.field],
+                      row.display_values?.[header.field]
+                    )}
                   </td>
                 ))}
                 <td>

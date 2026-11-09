@@ -4,6 +4,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { Link } from "react-router";
 import type { FieldValue } from "@plane/ui";
 import { persianDate, plainText } from "../utils";
+import { stateNameFa } from "../issue-status";
 import { RelationPreview } from "./record-form";
 import type { ViewField, ViewResult, ViewStyle } from "./view-types";
 
@@ -172,7 +173,13 @@ export function ViewValue({
                 }).format(new Date(String(item)))
               : field?.kind === "date"
                 ? persianDate(String(item))
-                : plainText(labels[String(item)]?.title || item);
+                : plainText(
+                    field &&
+                      (["status", "task_status", "ticket_state", "state_id"].includes(field.code) ||
+                        field.title === "وضعیت")
+                      ? stateNameFa(labels[String(item)]?.title || item)
+                      : labels[String(item)]?.title || item
+                  );
     const selected = labels[String(item)];
     const content = (
       <span

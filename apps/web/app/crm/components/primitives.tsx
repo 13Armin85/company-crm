@@ -9,6 +9,7 @@ import { useCurrentUser } from "../api";
 import { TableTabPicker, useHiddenTabs } from "../engine/table-tab-picker";
 import type { Member, Priority, Status } from "../types";
 import { priorityFa, statusFa, toFa } from "../utils";
+import { stateNameFa } from "../issue-status";
 
 export function IconButton({
   children,
@@ -129,12 +130,7 @@ export function StatusBadge({
 }) {
   const choices = useContext(ChoiceLabelsContext);
   const option = choices.task_status.find((o) => o.id === code);
-  const title =
-    label && !["Backlog", "Todo", "In Progress", "Review", "Done", "Blocked", "Cancelled"].includes(label)
-      ? label
-      : label
-        ? statusFa[status]
-        : option?.title || statusFa[status];
+  const title = stateNameFa(label || option?.title || statusFa[status]);
   return (
     <span
       className={`status status-${status.replace(" ", "-").toLowerCase()}`}

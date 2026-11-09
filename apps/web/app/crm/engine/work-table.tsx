@@ -6,6 +6,7 @@ import { Avatar, IssueActionsMenu, PriorityBadge, StatusBadge } from "../compone
 import type { Issue, Project, Status } from "../types";
 import { issueReference } from "../identifiers";
 import { persianDate, statusFa } from "../utils";
+import { stateNameFa } from "../issue-status";
 import { SurfaceTable } from "./surface";
 import { useCurrentUser, useUpdateIssueStatus, useWorkspaceAccess } from "../api";
 import { useUIStore } from "../store";
@@ -37,7 +38,7 @@ function WorkStatus({ issue, readOnly }: { issue: Issue; readOnly: boolean }) {
     issue.scope === "project" && issue.statusOptions?.length
       ? issue.statusOptions.map((option) => ({
           id: option.id,
-          title: statusFa[option.title as Status] || option.title,
+          title: stateNameFa(option.title),
           status: option.status,
         }))
       : choices.task_status.length
@@ -45,7 +46,7 @@ function WorkStatus({ issue, readOnly }: { issue: Issue; readOnly: boolean }) {
             .filter((option) => !option.disabled)
             .map((option) => ({
               id: option.id,
-              title: option.title,
+              title: stateNameFa(option.title),
               status: semanticStatus[option.id] || ("Todo" as Status),
             }))
         : statusOptions.map((status) => ({ id: status, title: statusFa[status], status }));
@@ -61,7 +62,10 @@ function WorkStatus({ issue, readOnly }: { issue: Issue; readOnly: boolean }) {
         options={
           options.some((option) => option.id === value)
             ? options
-            : [{ id: value, title: issue.statusLabel || statusFa[issue.status], disabled: true }, ...options]
+            : [
+                { id: value, title: stateNameFa(issue.statusLabel || statusFa[issue.status]), disabled: true },
+                ...options,
+              ]
         }
         onChange={(next) => {
           const selected = options.find((option) => option.id === next);

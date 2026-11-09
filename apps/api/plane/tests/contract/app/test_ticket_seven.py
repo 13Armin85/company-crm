@@ -186,6 +186,42 @@ def test_ticket_table_widget_returns_project_and_assignee_names(engine):
     assert row["display_values"]["ticket_assignees"] == actor.display_name
 
 
+def test_ticket_table_widget_returns_persian_status_labels(engine):
+    workspace, actor, client = engine
+    tasks_url = dashboard_path(workspace).replace("dashboard/", "tasks/")
+    created = client.post(tasks_url, {
+        "name": "کار در جریان", "status": "in_progress", "assignee_id": str(actor.id),
+    }, format="json")
+    assert created.status_code == 201, created.data
+    widget = {"type": "table", "config": {"entity": "ticket", "columns": ["title", "ticket_state"]}}
+    response = client.post(dashboard_path(workspace, "widgets/data/"), {"widget": widget}, format="json")
+
+    assert response.status_code == 200, response.data
+    row = next(item for item in response.data["results"] if item["title"] == "کار در جریان")
+    assert row["values"]["ticket_state"] == "in_progress"
+    assert row["display_values"]["ticket_state"] == "در حال انجام"
+
+
+def test_ticket_table_widget_resolves_project_state_id_to_persian_name(engine):
+    from plane.db.models import EntityType, State
+
+    workspace, _, client = engine
+    project_entity = EntityType.objects.get(workspace=workspace, code="project")
+    ticket_entity = EntityType.objects.get(workspace=workspace, code="ticket")
+    project = create_record(engine, project_entity, {"title": "پروژه وضعیت"})
+    state = State.objects.get(workspace=workspace, project_id=project["id"], name="In Progress")
+    ticket = create_record(engine, ticket_entity, {
+        "title": "کار دارای وضعیت پروژه", "project": project["id"], "ticket_state": str(state.id),
+    })
+    widget = {"type": "table", "config": {"entity": "ticket", "columns": ["title", "ticket_state"]}}
+    response = client.post(dashboard_path(workspace, "widgets/data/"), {"widget": widget}, format="json")
+
+    assert response.status_code == 200, response.data
+    row = next(item for item in response.data["results"] if item["id"] == ticket["id"])
+    assert row["values"]["ticket_state"] == str(state.id)
+    assert row["display_values"]["ticket_state"] == "در حال انجام"
+
+
 def test_calendar_widget_uses_jalali_month_boundaries(engine):
     workspace, _, client = engine
     entity, _ = make_entity(engine, [{"code": "due_on", "title": "موعد", "kind": "date", "config": {}}])

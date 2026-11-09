@@ -90,7 +90,7 @@ describe("choice lists in form design", () => {
     expect(html).toContain('aria-label="ویرایش گزینهٔ تهران"');
   });
 
-  it("only offers single-choice list fields as dependency parents", () => {
+  it("keeps choice editing in the input form without dependency controls", () => {
     const html = render(
       <DefinitionEditor
         kind="fields"
@@ -104,9 +104,9 @@ describe("choice lists in form design", () => {
     expect(html).toContain("گزینه‌های جدید (هر گزینه در یک خط)");
     expect(html).toContain("پیش‌نمایش ورودی");
     expect(html).not.toContain("ساخت یا ویرایش لیست و گزینه‌ها");
-    expect(html).toContain('<option value="country">کشور</option>');
-    expect(html).not.toContain('<option value="description">');
-    expect(html).not.toContain('<option value="tags">');
+    expect(html).not.toContain("فیلد والد برای محدود کردن گزینه‌ها");
+    expect(html).not.toContain("مقدار والد (اختیاری، برای گزینه‌های وابسته)");
+    expect(html).not.toContain("وابسته نیست");
   });
 
   it("guides the user to create the first list when none exists", () => {

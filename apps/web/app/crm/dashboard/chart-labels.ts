@@ -71,6 +71,17 @@ export function chartLabel(value: unknown, labels: Record<string, string> = {}):
   return toFa(persianDateValue(labels[raw] || knownLabels[raw.toLowerCase()] || raw));
 }
 
+export function tableValueLabel(field: string, title: string, value: unknown, displayValue?: string): string {
+  const status = ["status", "task_status", "ticket_state", "state_id"].includes(field) || title === "وضعیت";
+  if (status) {
+    const raw = displayValue ?? value;
+    if (raw === null || raw === undefined || raw === "") return "—";
+    if (!displayValue && /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(String(raw))) return "وضعیت نامشخص";
+    return plainText(stateNameFa(chartLabel(raw))) || "—";
+  }
+  return plainText(displayValue ?? persianDateValue(value)) || "—";
+}
+
 export function chartNumber(value: unknown): string {
   const number = Number(value);
   return Number.isFinite(number) ? number.toLocaleString("fa-IR") : toFa(String(value ?? ""));

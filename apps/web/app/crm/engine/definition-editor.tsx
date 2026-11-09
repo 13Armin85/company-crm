@@ -537,28 +537,6 @@ export function DefinitionEditor({
                 </label>
               </>
             )}
-            {choiceKinds.has(data.kind || "") && (
-              <div>
-                <SearchableSelect
-                  label="فیلد والد برای محدود کردن گزینه‌ها"
-                  showLabel
-                  disabled={locked}
-                  value={config.depends_on || ""}
-                  options={[
-                    { id: "", title: "وابسته نیست؛ همهٔ گزینه‌های لیست نمایش داده شوند" },
-                    ...fields
-                      .filter((f) => f.is_active && f.kind === "select" && f.lookup && f.code !== data.code)
-                      .map((f) => ({ id: f.code, title: f.title })),
-                  ]}
-                  onChange={(v) => updateConfig({ depends_on: v || undefined })}
-                />
-                <small>
-                  «وابسته نیست» یعنی انتخاب این فیلد از فیلد دیگری تأثیر نمی‌گیرد. برای وابستگی، فیلد والد باید از نوع
-                  انتخاب تکی و در همین فرم باشد؛ برای هر گزینهٔ فرزند هم «مقدار والد» را در همین بخش «منبع گزینه‌ها» تعیین
-                  کنید.
-                </small>
-              </div>
-            )}
             {data.kind === "computed" ? (
               <FormulaEditor value={config.formula} onChange={(formula) => updateConfig({ formula })} fields={fields} />
             ) : (

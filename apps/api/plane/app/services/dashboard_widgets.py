@@ -90,12 +90,28 @@ def _ticket_rows(query):
 
 
 def _table_display_values(payload, query, request, workspace):
-    """Return readable ticket relations while keeping raw IDs for filters and links."""
+    """Return readable choice and ticket relation values while retaining raw values."""
     for row in payload["results"]:
         display = row.setdefault("display_values", {})
         for key, value in row["values"].items():
             if isinstance(value, str) and ("<" in value or "&" in value):
                 display[key] = _display_text(value) or "—"
+    status_paths = [
+        column["field"] for column in query.spec["columns"]
+        if column["field"] in {"status", "task_status", "ticket_state", "state_id"}
+        or query.describe(column["field"])["title"] == "وضعیت"
+    ]
+    if status_paths and payload["results"]:
+        from .entity_view_export import status_label, value_labels
+
+        samples = [{"values": {path: row["values"].get(path) for path in status_paths}} for row in payload["results"]]
+        labels = value_labels(query, samples)
+        for row in payload["results"]:
+            for path in status_paths:
+                raw = row["values"].get(path)
+                if isinstance(raw, (str, int)) or raw is None:
+                    title = labels.get(path, {}).get(str(raw), {}).get("title")
+                    row["display_values"][path] = status_label(title if title else raw)
     if query.entity.code != "ticket" or not payload["results"]:
         return payload
     columns = {column["field"] for column in query.spec["columns"]}

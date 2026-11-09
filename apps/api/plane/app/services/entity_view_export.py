@@ -4,6 +4,7 @@ import csv
 import hashlib
 import json
 import logging
+import re
 from datetime import date, datetime
 from decimal import Decimal
 from io import TextIOWrapper
@@ -67,11 +68,29 @@ def flatten(value):
     return [value] if value is not None else []
 
 
+_STATUS_LABELS = {
+    "backlog": "فهرست انتظار", "unstarted": "برای انجام", "todo": "برای انجام", "to do": "برای انجام",
+    "started": "در حال انجام", "in progress": "در حال انجام", "review": "بازبینی", "in review": "بازبینی",
+    "done": "انجام‌شده", "completed": "انجام‌شده", "blocked": "مسدود", "cancelled": "لغوشده",
+    "canceled": "لغوشده",
+}
+
+
+def status_label(value):
+    label = str(value or "").strip()
+    if not label:
+        return "—"
+    if re.fullmatch(r"[0-9a-fA-F]{8}-[0-9a-fA-F-]{27,}", label):
+        return "وضعیت نامشخص"
+    return _STATUS_LABELS.get(label.lower().replace("_", "-").replace("-", " "), label)
+
+
 def value_labels(query, records):
     result = {}
     paths = {key for row in records for key in row["values"]}
     for path in paths:
         field = query.describe(path)
+        is_status = path in {"status", "task_status", "ticket_state", "state_id"} or field["title"] == "وضعیت"
         values = set(
             str(v) for row in records for v in flatten(row["values"].get(path))
         )
@@ -90,7 +109,7 @@ def value_labels(query, records):
                 choices = choices.filter(id__in=[v for v in values if len(v) == 36])
             labels = {
                 (v.code if field["config"].get("lookup_codes") else str(v.id)): {
-                    "title": v.title,
+                    "title": status_label(v.title) if is_status else v.title,
                     "color": v.color,
                     "inactive": not (v.is_active and v.category.is_active),
                 }
@@ -98,7 +117,7 @@ def value_labels(query, records):
             }
         elif field["config"].get("provider") in {"project_states", "work_states"}:
             labels = {
-                str(v.id): {"title": v.name, "color": v.color}
+                str(v.id): {"title": status_label(v.name), "color": v.color}
                 for v in State.objects.filter(
                     workspace=query.entity.workspace,
                     id__in=[v for v in values if len(v) == 36],
@@ -108,7 +127,7 @@ def value_labels(query, records):
                 labels.update(
                     {
                         value.code: {
-                            "title": value.title,
+                            "title": status_label(value.title),
                             "color": value.color,
                             "inactive": not value.is_active,
                         }
@@ -188,6 +207,7 @@ def kanban_choices(query):
     if query.spec.get("type") != "kanban" or not path:
         return {}
     field, selected = query.describe(path), settings.get("kanban_columns", [])
+    is_status = path in {"status", "task_status", "ticket_state", "state_id"} or field["title"] == "وضعیت"
     config = field["config"]
     if field.get("lookup"):
         all_values = LookupValue.objects.filter(
@@ -200,7 +220,7 @@ def kanban_choices(query):
         )
         result = {
             (v.code if key == "code" else str(v.id)): {
-                "title": v.title,
+                "title": status_label(v.title) if is_status else v.title,
                 "color": v.color,
                 "inactive": not (v.is_active and v.category.is_active),
             }
@@ -216,7 +236,7 @@ def kanban_choices(query):
             workspace=query.entity.workspace, project_id__in=projects
         ).order_by("name", "id")
         values = list(active[:200]) + list(active.filter(id__in=[value for value in selected if len(value) == 36]))
-        result = {str(v.id): {"title": v.name, "color": v.color} for v in values}
+        result = {str(v.id): {"title": status_label(v.name), "color": v.color} for v in values}
         if config.get("provider") == "work_states":
             standalone = LookupValue.objects.filter(
                 category__workspace=query.entity.workspace,
@@ -229,7 +249,7 @@ def kanban_choices(query):
             )
             result.update({
                 value.code: {
-                    "title": value.title,
+                    "title": status_label(value.title),
                     "color": value.color,
                     "inactive": not value.is_active,
                 }

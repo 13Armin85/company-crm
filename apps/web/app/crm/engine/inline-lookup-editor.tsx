@@ -25,7 +25,6 @@ export function InlineLookupEditor({
   const mutation = useEngineMutation();
   const [listTitle, setListTitle] = useState("");
   const [optionTitles, setOptionTitles] = useState("");
-  const [parent, setParent] = useState("");
   const [editingOption, setEditingOption] = useState("");
   const [editedTitle, setEditedTitle] = useState("");
   const selected = lookups.find((item) => item.id === lookupId);
@@ -68,7 +67,6 @@ export function InlineLookupEditor({
             title: titles[index],
             position: options.length + index,
             is_active: true,
-            ...(parent ? { parent } : {}),
           },
         });
       } catch {
@@ -77,7 +75,6 @@ export function InlineLookupEditor({
       }
     }
     setOptionTitles("");
-    setParent("");
   };
 
   const updateOption = async (item: LookupOptionDefinition, patch: Partial<LookupOptionDefinition>) => {
@@ -196,21 +193,6 @@ export function InlineLookupEditor({
                   placeholder={"نقدی\nاعتباری"}
                 />
               </label>
-              <SearchableSelect
-                label="مقدار والد (اختیاری، برای گزینه‌های وابسته)"
-                showLabel
-                value={parent}
-                options={[
-                  { id: "", title: "بدون والد" },
-                  ...values
-                    .filter((item) => item.category !== lookupId && item.is_active)
-                    .map((item) => ({
-                      id: item.id,
-                      title: `${lookups.find((list) => list.id === item.category)?.title || "لیست"} / ${item.title}`,
-                    })),
-                ]}
-                onChange={setParent}
-              />
               <Button
                 type="button"
                 variant="secondary"

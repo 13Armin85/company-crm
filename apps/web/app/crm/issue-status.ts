@@ -3,13 +3,14 @@ import type { Status } from "./types";
 /** Keep persisted state names and group keys intact; translate only their labels. */
 export function stateNameFa(name: unknown): string {
   const label = String(name ?? "").trim();
-  if (/^backlog$/i.test(label)) return "فهرست انتظار";
-  if (/^(?:cancelled|canceled|cancceled)$/i.test(label)) return "لغوشده";
-  if (/^to[\s-]?do$/i.test(label)) return "برای انجام";
-  if (/^in[\s-]?progress$/i.test(label)) return "در حال انجام";
-  if (/^(?:in[\s-]?)?review$/i.test(label)) return "بازبینی";
-  if (/^(?:done|completed)$/i.test(label)) return "انجام‌شده";
-  if (/^blocked$/i.test(label)) return "مسدود";
+  const normalized = label.replaceAll("_", " ");
+  if (/^backlog$/i.test(normalized)) return "فهرست انتظار";
+  if (/^(?:cancelled|canceled|cancceled)$/i.test(normalized)) return "لغوشده";
+  if (/^(?:unstarted|to[\s-]?do)$/i.test(normalized)) return "برای انجام";
+  if (/^(?:started|in[\s-]?progress)$/i.test(normalized)) return "در حال انجام";
+  if (/^(?:in[\s-]?)?review$/i.test(normalized)) return "بازبینی";
+  if (/^(?:done|completed)$/i.test(normalized)) return "انجام‌شده";
+  if (/^blocked$/i.test(normalized)) return "مسدود";
   return label;
 }
 
