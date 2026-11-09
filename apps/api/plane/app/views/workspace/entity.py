@@ -573,6 +573,8 @@ class EngineRecordsEndpoint(EngineAPIView):
 
 class EngineOptionsEndpoint(EngineAPIView):
     def get(self, request, slug, code, field_code):
+        from plane.app.services.entity_view_export import status_label
+
         entity = self.entity(slug, code)
         require_action(entity, request.user, "view", request)
         subtype = EntityType.objects.filter(parent=entity, code=request.query_params.get("subtype")).first()
@@ -594,6 +596,7 @@ class EngineOptionsEndpoint(EngineAPIView):
         selected = [item for item in request.query_params.get("selected", "").split(",") if item][:100]
         resolving = request.query_params.get("resolve") == "true" and bool(selected)
         config, kind = field["config"], field["kind"]
+        is_status = field_code in {"status", "task_status", "ticket_state", "state_id"} or field["title"] == "وضعیت"
         if field.get("lookup"):
             rows = LookupValue.objects.filter(category__workspace=entity.workspace, category__code=field["lookup"])
             rows = rows.filter(
@@ -620,7 +623,7 @@ class EngineOptionsEndpoint(EngineAPIView):
             result = [
                 {
                     "id": r.code if config.get("lookup_codes") else str(r.id),
-                    "title": r.title,
+                    "title": status_label(r.title) if is_status else r.title,
                     "color": r.color,
                     "disabled": not r.is_active,
                 }
@@ -635,7 +638,7 @@ class EngineOptionsEndpoint(EngineAPIView):
                 rows = LookupValue.objects.filter(category__workspace=entity.workspace,category__code="task-status",is_active=True,title__icontains=query)
                 if resolving:
                     rows = rows.filter(code__in=selected)
-                return Response({"results":[{"id":row.code,"title":row.title,"color":row.color} for row in rows.order_by("position","id")[offset*size:(offset+1)*size]],"count":rows.count(),"page":offset+1})
+                return Response({"results":[{"id":row.code,"title":status_label(row.title),"color":row.color} for row in rows.order_by("position","id")[offset*size:(offset+1)*size]],"count":rows.count(),"page":offset+1})
             allowed = visible_projects(Project.objects.filter(workspace=entity.workspace), request.user, slug)
             rows = (
                 State.objects.filter(project_id=project, project_id__in=allowed.values("id"), name__icontains=query)
@@ -647,7 +650,7 @@ class EngineOptionsEndpoint(EngineAPIView):
             count, result = (
                 rows.count(),
                 [
-                    {"id": str(r.id), "title": r.name, "color": r.color}
+                    {"id": str(r.id), "title": status_label(r.name), "color": r.color}
                     for r in rows[offset * size : (offset + 1) * size]
                 ],
             )

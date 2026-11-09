@@ -280,10 +280,13 @@ class EngineViewOptionsEndpoint(EngineAPIView):
                 else rows.filter(is_active=True)
             )
             count = rows.count()
+            from plane.app.services.entity_view_export import status_label
+
+            is_status = field_path in {"status", "task_status", "ticket_state", "state_id"} or field["title"] == "وضعیت"
             result = [
                 {
                     "id": r.code if config.get("lookup_codes") else str(r.id),
-                    "title": r.title,
+                    "title": status_label(r.title) if is_status else r.title,
                     "color": r.color,
                 }
                 for r in rows[offset * size : (offset + 1) * size]
@@ -300,8 +303,10 @@ class EngineViewOptionsEndpoint(EngineAPIView):
             if selected:
                 rows = rows.filter(id__in=selected)
             count = rows.count()
+            from plane.app.services.entity_view_export import status_label
+
             result = [
-                {"id": str(r.id), "title": r.name, "color": r.color}
+                {"id": str(r.id), "title": status_label(r.name), "color": r.color}
                 for r in rows[offset * size : (offset + 1) * size]
             ]
         elif field["kind"] == "relation":

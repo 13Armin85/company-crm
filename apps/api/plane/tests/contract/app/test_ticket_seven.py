@@ -220,6 +220,12 @@ def test_ticket_table_widget_resolves_project_state_id_to_persian_name(engine):
     row = next(item for item in response.data["results"] if item["id"] == ticket["id"])
     assert row["values"]["ticket_state"] == str(state.id)
     assert row["display_values"]["ticket_state"] == "در حال انجام"
+    options = client.get(
+        f"/api/workspaces/{workspace.slug}/engine/entities/ticket/options/ticket_state/",
+        {"parent": project["id"]},
+    )
+    assert options.status_code == 200, options.data
+    assert next(item for item in options.data["results"] if item["id"] == str(state.id))["title"] == "در حال انجام"
 
 
 def test_calendar_widget_uses_jalali_month_boundaries(engine):
