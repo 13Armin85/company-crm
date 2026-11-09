@@ -406,17 +406,17 @@ export function DefinitionEditor({
               <input value={data.placeholder || ""} onChange={(e) => set("placeholder", e.target.value)} />
             </label>
           )}
+          {choiceKinds.has(data.kind || "") && (
+            <InlineLookupEditor
+              lookupId={data.lookup}
+              onChange={(id) => set("lookup", id)}
+              lookups={lookups}
+              values={lookupValues}
+              selectionDisabled={locked}
+            />
+          )}
           <fieldset disabled={locked} className="engine-config-fields">
             <legend>قواعد پر کردن</legend>
-            {choiceKinds.has(data.kind || "") && (
-              <InlineLookupEditor
-                lookupId={data.lookup}
-                onChange={(id) => set("lookup", id)}
-                lookups={lookups}
-                values={lookupValues}
-                disabled={locked}
-              />
-            )}
             {data.kind === "relation" && (
               <>
                 <SearchableSelect

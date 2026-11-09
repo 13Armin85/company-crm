@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import { useUIStore } from "../store";
 
@@ -10,14 +11,16 @@ vi.mock("@plane/ui", async () => ({
     label,
     options,
     value,
+    disabled,
   }: {
     label: string;
     options: { id: string; title: string }[];
     value: string;
+    disabled?: boolean;
   }) => (
     <label>
       {label}
-      <select value={value} onChange={() => {}}>
+      <select value={value} disabled={disabled} onChange={() => {}}>
         {options.map((option) => (
           <option key={option.id} value={option.id}>
             {option.title}
@@ -34,7 +37,9 @@ vi.mock("../api", async () => ({
 }));
 
 import { DefinitionEditor } from "./definition-editor";
-import { LookupSettings } from "./lookup-settings";
+import { DesignWorkspace } from "./design-workspace";
+
+vi.mock("./form-designer", () => ({ FormDesigner: () => <div>طراح فرم</div> }));
 
 function render(element: ReactNode, empty = false) {
   const client = new QueryClient();
@@ -75,44 +80,74 @@ function render(element: ReactNode, empty = false) {
 }
 
 describe("choice lists in form design", () => {
-  it("shows searchable lists, option status, parent, and edit controls", () => {
-    const html = render(<LookupSettings />);
-    expect(html).toContain("ساخت لیست جدید");
-    expect(html).toContain("افزودن گزینه به این لیست");
-    expect(html).toContain("ایران");
-    expect(html).toContain("مقدار والد");
-    expect(html).toContain("جست‌وجوی لیست");
-    expect(html).toContain("جست‌وجوی گزینه در شهرها");
-    expect(html).toContain("والد: ایران");
-    expect(html).toContain("پیش‌فرض");
-    expect(html).toContain("غیرفعال");
-    expect(html).toContain('aria-pressed="true"');
-    expect(html).toContain('aria-label="ویرایش گزینهٔ تهران"');
-  });
-
-  it("keeps choice editing in the input form without dependency controls", () => {
+  it("keeps all list and option settings in the input form even when the field is used", () => {
     const html = render(
       <DefinitionEditor
         kind="fields"
-        row={{ id: "city", code: "city", title: "شهر", kind: "select", lookup: "cities", config: {} }}
+        row={{
+          id: "city",
+          code: "city",
+          title: "شهر",
+          kind: "select",
+          lookup: "cities",
+          config: {},
+          used_at: "2026-11-01",
+        }}
         onClose={() => {}}
       />
     );
     expect(html).toContain("منبع گزینه‌ها (لیست پایه)");
-    expect(html).toContain("نام لیست جدید");
+    expect(html).not.toContain("نام لیست جدید");
     expect(html).toContain("گزینه‌های «شهرها»");
-    expect(html).toContain("گزینه‌های جدید (هر گزینه در یک خط)");
+    expect(html).toContain("افزودن سریع گزینه‌ها (هر گزینه در یک خط)");
+    expect(html).toContain("ساخت گزینه با تنظیمات کامل");
+    expect(html).toContain("تنظیمات لیست «شهرها»");
+    expect(html).toContain("توضیح لیست (اختیاری)");
+    expect(html).toContain("ویرایش گزینهٔ تهران");
+    expect(html).toContain("رنگ");
+    expect(html).toContain("آیکون (اختیاری)");
+    expect(html).toContain("جایگاه نمایش");
+    expect(html).toContain("مقدار پیش‌فرض");
+    expect(html).toContain("گزینه فعال است");
     expect(html).toContain("پیش‌نمایش ورودی");
-    expect(html).not.toContain("ساخت یا ویرایش لیست و گزینه‌ها");
+    expect(html.indexOf("engine-inline-lookup")).toBeLessThan(html.indexOf("<fieldset disabled"));
     expect(html).not.toContain("فیلد والد برای محدود کردن گزینه‌ها");
-    expect(html).not.toContain("مقدار والد (اختیاری، برای گزینه‌های وابسته)");
-    expect(html).not.toContain("وابسته نیست");
+    expect(html).not.toContain("مقدار والد");
   });
 
-  it("guides the user to create the first list when none exists", () => {
-    const html = render(<LookupSettings />, true);
-    expect(html).toContain("اولین لیست انتخابی را بسازید");
+  it("allows a multi-choice field to create its first list in place", () => {
+    const html = render(
+      <DefinitionEditor
+        kind="fields"
+        row={{ title: "برچسب‌ها", kind: "multi_select", config: {} }}
+        onClose={() => {}}
+      />,
+      true
+    );
     expect(html).toContain("ساخت لیست جدید");
-    expect(html).not.toContain("افزودن گزینه به این لیست");
+    expect(html).toContain("کد لیست (اختیاری)");
+    expect(html).not.toContain("گزینه‌های «");
+  });
+
+  it("does not show a separate choice-list tab", () => {
+    const client = new QueryClient();
+    useUIStore.setState({ workspaceSlug: "" });
+    client.setQueryData(["entity-engine", "", "catalog", "catalog/"], {
+      entities: [{ id: "ticket", code: "ticket", title: "کارها", is_active: true, parent: null }],
+      field_kinds: [],
+    });
+    client.setQueryData(["entity-engine", "", "fields", "definitions/fields/"], []);
+    client.setQueryData(["entity-engine", "", "surfaces", "surfaces/"], { results: [] });
+    const html = renderToStaticMarkup(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <DesignWorkspace />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+    client.clear();
+    expect(html).toContain('aria-label="بخش‌های طراحی"');
+    expect(html).toContain("ورودی‌های فرم");
+    expect(html).not.toContain("لیست‌های انتخابی");
   });
 });
