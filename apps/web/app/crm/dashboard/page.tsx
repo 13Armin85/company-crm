@@ -31,6 +31,7 @@ import { dashboardUrl, useAddDashboardWidget, useDashboard, useSaveDashboard } f
 import type { DashboardTab, DashboardWidget, WidgetType } from "./types";
 import { WidgetContent } from "./widget";
 import { DashboardWidgetSettings } from "./settings";
+import { dashboardPreviewRoles } from "./preview-roles";
 import "../../../styles/dashboard.css";
 import { browserId } from "../browser-id";
 
@@ -250,7 +251,11 @@ export default function DashboardPage() {
                 value={roleId}
                 options={[
                   { id: "", title: "داشبورد شخصی من", description: "فقط برای خودتان" },
-                  ...roles.map((role) => ({ id: role.id, title: role.name, description: "پیش‌فرض نقش" })),
+                  ...dashboardPreviewRoles(roles).map((role) => ({
+                    id: role.id,
+                    title: role.name,
+                    description: "پیش‌فرض نقش",
+                  })),
                 ]}
                 onChange={(next) => {
                   setEditing(false);
