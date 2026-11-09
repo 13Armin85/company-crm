@@ -17,7 +17,7 @@ import { useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications 
 import { Button, EmptyState, NotificationDetails, PageHeader, SearchBox, Skeleton, TabBar } from "../components";
 import { matchesRecordSearch } from "../identifiers";
 import type { NotificationItem } from "../types";
-import { persianDate, toFa } from "../utils";
+import { persianDate, plainText, toFa } from "../utils";
 
 const icons = {
   mention: AtSign,
@@ -159,7 +159,7 @@ export default function InboxPage() {
                       <h3>{item.title}</h3>
                       {!item.read && <span className="inbox-new">جدید</span>}
                     </span>
-                    <span className="inbox-item-preview">{item.preview ?? item.description}</span>
+                    <span className="inbox-item-preview">{plainText(item.preview ?? item.description)}</span>
                     {(item.entityName || item.projectName || item.actor) && (
                       <span className="inbox-item-context">
                         {item.entityName && <span>کار: {item.entityName}</span>}

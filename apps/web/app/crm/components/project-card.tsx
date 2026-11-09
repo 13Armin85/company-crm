@@ -7,7 +7,7 @@ import { Clock3, Trash2 } from "lucide-react";
 import { useArchiveProject, useDeleteProject, useWorkspaceAccess } from "../api";
 import { useUIStore } from "../store";
 import type { Project } from "../types";
-import { persianDate, toFa } from "../utils";
+import { persianDate, plainText, toFa } from "../utils";
 import { AvatarStack } from "./primitives";
 
 export function ProjectCard({ project }: { project: Project }) {
@@ -70,7 +70,7 @@ export function ProjectCard({ project }: { project: Project }) {
       </div>
       <Link to={project.archivedAt ? "/projects" : `/projects/${project.id}`} className="project-card-link">
         <h3>{project.name}</h3>
-        <p>{project.description || "توضیحی برای این پروژه ثبت نشده است."}</p>
+        <p>{plainText(project.description || "توضیحی برای این پروژه ثبت نشده است.")}</p>
         <div className="project-progress-label">
           <span>{toFa(project.progress ?? 0)}٪ پیشرفت</span>
           <span>

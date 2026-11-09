@@ -861,6 +861,54 @@
   display: grid;
   gap: 14px;
 }
+.engine-inline-lookup,
+.engine-inline-lookup-create,
+.engine-inline-lookup-options,
+.engine-field-preview {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.engine-inline-lookup {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.engine-inline-lookup-options ul {
+  display: grid;
+  gap: 6px;
+  max-height: 180px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.engine-inline-lookup-options li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.engine-inline-lookup-options li span {
+  flex: 1;
+}
+.engine-inline-lookup-options li input {
+  flex: 1;
+  min-width: 130px;
+}
+.engine-inline-lookup-options li button {
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-primary);
+  cursor: pointer;
+}
 .engine-checkbox {
   display: flex !important;
   flex-direction: row;

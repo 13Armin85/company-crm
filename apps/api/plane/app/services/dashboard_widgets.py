@@ -1,16 +1,30 @@
 """Independent widget data handlers backed by the ticket-six EntityQuery."""
 
 from datetime import date, timedelta
+from html import unescape
+import re
 
 from django.db.models import Avg, Case, Count, F, IntegerField, Q, Sum, Value, When
 from django.db.models.functions import Coalesce
 from django.utils import timezone
+from django.utils.html import strip_tags
 from rest_framework.exceptions import ValidationError
 
 from plane.db.models import EntityEvent, EntityType, Issue, IssueAssignee, User, UserAbsence, OrganizationUnitMember, OrganizationUnitDelegate
 from .dashboard_layout import WIDGETS
 from .entity_query import EntityQuery, json_value
 from .entity_views import make_query
+
+
+def _display_text(value, limit=None):
+    """Plain text for dashboard summaries; rich-text HTML stays in stored records."""
+    text = str(value or "")
+    for _ in range(2):
+        text = strip_tags(re.sub(
+            r"</(?:p|div|li|h[1-6]|blockquote)>|<br\s*/?>", " ", unescape(text), flags=re.IGNORECASE,
+        ))
+    text = re.sub(r"\s+", " ", unescape(text)).strip()
+    return text[:limit] if limit else text
 
 
 def _source(widget, request, workspace):
@@ -77,6 +91,11 @@ def _ticket_rows(query):
 
 def _table_display_values(payload, query, request, workspace):
     """Return readable ticket relations while keeping raw IDs for filters and links."""
+    for row in payload["results"]:
+        display = row.setdefault("display_values", {})
+        for key, value in row["values"].items():
+            if isinstance(value, str) and ("<" in value or "&" in value):
+                display[key] = _display_text(value) or "—"
     if query.entity.code != "ticket" or not payload["results"]:
         return payload
     columns = {column["field"] for column in query.spec["columns"]}
@@ -157,10 +176,10 @@ def _activity_value(value, labels):
     if isinstance(value, (str, int, float)):
         text = str(value)
         if text in labels:
-            return str(labels[text])[:80]
+            return _display_text(labels[text], 80)
         if len(text) == 36 and text.count("-") == 4:
             return None  # An unresolved identifier says nothing to a reader.
-        return text[:80]
+        return _display_text(text, 80)
     return None
 
 
@@ -170,7 +189,7 @@ def widget_data(widget, request, workspace):
         raise ValidationError("نوع ویجت شناخته نشده است.")
     config = widget.get("config", {})
     if kind in {"links", "note"}:
-        return {"type": kind, "value": config.get("links", []) if kind == "links" else config.get("text", "")}
+        return {"type": kind, "value": config.get("links", []) if kind == "links" else _display_text(config.get("text", ""))}
     if kind == "team-cards":
         from .dashboard_team import team_cards
 
@@ -325,8 +344,8 @@ def widget_data(widget, request, workspace):
             actor = (row.created_by.display_name or row.created_by.email) if row.created_by else "سیستم"
             items.append({
                 "id": str(row.id), "event": row.event_type, "at": row.created_at.isoformat(),
-                "record_id": str(row.record_id), "record": str(title or (f"شماره {number}" if number else "رکورد بدون عنوان")),
-                "entity": entity.title, "actor": actor, "field": field_title,
+                "record_id": str(row.record_id), "record": _display_text(title or (f"شماره {number}" if number else "رکورد بدون عنوان")),
+                "entity": _display_text(entity.title), "actor": _display_text(actor), "field": _display_text(field_title),
                 "before": _activity_value(row.before, labels.get(field, {})) if field else None,
                 "after": _activity_value(row.after, labels.get(field, {})) if field else None,
             })

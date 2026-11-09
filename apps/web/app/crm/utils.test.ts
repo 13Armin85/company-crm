@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { greeting, persianDate, persianDateValue, priorityFa, statusFa, toFa } from "./utils";
+import { greeting, persianDate, persianDateValue, plainText, priorityFa, statusFa, toFa } from "./utils";
 
 describe("Persian CRM formatting", () => {
   it("converts Latin digits to Persian digits", () => {
@@ -16,6 +16,10 @@ describe("Persian CRM formatting", () => {
     expect(persianDateValue("2024-03-20T12:00:00Z")).toContain("۱ فروردین ۱۴۰۳");
     expect(persianDateValue("2024-03-20 extra")).toBe("2024-03-20 extra");
     expect(persianDateValue(null)).toBe("—");
+  });
+  it("turns editor HTML into readable text in summaries and tables", () => {
+    expect(plainText('<p class="editor-paragraph-block">خط اول &amp; دوم</p><p>پایان</p>')).toBe("خط اول & دوم پایان");
+    expect(persianDateValue("<p>شرح کار</p>")).toBe("شرح کار");
   });
 
   it.each([

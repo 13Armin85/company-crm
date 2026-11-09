@@ -44,7 +44,7 @@ import { IssueCalendar } from "../issue-calendar";
 import { useUIStore } from "../store";
 import { IssueKanbanBoard } from "../kanban";
 import { useDismissMenu } from "../use-dismiss-menu";
-import { persianDate, toFa } from "../utils";
+import { persianDate, plainText, toFa } from "../utils";
 
 const tabs = [
   { id: "overview", label: "نمای کلی" },
@@ -102,7 +102,7 @@ export default function ProjectDetailPage() {
           <div>
             <IdentifierBadge value={project.identifier} label="شناسه پروژه" />
             <h1>{project.name}</h1>
-            <p>{project.description || "برای این پروژه توضیحی ثبت نشده است."}</p>
+            <p>{plainText(project.description || "برای این پروژه توضیحی ثبت نشده است.")}</p>
           </div>
         </div>
         <div className="page-actions">
@@ -470,7 +470,7 @@ function CyclesTab({
             <article className="cycle-card" key={cycle.id}>
               <div>
                 <strong>{cycle.name}</strong>
-                <p>{cycle.description || "بدون توضیح"}</p>
+                <p>{plainText(cycle.description || "بدون توضیح")}</p>
               </div>
               <span>
                 {persianDate(cycle.startDate)} تا {persianDate(cycle.endDate)}

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { SearchableSelect } from "@plane/ui";
 import { DefaultValueEditor, dynamicDefaultsFor } from "./default-value-editor";
-import type { FieldConfig, FieldKind } from "@plane/ui";
+import type { FieldConfig, FieldKind, FieldValue } from "@plane/ui";
 import { useOrganizationPermissions } from "../api";
 import { Button } from "../components";
 import { useEngineMutation, useEngineDefinitions, useEngineCatalog } from "./api";
@@ -9,6 +9,7 @@ import type { EntityDefinition, FieldDefinition, LookupDefinition, LookupOptionD
 import { ConditionEditor, FormulaEditor, conditionProblems } from "./rule-editors";
 import { useUIStore } from "../store";
 import { browserId } from "../browser-id";
+import { InlineLookupEditor } from "./inline-lookup-editor";
 
 const textKinds = new Set(["short_text", "long_text", "email", "phone", "url"]);
 const numberKinds = new Set(["integer", "decimal", "money", "percent"]);
@@ -24,13 +25,11 @@ export function DefinitionEditor({
   row,
   onClose,
   onSaved,
-  onManageLookups,
 }: {
   kind: DefinitionKind;
   row?: EditableDefinition;
   onClose: () => void;
   onSaved?: (row?: EditableDefinition) => void;
-  onManageLookups?: () => void;
 }) {
   const { data: catalog } = useEngineCatalog();
   const { data: fields = [] } = useEngineDefinitions<FieldDefinition>("fields", kind === "fields");
@@ -44,6 +43,7 @@ export function DefinitionEditor({
   );
   const { data: permissions = [] } = useOrganizationPermissions(undefined, kind === "entities");
   const mutation = useEngineMutation();
+  const [previewValue, setPreviewValue] = useState<FieldValue>(null);
   const [data, setData] = useState<EditableDefinition>(() => ({
     code:
       kind === "lookups" || kind === "values"
@@ -389,6 +389,7 @@ export function DefinitionEditor({
               set("config", v === "computed" ? { formula: { value: 0 } } : {});
               set("lookup", null);
               set("relation_entity", null);
+              setPreviewValue(null);
             }}
           />
           <label>
@@ -407,27 +408,14 @@ export function DefinitionEditor({
           )}
           <fieldset disabled={locked} className="engine-config-fields">
             <legend>قواعد پر کردن</legend>
-            {["select", "multi_select"].includes(data.kind || "") && (
-              <div>
-                <SearchableSelect
-                  label="منبع گزینه‌ها (لیست پایه)"
-                  showLabel
-                  disabled={locked}
-                  value={data.lookup || ""}
-                  options={lookups
-                    .filter((item) => item.is_active || item.id === data.lookup)
-                    .map((item) => ({ id: item.id, title: item.is_active ? item.title : `${item.title} (غیرفعال)` }))}
-                  onChange={(v) => set("lookup", v || null)}
-                />
-                <small>
-                  هر گزینه یک مقدار در این لیست است. ابتدا لیست و گزینه‌ها را بسازید، سپس لیست را اینجا انتخاب کنید.
-                </small>
-                {onManageLookups && !locked && (
-                  <Button variant="secondary" onClick={onManageLookups}>
-                    ساخت یا ویرایش لیست و گزینه‌ها
-                  </Button>
-                )}
-              </div>
+            {choiceKinds.has(data.kind || "") && (
+              <InlineLookupEditor
+                lookupId={data.lookup}
+                onChange={(id) => set("lookup", id)}
+                lookups={lookups}
+                values={lookupValues}
+                disabled={locked}
+              />
             )}
             {data.kind === "relation" && (
               <>
@@ -566,7 +554,7 @@ export function DefinitionEditor({
                 />
                 <small>
                   «وابسته نیست» یعنی انتخاب این فیلد از فیلد دیگری تأثیر نمی‌گیرد. برای وابستگی، فیلد والد باید از نوع
-                  انتخاب تکی و در همین فرم باشد؛ برای هر گزینهٔ فرزند هم «مقدار والد» را در تب لیست‌های انتخابی تعیین
+                  انتخاب تکی و در همین فرم باشد؛ برای هر گزینهٔ فرزند هم «مقدار والد» را در همین بخش «منبع گزینه‌ها» تعیین
                   کنید.
                 </small>
               </div>
@@ -627,6 +615,29 @@ export function DefinitionEditor({
               lookupValues={lookupValues}
             />
           </fieldset>
+          {data.kind && data.kind !== "computed" && (
+            <fieldset className="engine-field-preview">
+              <legend>
+                پیش‌نمایش ورودی {data.kind === "rich_text" ? "متن غنی" : data.kind === "percent" ? "درصد" : ""}
+              </legend>
+              <small>این کادر همان نوع ورودی را در فرم نشان می‌دهد. مقداری که اینجا وارد می‌کنید ذخیره نمی‌شود.</small>
+              <DefaultValueEditor
+                field={{
+                  id: row?.id,
+                  code: data.code || "preview_value",
+                  kind: data.kind,
+                  config,
+                  lookup: data.lookup,
+                  relation_entity: data.relation_entity,
+                }}
+                value={previewValue}
+                onChange={setPreviewValue}
+                disabled={data.kind === "file"}
+                label="نمونهٔ ورودی"
+                showClear={false}
+              />
+            </fieldset>
+          )}
           {locked && data.kind !== "computed" && (
             <fieldset>
               <legend>مقدار اولیه ورودی</legend>

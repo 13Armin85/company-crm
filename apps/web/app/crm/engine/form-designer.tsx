@@ -68,14 +68,12 @@ export function FormDesigner({
   fields,
   entities,
   onFieldCreated,
-  onManageLookups,
   viewMode = "layout",
 }: {
   entity: EntityDefinition;
   fields: FieldDefinition[];
   entities: EntityDefinition[];
   onFieldCreated?: () => void;
-  onManageLookups?: () => void;
   viewMode?: "fields" | "layout" | "preview" | "versions";
 }) {
   const form = useEngineForm(entity.code),
@@ -330,15 +328,6 @@ export function FormDesigner({
                 if (creatingField && created?.code) addField(created.code);
                 onFieldCreated?.();
               }}
-              onManageLookups={
-                onManageLookups
-                  ? () => {
-                      setCreatingField(false);
-                      setEditingField(null);
-                      onManageLookups();
-                    }
-                  : undefined
-              }
             />
           </div>
         </div>

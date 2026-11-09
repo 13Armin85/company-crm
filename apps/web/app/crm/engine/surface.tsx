@@ -17,7 +17,7 @@ import { api, errorMessage, useWorkspaceAccess } from "../api";
 import { useUIStore } from "../store";
 import { useEngineQuery, useEngineSlug, enginePath } from "./api";
 import { EngineRichText } from "./record-form";
-import { persianDate } from "../utils";
+import { persianDate, plainText } from "../utils";
 import { Button } from "../components";
 import { EntityViewsPage } from "./view-page";
 import type { SavedViewList } from "./view-types";
@@ -365,7 +365,7 @@ export function SurfaceFieldValue({
         ))}
       </>
     );
-  if (reference) return <>{ids.map((id) => labels[id] || "انتخاب ثبت‌شده").join("، ")}</>;
+  if (reference) return <>{ids.map((id) => plainText(labels[id] || "انتخاب ثبت‌شده")).join("، ")}</>;
   if (field.kind === "date" || field.kind === "datetime")
     return (
       <>{persianDate(String(value), field.kind === "datetime" ? { hour: "2-digit", minute: "2-digit" } : undefined)}</>
@@ -377,8 +377,8 @@ export function SurfaceFieldValue({
         {persianDate(value.start)} تا {persianDate(value.end)}
       </>
     );
-  if (field.kind === "rich_text") return <>{String(value).replace(/<[^>]*>/g, " ")}</>;
-  return <>{Array.isArray(value) ? value.join("، ") : String(value)}</>;
+  if (field.kind === "rich_text") return <>{plainText(value)}</>;
+  return <>{Array.isArray(value) ? value.map(plainText).join("، ") : plainText(value)}</>;
 }
 
 const surfaceRowId = (row: ReactElement) =>

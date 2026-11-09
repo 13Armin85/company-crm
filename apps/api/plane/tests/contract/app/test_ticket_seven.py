@@ -152,6 +152,22 @@ def test_adding_role_widget_creates_missing_tab_in_backend(engine):
     assert saved.data["tabs"] == response.data["tabs"]
 
 
+def test_role_dashboard_without_saved_layout_has_usable_starter(engine):
+    from plane.app.services.dashboard_layout import selected_role
+
+    workspace, user, client = engine
+    role = selected_role(workspace, user)
+    response = client.get(dashboard_path(workspace, f"defaults/{role.id}/"))
+    assert response.status_code == 200, response.data
+    assert response.data["revision"] == 0
+    assert response.data["tabs"][0]["widgets"]
+    saved = client.put(dashboard_path(workspace, f"defaults/{role.id}/"), {
+        "tabs": response.data["tabs"], "revision": 0,
+    }, format="json")
+    assert saved.status_code == 200, saved.data
+    assert client.get(dashboard_path(workspace, f"defaults/{role.id}/")).data["tabs"] == saved.data["tabs"]
+
+
 def test_ticket_table_widget_returns_project_and_assignee_names(engine):
     from plane.db.models import EntityType
 

@@ -63,4 +63,17 @@ describe("Persian dashboard chart labels", () => {
       })
     ).toBe("علی پیوست «قرارداد ۱۲» را تغییر داد");
   });
+  it("shows rich-text changes as Persian sentences without editor HTML", () => {
+    expect(
+      activityDescription({
+        actor: "علی",
+        record: "TT21",
+        event: "record.field_changed",
+        field: "توضیحات",
+        before: '<p class="editor-paragraph-block">متن قدیم</p>',
+        after: '<p class="editor-paragraph-block" data-id="123">متن تازه &amp; کامل</p>',
+      })
+    ).toBe("علی توضیحات «TT21» را از «متن قدیم» به «متن تازه & کامل» تغییر داد");
+    expect(chartLabel("<p>شرح &amp; توضیح</p>")).toBe("شرح & توضیح");
+  });
 });

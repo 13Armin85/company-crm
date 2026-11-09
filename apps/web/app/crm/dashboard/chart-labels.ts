@@ -1,5 +1,5 @@
 import { stateNameFa } from "../issue-status";
-import { persianDateValue, toFa } from "../utils";
+import { persianDateValue, plainText, toFa } from "../utils";
 
 const knownLabels: Record<string, string> = {
   urgent: "فوری",
@@ -39,20 +39,20 @@ const readableValue = (value: unknown): string | undefined => {
   if (value === "") return "";
   if (value === null || value === undefined) return undefined;
   if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") return undefined;
-  const raw = String(value);
+  const raw = plainText(value);
   if (/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(raw)) return undefined;
   return stateNameFa(chartLabel(raw)).slice(0, 80);
 };
 
 export function activityDescription(item: Record<string, unknown>): string {
-  const actor = String(item.actor || "کاربر");
-  const record = String(item.record || "رکورد").slice(0, 100);
+  const actor = plainText(item.actor || "کاربر");
+  const record = plainText(item.record || "رکورد").slice(0, 100);
   const target = `«${record}»`;
   if (item.event === "record.created") return `${actor} ${target} را ایجاد کرد`;
   if (item.event === "record.deleted") return `${actor} ${target} را حذف کرد`;
   if (item.event === "surface.values.updated") return `${actor} اطلاعات فرم ${target} را ویرایش کرد`;
   if (item.event === "record.field_changed" || item.event === "record.status_changed") {
-    const field = String(item.field || (item.event === "record.status_changed" ? "وضعیت" : "یکی از فیلدها"));
+    const field = plainText(item.field || (item.event === "record.status_changed" ? "وضعیت" : "یکی از فیلدها"));
     const before = readableValue(item.before);
     const after = readableValue(item.after);
     if (before && after && before !== after)

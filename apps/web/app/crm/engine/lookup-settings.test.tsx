@@ -96,11 +96,14 @@ describe("choice lists in form design", () => {
         kind="fields"
         row={{ id: "city", code: "city", title: "شهر", kind: "select", lookup: "cities", config: {} }}
         onClose={() => {}}
-        onManageLookups={() => {}}
       />
     );
     expect(html).toContain("منبع گزینه‌ها (لیست پایه)");
-    expect(html).toContain("ساخت یا ویرایش لیست و گزینه‌ها");
+    expect(html).toContain("نام لیست جدید");
+    expect(html).toContain("گزینه‌های «شهرها»");
+    expect(html).toContain("گزینه‌های جدید (هر گزینه در یک خط)");
+    expect(html).toContain("پیش‌نمایش ورودی");
+    expect(html).not.toContain("ساخت یا ویرایش لیست و گزینه‌ها");
     expect(html).toContain('<option value="country">کشور</option>');
     expect(html).not.toContain('<option value="description">');
     expect(html).not.toContain('<option value="tags">');

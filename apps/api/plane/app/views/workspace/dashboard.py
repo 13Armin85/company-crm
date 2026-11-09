@@ -10,7 +10,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 
 from plane.app.services.access_control import has_permission
-from plane.app.services.dashboard_layout import WIDGETS, add_widget, default_layout, personal_layout, save_layout, shared_tabs
+from plane.app.services.dashboard_layout import WIDGETS, add_widget, default_layout, make_tab, personal_layout, save_layout, shared_tabs, starter_widgets
 from plane.app.services.dashboard_team import settings_for, save_team_settings, subordinate_units, team_cards, validate_rules, color_for
 from plane.app.services.dashboard_widgets import widget_data
 from plane.app.services.entity_records import emit_definition, get_record, record_payload, save_record
@@ -58,8 +58,10 @@ class DashboardRoleEndpoint(EngineAPIView):
             raise PermissionDenied()
         role = get_object_or_404(OrganizationRole, workspace=workspace, id=role_id, is_active=True)
         row = DashboardConfiguration.objects.filter(workspace=workspace, role=role).first()
+        starter = make_tab("پیش‌فرض نقش")
+        starter["widgets"] = starter_widgets()
         return Response({
-            "role": str(role.id), "tabs": row.tabs if row else [], "revision": row.revision if row else 0,
+            "role": str(role.id), "tabs": row.tabs if row else [starter], "revision": row.revision if row else 0,
             "gallery": [{"type": key, "title": title} for key, title in WIDGETS.items()],
             "can_team": has_permission(request.user, workspace, "Dashboard.Team.View", request=request),
             "can_manage_defaults": True,

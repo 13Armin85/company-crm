@@ -183,7 +183,6 @@ export function DesignWorkspace() {
                     fields={fields.data}
                     entities={entities}
                     viewMode={tab === "fields" || tab === "preview" || tab === "versions" ? tab : "layout"}
-                    onManageLookups={() => setTab("choices")}
                   />
                 )}
               </div>

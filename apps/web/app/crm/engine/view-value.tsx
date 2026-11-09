@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import type { CSSProperties, ReactNode } from "react";
 import { Link } from "react-router";
 import type { FieldValue } from "@plane/ui";
-import { persianDate } from "../utils";
+import { persianDate, plainText } from "../utils";
 import { RelationPreview } from "./record-form";
 import type { ViewField, ViewResult, ViewStyle } from "./view-types";
 
@@ -172,7 +172,7 @@ export function ViewValue({
                 }).format(new Date(String(item)))
               : field?.kind === "date"
                 ? persianDate(String(item))
-                : labels[String(item)]?.title || String(item).replace(/<[^>]*>/g, " ");
+                : plainText(labels[String(item)]?.title || item);
     const selected = labels[String(item)];
     const content = (
       <span

@@ -7,7 +7,7 @@ import { Button, EmptyState, PageHeader, SearchBox, Skeleton } from "../componen
 import { AccessModal } from "../access/components";
 import { errorMessage, useWorkspaceAccess } from "../api";
 import { useUIStore } from "../store";
-import { persianDate } from "../utils";
+import { persianDate, plainText } from "../utils";
 import { EngineRecordForm } from "./record-form";
 import { EntityRecordSummary } from "./record-summary";
 import { RelatedRecords } from "./related-records";
@@ -91,7 +91,7 @@ export function EntityDirectoryPage() {
                   <span className="engine-entity-kind">{entity.adapter ? "فرم اصلی" : "فرم سفارشی"}</span>
                 </div>
                 <h2>{entityDisplayTitle(entity.title)}</h2>
-                <p>{entity.description || "مشاهده، ثبت و ویرایش رکوردها در فرم مشترک فضای کاری"}</p>
+                <p>{plainText(entity.description || "مشاهده، ثبت و ویرایش رکوردها در فرم مشترک فضای کاری")}</p>
                 <div className="engine-entity-card-footer">
                   <small>{subtypes ? `${subtypes.toLocaleString("fa-IR")} زیرنوع` : "فرم پایه"}</small>
                   <span>

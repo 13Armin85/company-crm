@@ -41,11 +41,15 @@ export function DefaultValueEditor({
   value,
   onChange,
   disabled = false,
+  label = "مقدار پیش‌فرض ثابت",
+  showClear = true,
 }: {
   field: DefaultField;
   value?: FieldValue;
   onChange: (value: FieldValue) => void;
   disabled?: boolean;
+  label?: string;
+  showClear?: boolean;
 }) {
   const slug = useEngineSlug(),
     { data: catalog } = useEngineCatalog();
@@ -62,7 +66,7 @@ export function DefaultValueEditor({
       {
         id: field.id || code,
         code,
-        title: "مقدار پیش‌فرض ثابت",
+        title: label,
         kind: field.kind,
         config: {
           ...field.config,
@@ -140,9 +144,11 @@ export function DefaultValueEditor({
         }}
         fileHref={(_item, id) => `${enginePath(slug)}/definitions/fields/${field.id}/default-file/${id}/`}
       />
-      <button type="button" className="button button-ghost" disabled={disabled} onClick={() => onChange(null)}>
-        پاک کردن پیش‌فرض ثابت
-      </button>
+      {showClear && (
+        <button type="button" className="button button-ghost" disabled={disabled} onClick={() => onChange(null)}>
+          پاک کردن پیش‌فرض ثابت
+        </button>
+      )}
     </div>
   );
 }

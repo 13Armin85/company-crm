@@ -14,7 +14,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { persianDate, persianDateValue } from "../utils";
+import { persianDate, persianDateValue, plainText } from "../utils";
 import { errorMessage } from "../api";
 import { useWidgetData } from "./api";
 import { DashboardCalendar } from "./calendar";
@@ -101,7 +101,7 @@ function DataWidget({ widget }: { widget: DashboardWidget }) {
           <thead>
             <tr>
               {headers.map((header) => (
-                <th key={header.field}>{header.title}</th>
+                <th key={header.field}>{plainText(header.title)}</th>
               ))}
               <th>رکورد</th>
             </tr>
@@ -111,11 +111,12 @@ function DataWidget({ widget }: { widget: DashboardWidget }) {
               <tr key={row.id} draggable onDragStart={(event) => event.dataTransfer.setData("task-id", row.id)}>
                 {headers.map((header) => (
                   <td key={header.field}>
-                    {row.display_values?.[header.field] ?? persianDateValue(row.values?.[header.field])}
+                    {plainText(row.display_values?.[header.field] ?? persianDateValue(row.values?.[header.field])) ||
+                      "—"}
                   </td>
                 ))}
                 <td>
-                  <Link to={`/entities/${entity}/${row.id}`}>{row.number || row.title}</Link>
+                  <Link to={`/entities/${entity}/${row.id}`}>{plainText(row.number || row.title)}</Link>
                 </td>
               </tr>
             ))}
@@ -132,7 +133,7 @@ function DataWidget({ widget }: { widget: DashboardWidget }) {
         {rows.map((row) => (
           <div key={row.id} draggable onDragStart={(event) => event.dataTransfer.setData("task-id", row.id)}>
             <Link to={`/entities/${entity}/${row.id}`}>
-              {row.number} · {row.title}
+              {plainText(row.number)} · {plainText(row.title)}
             </Link>
           </div>
         ))}
@@ -238,7 +239,8 @@ function DataWidget({ widget }: { widget: DashboardWidget }) {
         ))}
       </div>
     );
-  if (widget.type === "note") return <p className="dashboard-note">{String(data.value || "یادداشتی ثبت نشده است.")}</p>;
+  if (widget.type === "note")
+    return <p className="dashboard-note">{plainText(data.value || "یادداشتی ثبت نشده است.")}</p>;
   if (widget.type === "links")
     return (
       <div className="dashboard-links">
@@ -246,7 +248,7 @@ function DataWidget({ widget }: { widget: DashboardWidget }) {
           ? (data.value as { title: string; href: string }[]).map((link, index) => (
               // eslint-disable-next-line react/no-array-index-key -- saved links have no ids.
               <Link key={index} to={link.href}>
-                {link.title}
+                {plainText(link.title)}
               </Link>
             ))
           : null}
@@ -276,8 +278,8 @@ function DataWidget({ widget }: { widget: DashboardWidget }) {
           ? items.map((item, index) => (
               // eslint-disable-next-line react/no-array-index-key -- absence rows can repeat a user.
               <div key={index}>
-                <Link to={`/entities/leave/${String(item.id)}`}>{String(item.name)}</Link> ·{" "}
-                {String(item.reason || "بدون دلیل")} · بازگشت {displayDate(item.return_at)} · جانشین{" "}
+                <Link to={`/entities/leave/${String(item.id)}`}>{plainText(item.name)}</Link> ·{" "}
+                {plainText(item.reason || "بدون دلیل")} · بازگشت {displayDate(item.return_at)} · جانشین{" "}
                 {String(item.substitute || "ندارد")}
               </div>
             ))

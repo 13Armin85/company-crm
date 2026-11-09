@@ -8,6 +8,7 @@ import { useEngineDefinitions } from "./api";
 import type { LookupDefinition, LookupOptionDefinition } from "./api";
 import { DefinitionEditor } from "./definition-editor";
 import type { EditableDefinition } from "./definition-editor";
+import { plainText } from "../utils";
 
 type ChoiceFilter = "all" | "active" | "inactive";
 
@@ -154,7 +155,9 @@ export function LookupSettings() {
                 >
                   <span className="engine-choices-library-copy">
                     <strong>{item.title}</strong>
-                    <small>{item.description || (item.is_active ? "آمادهٔ استفاده در فرم" : "لیست غیرفعال")}</small>
+                    <small>
+                      {plainText(item.description || (item.is_active ? "آمادهٔ استفاده در فرم" : "لیست غیرفعال"))}
+                    </small>
                   </span>
                   <span className="engine-choices-library-count" aria-label={`${count.toLocaleString("fa-IR")} گزینه`}>
                     {count.toLocaleString("fa-IR")}
@@ -187,7 +190,7 @@ export function LookupSettings() {
                 <div>
                   <span className="engine-rules-eyebrow">گزینه‌های لیست انتخاب‌شده</span>
                   <h4 id="engine-choices-detail-title">{selected.title}</h4>
-                  <p>{selected.description || "این لیست در تمام فرم‌های فضای کاری قابل استفاده است."}</p>
+                  <p>{plainText(selected.description || "این لیست در تمام فرم‌های فضای کاری قابل استفاده است.")}</p>
                 </div>
                 {access.can("Lookup.Edit") && (
                   <Button variant="secondary" onClick={() => setEditingLookup(selected)}>

@@ -13,7 +13,7 @@ import {
 import { AccessModal } from "../access/components";
 import { useUIStore } from "../store";
 import type { NotificationItem } from "../types";
-import { persianDate, toFa } from "../utils";
+import { persianDate, plainText, toFa } from "../utils";
 import { IconButton, Button, Skeleton, EmptyState } from "./primitives";
 
 export function NotificationDetails({
@@ -85,7 +85,9 @@ export function NotificationDetails({
             </Button>
           </div>
         )}
-        <p className="notification-message">{details.description || "متن تکمیلی برای این اعلان ثبت نشده است."}</p>
+        <p className="notification-message">
+          {plainText(details.description || "متن تکمیلی برای این اعلان ثبت نشده است.")}
+        </p>
       </section>
       <footer>
         {details.actionHref ? (
@@ -198,7 +200,7 @@ export function NotificationDrawer() {
                   </span>
                   <div>
                     <strong>{item.title}</strong>
-                    <p>{item.preview ?? item.description}</p>
+                    <p>{plainText(item.preview ?? item.description)}</p>
                     {(item.entityName || item.projectName) && (
                       <small className="notification-context">
                         {[
