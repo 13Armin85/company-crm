@@ -1,0 +1,169 @@
+{
+  "started_at": "mwc6xrqk",
+  "base": "http://localhost:3000",
+  "checks": [
+    {
+      "step": 1,
+      "name": "تیکت با عنوان، شرح، نوع، اولویت، مسئول، ثبت‌کننده، مشتری، پروژه، سررسید و والد/فرزند ساخته شد",
+      "passed": true,
+      "screenshot": "step-01.png",
+      "details": {
+        "customer_relation_field": "rel_bd9f2b461611471f8ea414d22c157c32_right",
+        "parent": "9ec94304-31b0-457d-802a-5f164248f733",
+        "child": "90b696a3-f4b1-40da-b02c-9dccad8bcfa9"
+      }
+    },
+    {
+      "step": 2,
+      "name": "۸ ساعت کاری برای نوع؛ شروع کار؛ پایان تقریبی، منبع تقویم و زمان مانده",
+      "passed": true,
+      "screenshot": "step-02.png",
+      "details": {
+        "target_at": "2026-11-12T09:38:01.748875+03:30",
+        "calendar": {
+          "source": "exception",
+          "label": "استثنای برنامهٔ فرد",
+          "help": "برای روز شروع، استثنای برنامهٔ کاری مسئول (مثلاً تعطیلی یا شیفت) اعمال شده است.",
+          "source_id": "c27ba5c6-285c-4771-8046-481a0392a962",
+          "builtin": false
+        }
+      }
+    },
+    {
+      "step": 3,
+      "name": "تغییر مدت هدف توسط مدیر با دلیل؛ مقدار قبلی در سابقه",
+      "passed": true,
+      "screenshot": "step-03.png",
+      "details": {}
+    },
+    {
+      "step": 4,
+      "name": "پنجرهٔ تمدید با پیش‌نمایش پایان جدید و گیرنده",
+      "passed": true,
+      "screenshot": "step-04a.png",
+      "details": {}
+    },
+    {
+      "step": 4,
+      "name": "معلق ← ثابت؛ رد ← ثابت؛ درخواست دوباره ← تأیید ← موعد جدید",
+      "passed": true,
+      "screenshot": "step-04b.png",
+      "details": {
+        "before": "2026-11-12T11:38:01.748875+03:30",
+        "after": "2026-11-12T12:38:01.748875+03:30"
+      }
+    },
+    {
+      "step": 5,
+      "name": "بنر دیرکرد و ثبت گزارش تأخیر؛ تیکت باز می‌ماند",
+      "passed": true,
+      "screenshot": "step-05a.png",
+      "details": {}
+    },
+    {
+      "step": 5,
+      "name": "فیلتر «عقب‌افتاده» با شمارندهٔ سرور",
+      "passed": true,
+      "screenshot": "step-05b.png",
+      "details": {}
+    },
+    {
+      "step": 5,
+      "name": "«همه کارها»: فیلتر آماده و کانبان گروه‌بندی‌شده با سه دستهٔ وضعیت",
+      "passed": true,
+      "screenshot": "step-05c.png",
+      "details": {}
+    },
+    {
+      "step": 6,
+      "name": "قاعدهٔ نوبتی بین دو نفر؛ سه تیکت به‌نوبت توزیع شد",
+      "passed": true,
+      "screenshot": "step-06a.png",
+      "details": {
+        "routed": [
+          "1b0a7076-a2da-4af2-b011-cdda1940408f",
+          "8da94693-939a-42b6-8130-3ef94dbedce8",
+          "1b0a7076-a2da-4af2-b011-cdda1940408f"
+        ]
+      }
+    },
+    {
+      "step": 6,
+      "name": "یک نفر غایب ← جانشین؛ همه غایب ← «بدون مسئول» و علامت مدیر",
+      "passed": true,
+      "screenshot": "step-06b.png",
+      "details": {
+        "delegate_ticket": "f937efd3-34ee-4bf8-b051-2139285b0cd8",
+        "unassigned_ticket": "e3e3ec38-731b-452b-9c48-12f31d669e56"
+      }
+    },
+    {
+      "step": 7,
+      "name": "ارجاع دستی ← رد با دلیل ← ارجاع به فرد دیگر ← پذیرش؛ زنجیره در سابقه",
+      "passed": true,
+      "screenshot": "step-07.png",
+      "details": {
+        "chain": [
+          "T5 employee mwc6xrqk→T5 colleague mwc6xrqk:rejected",
+          "T5 employee mwc6xrqk→T5 colleague mwc6xrqk:forwarded",
+          "T5 colleague mwc6xrqk→T5 delegate mwc6xrqk:accepted"
+        ]
+      }
+    },
+    {
+      "step": 8,
+      "name": "حل شد ← تیکت بسته شد با دادهٔ تماس در سابقه",
+      "passed": true,
+      "screenshot": "step-08a.png",
+      "details": {}
+    },
+    {
+      "step": 8,
+      "name": "حل نشد ← مسیر عادی",
+      "passed": true,
+      "screenshot": "step-08b.png",
+      "details": {}
+    },
+    {
+      "step": 9,
+      "name": "کاربر بدون دسترسی: تیکت در فهرست، جست‌وجو، جدول و کانبان نیست",
+      "passed": true,
+      "screenshot": "step-09a.png",
+      "details": {}
+    },
+    {
+      "step": 9,
+      "name": "آدرس مستقیم پیام دسترسی می‌دهد",
+      "passed": true,
+      "screenshot": "step-09b.png",
+      "details": {}
+    },
+    {
+      "step": 10,
+      "name": "بستن و بازگشایی؛ سابقه کامل؛ شماره ثابت؛ دسته درست",
+      "passed": true,
+      "screenshot": "step-10.png",
+      "details": {
+        "number": "TT116",
+        "events": 29
+      }
+    },
+    {
+      "step": 11,
+      "name": "صفحهٔ تیکت در حالت تیره و عرض موبایل",
+      "passed": true,
+      "screenshot": "step-11a.png",
+      "details": {
+        "overflow": 0
+      }
+    },
+    {
+      "step": 11,
+      "name": "پنجرهٔ حل در تماس در حالت تیره و موبایل",
+      "passed": true,
+      "screenshot": "step-11b.png",
+      "details": {}
+    }
+  ],
+  "errors": []
+}
