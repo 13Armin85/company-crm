@@ -85,6 +85,7 @@ export interface EngineRecord {
   can_deactivate?: boolean;
   can_delete: boolean;
   native_url: string | null;
+  relation_data?: Record<string, { id: string; data: Record<string, unknown> }[]>;
 }
 export interface EnginePage {
   results: EngineRecord[];

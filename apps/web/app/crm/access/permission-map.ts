@@ -9,6 +9,7 @@ export const pagePermissions: Record<string, string> = {
   "/issues": "Issue.View",
   "/routing": "Routing.Queue.View",
   "/projects": "Project.View",
+  "/workflow-inbox": "Workflow.View",
 };
 
 export function permissionsForPath(pathname: string): string[] {
@@ -28,7 +29,18 @@ export function canAccessPath(pathname: string, can: (code: string) => boolean):
       "Relation.View",
       "Field.View",
       "View.Official.Manage",
+      "Workflow.Design",
     ].some(can);
   if (/^\/roles\/[^/]+\/permissions\/?$/.test(pathname)) return can("Role.View") || can("Role.Permission.Assign");
   return permissionsForPath(pathname).every(can);
 }
+
+/** Ticket 5 action permissions (the server enforces the same codes). Extension approval has no code:
+ * it follows the "direct manager / active delegate" relation only. */
+export const ticketActionPermissions = {
+  setTarget: "Ticket.TargetSet",
+  manageRules: "Routing.Manage",
+  viewRules: "Routing.View",
+  manageQueue: "Routing.Queue.ViewAll",
+  route: "Routing.Route",
+} as const;

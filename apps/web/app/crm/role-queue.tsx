@@ -14,6 +14,7 @@ import {
 import { useState } from "react";
 import { Link } from "react-router";
 import { useClaimTicketRoleQueue, useTicketRoleQueue } from "./api";
+import { isUnassignedEntry } from "./role-queue-model";
 import { Button, EmptyState, Skeleton } from "./components";
 import { filterRoleQueue, isLongWaiting, queueWaitLabel } from "./role-queue-model";
 import type { QueueSort } from "./role-queue-model";
@@ -212,7 +213,7 @@ export function RoleQueue({
                         <div className="role-queue-card-top">
                           <span className="role-queue-role">
                             <ShieldCheck size={14} aria-hidden="true" />
-                            {entry.roleName || "نقش بدون نام"}
+                            {isUnassignedEntry(entry) ? "بدون مسئول" : entry.roleName || "نقش بدون نام"}
                           </span>
                           {isLongWaiting(entry) && <span className="role-queue-aged">بیش از یک روز در صف</span>}
                         </div>
@@ -225,7 +226,9 @@ export function RoleQueue({
                               پروژه
                             </dt>
                             <dd>
-                              {canViewProject ? (
+                              {!entry.projectId || entry.projectId === "null" ? (
+                                "بدون پروژه"
+                              ) : canViewProject ? (
                                 <Link to={`/projects/${entry.projectId}`}>{entry.projectName || "پروژه بدون نام"}</Link>
                               ) : (
                                 entry.projectName || "پروژه بدون نام"
@@ -265,7 +268,13 @@ export function RoleQueue({
                             {queueWaitLabel(entry)}
                             {hasDate ? " در انتظار" : ""}
                           </span>
-                          {canClaim && (
+                          {isUnassignedEntry(entry) ? (
+                            canViewAll && (
+                              <Link className="button button-primary" to={`/entities/ticket/${entry.issueId}`}>
+                                ارجاع
+                              </Link>
+                            )
+                          ) : canClaim && (
                             <button
                               className="button button-primary"
                               type="button"

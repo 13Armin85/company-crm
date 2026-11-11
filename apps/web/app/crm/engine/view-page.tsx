@@ -1,4 +1,6 @@
 import { ErrorNotice, ErrorState } from "../error-state";
+import { TicketPresetBar } from "../ticket/preset-bar";
+import type { PresetId } from "../ticket/model";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
@@ -98,7 +100,7 @@ function SaveViewEditor({
   definition: ViewDefinition;
   original?: SavedView;
   copy: boolean;
-  onSaved: (id: string) => void;
+  onSaved: (id: string, visibility: SavedView["visibility"]) => void;
 }) {
   const { data: access } = useWorkspaceAccess(),
     mutation = useEngineMutation();
@@ -115,6 +117,13 @@ function SaveViewEditor({
       className="engine-view-settings"
       onSubmit={(e) => {
         e.preventDefault();
+        if (
+          visibility !== "personal" &&
+          !window.confirm(
+            `${definition.columns.length.toLocaleString("fa-IR")} ستون این نما برای ${visibility === "official" ? "کاربران جدول رسمی" : "گیرندگان انتخاب‌شده"} ذخیره شود؟`
+          )
+        )
+          return;
         void mutation
           .mutateAsync({
             path: `entities/${code}/views/${original && !copy ? `${original.id}/` : ""}`,
@@ -128,7 +137,7 @@ function SaveViewEditor({
               revision: original?.revision,
             },
           })
-          .then((result) => onSaved((result as SavedView).id))
+          .then((result) => onSaved((result as SavedView).id, visibility))
           .catch(() => {});
       }}
     >
@@ -136,38 +145,59 @@ function SaveViewEditor({
         نام نما
         <input value={name} onChange={(e) => setName(e.target.value)} required maxLength={255} />
       </label>
-      <SearchableSelect
-        label="نوع دسترسی"
-        value={visibility}
-        disabled={Boolean(original && !copy)}
-        options={[
-          ...(access?.can("View.Personal.Create") ? [{ id: "personal", title: "شخصی؛ فقط خودم" }] : []),
-          ...(access?.can("View.Personal.Share") ? [{ id: "shared", title: "اشتراکی؛ گیرندگان مشخص" }] : []),
-          ...(access?.can("View.Official.Manage") ? [{ id: "official", title: "رسمی" }] : []),
-        ]}
-        onChange={(v) => setVisibility(v as SavedView["visibility"])}
-      />
-      {visibility === "shared" && (
-        <>
-          {(["roles", "units", "users"] as const).map((kind) => (
-            <RecipientInput
-              key={kind}
-              code={code}
-              kind={kind}
-              value={recipients[kind] || []}
-              title={{ roles: "نقش‌های گیرنده", units: "واحدهای گیرنده", users: "کاربران گیرنده" }[kind]}
-              onChange={(ids) => setRecipients({ ...recipients, [kind]: ids })}
-            />
-          ))}
-          <p>اشتراک نما، مجوز مشاهده رکورد یا فیلد به گیرندگان اضافه نمی‌کند.</p>
-        </>
-      )}
-      {visibility === "official" && (
-        <RecipientInput code={code} kind="roles" title="نمای پیش‌فرض نقش‌ها" value={defaults} onChange={setDefaults} />
-      )}
+      <p role="note">
+        {visibility === "personal"
+          ? "نمای شخصی من؛ فقط شما این تنظیمات را می‌بینید."
+          : visibility === "official"
+            ? "نمای رسمی؛ کاربران مجاز آن را در فهرست نماها می‌بینند."
+            : "نمای اشتراکی؛ گیرندگان انتخاب‌شده آن را می‌بینند."}
+      </p>
+      <p>
+        ستون‌های این نما: {definition.columns.length.toLocaleString("fa-IR")} ستون. ترتیب را در جدول پشت این پنجره
+        ببینید.
+      </p>
+      <details
+        className="engine-advanced-setting"
+        open={visibility !== "personal" || Boolean(original && original.visibility !== "personal") ? true : undefined}
+      >
+        <summary>تنظیمات پیشرفتهٔ دسترسی</summary>
+        <SearchableSelect
+          label="نوع دسترسی"
+          value={visibility}
+          disabled={Boolean(original && !copy)}
+          options={[
+            ...(access?.can("View.Personal.Create") ? [{ id: "personal", title: "شخصی؛ فقط خودم" }] : []),
+            ...(access?.can("View.Personal.Share") ? [{ id: "shared", title: "اشتراکی؛ گیرندگان مشخص" }] : []),
+            ...(access?.can("View.Official.Manage") ? [{ id: "official", title: "رسمی" }] : []),
+          ]}
+          onChange={(v) => setVisibility(v as SavedView["visibility"])}
+        />
+        {visibility === "shared" && (
+          <>
+            {(["roles", "units", "users"] as const).map((kind) => (
+              <RecipientInput
+                key={kind}
+                code={code}
+                kind={kind}
+                value={recipients[kind] || []}
+                title={{ roles: "نقش‌های گیرنده", units: "واحدهای گیرنده", users: "کاربران گیرنده" }[kind]}
+                onChange={(ids) => setRecipients({ ...recipients, [kind]: ids })}
+              />
+            ))}
+            <p>اشتراک نما، مجوز مشاهده رکورد یا فیلد به گیرندگان اضافه نمی‌کند.</p>
+          </>
+        )}
+        {visibility === "official" && (
+          <RecipientInput code={code} kind="roles" title="نمای پیش‌فرض نقش‌ها" value={defaults} onChange={setDefaults} />
+        )}
+      </details>
       <ErrorNotice message={mutation.error && errorMessage(mutation.error, "ذخیره نما انجام نشد.")} />
       <Button type="submit" disabled={mutation.isPending}>
-        ذخیره نما
+        {visibility === "personal"
+          ? "ذخیرهٔ نمای شخصی من"
+          : visibility === "official"
+            ? "ذخیرهٔ نمای رسمی"
+            : "ذخیرهٔ نمای اشتراکی"}
       </Button>
     </form>
   );
@@ -402,9 +432,15 @@ export function EntityViewsPage({ entityCode }: { entityCode?: string } = {}) {
   const saved = useEngineQuery<SavedViewList>("views", `entities/${code}/views/`);
   const [definition, setDefinition] = useState<ViewDefinition | null>(null),
     [selectedView, setSelectedView] = useState("");
+  const [justSavedView, setJustSavedView] = useState<{
+    id: string;
+    visibility: SavedView["visibility"];
+    definition: ViewDefinition;
+  } | null>(null);
   const [extraFields, setExtraFields] = useState<ViewField[]>([]),
     [search, setSearch] = useState(""),
-    [debouncedSearch, setDebouncedSearch] = useState("");
+    [debouncedSearch, setDebouncedSearch] = useState(""),
+    [preset, setPreset] = useState<PresetId>("all");
   const [page, setPage] = useState(1),
     [selected, setSelected] = useState<string[]>([]),
     [drawer, setDrawer] = useState<
@@ -477,6 +513,7 @@ export function EntityViewsPage({ entityCode }: { entityCode?: string } = {}) {
       debouncedSearch,
       page,
       selectedView.startsWith("system:") ? selectedView : "",
+      code === "ticket" ? preset : "",
     ],
     enabled: Boolean(slug && effective),
     queryFn: async ({ signal }): Promise<ViewResult> =>
@@ -489,6 +526,7 @@ export function EntityViewsPage({ entityCode }: { entityCode?: string } = {}) {
             page,
             page_size: 100,
             ...(selectedView ? { view_id: selectedView } : {}),
+            ...(code === "ticket" && preset !== "all" ? { preset } : {}),
           },
           { signal }
         )
@@ -548,9 +586,16 @@ export function EntityViewsPage({ entityCode }: { entityCode?: string } = {}) {
     JSON.stringify([definition?.columns, definition?.sort, definition?.group, definition?.filter, definition?.subtype]),
   ]);
   const activeView = saved.data?.results.find((v) => v.id === selectedView);
+  const recent = justSavedView?.id === selectedView ? justSavedView : null;
+  const viewDirty = Boolean(
+    definition &&
+    JSON.stringify(definition) !==
+      JSON.stringify(recent?.definition || activeView?.definition || schema.data?.definition)
+  );
   const chooseView = (id: string) => {
     const view = saved.data?.results.find((v) => v.id === id);
     setSelectedView(id);
+    setJustSavedView(null);
     update(view?.definition || schema.data!.definition);
   };
   const move = async (row: ViewRow, field: string, value: FieldValue) => {
@@ -674,6 +719,15 @@ export function EntityViewsPage({ entityCode }: { entityCode?: string } = {}) {
             />
           </div>
           <div className="engine-view-tools">
+            <span role="status" aria-live="polite">
+              {viewDirty
+                ? "ذخیره‌نشده"
+                : (recent?.visibility || activeView?.visibility) === "personal"
+                  ? "نمای شخصی من ذخیره شد"
+                  : (recent?.visibility || activeView?.visibility) === "official"
+                    ? "نمای رسمی ذخیره شد"
+                    : "نمای پایه"}
+            </span>
             <Button variant="secondary" onClick={() => setDrawer("columns")}>
               <SlidersHorizontal size={16} />
               ستون‌ها و ترتیب
@@ -701,6 +755,16 @@ export function EntityViewsPage({ entityCode }: { entityCode?: string } = {}) {
             )}
           </div>
         </div>
+        {code === "ticket" && (
+          <TicketPresetBar
+            value={preset}
+            counts={records.data?.preset_counts}
+            onChange={(next) => {
+              setPreset(next);
+              setPage(1);
+            }}
+          />
+        )}
         <div className="engine-view-toolbar engine-view-toolbar-search">
           <SearchBox value={search} onChange={setSearch} placeholder="جستجو در فیلدهای مجاز…" />
           <SearchableSelect
@@ -752,12 +816,18 @@ export function EntityViewsPage({ entityCode }: { entityCode?: string } = {}) {
             access?.can("View.Personal.Share") ||
             access?.can("View.Official.Manage")) && (
             <Button variant="secondary" onClick={() => setDrawer("save")}>
-              {activeView?.can_edit ? "ذخیره / تغییر نام جدول من" : "جدول من"}
+              {activeView?.can_edit
+                ? activeView.visibility === "personal"
+                  ? "ذخیرهٔ نمای شخصی من"
+                  : activeView.visibility === "official"
+                    ? "ذخیرهٔ نمای رسمی"
+                    : "ذخیرهٔ نمای اشتراکی"
+                : "ساخت نمای شخصی من"}
             </Button>
           )}
           {activeView && (
             <Button variant="secondary" onClick={() => setDrawer("copy")}>
-              کپی نما
+              {access?.can("View.Personal.Create") ? "ساخت نمای شخصی از این نما" : "کپی نما"}
             </Button>
           )}
           {activeView?.can_edit && (
@@ -975,8 +1045,9 @@ export function EntityViewsPage({ entityCode }: { entityCode?: string } = {}) {
               definition={definition}
               original={drawer === "copy" || activeView?.can_edit ? activeView : undefined}
               copy={drawer === "copy"}
-              onSaved={(id) => {
+              onSaved={(id, visibility) => {
                 setSelectedView(id);
+                setJustSavedView({ id, visibility, definition });
                 setDrawer(null);
               }}
             />

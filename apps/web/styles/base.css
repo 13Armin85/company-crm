@@ -1,0 +1,900 @@
+/*
+ * Workspace components v3. Loaded after every screen stylesheet, so these are the
+ * final word on shared surfaces. The language: a flat white sheet, hairline outlines
+ * instead of shadows, one accent for action, tabular numbers, 8px controls.
+ */
+
+/* ───── Page scaffold ───── */
+.page-content {
+  max-width: none;
+  min-height: calc(100vh - var(--header-height));
+  margin: 0;
+  padding: 24px 28px 64px;
+  background: var(--bg);
+}
+.page-content > * {
+  max-width: 1600px;
+  margin-inline: auto;
+}
+/* Page masthead: a full-bleed band under the top bar. Section icon, quiet section name,
+   a strong title and one line of purpose; actions sit on the far edge, vertically centred. */
+.page-header,
+:root .dashboard-hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px 28px;
+  max-width: none;
+  margin: -24px -28px 24px;
+  padding: 22px 28px 20px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--surface-soft);
+  box-shadow: none;
+}
+.page-header::before,
+.page-header::after {
+  display: none;
+}
+.page-header-main {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  flex: 1 1 420px;
+}
+.page-header-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-md);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.page-header-text {
+  min-width: 0;
+}
+.page-header .eyebrow,
+.dashboard-hero-date,
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent-ink);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  line-height: 1.4;
+}
+.page-header h1,
+.dashboard-hero h1 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: clamp(22px, 1.7vw, 28px);
+  font-weight: 800;
+  line-height: 1.35;
+  letter-spacing: -0.015em;
+  overflow-wrap: anywhere;
+}
+.page-header p,
+.dashboard-hero p {
+  margin: 6px 0 0;
+  max-width: 68ch;
+  color: var(--text-secondary);
+  font-size: var(--fs-md);
+  line-height: 1.75;
+}
+.page-header .page-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+/* Pages that place content right under the header get a tidy gap from the band. */
+.page-header + .content-toolbar,
+.page-header + .tab-bar {
+  margin-top: -4px;
+}
+
+/* ───── Containers: outlined, never floating ───── */
+.panel,
+.table-card,
+.inbox-card,
+.settings-section,
+.calendar-card,
+.project-card,
+.stats-grid article,
+.dashboard-widget,
+.issue-list-card,
+.team-card,
+.focus-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: none;
+}
+.panel {
+  padding: 18px 20px;
+}
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.section-header h2 {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: 700;
+}
+.section-header p {
+  margin: 2px 0 0;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+
+/* ───── Buttons ───── */
+.button {
+  min-height: 36px;
+  gap: 6px;
+  padding: 0 14px;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  box-shadow: none;
+}
+.button-primary {
+  color: var(--text-on-accent);
+  background: var(--accent);
+}
+.button-primary:hover {
+  background: var(--accent-hover);
+  transform: none;
+  filter: none;
+}
+.button-secondary {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+  background: var(--surface);
+}
+.button-secondary:hover {
+  border-color: var(--text-muted);
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+.button-ghost {
+  color: var(--text-secondary);
+}
+.button-ghost:hover {
+  border-color: transparent;
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+.button-danger {
+  color: #fff;
+  background: var(--danger);
+}
+.icon-button {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  background: transparent;
+}
+.icon-button:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+.notification-badge {
+  top: 1px;
+  inset-inline-end: 0;
+  border-color: var(--bg);
+}
+.user-avatar {
+  border: 0;
+  border-radius: 50%;
+  color: var(--text-on-accent);
+  background: var(--rail-bg);
+  box-shadow: none;
+  font-weight: 700;
+}
+.user-avatar img {
+  border-radius: 50%;
+}
+.user-avatar span {
+  border-color: var(--bg);
+}
+
+/* ───── Toolbars, filters, tabs ───── */
+.content-toolbar {
+  margin-bottom: 14px;
+  padding: 0 0 12px;
+  border-bottom: 1px solid var(--border);
+}
+.filter-tabs,
+.view-switcher,
+.view-toggle,
+.segmented {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+}
+.filter-tabs button,
+.view-switcher button,
+.view-toggle button,
+.segmented button {
+  min-height: 30px;
+  height: auto;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  color: var(--text-secondary);
+  background: transparent;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: none;
+}
+.view-toggle button {
+  width: 32px;
+  padding: 0;
+}
+.filter-tabs button:hover,
+.view-switcher button:hover,
+.view-toggle button:hover,
+.segmented button:hover {
+  color: var(--text-primary);
+  background: transparent;
+}
+.filter-tabs button.active,
+.view-switcher button.active,
+.view-toggle button.active,
+.segmented button.active {
+  color: var(--text-primary);
+  background: var(--surface);
+  box-shadow:
+    0 0 0 1px var(--border),
+    var(--shadow-xs);
+  font-weight: 700;
+}
+.filter-tabs button span {
+  margin-inline-start: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  color: var(--text-secondary);
+  background: var(--surface-sunken);
+  font-size: var(--fs-2xs);
+  font-weight: 700;
+}
+.search-box,
+.filter-button,
+.select-filter {
+  height: 36px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: none;
+}
+.filter-button.has-filters {
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  background: var(--accent-softer);
+}
+.tab-bar {
+  gap: 0;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--border);
+}
+.tab-bar button {
+  height: 42px;
+  padding: 0 14px;
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+.tab-bar button.active {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+.tab-bar button.active::after {
+  inset-inline: 10px;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--accent);
+}
+
+/* ───── Tables: full-bleed rows, sticky quiet header ───── */
+.table-card {
+  overflow: auto;
+}
+.table-card th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  height: 40px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  background: var(--surface-soft);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+.table-card td {
+  height: 52px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+.table-card tbody tr:hover {
+  background: var(--surface-hover);
+}
+.schema-data-grid {
+  border-radius: var(--radius-md);
+  box-shadow: none;
+}
+.schema-data-grid th {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+.schema-data-grid td {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ───── Lists of work ───── */
+.issue-row {
+  min-height: 52px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.issue-row:hover {
+  background: var(--surface-hover);
+}
+.issue-main strong {
+  font-weight: 600;
+}
+.issue-code {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.status,
+.priority {
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: var(--radius-xs);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+.priority {
+  padding: 0;
+}
+.issue-project,
+.issue-context {
+  border-radius: var(--radius-xs);
+}
+
+/* ───── Projects ───── */
+.project-grid {
+  gap: 14px;
+}
+.project-card {
+  padding: 16px;
+  transition: border-color var(--duration-fast) ease;
+}
+.project-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: none;
+  transform: none;
+}
+.progress {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--surface-sunken);
+}
+.progress i {
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+/* ───── Kanban: columns are lanes on the sheet, cards are outlined ───── */
+.kanban-column {
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--surface-soft);
+}
+.kanban-column.is-over {
+  background: var(--accent-softer);
+  box-shadow: inset 0 0 0 2px var(--accent-border);
+}
+.kanban-column > header b {
+  border-radius: 999px;
+  background: var(--surface-sunken);
+}
+.kanban-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
+}
+.kanban-card:hover {
+  border-color: var(--border-strong);
+}
+
+/* ───── Home ───── */
+.stats-grid {
+  gap: 12px;
+}
+.stats-grid article {
+  min-height: 92px;
+  padding: 16px;
+}
+.stats-grid strong {
+  font-variant-numeric: tabular-nums;
+}
+.stat-icon {
+  border-radius: var(--radius-sm);
+}
+.focus-card {
+  border: 0;
+  color: #fff;
+  background: var(--rail-bg);
+}
+.focus-card > span {
+  background: rgb(255 255 255 / 10%);
+}
+.focus-card p {
+  color: rgb(255 255 255 / 74%);
+}
+.focus-card .progress {
+  background: rgb(255 255 255 / 16%);
+}
+.focus-card .progress i {
+  background: var(--accent-ink);
+}
+:root[data-theme="dark"] .focus-card {
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+/* ───── Dashboard widgets ───── */
+:root .custom-dashboard .dashboard-widget {
+  border-radius: var(--radius-md);
+  box-shadow: none;
+}
+:root .custom-dashboard .dashboard-widget > header {
+  min-height: 46px;
+  border-bottom: 1px solid var(--border);
+}
+.dashboard-widget-icon {
+  border-radius: var(--radius-xs);
+}
+
+/* ───── Settings ───── */
+.settings-nav {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.settings-nav button {
+  border-radius: var(--radius-sm);
+}
+.settings-nav button.active {
+  color: var(--text-primary);
+  background: var(--surface-soft);
+  box-shadow: inset 0 0 0 1px var(--border);
+  font-weight: 700;
+}
+.settings-section {
+  padding: 20px;
+}
+
+/* ───── Overlays ───── */
+.modal-layer {
+  background: var(--overlay);
+  backdrop-filter: none;
+}
+.command-modal,
+.create-modal,
+.access-modal,
+.organization-modal {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-lg);
+}
+.create-modal {
+  padding: 22px;
+}
+.command-input {
+  height: 54px;
+}
+.command-results button {
+  border-radius: var(--radius-sm);
+}
+.command-results button:hover,
+.command-results button:focus-visible {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+.action-menu,
+.workspace-dropdown,
+.issue-action-menu {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-lg);
+}
+.action-menu button,
+.action-menu a {
+  border-radius: var(--radius-xs);
+}
+.notification-drawer {
+  background: var(--surface-raised);
+}
+.toast {
+  border: 1px solid var(--border);
+  border-inline-start: 3px solid var(--accent);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-lg);
+}
+
+/* ───── Empty and loading ───── */
+.empty-state > span,
+.not-found > span {
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  background: var(--surface-sunken);
+}
+.skeleton-row,
+.skeleton-card {
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+
+/* ───── Responsive ───── */
+@media (max-width: 760px) {
+  .page-content {
+    padding: 16px 14px 48px;
+  }
+  .page-header,
+  :root .dashboard-hero {
+    margin: -16px -14px 18px;
+    padding: 16px 14px;
+  }
+  .page-header-main {
+    flex-basis: 100%;
+    gap: 12px;
+  }
+  .page-header-icon {
+    width: 40px;
+    height: 40px;
+    flex-basis: 40px;
+  }
+  .page-header h1,
+  .dashboard-hero h1 {
+    font-size: var(--fs-3xl);
+  }
+  .page-header p,
+  .dashboard-hero p {
+    font-size: var(--fs-sm);
+  }
+  .page-header .page-actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+}
+
+/* ───── Records pages (entities): one compact command bar above a full-bleed grid ───── */
+.engine-view-controls {
+  display: grid;
+  gap: 0;
+  margin: 0 0 12px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-soft);
+}
+.engine-view-toolbar {
+  gap: 8px;
+  align-items: end;
+  margin: 0;
+  padding: 10px 12px;
+}
+.engine-view-toolbar + .engine-view-toolbar {
+  border-top: 1px solid var(--border);
+}
+.engine-view-toolbar-search {
+  padding-top: 10px;
+}
+.engine-view-toolbar:empty {
+  display: none;
+}
+.engine-view-controls .searchable-select > label,
+.engine-subtype .searchable-select > label {
+  margin-bottom: 4px;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+.engine-view-controls .selector-input-row {
+  min-height: 36px;
+  background: var(--surface);
+}
+.engine-view-controls .button {
+  min-height: 34px;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+.engine-view-tools > span[role="status"] {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+.engine-view-tools .button-secondary,
+.engine-view-toolbar-actions .button-secondary {
+  border-color: transparent;
+  color: var(--text-secondary);
+  background: transparent;
+}
+.engine-view-tools .button-secondary:hover,
+.engine-view-toolbar-actions .button-secondary:hover {
+  border-color: var(--border);
+  color: var(--text-primary);
+  background: var(--surface);
+}
+.engine-view-toolbar-search > .search-box {
+  background: var(--surface);
+}
+.engine-filter-chip {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--accent-border);
+  border-radius: 999px;
+  color: var(--accent-ink);
+  background: var(--accent-softer);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  cursor: pointer;
+}
+.engine-results-meta {
+  margin: 14px 2px 8px;
+}
+.engine-results-meta strong {
+  font-size: var(--fs-md);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Grids react to the workspace width: with the section panel open the sheet is ~320px narrower. */
+@media (max-width: 1560px) {
+  .app-shell:not(.is-panel-collapsed) .project-overview {
+    grid-template-columns: 1fr;
+  }
+  .app-shell:not(.is-panel-collapsed) .project-overview > aside {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    align-items: start;
+  }
+}
+@media (max-width: 1500px) {
+  .app-shell:not(.is-panel-collapsed) .stats-grid:not(.project-stats) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .app-shell:not(.is-panel-collapsed) .home-projects,
+  .app-shell:not(.is-panel-collapsed) .page-projects {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 1340px) {
+  .app-shell:not(.is-panel-collapsed) .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Retire the v2 decorative washes: intros and headers sit flat on the sheet. */
+.project-about-new > header,
+.engine-workspace-sidebar > header,
+.engine-designer-toolbar,
+.engine-input-card,
+.engine-workspace-heading,
+.engine-rules-card-header,
+.engine-choices-intro,
+.crm-help-intro,
+.inbox-overview,
+:root .dashboard-counter {
+  background: var(--surface);
+  box-shadow: none;
+}
+.engine-workspace-heading,
+.crm-help-intro,
+.engine-choices-intro {
+  border-color: var(--border);
+}
+.inbox-overview {
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.inbox-overview-icon {
+  border-radius: var(--radius-md);
+}
+.inbox-overview-eyebrow {
+  color: var(--text-muted);
+}
+.inbox-overview-stats > div {
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+  box-shadow: none;
+}
+
+/* ───── Work tables (All tasks, project tasks): fit the sheet ─────
+   Widths are keyed to the column itself (data-column), so hiding or adding columns from
+   "تب‌های من" never shifts a width onto the wrong column. The title takes what is left.
+   If someone adds more columns than can fit, the table scrolls instead of clipping. */
+.surface-table-wrap:has(> .surface-work-table:not(.personal-work-table)) {
+  overflow-x: auto;
+}
+.surface-work-table:not(.personal-work-table) {
+  width: 100%;
+  table-layout: fixed;
+  white-space: normal;
+}
+.surface-work-table:not(.personal-work-table) :is(th, td) {
+  padding-inline: 10px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.surface-work-table:not(.personal-work-table) td {
+  height: 56px;
+}
+.surface-work-table:not(.personal-work-table) th {
+  width: 130px;
+}
+.surface-work-table:not(.personal-work-table) th[data-column="native:عنوان کار"] {
+  width: auto;
+  min-width: 220px;
+}
+.surface-work-table:not(.personal-work-table) th[data-column="native:شناسه"] {
+  width: 92px;
+}
+.surface-work-table:not(.personal-work-table) th[data-column="native:پروژه"] {
+  width: 14%;
+}
+.surface-work-table:not(.personal-work-table) th[data-column="native:وضعیت"] {
+  width: 136px;
+}
+.surface-work-table:not(.personal-work-table) th[data-column="native:اولویت"] {
+  width: 88px;
+}
+.surface-work-table:not(.personal-work-table) th[data-column="native:موعد"] {
+  width: 96px;
+}
+.surface-work-table:not(.personal-work-table) th[data-column="native:مسئول"] {
+  width: 15%;
+}
+.surface-work-table:not(.personal-work-table) th[data-column="native:عملیات"] {
+  width: 68px;
+  text-overflow: clip;
+}
+.surface-work-table:not(.personal-work-table) td[data-column="native:عنوان کار"] {
+  white-space: normal;
+}
+.surface-work-table:not(.personal-work-table) .surface-work-title {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.6;
+}
+.surface-work-table:not(.personal-work-table) .surface-work-sender {
+  overflow: hidden;
+  margin-top: 2px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.surface-work-table:not(.personal-work-table) .identifier-copy > span {
+  max-width: 100%;
+}
+.surface-work-table:not(.personal-work-table) .issue-status-control {
+  width: 100%;
+}
+.surface-work-table:not(.personal-work-table) .surface-work-assignee {
+  min-width: 0;
+}
+.surface-work-table:not(.personal-work-table) .surface-work-assignee > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Narrower sheets drop the least-used columns instead of scrolling. */
+@media (max-width: 1280px) {
+  .app-shell:not(.is-panel-collapsed) .surface-work-table:not(.personal-work-table) [data-column="native:شناسه"] {
+    display: none;
+  }
+}
+@media (max-width: 1100px) {
+  .surface-work-table:not(.personal-work-table) :is([data-column="native:شناسه"], [data-column="native:پروژه"]) {
+    display: none;
+  }
+}
+@media (max-width: 760px) {
+  .surface-work-table:not(.personal-work-table) :is([data-column="native:اولویت"], [data-column="native:موعد"]) {
+    display: none;
+  }
+}
+
+/* "تب‌های من" on tables opens as a band under the toolbar: the table moves down, so nothing
+   ever sits underneath the picker while columns are switched on or off. */
+.surface-table-toolbar:has(.table-tab-picker.is-inline) {
+  flex-wrap: wrap;
+}
+.surface-table-toolbar .surface-table-actions:has(.table-tab-picker.is-inline),
+.surface-table-toolbar .table-tab-picker.is-inline {
+  display: contents;
+}
+.surface-table-toolbar .table-tab-picker.is-inline > .table-tab-picker-trigger {
+  margin-inline-start: auto;
+}
+.table-tab-picker-panel.is-inline {
+  position: static;
+  order: 99;
+  flex: 1 0 100%;
+  width: 100%;
+  max-height: none;
+  margin: 4px 0 2px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-soft);
+  box-shadow: none;
+  display: grid;
+  grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);
+  gap: 12px 24px;
+  align-items: start;
+}
+.table-tab-picker-panel.is-inline > * {
+  grid-column: 1;
+}
+.table-tab-picker-panel.is-inline > .table-tab-active-columns {
+  grid-column: 2;
+  grid-row: 1 / span 6;
+  margin: 0;
+  padding: 0 24px 0 0;
+  border: 0;
+  border-inline-start: 1px solid var(--border);
+}
+.table-tab-picker-panel.is-inline .table-tab-active-column-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 2px 12px;
+}
+@media (max-width: 760px) {
+  .table-tab-picker-panel.is-inline {
+    grid-template-columns: 1fr;
+  }
+  .table-tab-picker-panel.is-inline > .table-tab-active-columns {
+    grid-column: 1;
+    grid-row: auto;
+    padding: 12px 0 0;
+    border-inline-start: 0;
+    border-top: 1px solid var(--border);
+  }
+}

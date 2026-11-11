@@ -1,0 +1,269 @@
+/* Work calendar layers, schedule editor, presence and pending confirmations. */
+.work-calendar-page {
+  --layer-tasks: var(--accent);
+  --layer-schedule: var(--green);
+  --layer-exception: var(--orange);
+  --layer-off: var(--text-muted);
+  --layer-meeting: var(--blue);
+  --layer-mission: var(--purple);
+  --layer-event: #0d9488;
+  --layer-presence: var(--yellow);
+  --layer-absence: var(--red);
+  --layer-busy: var(--text-secondary);
+  display: grid;
+  gap: 16px;
+}
+.work-chip-tasks {
+  --chip: var(--layer-tasks);
+}
+.work-chip-schedule {
+  --chip: var(--layer-schedule);
+}
+.work-chip-exception {
+  --chip: var(--layer-exception);
+}
+.work-chip-off {
+  --chip: var(--layer-off);
+}
+.work-chip-meeting {
+  --chip: var(--layer-meeting);
+}
+.work-chip-mission {
+  --chip: var(--layer-mission);
+}
+.work-chip-event {
+  --chip: var(--layer-event);
+}
+.work-chip-presence {
+  --chip: var(--layer-presence);
+}
+.work-chip-absence {
+  --chip: var(--layer-absence);
+}
+.work-chip-busy {
+  --chip: var(--layer-busy);
+}
+.work-layer-chips {
+  display: grid;
+  gap: 4px;
+  margin-top: 4px;
+}
+.work-chip {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  padding: 3px 6px;
+  border-inline-start: 3px solid var(--chip, var(--accent));
+  border-radius: var(--radius-xs);
+  background: color-mix(in srgb, var(--chip, var(--accent)) 12%, transparent);
+  color: var(--text-primary);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+span.work-chip {
+  display: inline-block;
+}
+.work-chip b,
+.work-chip small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.work-chip small {
+  color: var(--text-secondary);
+}
+.work-chip-flag {
+  color: var(--orange);
+  font-style: normal;
+  font-weight: 600;
+}
+.work-calendar-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 12px;
+}
+.work-person-picker {
+  display: grid;
+  gap: 6px;
+  min-width: min(280px, 100%);
+}
+.work-layer-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+.work-layer-filter legend {
+  padding: 0 4px;
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+}
+.work-layer-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--chip) 12%, transparent);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.work-layer-toggle input {
+  accent-color: var(--chip);
+}
+.work-presence,
+.work-pending,
+.work-schedule-editor,
+.work-exception-form,
+.work-event-form,
+.work-restricted-note {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.work-presence {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-color: color-mix(in srgb, var(--layer-presence) 45%, var(--border));
+}
+.work-presence p,
+.work-muted {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-md);
+}
+.work-presence-done,
+.work-calendar-actions,
+.work-form-actions,
+.work-pending-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.work-restricted-note {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-md);
+}
+.work-schedule-editor,
+.work-exception-form,
+.work-event-form {
+  display: grid;
+  gap: 12px;
+}
+.work-schedule-editor table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-md);
+}
+.work-schedule-editor th,
+.work-schedule-editor td {
+  padding: 6px;
+  border-bottom: 1px solid var(--border);
+  text-align: start;
+  vertical-align: top;
+}
+.work-schedule-editor tr[data-working="false"] td {
+  opacity: 0.6;
+}
+.work-break {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.work-icon-button,
+.work-link-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.work-icon-button {
+  color: var(--red);
+}
+.work-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.work-form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+.work-field {
+  display: grid;
+  gap: 6px;
+  font-size: var(--fs-md);
+}
+.work-field input,
+.work-field textarea,
+.work-pending textarea {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-primary);
+  font: inherit;
+}
+.work-errors {
+  margin: 0;
+  padding-inline-start: 18px;
+  color: var(--red);
+  font-size: var(--fs-md);
+}
+.work-pending h2 {
+  margin: 0;
+  font-size: var(--fs-xl);
+}
+.work-pending ul {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.work-pending li {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.work-pending li > div:first-child {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.work-pending li small {
+  color: var(--text-secondary);
+}
+@media (max-width: 700px) {
+  .work-schedule-editor {
+    overflow-x: auto;
+  }
+  .work-schedule-editor table {
+    min-width: 640px;
+  }
+}

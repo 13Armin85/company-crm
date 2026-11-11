@@ -1,4 +1,7 @@
 import { useCurrentUser, useWorkspaceAccess, useProjects, useMembers } from "./api";
+import { TicketDeadlineBadge } from "./ticket/deadline-badge";
+import { CATEGORY_TITLES, UI_STATUS_CATEGORY, workCategory } from "./ticket/model";
+import type { WorkCategoryId } from "./ticket/model";
 import { canChangeIssueStatus, canTransferIssue } from "./task-access";
 import { SearchableSelect } from "@plane/ui";
 import { useState } from "react";
@@ -49,6 +52,7 @@ export const kanbanColumns = (states?: ProjectState[]) =>
         title: state.name,
         color: state.color,
         stateId: state.id,
+        category: workCategory({ group: state.group }),
       }))
     : ISSUE_STATUS_COLUMNS.map((column) => ({
         id: column.id,
@@ -56,7 +60,18 @@ export const kanbanColumns = (states?: ProjectState[]) =>
         status: column.id,
         title: statusFa[column.id],
         stateId: undefined,
+        category: UI_STATUS_CATEGORY[column.id] ?? ("todo" as WorkCategoryId),
       }));
+
+/** Columns grouped by ن۶ category, in board order (empty categories are left out). */
+export const kanbanGroups = (columns: ReturnType<typeof kanbanColumns>) =>
+  (Object.keys(CATEGORY_TITLES) as WorkCategoryId[])
+    .map((category) => ({
+      category,
+      title: CATEGORY_TITLES[category],
+      columns: columns.filter((column) => column.category === category),
+    }))
+    .filter((group) => group.columns.length > 0);
 
 function KanbanCard({
   issue,
@@ -124,6 +139,7 @@ function KanbanCard({
         </div>
       </div>
       <h3>{issue.name}</h3>
+      <TicketDeadlineBadge badge={issue.deadline ?? undefined} />
       <p className="issue-people">
         فرستنده: {issue.sender?.displayName || "نامشخص"}
         <br />
@@ -302,23 +318,46 @@ export function IssueKanbanBoard({
       onDragEnd={dragEnd}
       onDragCancel={() => setMoving(null)}
     >
-      <div className="kanban-board">
-        {columns.map((column) => (
-          <KanbanColumn
-            key={column.id}
-            {...column}
-            issues={issues.filter((issue) =>
-              column.stateId ? issue.stateId === column.stateId : issue.status === column.status
-            )}
-            project={project}
-            transferPresentation={transferPresentation}
-            onCreate={readOnly ? undefined : onCreate}
-            transferMembers={transferMembers}
-            transferDisabled={transferDisabled}
-            onAssigneeChange={onAssigneeChange}
-            readOnly={readOnly}
-            allowTransfer={allowTransfer}
-          />
+      <div className="kanban-board kanban-board-grouped">
+        {kanbanGroups(columns).map((group) => (
+          <div
+            key={group.category}
+            className={`kanban-category kanban-category-${group.category}`}
+            role="group"
+            aria-label={group.title}
+          >
+            <h3 className="kanban-category-title">
+              {group.title}{" "}
+              <b>
+                {toFa(
+                  issues.filter((issue) =>
+                    group.columns.some((column) =>
+                      column.stateId ? issue.stateId === column.stateId : issue.status === column.status
+                    )
+                  ).length
+                )}
+              </b>
+            </h3>
+            <div className="kanban-category-columns">
+              {group.columns.map((column) => (
+                <KanbanColumn
+                  key={column.id}
+                  {...column}
+                  issues={issues.filter((issue) =>
+                    column.stateId ? issue.stateId === column.stateId : issue.status === column.status
+                  )}
+                  project={project}
+                  transferPresentation={transferPresentation}
+                  onCreate={readOnly ? undefined : onCreate}
+                  transferMembers={transferMembers}
+                  transferDisabled={transferDisabled}
+                  onAssigneeChange={onAssigneeChange}
+                  readOnly={readOnly}
+                  allowTransfer={allowTransfer}
+                />
+              ))}
+            </div>
+          </div>
         ))}
       </div>
       <DragOverlay dropAnimation={null}>

@@ -126,7 +126,7 @@ describe("member task pages", () => {
   });
   it("keeps task actions in one compact table column", () => {
     const html = renderPage(<IssuesPage />);
-    expect(html).toContain("<th>عملیات</th>");
+    expect(html).toContain('<th data-column="native:عملیات">عملیات</th>');
     expect(html).toContain('class="surface-work-actions"');
     expect(html).toContain('aria-label="عملیات کار"');
     expect(html).not.toContain("has-inline-transfer");

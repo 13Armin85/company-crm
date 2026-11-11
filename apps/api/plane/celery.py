@@ -46,6 +46,14 @@ app.conf.beat_schedule = {
         "task": "plane.bgtasks.dashboard_alerts.notify_idle_team_managers",
         "schedule": crontab(minute="*/5"),
     },
+    "ticket-overdue-flags": {
+        "task": "plane.bgtasks.ticket_overdue.mark_overdue_tickets",
+        "schedule": crontab(minute="*/5"),
+    },
+    "workflow-due-reminders": {
+        "task": "plane.bgtasks.workflow_reminders.send_workflow_reminders",
+        "schedule": crontab(minute="*/5"),
+    },
     # Intra day recurring jobs
     "check-every-five-minutes-to-send-email-notifications": {
         "task": "plane.bgtasks.email_notification_task.stack_email_notification",

@@ -9,7 +9,7 @@
   align-items: center;
   padding: 24px;
   margin: 20px 0;
-  border-radius: 18px;
+  border-radius: var(--radius-xl);
   color: var(--text-primary);
   background: linear-gradient(115deg, color-mix(in srgb, var(--accent) 13%, var(--surface)), var(--surface));
   border: 1px solid var(--border);
@@ -21,7 +21,7 @@
 .crm-help-intro h2,
 .crm-help-card h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: var(--fs-2xl);
 }
 .crm-help-intro p,
 .crm-help-card p {
@@ -58,7 +58,7 @@
   scroll-margin-top: 24px;
   padding: 23px;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-xl);
   background: var(--surface);
 }
 .crm-help-card-heading {

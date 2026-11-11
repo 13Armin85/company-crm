@@ -9,7 +9,7 @@ export default function EngineSettingsPage() {
       <PageHeader
         eyebrow="تنظیمات برنامه"
         title="طراحی فرم‌ها و جدول‌ها"
-        description="صفحه را انتخاب کنید و فیلدها، ستون‌ها و تب‌های جدول آن را تغییر دهید."
+        description="بخش را انتخاب کنید و فرم یا جدول آن را تنظیم کنید."
       />
       {isLoading ? (
         <Skeleton rows={6} />

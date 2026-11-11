@@ -3,6 +3,7 @@
 from copy import deepcopy
 from io import BytesIO
 from pathlib import PurePath
+from uuid import UUID
 
 from django.conf import settings
 from django.db import transaction
@@ -664,6 +665,29 @@ class EngineOptionsEndpoint(EngineAPIView):
             )
             if resolving:
                 rows = rows.filter(id__in=selected)
+            elif not target.adapter:
+                # Deactivated targets stay visible only as already-selected values.
+                rows = rows.filter(Q(is_active=True) | Q(id__in=selected))
+            exclude = request.query_params.get("exclude")
+            if exclude and target.id == entity.id:
+                try:
+                    rows = rows.exclude(id=UUID(exclude))
+                except ValueError:
+                    raise ValidationError("شناسه رکورد مستثنا معتبر نیست.")
+            if request.query_params.get("filter"):
+                import json as _json
+                from plane.app.services.entity_query import EntityQuery
+
+                try:
+                    node = _json.loads(request.query_params["filter"])
+                except ValueError:
+                    raise ValidationError("فیلتر گزینه‌ها معتبر نیست.")
+                scoped = EntityQuery(target, request.user, request)
+                predicate = scoped.predicate(node)  # annotates scoped.rows first
+                matching = scoped.rows.filter(predicate)
+                rows = rows.filter(
+                    id__in=matching.values("source_id" if target.adapter else "id")
+                )
             title_allowed = present_schema(target, request.user)["fields"]
             if target.title_field not in {
                 f["code"] for f in title_allowed if not f["config"].get("hidden") and not f["config"].get("visible_if")
@@ -681,7 +705,21 @@ class EngineOptionsEndpoint(EngineAPIView):
                     if target.adapter
                     else record_payload(target, request.user, r, request=request)
                 )
-                result.append({"id": payload["id"], "title": payload["title"]})
+                result.append(
+                    {
+                        "id": payload["id"],
+                        "title": payload["title"],
+                        **({"disabled": True, "inactive": True} if not payload["is_active"] else {}),
+                    }
+                )
+            return Response(
+                {
+                    "results": result,
+                    "count": count,
+                    "page": offset + 1,
+                    "can_create": permission(target, request.user, "create", request),
+                }
+            )
         else:
             model = {"user": User, "unit": OrganizationUnit, "role": OrganizationRole}.get(kind)
             if not model:

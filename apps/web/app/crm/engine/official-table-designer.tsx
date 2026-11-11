@@ -4,6 +4,7 @@ import { Columns3, Filter, ListTree, Plus, Save, SlidersHorizontal } from "lucid
 import { SearchableSelect } from "@plane/ui";
 import { Button, Skeleton } from "../components";
 import { api, errorMessage, useWorkspaceAccess } from "../api";
+import { useUIStore } from "../store";
 import { ColumnEditor, ViewFilterEditor } from "./view-controls";
 import { enginePath, useEngineMutation, useEngineQuery, useEngineSlug } from "./api";
 import type { SavedView, SavedViewList, ViewDefinition, ViewField, ViewSchema } from "./view-types";
@@ -17,6 +18,8 @@ export function OfficialTableDesigner({ code }: { code: string }) {
   const [selected, setSelected] = useState("");
   const [name, setName] = useState("جدول رسمی");
   const [definition, setDefinition] = useState<ViewDefinition | null>(null);
+  const [savedDefinition, setSavedDefinition] = useState<ViewDefinition | null>(null);
+  const [savedName, setSavedName] = useState("");
   const [extraFields, setExtraFields] = useState<ViewField[]>([]);
   const [notice, setNotice] = useState("");
   const official = useMemo(
@@ -24,17 +27,30 @@ export function OfficialTableDesigner({ code }: { code: string }) {
     [saved.data?.results]
   );
   const current = official.find((view) => view.id === selected);
+  const dirty = Boolean(
+    definition && (name !== savedName || JSON.stringify(definition) !== JSON.stringify(savedDefinition))
+  );
+  const setDirty = useUIStore((state) => state.setFormDirty);
+  useEffect(() => {
+    setDirty(`official-table:${code}`, dirty);
+    return () => setDirty(`official-table:${code}`, false);
+  }, [code, dirty, setDirty]);
   useEffect(() => {
     if (!schema.data || !saved.data || definition) return;
     const initial = official.find((view) => view.id === saved.data?.official_id) || official[0];
     setSelected(initial?.id || "");
     setName(initial?.name || "جدول رسمی");
+    setSavedName(initial?.name || "جدول رسمی");
     setDefinition(structuredClone(initial?.definition || schema.data.definition));
+    setSavedDefinition(structuredClone(initial?.definition || schema.data.definition));
   }, [schema.data, saved.data, definition, official]);
   const choose = (view?: SavedView) => {
+    if (dirty && !window.confirm("تغییرات ذخیره‌نشدهٔ نمای رسمی کنار گذاشته شود؟")) return;
     setSelected(view?.id || "");
     setName(view?.name || "جدول رسمی");
+    setSavedName(view?.name || "جدول رسمی");
     setDefinition(structuredClone(view?.definition || schema.data?.definition || null));
+    setSavedDefinition(structuredClone(view?.definition || schema.data?.definition || null));
     setExtraFields([]);
     setNotice("");
   };
@@ -57,6 +73,15 @@ export function OfficialTableDesigner({ code }: { code: string }) {
   };
   const save = async () => {
     if (!definition) return;
+    const names = definition.columns.map(
+      (column) => fields.find((field) => field.code === column.field)?.title || column.field
+    );
+    if (
+      !window.confirm(
+        `نمای رسمی «${name.trim()}» با ${names.length.toLocaleString("fa-IR")} ستون برای کاربران ذخیره شود؟\n${names.join("، ")}`
+      )
+    )
+      return;
     try {
       const result = (await mutation.mutateAsync({
         path: `entities/${code}/views/${current ? `${current.id}/` : ""}`,
@@ -71,6 +96,9 @@ export function OfficialTableDesigner({ code }: { code: string }) {
         },
       })) as SavedView;
       setSelected(result.id);
+      setDefinition(structuredClone(result.definition));
+      setSavedDefinition(structuredClone(result.definition));
+      setSavedName(result.name);
       setNotice("تنظیمات جدول رسمی ذخیره شد.");
     } catch {
       setNotice("");
@@ -87,8 +115,8 @@ export function OfficialTableDesigner({ code }: { code: string }) {
       <div className="engine-panel-heading engine-table-designer-heading">
         <div>
           <span className="engine-step-badge">طراحی جدول</span>
-          <h3>نماهای آماده جدول</h3>
-          <p>ستون‌ها، مرتب‌سازی و فیلتر اولیه‌ای را که کاربران هنگام باز کردن جدول می‌بینند تعیین کنید.</p>
+          <h3>نماهای رسمی ذخیره‌شده</h3>
+          <p>این نما پس از ذخیره در فهرست نماهای کاربران دیده می‌شود. نمای شخصی هر کاربر جداگانه ذخیره می‌شود.</p>
         </div>
         <Button variant="secondary" onClick={() => choose()}>
           <Plus size={16} aria-hidden="true" />
@@ -124,7 +152,7 @@ export function OfficialTableDesigner({ code }: { code: string }) {
             </span>
             <div>
               <h4>ستون‌های جدول</h4>
-              <p>ستون‌ها را اضافه، مرتب و اندازه‌گذاری کنید. ترتیب اینجا همان ترتیب جدول نهایی است.</p>
+              <p>ستون‌ها را اضافه، حذف یا مرتب کنید. نتیجه را پیش از ذخیره پایین صفحه ببینید.</p>
             </div>
           </div>
           <ColumnEditor columnsOnly value={definition} onChange={setDefinition} fields={fields} onLoadPath={loadPath} />
@@ -139,7 +167,8 @@ export function OfficialTableDesigner({ code }: { code: string }) {
               <p>خلاصه ردیف، ترتیب اولیه و گروه‌بندی اطلاعات را مشخص کنید.</p>
             </div>
           </div>
-          <div className="engine-table-setting-group">
+          <details className="engine-table-setting-group engine-advanced-setting">
+            <summary>خلاصهٔ ردیف و تنظیمات پیشرفته</summary>
             <div className="engine-subsection-heading">
               <ListTree size={17} aria-hidden="true" />
               <div>
@@ -168,7 +197,7 @@ export function OfficialTableDesigner({ code }: { code: string }) {
                   </label>
                 ))}
             </div>
-          </div>
+          </details>
           <div className="engine-table-setting-group engine-sort-settings">
             <h5>مرتب‌سازی اولیه</h5>
             <SearchableSelect
@@ -216,7 +245,8 @@ export function OfficialTableDesigner({ code }: { code: string }) {
           </div>
         </section>
       </div>
-      <section className="engine-designer-card engine-filter-design-card">
+      <details className="engine-designer-card engine-filter-design-card engine-advanced-setting">
+        <summary>فیلتر پیش‌فرض و تنظیمات پیشرفته</summary>
         <div className="engine-designer-card-heading">
           <span className="engine-designer-card-icon">
             <Filter size={19} aria-hidden="true" />
@@ -231,17 +261,46 @@ export function OfficialTableDesigner({ code }: { code: string }) {
           onChange={(filter) => setDefinition({ ...definition, filter })}
           fields={fields}
         />
+      </details>
+      <section className="studio-table-preview" aria-label="پیش‌نمایش ستون‌های نمای رسمی">
+        <h4>پیش‌نمایش ستون‌ها</h4>
+        <p>از راست به چپ، این ستون‌ها هنگام انتخاب این نمای رسمی دیده می‌شوند.</p>
+        <div className="studio-table-preview-scroll">
+          <table>
+            <thead>
+              <tr>
+                {definition.columns.map((column) => (
+                  <th key={column.field}>
+                    {fields.find((field) => field.code === column.field)?.title || column.field}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                {definition.columns.map((column) => (
+                  <td key={column.field}>—</td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
       {notice && <p role="status">{notice}</p>}
       <ErrorNotice message={mutation.error && errorMessage(mutation.error, "ذخیره جدول رسمی انجام نشد.")} />
       <div className="engine-designer-savebar">
         <div>
-          <strong>آمادهٔ ذخیره تنظیمات هستید؟</strong>
-          <small>این تغییرات روی نمای رسمی کاربران اعمال می‌شود.</small>
+          <strong role="status" aria-live="polite">
+            {dirty || !selected ? "ذخیره‌نشده" : "نمای رسمی ذخیره شد"}
+          </strong>
+          <small>ذخیرهٔ این نما روی فهرست نماهای کاربران اثر می‌گذارد.</small>
         </div>
-        <Button disabled={!name.trim() || mutation.isPending} onClick={() => void save()}>
+        <Button
+          disabled={!name.trim() || (!dirty && Boolean(selected)) || mutation.isPending}
+          onClick={() => void save()}
+        >
           <Save size={16} aria-hidden="true" />
-          ذخیره نما
+          ذخیرهٔ نمای رسمی برای کاربران
         </Button>
       </div>
     </section>

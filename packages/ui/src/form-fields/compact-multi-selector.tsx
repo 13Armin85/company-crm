@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Popover, PopoverButton, PopoverPanel } from "@headlessui/react";
+import { ChevronDown } from "lucide-react";
 import { normalizePersianSearch } from "./searchable-select";
 
 export function CompactMultiSelector({
@@ -60,7 +61,11 @@ export function CompactMultiSelector({
       <Popover>
         {!expanded && (
           <PopoverButton type="button" className="selector-trigger" disabled={disabled}>
-            انتخاب {label} · {selected.length.toLocaleString("fa-IR")} انتخاب ⌄
+            <span>انتخاب {label}</span>
+            <span className="selector-trigger-meta">
+              <span className="selector-count">{selected.length.toLocaleString("fa-IR")} انتخاب</span>
+              <ChevronDown className="selector-chevron" size={16} strokeWidth={2.2} aria-hidden="true" />
+            </span>
           </PopoverButton>
         )}
         <PopoverPanel

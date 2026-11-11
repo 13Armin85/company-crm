@@ -340,6 +340,8 @@ CELERY_IMPORTS = (
     "plane.app.services.entity_view_export",
     # scheduled tasks
     "plane.bgtasks.dashboard_alerts",
+    "plane.bgtasks.workflow_reminders",
+    "plane.bgtasks.ticket_overdue",
     "plane.bgtasks.issue_automation_task",
     "plane.bgtasks.exporter_expired_task",
     "plane.bgtasks.file_asset_task",

@@ -114,3 +114,22 @@ from .entity import EntityUniqueRule
 from .entity import EntityNumberingRule, EntityNumberValue
 from .entity import EntityRelation, EntityRelationLink
 from .dashboard import DashboardConfiguration, DashboardTeamSettings
+from .work_calendar import (
+    ActivityConfirmation,
+    PresenceDeclaration,
+    WorkEvent,
+    WorkEventParticipant,
+    WorkSchedule,
+    WorkScheduleDay,
+    WorkScheduleException,
+)
+from .workflow import (
+    WorkflowDecision,
+    WorkflowDefinition,
+    WorkflowDelayReport,
+    WorkflowExtension,
+    WorkflowInstance,
+    WorkflowPause,
+    WorkflowStepRun,
+    WorkflowVersion,
+)

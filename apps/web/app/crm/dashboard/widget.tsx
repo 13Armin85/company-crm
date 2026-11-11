@@ -154,7 +154,9 @@ function DataWidget({ widget }: { widget: DashboardWidget }) {
     const variant = String(data.chart || "bar");
     const openPoint = (point: { label?: unknown }) => {
       const field = String(widget.config.group_by || "");
-      if (field) goTable({ field, op: "eq", value: point.label ?? null });
+      // The category report is not a form field: open the table unfiltered.
+      if (field === "__work_category__") goTable();
+      else if (field) goTable({ field, op: "eq", value: point.label ?? null });
       else goTable();
     };
     return (

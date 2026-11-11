@@ -42,6 +42,10 @@ export interface Project {
 }
 export interface Issue {
   id: string;
+  /** Ticket 5: server-side deadline state of this row (absent when the ticket has no target). */
+  deadline?: { state: string; target_at: string | null; target_text: string } | null;
+  /** Ticket 5: انجام‌نشده / در حال انجام / انجام‌شده, computed by the server's single mapping. */
+  category?: "todo" | "in_progress" | "done" | null;
     workNumber?: string;
   sequenceId: number;
   name: string;

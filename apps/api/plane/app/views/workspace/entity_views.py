@@ -212,6 +212,18 @@ class EngineViewQueryEndpoint(EngineAPIView):
         except (TypeError, ValueError):
             raise ValidationError("اندازه یا شماره صفحه معتبر نیست.")
         query.prepare(definition, request.data.get("search", ""), system)
+        preset = request.data.get("preset")
+        if entity.adapter == "ticket":
+            from plane.app.services.entity_records import native_queryset
+            from plane.app.services.ticket_core import preset_counts, preset_filter
+
+            natives = native_queryset(entity, request.user, request)
+            base_ids = query.rows.values("source_id")
+            preset_totals = preset_counts(natives.filter(id__in=base_ids), request.user)
+            if preset not in (None, "", "all"):
+                query.rows = query.rows.filter(
+                    source_id__in=preset_filter(natives, preset, request.user).values("id")
+                )
         if getattr(request, "_engine_empty_saved_filter", False):
             query.rows = query.rows.none()
             query.warnings.append(
@@ -227,6 +239,11 @@ class EngineViewQueryEndpoint(EngineAPIView):
                 for group in result["groups"]
             ]
         result["labels"] = value_labels(query, label_rows)
+        if entity.adapter == "ticket":
+            from plane.app.services.ticket_core import deadline_badges
+
+            result["preset_counts"] = preset_totals
+            result["ticket_deadlines"] = deadline_badges([row["id"] for row in result["results"]], entity.workspace)
         axis = definition.get("settings", {}).get("kanban_field")
         if axis and definition.get("type") == "kanban":
             result["labels"].setdefault(axis, {}).update(kanban_choices(query))

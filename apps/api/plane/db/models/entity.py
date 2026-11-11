@@ -353,7 +353,14 @@ class EntityRelation(BaseModel):
     kind = models.CharField(max_length=16)
     left_required = models.BooleanField(default=False)
     right_required = models.BooleanField(default=False)
-    on_delete = models.CharField(max_length=8, default="block")
+    # block | detach | soft_deactivate. Cascading deletes are intentionally not offered.
+    on_delete = models.CharField(max_length=16, default="block")
+    # The same pair may be linked more than once only when the link data differs.
+    allow_duplicates = models.BooleanField(default=False)
+    # Self relations marked hierarchical refuse cycles (A -> B -> A).
+    hierarchical = models.BooleanField(default=False)
+    # Field definitions (FieldDefinition-shaped dicts) stored on each link's ``data``.
+    link_fields = models.JSONField(default=list)
 
     class Meta:
         db_table = "crm_entity_relations"
@@ -365,14 +372,18 @@ class EntityRelationLink(BaseModel):
     )
     left_id = models.UUIDField()
     right_id = models.UUIDField()
+    data = models.JSONField(default=dict)
+    # Empty unless the relation allows duplicates and the link has data; existing
+    # rows keep "" so the (relation, left, right) uniqueness is unchanged for them.
+    data_key = models.CharField(max_length=64, default="", blank=True)
 
     class Meta:
         db_table = "crm_entity_relation_links"
         constraints = [
             models.UniqueConstraint(
-                fields=["relation", "left_id", "right_id"],
+                fields=["relation", "left_id", "right_id", "data_key"],
                 condition=models.Q(deleted_at__isnull=True),
-                name="crm_relation_pair_unique",
+                name="crm_relation_pair_data_unique",
             )
         ]
         indexes = [

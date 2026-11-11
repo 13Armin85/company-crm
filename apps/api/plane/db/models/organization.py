@@ -291,6 +291,9 @@ class UserAbsence(BaseModel):
         SCHEDULED = "scheduled", "Scheduled"
         CANCELLED = "cancelled", "Cancelled"
         ENDED = "ended", "Ended"
+        # Additive (ticket 4): a requested absence awaiting workflow approval. Only
+        # "scheduled" counts as unavailable, overlaps or delegation anywhere.
+        PENDING = "pending", "Pending approval"
 
     workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="user_absences")
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="absences")
@@ -327,17 +330,43 @@ class UserAbsence(BaseModel):
 
 
 class TicketRoutingRule(BaseModel):
+    class Method(models.TextChoices):
+        # The original behavior: first eligible manager (with the required role) up the unit tree.
+        MANAGER = "manager", "مدیر واحد (بالا رفتن در درخت واحد)"
+        USER = "user", "فرد ثابت"
+        GROUP = "group", "گروه ثابت (صف نقش/واحد)"
+        ROUND_ROBIN = "round_robin", "نوبتی"
+        LEAST_LOADED = "least_loaded", "کمترین حجم کار"
+
     workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="ticket_routing_rules")
     name = models.CharField(max_length=150)
-    unit = models.ForeignKey(OrganizationUnit, on_delete=models.CASCADE, related_name="routing_rules")
-    required_role = models.ForeignKey(OrganizationRole, on_delete=models.PROTECT, related_name="routing_rules")
+    unit = models.ForeignKey(
+        OrganizationUnit, null=True, blank=True, on_delete=models.CASCADE, related_name="routing_rules"
+    )
+    required_role = models.ForeignKey(
+        OrganizationRole, null=True, blank=True, on_delete=models.PROTECT, related_name="routing_rules"
+    )
     is_active = models.BooleanField(default=True)
+    # Ticket 5 (additive): ordered, criteria-based automatic selection.
+    position = models.PositiveIntegerField(default=0)
+    # {"type_ids": [...], "priorities": [...], "customer_ids": [...], "project_ids": [...], "unit_ids": [...]}
+    conditions = models.JSONField(default=dict, blank=True)
+    method = models.CharField(max_length=20, choices=Method.choices, default=Method.MANAGER)
+    target_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    # Explicit pool for round-robin / least-loaded; empty = holders of required_role (within unit if set).
+    member_ids = models.JSONField(default=list, blank=True)
+    # Round-robin pointer: index of the last chosen pool member (updated under select_for_update).
+    cursor = models.IntegerField(default=-1)
 
     class Meta:
         db_table = "ticket_routing_rules"
-        ordering = ("name",)
+        ordering = ("position", "name")
 
     def clean(self):
+        if self.method == self.Method.MANAGER and not (self.unit_id and self.required_role_id):
+            raise ValidationError({"unit": "Manager routing needs a unit and a required role."})
         if self.unit_id and self.unit.workspace_id != self.workspace_id:
             raise ValidationError({"unit": "Unit must belong to the selected workspace."})
         if self.required_role_id and self.required_role.workspace_id != self.workspace_id:
@@ -348,9 +377,29 @@ class TicketRoutingDecision(BaseModel):
     class Outcome(models.TextChoices):
         ASSIGNED = "assigned", "Assigned"
         QUEUED = "queued", "Role queue"
+        REFERRED = "referred", "Manual referral"
+
+    class Response(models.TextChoices):
+        PENDING = "pending", "در انتظار پذیرش"
+        ACCEPTED = "accepted", "پذیرفته‌شده"
+        REJECTED = "rejected", "ردشده"
+        FORWARDED = "forwarded", "ارجاع به فرد دیگر"
 
     issue = models.ForeignKey("db.Issue", on_delete=models.CASCADE, related_name="routing_decisions")
-    rule = models.ForeignKey(TicketRoutingRule, on_delete=models.PROTECT, related_name="decisions")
+    rule = models.ForeignKey(
+        TicketRoutingRule, null=True, blank=True, on_delete=models.PROTECT, related_name="decisions"
+    )
+    # Ticket 5 (additive): readable explanation and the manual referral chain.
+    method = models.CharField(max_length=20, blank=True)
+    reason = models.TextField(blank=True)
+    details = models.JSONField(default=dict, blank=True)
+    referred_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    previous = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    response = models.CharField(max_length=12, choices=Response.choices, blank=True)
+    responded_at = models.DateTimeField(null=True, blank=True)
+    response_reason = models.TextField(blank=True)
     resolved_unit = models.ForeignKey(
         OrganizationUnit,
         on_delete=models.SET_NULL,
@@ -379,8 +428,13 @@ class TicketRoleQueueEntry(BaseModel):
         CLOSED = "closed", "Closed"
 
     issue = models.ForeignKey("db.Issue", on_delete=models.CASCADE, related_name="role_queue_entries")
-    rule = models.ForeignKey(TicketRoutingRule, on_delete=models.PROTECT, related_name="queue_entries")
-    required_role = models.ForeignKey(OrganizationRole, on_delete=models.PROTECT, related_name="queue_entries")
+    # Nullable since ticket 5: a ticket with no available recipient waits in the unassigned queue.
+    rule = models.ForeignKey(
+        TicketRoutingRule, null=True, blank=True, on_delete=models.PROTECT, related_name="queue_entries"
+    )
+    required_role = models.ForeignKey(
+        OrganizationRole, null=True, blank=True, on_delete=models.PROTECT, related_name="queue_entries"
+    )
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.OPEN)
     claimed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -398,5 +452,10 @@ class TicketRoleQueueEntry(BaseModel):
                 fields=["issue", "rule"],
                 condition=Q(status="open", deleted_at__isnull=True),
                 name="ticket_queue_unique_open_issue_rule",
+            ),
+            models.UniqueConstraint(
+                fields=["issue"],
+                condition=Q(status="open", deleted_at__isnull=True, rule__isnull=True),
+                name="ticket_queue_unique_open_unassigned",
             )
         ]

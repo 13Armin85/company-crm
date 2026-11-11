@@ -9,6 +9,7 @@ import {
   PopoverButton,
   PopoverPanel,
 } from "@headlessui/react";
+import { ChevronDown } from "lucide-react";
 import { ErrorNotice } from "../error-notice";
 import type { CSSProperties } from "react";
 import { PersianDatePicker, PersianDateTimePicker } from "../form-fields/persian-date-picker";
@@ -179,7 +180,7 @@ function OptionField({
               </button>
             )}
             <ComboboxButton type="button" aria-label={`باز کردن ${field.title}`} onClick={source.activate}>
-              ⌄
+              <ChevronDown className="selector-chevron" size={16} strokeWidth={2.2} aria-hidden="true" />
             </ComboboxButton>
           </div>
           <ComboboxOptions
@@ -239,8 +240,9 @@ function OptionField({
           onClick={source.activate}
         >
           <span>{field.placeholder || `انتخاب ${field.title}`}</span>
-          <span>
-            {selected.length.toLocaleString("fa-IR")} انتخاب <span aria-hidden>⌄</span>
+          <span className="selector-trigger-meta">
+            <span className="selector-count">{selected.length.toLocaleString("fa-IR")} انتخاب</span>
+            <ChevronDown className="selector-chevron" size={16} strokeWidth={2.2} aria-hidden="true" />
           </span>
         </PopoverButton>
         <PopoverPanel
@@ -399,7 +401,10 @@ function FormField({
     disabled,
     "aria-label": field.title,
     "aria-invalid": Boolean(props.errors?.[field.code]),
-    "aria-describedby": `${id}-help`,
+    "aria-describedby":
+      [field.help_text ? `${id}-help` : "", props.errors?.[field.code] ? `${id}-error` : ""]
+        .filter(Boolean)
+        .join(" ") || undefined,
     placeholder: field.placeholder,
   };
   const text = typeof value === "string" || typeof value === "number" ? String(value) : "";
@@ -625,8 +630,13 @@ function FormField({
       {related.map((relatedId) => (
         <RelationInfo key={relatedId} field={field} id={relatedId} props={props} />
       ))}
+      {props.renderFieldAddon?.(field)}
       {field.help_text && <small id={`${id}-help`}>{field.help_text}</small>}
-      {props.errors?.[field.code] && <span className="sr-only">{props.errors[field.code]}</span>}
+      {props.errors?.[field.code] && (
+        <span className="sr-only" id={`${id}-error`} role="alert">
+          {props.errors[field.code]}
+        </span>
+      )}
     </div>
   );
 }

@@ -234,8 +234,10 @@ export function PageEditor({
   const [mode, setMode] = useState(params.get("mode") === "columns" ? "columns" : "form");
   const [draft, setDraft] = useState<SurfaceDefinition>(),
     [revision, setRevision] = useState(0);
+  const [savedDefinition, setSavedDefinition] = useState<SurfaceDefinition>();
   const [form, setForm] = useState<FormLayoutSchema>(),
     [formRevision, setFormRevision] = useState(0);
+  const [savedForm, setSavedForm] = useState<FormLayoutSchema>();
   const [creating, setCreating] = useState(false),
     [selectedTab, setSelectedTab] = useState(""),
     [newTab, setNewTab] = useState("");
@@ -243,15 +245,16 @@ export function PageEditor({
   useEffect(() => {
     if (query.data && draft === undefined) {
       setDraft(structuredClone(query.data.definition));
+      setSavedDefinition(structuredClone(query.data.definition));
       setRevision(query.data.revision);
       setForm(query.data.form?.layout ? structuredClone(query.data.form.layout) : undefined);
+      setSavedForm(query.data.form?.layout ? structuredClone(query.data.form.layout) : undefined);
       setFormRevision(query.data.form?.revision || 0);
     }
   }, [query.data, draft]);
   const dirty = Boolean(
     draft &&
-    (JSON.stringify(draft) !== JSON.stringify(query.data?.definition) ||
-      JSON.stringify(form) !== JSON.stringify(query.data?.form?.layout))
+    (JSON.stringify(draft) !== JSON.stringify(savedDefinition) || JSON.stringify(form) !== JSON.stringify(savedForm))
   );
   useEffect(() => {
     setDirty(`page-studio:${code}`, dirty);
@@ -340,6 +343,15 @@ export function PageEditor({
     });
   };
   const save = async () => {
+    const summary = columns.map((column) => allColumns.find((item) => item.id === column)?.title || column).join("، ");
+    if (
+      !window.confirm(
+        tableOnly
+          ? `ستون‌های ${activeTab?.title || "جدول اصلی"} برای کاربران این صفحه ذخیره شود؟\n${summary}`
+          : `تغییرات صفحهٔ ${surface.title} برای کاربران ذخیره شود؟`
+      )
+    )
+      return;
     const submitted = draft,
       submittedForm = form;
     try {
@@ -353,7 +365,9 @@ export function PageEditor({
         },
       })) as SurfaceSchema;
       setDraft((current) => (JSON.stringify(current) === JSON.stringify(submitted) ? result.definition : current));
+      setSavedDefinition(result.definition);
       setForm((current) => (JSON.stringify(current) === JSON.stringify(submittedForm) ? result.form?.layout : current));
+      setSavedForm(result.form?.layout);
       setRevision(result.revision);
       setFormRevision(result.form?.revision || 0);
     } catch {
@@ -365,8 +379,10 @@ export function PageEditor({
     const result = await query.refetch();
     if (!result.data || result.error) return;
     setDraft(structuredClone(result.data.definition));
+    setSavedDefinition(structuredClone(result.data.definition));
     setRevision(result.data.revision);
     setForm(result.data.form?.layout ? structuredClone(result.data.form.layout) : undefined);
+    setSavedForm(result.data.form?.layout ? structuredClone(result.data.form.layout) : undefined);
     setFormRevision(result.data.form?.revision || 0);
     mutation.reset();
     setConfirmReload(false);
@@ -740,7 +756,34 @@ export function PageEditor({
           )}
         </fieldset>
       </div>
+      {currentMode === "columns" && (
+        <section className="studio-table-preview" aria-label="پیش‌نمایش ترتیب ستون‌های جدول">
+          <h3>پیش‌نمایش ستون‌ها</h3>
+          <p>از راست به چپ، همین ستون‌ها پس از ذخیره برای کاربران این صفحه نمایش داده می‌شوند.</p>
+          <div className="studio-table-preview-scroll">
+            <table>
+              <thead>
+                <tr>
+                  {columns.map((column) => (
+                    <th key={column}>{allColumns.find((item) => item.id === column)?.title || column}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  {columns.map((column) => (
+                    <td key={column}>—</td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
       <footer className="studio-save-bar">
+        <span role="status" aria-live="polite">
+          {dirty ? "ذخیره‌نشده" : currentMode === "columns" ? "جدول ذخیره شد" : "تنظیمات صفحه ذخیره شد"}
+        </span>
         <div className="studio-save-actions">
           <Button
             variant="secondary"
@@ -752,10 +795,12 @@ export function PageEditor({
           </Button>
           <Button
             icon={Check}
-            disabled={!dirty || mutation.isPending || !designer.can_publish}
+            disabled={
+              !dirty || mutation.isPending || !designer.can_publish || (currentMode === "columns" && !columns.length)
+            }
             onClick={() => void save()}
           >
-            {mutation.isPending ? "در حال ذخیره…" : "ذخیره تغییرات"}
+            {mutation.isPending ? "در حال ذخیره…" : tableOnly ? "ذخیرهٔ جدول برای کاربران" : "ذخیرهٔ تغییرات صفحه"}
           </Button>
         </div>
       </footer>

@@ -54,7 +54,7 @@ const themes: { id: ThemeMode; label: string; description: string; icon: typeof 
   { id: "dark", label: "تیره", description: "مناسب محیط کم‌نور", icon: Moon },
   { id: "system", label: "سیستم", description: "هماهنگ با دستگاه", icon: Monitor },
 ];
-const accents = ["#4F46E5", "#2563EB", "#0F766E", "#9333EA", "#DB2777"];
+const accents = ["#2A4BD0", "#0E7490", "#0F766E", "#6D4BD6", "#BE185D"];
 export default function SettingsPage() {
   const [params] = useSearchParams();
   const [section, setSection] = useState(params.get("section") || "general");
@@ -78,7 +78,7 @@ export default function SettingsPage() {
   const updateAppearance = useUpdateAppearance();
   const { data: notificationPreferences } = useNotificationPreferences();
   const updateNotifications = useUpdateNotificationPreferences();
-  const [accent, setAccent] = useState("#4F46E5");
+  const [accent, setAccent] = useState("#2A4BD0");
   useEffect(() => {
     const requestedSection = params.get("section");
     if (requestedSection && settingsNav.some((item) => item.id === requestedSection)) setSection(requestedSection);

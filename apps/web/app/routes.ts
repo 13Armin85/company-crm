@@ -24,6 +24,7 @@ export default [
     route("my-work", "./crm/pages/my-work.tsx"),
     route("inbox", "./crm/pages/inbox.tsx"),
     route("calendar", "./crm/pages/calendar.tsx"),
+    route("workflow-inbox", "./crm/workflow/inbox-page.tsx"),
     route("team", "./crm/pages/team.tsx"),
     route("team/:userId", "./crm/pages/user-profile.tsx"),
     route("organization", "./crm/pages/organization.tsx"),

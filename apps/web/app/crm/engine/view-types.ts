@@ -62,6 +62,9 @@ export interface ViewResult {
   labels: Record<string, Record<string, { title: string; color?: string; inactive?: boolean }>>;
   totals: Record<string, { sum: string | number | null; avg: string | number | null }>;
   groups: { value: FieldValue; key?: string; count: number; totals: ViewResult["totals"] }[];
+  /** Ticket 5: server-side counters of the ready filters and per-row deadline state. */
+  preset_counts?: Record<string, number>;
+  ticket_deadlines?: Record<string, { state: string; target_at: string | null; target_text: string }>;
 }
 export interface FormatRule {
   when: Condition;

@@ -146,8 +146,8 @@ describe("choice lists in form design", () => {
       </QueryClientProvider>
     );
     client.clear();
-    expect(html).toContain('aria-label="بخش‌های طراحی"');
-    expect(html).toContain("ورودی‌های فرم");
+    expect(html).toContain('aria-label="انتخاب بخش"');
+    expect(html).toContain("فرم و جدول کدام بخش را تنظیم می‌کنید؟");
     expect(html).not.toContain("لیست‌های انتخابی");
   });
 });

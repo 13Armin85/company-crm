@@ -10,8 +10,26 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import type { DragEndEvent } from "@dnd-kit/core";
-import { ArrowUp, GripVertical, LockKeyhole, Plus, RotateCcw, Save, Send, Trash2 } from "lucide-react";
-import { CompactMultiSelector, SchemaDrivenForm, SearchableSelect, normalizePersianSearch } from "@plane/ui";
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronDown,
+  GripVertical,
+  LockKeyhole,
+  Plus,
+  RotateCcw,
+  Save,
+  Send,
+  Settings2,
+  Trash2,
+} from "lucide-react";
+import {
+  CompactMultiSelector,
+  SchemaDrivenForm,
+  SearchableSelect,
+  normalizePersianSearch,
+  validateSchemaValues,
+} from "@plane/ui";
 import type { EntityFormSchema, FieldBinding, FormLayoutSchema, FormValues, SchemaField } from "@plane/ui";
 import { Button, Skeleton } from "../components";
 import { browserId } from "../browser-id";
@@ -41,6 +59,41 @@ export function moveBinding(
   const index = before ? target.bindings.findIndex((b) => b.field === before) : -1;
   target.bindings.splice(index < 0 ? target.bindings.length : index, 0, binding);
   return next;
+}
+
+export function moveBindingStep(layout: FormLayoutSchema, sectionId: string, field: string, direction: -1 | 1) {
+  const bindings = layout.sections.find((section) => section.id === sectionId)?.bindings || [];
+  const index = bindings.findIndex((binding) => binding.field === field);
+  if (index < 0 || index + direction < 0 || index + direction >= bindings.length) return layout;
+  return moveBinding(layout, sectionId, field, sectionId, bindings[direction === -1 ? index - 1 : index + 2]?.field);
+}
+
+const formCodes = (layout: FormLayoutSchema | null) =>
+  layout?.sections.flatMap((section) => section.bindings.map((binding) => binding.field)) || [];
+
+export function formChangeSummary(
+  next: FormLayoutSchema,
+  previous: FormLayoutSchema | null,
+  fields: Pick<FieldDefinition, "code" | "title">[]
+) {
+  const before = formCodes(previous),
+    after = formCodes(next);
+  const title = (code: string) => fields.find((field) => field.code === code)?.title || code;
+  const added = after.filter((code) => !before.includes(code)).map(title);
+  const removed = before.filter((code) => !after.includes(code)).map(title);
+  const lines = [
+    added.length ? `افزوده: ${added.join("، ")}` : "",
+    removed.length ? `برداشته: ${removed.join("، ")}` : "",
+    JSON.stringify(before) !== JSON.stringify(after) ? "ترتیب ورودی‌ها به شکل پیش‌نمایش تغییر می‌کند." : "",
+  ].filter(Boolean);
+  return lines.length ? lines.join("\n") : "تنظیمات یا بخش‌های فرم تغییر می‌کند.";
+}
+
+export function formDesignState(draft: FormLayoutSchema, saved: FormLayoutSchema, applied: FormLayoutSchema | null) {
+  if (JSON.stringify(draft) !== JSON.stringify(saved)) return "ذخیره‌نشده";
+  if (!saved.sections.length && !applied) return "ذخیره‌نشده";
+  if (JSON.stringify(saved) !== JSON.stringify(applied)) return "پیش‌نویس ذخیره شد";
+  return "روی فرم اعمال شد";
 }
 
 function DragItem({ id, children, label }: { id: string; children: ReactNode; label: string }) {
@@ -92,19 +145,26 @@ export function FormDesigner({
   const [creatingField, setCreatingField] = useState(false),
     [editingField, setEditingField] = useState<FieldDefinition | null>(null),
     [note, setNote] = useState(""),
-    [newTab, setNewTab] = useState("");
+    [newTab, setNewTab] = useState(""),
+    [previewMode, setPreviewMode] = useState<"create" | "edit">("create"),
+    [previewErrors, setPreviewErrors] = useState<Record<string, string>>({}),
+    [savedDraft, setSavedDraft] = useState<FormLayoutSchema>({ tabs: [], sections: [] }),
+    [appliedDraft, setAppliedDraft] = useState<FormLayoutSchema | null>(null);
   const setDirty = useUIStore((s) => s.setFormDirty),
     sensors = useSensors(
       useSensor(PointerSensor, { activationConstraint: { distance: 7 } }),
       useSensor(KeyboardSensor)
     );
   const inherited = parentForm.data?.published;
+  const canPublish = Boolean(access?.can("FormDesigner.Publish"));
   const inheritedCodes = new Set(inherited?.sections.flatMap((s) => s.bindings.map((b) => b.field)) || []);
   const attached = new Set(draft.sections.flatMap((s) => s.bindings.map((b) => b.field)));
-  const dirty = revision !== null && JSON.stringify(draft) !== JSON.stringify(form.data?.draft);
+  const dirty = revision !== null && JSON.stringify(draft) !== JSON.stringify(savedDraft);
   useEffect(() => {
     if (form.data && revision === null) {
       setDraft(form.data.draft);
+      setSavedDraft(form.data.draft);
+      setAppliedDraft(form.data.published);
       setRevision(form.data.revision);
     }
   }, [form.data, revision]);
@@ -161,6 +221,27 @@ export function FormDesigner({
       schema_version: 1,
     };
   }, [draft, entity.code, entity.title, entities, fields, inherited, lookups, parent?.code]);
+  const previewSchema = useMemo<EntityFormSchema>(
+    () => ({
+      ...liveSchema,
+      fields: liveSchema.fields.map((field) => ({
+        ...field,
+        config: {
+          ...field.config,
+          ...(field.binding.required !== undefined ? { required: field.binding.required } : {}),
+          ...(field.binding.hidden !== undefined ? { hidden: field.binding.hidden } : {}),
+          ...(field.binding.required_if !== undefined ? { required_if: field.binding.required_if } : {}),
+          ...(field.binding.visible_if !== undefined ? { visible_if: field.binding.visible_if } : {}),
+          readonly: Boolean(
+            field.binding.readonly ||
+            field.config.readonly ||
+            (previewMode === "edit" && field.config.editable_after_create === false)
+          ),
+        },
+      })),
+    }),
+    [liveSchema, previewMode]
+  );
   const addSection = () =>
     setDraft((old) => ({
       ...old,
@@ -168,10 +249,17 @@ export function FormDesigner({
     }));
   const addField = (code: string) => {
     if (!draft.sections.length) {
+      const sectionId = `section-${browserId()}`;
+      const titleField = parent?.title_field || entity.title_field;
+      const bindings =
+        titleField !== code && !inheritedCodes.has(titleField) && fields.some((field) => field.code === titleField)
+          ? [{ field: titleField }, { field: code }]
+          : [{ field: code }];
       setDraft({
         ...draft,
-        sections: [{ id: `section-${browserId()}`, title: "اطلاعات", columns: 2, bindings: [{ field: code }] }],
+        sections: [{ id: sectionId, title: "اطلاعات", columns: 2, bindings }],
       });
+      setSelected({ section: sectionId, field: code });
       return;
     }
     const target = selected?.section || draft.sections[0].id;
@@ -182,7 +270,7 @@ export function FormDesigner({
     setSelected({ section: target, field: code });
   };
   const drop = (event: DragEndEvent) => {
-    if (!event.over) return;
+    if (!event.over || !canPublish) return;
     const from = String(event.active.id).split(":"),
       to = String(event.over.id).split(":");
     if (from[0] === "field")
@@ -216,12 +304,21 @@ export function FormDesigner({
       method: "put",
       data: { draft, revision },
     })) as { revision: number };
+    setSavedDraft(draft);
     setRevision(result.revision);
     setDirty(`designer:${entity.code}`, false);
     return result.revision;
   };
   const publish = async (rollback?: number) => {
     if (rollback && !window.confirm(`فرم به نسخه ${rollback.toLocaleString("fa-IR")} برگردد؟`)) return;
+    if (!rollback) {
+      if (
+        !window.confirm(
+          `فرم «${entity.title}» برای ثبت و ویرایش همهٔ کاربران تغییر می‌کند.\n${formChangeSummary(draft, appliedDraft, fields)}\nتغییرات اعمال شود؟`
+        )
+      )
+        return;
+    }
     try {
       const current = dirty && !rollback ? await saveDraft() : revision;
       const result = (await mutation.mutateAsync({
@@ -229,16 +326,23 @@ export function FormDesigner({
         data: { revision: current, change_note: note, ...(rollback ? { rollback_version: rollback } : {}) },
       })) as { revision: number };
       setRevision(result.revision);
+      if (!rollback) {
+        setAppliedDraft(draft);
+        setSavedDraft(draft);
+      }
       setDirty(`designer:${entity.code}`, false);
       const fresh = await form.refetch();
-      if (fresh.data) setDraft(fresh.data.draft);
+      if (fresh.data && rollback) {
+        setDraft(fresh.data.draft);
+        setSavedDraft(fresh.data.draft);
+        setAppliedDraft(fresh.data.published);
+      }
     } catch {
       /* Surface server validation or conflict; keep local changes. */
     }
   };
-  const canPublish = Boolean(access?.can("FormDesigner.Publish"));
   const unpublished =
-    !dirty && Boolean(form.data) && JSON.stringify(form.data?.draft) !== JSON.stringify(form.data?.published);
+    !dirty && savedDraft.sections.length > 0 && JSON.stringify(savedDraft) !== JSON.stringify(appliedDraft);
   if (form.isLoading || (revision === null && !form.error)) return <Skeleton rows={5} />;
   if (form.error)
     return (
@@ -256,27 +360,39 @@ export function FormDesigner({
           <span className="engine-eyebrow">فرم فعال</span>
           <div className="engine-designer-title-row">
             <strong>{entity.title}</strong>
-            <span className={`engine-status${dirty || unpublished ? " is-dirty" : ""}`}>
-              {dirty ? "تغییرات ذخیره نشده" : unpublished ? "هنوز روی فرم اعمال نشده" : "روی فرم اعمال شده"}
+            <span
+              role="status"
+              aria-live="polite"
+              className={`engine-status${dirty || unpublished ? " is-dirty" : ""}`}
+            >
+              {formDesignState(draft, savedDraft, appliedDraft)}
             </span>
           </div>
           <small>
             {canPublish
-              ? "با «ذخیره و اعمال روی فرم» تغییرات بلافاصله در فرم اصلی دیده می‌شود."
-              : "تغییرات شما ذخیره می‌شود و پس از تأیید مدیر روی فرم اعمال می‌شود."}
+              ? "پیش‌نویس فقط برای طراحان ذخیره می‌شود؛ «اعمال روی فرم» آن را برای کاربران نمایش می‌دهد."
+              : "برای ذخیرهٔ پیش‌نویس یا اعمال روی فرم، دسترسی طراحی فرم لازم است."}
           </small>
         </div>
         <div className="engine-actions">
-          {canPublish ? (
+          {canPublish && (
             <Button disabled={mutation.isPending || (!dirty && !unpublished)} onClick={() => void publish()}>
               <Send size={16} aria-hidden="true" />
-              ذخیره و اعمال روی فرم
+              اعمال روی فرم
             </Button>
-          ) : (
-            <Button disabled={mutation.isPending || !dirty} onClick={() => void saveDraft().catch(() => {})}>
+          )}
+          {canPublish && (
+            <Button
+              variant="secondary"
+              disabled={mutation.isPending || !dirty}
+              onClick={() => void saveDraft().catch(() => {})}
+            >
               <Save size={16} aria-hidden="true" />
-              ذخیره تغییرات
+              ذخیرهٔ پیش‌نویس
             </Button>
+          )}
+          {mutation.error && (
+            <p role="alert">ذخیره یا اعمال فرم انجام نشد. تغییرات شما در این صفحه حفظ شده‌اند؛ دوباره تلاش کنید.</p>
           )}
           <Button
             variant="ghost"
@@ -285,6 +401,8 @@ export function FormDesigner({
               const fresh = await form.refetch();
               if (fresh.data) {
                 setDraft(fresh.data.draft);
+                setSavedDraft(fresh.data.draft);
+                setAppliedDraft(fresh.data.published);
                 setRevision(fresh.data.revision);
               }
             }}
@@ -340,7 +458,7 @@ export function FormDesigner({
               <h3>ورودی‌های فرم {entity.title}</h3>
               <p>هر ورودی یک خانه از فرم است. برای تغییر نام، نوع یا قواعد آن «ویرایش» را بزنید.</p>
             </div>
-            {access?.can("Field.Create") && (
+            {canPublish && access?.can("Field.Create") && (
               <Button onClick={() => setCreatingField(true)}>
                 <Plus size={16} aria-hidden="true" />
                 ورودی جدید
@@ -377,8 +495,8 @@ export function FormDesigner({
                     </Button>
                   )}
                   {!attached.has(field.code) && !inheritedCodes.has(field.code) && (
-                    <Button variant="ghost" onClick={() => addField(field.code)}>
-                      افزودن به چیدمان
+                    <Button variant="ghost" disabled={!canPublish} onClick={() => addField(field.code)}>
+                      افزودن به فرم
                     </Button>
                   )}
                 </article>
@@ -388,397 +506,514 @@ export function FormDesigner({
         </section>
       )}
       <div hidden={viewMode !== "layout"}>
-        <DndContext sensors={sensors} onDragEnd={drop}>
-          <div className="engine-designer-columns">
-            <aside className="engine-library">
-              <div className="engine-side-panel-heading">
-                <span className="engine-step-badge">۱</span>
-                <div>
-                  <h3>ورودی‌های آماده</h3>
-                  <p>روی هر ورودی بزنید تا به فرم اضافه شود.</p>
-                </div>
-              </div>
-              <label className="engine-search-field">
-                <span>جستجوی ورودی</span>
-                <input placeholder="نام یا کد ورودی…" value={query} onChange={(e) => setQuery(e.target.value)} />
-              </label>
-              {access?.can("Field.Create") && (
-                <Button variant="secondary" onClick={() => setCreatingField(true)}>
-                  <Plus size={15} aria-hidden="true" />
-                  ساخت ورودی جدید
-                </Button>
-              )}
-              <div className="engine-library-list">
-                {fields
-                  .filter(
-                    (f) =>
-                      f.is_active &&
-                      !attached.has(f.code) &&
-                      !inheritedCodes.has(f.code) &&
-                      normalizePersianSearch(f.title + f.code).includes(normalizePersianSearch(query))
-                  )
-                  .map((field) => (
-                    <button
-                      className="engine-library-field"
-                      key={field.id}
-                      type="button"
-                      onClick={() => addField(field.code)}
-                    >
-                      <span>{field.title}</span>
-                      <small>افزودن به فرم</small>
-                      <b>＋</b>
-                    </button>
-                  ))}
-              </div>
-              {inheritedCodes.size > 0 && (
-                <p className="engine-notice">
-                  فیلدهای مشترک از فرم {parent?.title} به ارث می‌رسند و در فرم اصلی ویرایش می‌شوند.
-                </p>
-              )}
-            </aside>
-            <main className="engine-design-canvas">
-              <div className="engine-canvas-heading">
+        <fieldset disabled={!canPublish} className="engine-layout-controls">
+          <DndContext sensors={sensors} onDragEnd={drop}>
+            <div className="engine-designer-columns">
+              <aside className="engine-library">
                 <div className="engine-side-panel-heading">
-                  <span className="engine-step-badge">۲</span>
+                  <span className="engine-step-badge">۱</span>
                   <div>
-                    <h3>چیدمان فرم</h3>
-                    <p>ورودی‌ها را بکشید تا ترتیبشان عوض شود؛ برای دسته‌بندی، بخش یا تب اضافه کنید.</p>
+                    <h3>ورودی‌های آماده</h3>
+                    <p>روی هر ورودی بزنید تا به فرم اضافه شود.</p>
                   </div>
                 </div>
-                <Button variant="secondary" onClick={addSection}>
-                  <Plus size={15} aria-hidden="true" />
-                  افزودن بخش
-                </Button>
-              </div>
-              <div className="engine-tab-creator">
-                <label>
-                  <span>
-                    نام تب جدید <small>(اختیاری؛ برای فرم‌های طولانی)</small>
-                  </span>
-                  <input placeholder="مثلاً اطلاعات تکمیلی" value={newTab} onChange={(e) => setNewTab(e.target.value)} />
+                <label className="engine-search-field">
+                  <span>جستجوی ورودی</span>
+                  <input placeholder="نام یا کد ورودی…" value={query} onChange={(e) => setQuery(e.target.value)} />
                 </label>
-                <Button
-                  variant="ghost"
-                  disabled={!newTab.trim()}
-                  onClick={() => {
-                    if (newTab.trim()) {
-                      setDraft({
-                        ...draft,
-                        tabs: [...draft.tabs, { id: `tab-${browserId()}`, title: newTab.trim() }],
-                      });
-                      setNewTab("");
-                    }
-                  }}
-                >
-                  افزودن تب
-                </Button>
-              </div>
-              {draft.tabs.map((tab) => (
-                <div className="engine-tab-editor" key={tab.id}>
-                  <label>
-                    <span>عنوان تب</span>
-                    <input
-                      value={tab.title}
-                      onChange={(e) =>
-                        setDraft({
-                          ...draft,
-                          tabs: draft.tabs.map((t) => (t.id === tab.id ? { ...t, title: e.target.value } : t)),
-                        })
-                      }
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    aria-label={`حذف تب ${tab.title}`}
-                    onClick={() =>
-                      setDraft({
-                        tabs: draft.tabs.filter((t) => t.id !== tab.id),
-                        sections: draft.sections.map((s) => (s.tab === tab.id ? { ...s, tab: undefined } : s)),
-                      })
-                    }
-                  >
-                    <Trash2 size={16} aria-hidden="true" />
-                    حذف تب
-                  </button>
+                {canPublish && access?.can("Field.Create") && (
+                  <Button variant="secondary" onClick={() => setCreatingField(true)}>
+                    <Plus size={15} aria-hidden="true" />
+                    ساخت ورودی جدید
+                  </Button>
+                )}
+                <div className="engine-library-list">
+                  {fields
+                    .filter(
+                      (f) =>
+                        f.is_active &&
+                        !attached.has(f.code) &&
+                        !inheritedCodes.has(f.code) &&
+                        normalizePersianSearch(f.title + f.code).includes(normalizePersianSearch(query))
+                    )
+                    .map((field) => (
+                      <button
+                        className="engine-library-field"
+                        key={field.id}
+                        type="button"
+                        onClick={() => addField(field.code)}
+                      >
+                        <span>{field.title}</span>
+                        <small>افزودن به فرم</small>
+                        <b>＋</b>
+                      </button>
+                    ))}
                 </div>
-              ))}
-              {draft.sections.map((section, sectionIndex) => (
-                <DragItem key={section.id} id={`section:${section.id}`} label="جابه‌جایی بخش">
-                  <div className="engine-design-section">
-                    <header>
+                {inheritedCodes.size > 0 && (
+                  <p className="engine-notice">
+                    ورودی‌های مشترک از فرم {parent?.title} به ارث می‌رسند و در فرم اصلی ویرایش می‌شوند.
+                  </p>
+                )}
+              </aside>
+              <main className="engine-design-canvas">
+                <div className="engine-canvas-heading">
+                  <div className="engine-side-panel-heading">
+                    <span className="engine-step-badge">۲</span>
+                    <div>
+                      <h3>چیدمان فرم</h3>
+                      <p>ورودی‌ها را با دکمه‌های بالا و پایین جابه‌جا کنید. کشیدن هم ممکن است.</p>
+                    </div>
+                  </div>
+                  <Button variant="secondary" onClick={addSection}>
+                    <Plus size={15} aria-hidden="true" />
+                    افزودن بخش
+                  </Button>
+                </div>
+                <details className="engine-advanced-setting">
+                  <summary>بخش‌ها و تب‌های پیشرفته</summary>
+                  <div className="engine-tab-creator">
+                    <label>
+                      <span>
+                        نام تب جدید <small>(اختیاری؛ برای فرم‌های طولانی)</small>
+                      </span>
+                      <input
+                        placeholder="مثلاً اطلاعات تکمیلی"
+                        value={newTab}
+                        onChange={(e) => setNewTab(e.target.value)}
+                      />
+                    </label>
+                    <Button
+                      variant="ghost"
+                      disabled={!newTab.trim()}
+                      onClick={() => {
+                        if (newTab.trim()) {
+                          setDraft({
+                            ...draft,
+                            tabs: [...draft.tabs, { id: `tab-${browserId()}`, title: newTab.trim() }],
+                          });
+                          setNewTab("");
+                        }
+                      }}
+                    >
+                      افزودن تب
+                    </Button>
+                  </div>
+                  {draft.tabs.map((tab) => (
+                    <div className="engine-tab-editor" key={tab.id}>
                       <label>
-                        <span>عنوان بخش</span>
+                        <span>عنوان تب</span>
                         <input
-                          value={section.title || ""}
-                          placeholder="مثلاً اطلاعات اصلی"
+                          value={tab.title}
                           onChange={(e) =>
                             setDraft({
                               ...draft,
-                              sections: draft.sections.map((s) =>
-                                s.id === section.id ? { ...s, title: e.target.value } : s
-                              ),
+                              tabs: draft.tabs.map((t) => (t.id === tab.id ? { ...t, title: e.target.value } : t)),
                             })
                           }
                         />
                       </label>
-                      <span className="engine-field-count">
-                        {section.bindings.length.toLocaleString("fa-IR")} ورودی
-                      </span>
                       <button
                         type="button"
-                        aria-label="حذف بخش"
-                        disabled={section.bindings.some((binding) => form.data?.locked_fields?.includes(binding.field))}
-                        onClick={() => {
-                          if (window.confirm("این بخش از چیدمان حذف شود؟ داده رکوردهای قدیمی حفظ می‌شود."))
-                            setDraft({ ...draft, sections: draft.sections.filter((s) => s.id !== section.id) });
-                        }}
+                        aria-label={`حذف تب ${tab.title}`}
+                        onClick={() =>
+                          setDraft({
+                            tabs: draft.tabs.filter((t) => t.id !== tab.id),
+                            sections: draft.sections.map((s) => (s.tab === tab.id ? { ...s, tab: undefined } : s)),
+                          })
+                        }
                       >
-                        <Trash2 size={17} aria-hidden="true" />
+                        <Trash2 size={16} aria-hidden="true" />
+                        حذف تب
                       </button>
-                    </header>
-                    <div className="engine-section-options">
-                      <SearchableSelect
-                        showLabel
-                        label="چند ورودی در یک ردیف"
-                        value={String(section.columns)}
-                        options={[1, 2, 3].map((v) => ({ id: String(v), title: `${v.toLocaleString("fa-IR")} ورودی` }))}
-                        onChange={(v) =>
-                          setDraft({
-                            ...draft,
-                            sections: draft.sections.map((s) =>
-                              s.id === section.id ? { ...s, columns: Number(v) as 1 | 2 | 3 } : s
-                            ),
-                          })
-                        }
-                      />
-                      <SearchableSelect
-                        showLabel
-                        label="نمایش در تب"
-                        value={section.tab || ""}
-                        options={[{ id: "", title: "همه تب‌ها / بدون تب" }, ...draft.tabs]}
-                        onChange={(v) =>
-                          setDraft({
-                            ...draft,
-                            sections: draft.sections.map((s) =>
-                              s.id === section.id ? { ...s, tab: v || undefined } : s
-                            ),
-                          })
-                        }
-                      />
-                      <Button
-                        variant="ghost"
-                        disabled={sectionIndex === 0}
-                        onClick={() => {
-                          const next = [...draft.sections];
-                          [next[sectionIndex - 1], next[sectionIndex]] = [next[sectionIndex], next[sectionIndex - 1]];
-                          setDraft({ ...draft, sections: next });
-                        }}
-                      >
-                        <ArrowUp size={15} aria-hidden="true" />
-                        بخش به بالا
-                      </Button>
                     </div>
-                    {section.bindings.map((binding, index) => (
-                      <DragItem
-                        key={binding.field}
-                        id={`field:${section.id}:${binding.field}`}
-                        label={`جابه‌جایی ${fields.find((f) => f.code === binding.field)?.title || binding.field}`}
-                      >
-                        <button
-                          type="button"
-                          className={`engine-binding${selected?.section === section.id && selected.field === binding.field ? " selected" : ""}`}
-                          onClick={() => setSelected({ section: section.id, field: binding.field })}
-                        >
-                          {binding.title || fields.find((f) => f.code === binding.field)?.title || binding.field}
-                          {form.data?.locked_fields?.includes(binding.field) && (
-                            <span aria-label="فیلد هسته‌ای قفل است">
-                              <LockKeyhole size={14} aria-hidden="true" />
+                  ))}
+                </details>
+                {draft.sections.map((section, sectionIndex) => (
+                  <DragItem key={section.id} id={`section:${section.id}`} label="جابه‌جایی بخش">
+                    <div className="engine-design-section">
+                      <header className="engine-section-head">
+                        <span className="engine-section-index" aria-hidden="true">
+                          {(sectionIndex + 1).toLocaleString("fa-IR")}
+                        </span>
+                        <label className="engine-section-title-field">
+                          <span>عنوان بخش</span>
+                          <input
+                            value={section.title || ""}
+                            placeholder="مثلاً اطلاعات اصلی"
+                            onChange={(e) =>
+                              setDraft({
+                                ...draft,
+                                sections: draft.sections.map((s) =>
+                                  s.id === section.id ? { ...s, title: e.target.value } : s
+                                ),
+                              })
+                            }
+                          />
+                        </label>
+                        <div className="engine-section-meta">
+                          <span className="engine-field-count">
+                            {section.bindings.length.toLocaleString("fa-IR")} ورودی
+                          </span>
+                          <span className="engine-field-count">{section.columns.toLocaleString("fa-IR")} ستونه</span>
+                          {section.tab && (
+                            <span className="engine-field-count">
+                              {draft.tabs.find((t) => t.id === section.tab)?.title || "تب"}
                             </span>
                           )}
-                        </button>
+                        </div>
                         <button
                           type="button"
-                          aria-label="انتقال فیلد به بالا"
-                          disabled={index === 0}
-                          onClick={() =>
-                            setDraft(
-                              moveBinding(
-                                draft,
-                                section.id,
-                                binding.field,
-                                section.id,
-                                section.bindings[index - 1].field
-                              )
-                            )
-                          }
+                          aria-label="حذف بخش"
+                          disabled={section.bindings.some((binding) =>
+                            form.data?.locked_fields?.includes(binding.field)
+                          )}
+                          onClick={() => {
+                            if (window.confirm("این بخش از چیدمان حذف شود؟ داده رکوردهای قدیمی حفظ می‌شود."))
+                              setDraft({ ...draft, sections: draft.sections.filter((s) => s.id !== section.id) });
+                          }}
                         >
-                          <ArrowUp size={15} aria-hidden="true" />
+                          <Trash2 size={17} aria-hidden="true" />
                         </button>
-                        <button
-                          type="button"
-                          aria-label="حذف از فرم"
-                          title="حذف از فرم"
-                          disabled={form.data?.locked_fields?.includes(binding.field)}
-                          onClick={() =>
-                            setDraft({
-                              ...draft,
-                              // eslint-disable-next-line oxc/no-map-spread -- React state must be copied, not mutated.
-                              sections: draft.sections.map((s) =>
-                                s.id === section.id
-                                  ? { ...s, bindings: s.bindings.filter((b) => b.field !== binding.field) }
-                                  : s
-                              ),
-                            })
-                          }
+                      </header>
+                      <details className="engine-advanced-setting engine-section-settings">
+                        <summary>
+                          <Settings2 size={15} aria-hidden="true" />
+                          <span>چیدمان بخش {section.title || "بدون عنوان"}</span>
+                          <ChevronDown className="engine-section-settings-chevron" size={15} aria-hidden="true" />
+                        </summary>
+                        <div className="engine-section-options">
+                          <div className="engine-section-columns" role="radiogroup" aria-label="چند ورودی در یک ردیف">
+                            <span>چند ورودی در یک ردیف</span>
+                            <div>
+                              {([1, 2, 3] as const).map((count) => (
+                                <button
+                                  key={count}
+                                  type="button"
+                                  role="radio"
+                                  aria-checked={section.columns === count}
+                                  onClick={() =>
+                                    setDraft({
+                                      ...draft,
+                                      sections: draft.sections.map((s) =>
+                                        s.id === section.id ? { ...s, columns: count } : s
+                                      ),
+                                    })
+                                  }
+                                >
+                                  <span className="engine-column-glyph" data-count={count} aria-hidden="true">
+                                    {Array.from({ length: count }, (_, i) => (
+                                      <i key={i} />
+                                    ))}
+                                  </span>
+                                  {count.toLocaleString("fa-IR")} ورودی
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <SearchableSelect
+                            showLabel
+                            label="نمایش در تب"
+                            value={section.tab || ""}
+                            options={[{ id: "", title: "همه تب‌ها / بدون تب" }, ...draft.tabs]}
+                            onChange={(v) =>
+                              setDraft({
+                                ...draft,
+                                sections: draft.sections.map((s) =>
+                                  s.id === section.id ? { ...s, tab: v || undefined } : s
+                                ),
+                              })
+                            }
+                          />
+                          <Button
+                            variant="ghost"
+                            disabled={sectionIndex === 0}
+                            onClick={() => {
+                              const next = [...draft.sections];
+                              [next[sectionIndex - 1], next[sectionIndex]] = [
+                                next[sectionIndex],
+                                next[sectionIndex - 1],
+                              ];
+                              setDraft({ ...draft, sections: next });
+                            }}
+                          >
+                            <ArrowUp size={15} aria-hidden="true" />
+                            بخش به بالا
+                          </Button>
+                        </div>
+                      </details>
+                      {section.bindings.map((binding, index) => (
+                        <DragItem
+                          key={binding.field}
+                          id={`field:${section.id}:${binding.field}`}
+                          label={`جابه‌جایی ${fields.find((f) => f.code === binding.field)?.title || binding.field}`}
                         >
-                          <Trash2 size={15} aria-hidden="true" />
-                        </button>
-                      </DragItem>
-                    ))}
-                    {!section.bindings.length && (
-                      <p className="engine-drop-hint">
-                        از «ورودی‌های آماده» یک ورودی اضافه کنید یا آن را به اینجا بکشید.
-                      </p>
-                    )}
+                          <button
+                            type="button"
+                            className={`engine-binding${selected?.section === section.id && selected.field === binding.field ? " selected" : ""}`}
+                            onClick={() => setSelected({ section: section.id, field: binding.field })}
+                          >
+                            {binding.title || fields.find((f) => f.code === binding.field)?.title || binding.field}
+                            {form.data?.locked_fields?.includes(binding.field) && (
+                              <span aria-label="فیلد هسته‌ای قفل است">
+                                <LockKeyhole size={14} aria-hidden="true" />
+                              </span>
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={`انتقال ${binding.title || fields.find((f) => f.code === binding.field)?.title || binding.field} به بالا`}
+                            disabled={index === 0}
+                            onClick={() => setDraft(moveBindingStep(draft, section.id, binding.field, -1))}
+                          >
+                            <ArrowUp size={15} aria-hidden="true" />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={`انتقال ${binding.title || fields.find((f) => f.code === binding.field)?.title || binding.field} به پایین`}
+                            disabled={index === section.bindings.length - 1}
+                            onClick={() => setDraft(moveBindingStep(draft, section.id, binding.field, 1))}
+                          >
+                            <ArrowDown size={15} aria-hidden="true" />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label="حذف از فرم"
+                            title="حذف از فرم"
+                            disabled={form.data?.locked_fields?.includes(binding.field)}
+                            onClick={() =>
+                              setDraft({
+                                ...draft,
+                                // eslint-disable-next-line oxc/no-map-spread -- React state must be copied, not mutated.
+                                sections: draft.sections.map((s) =>
+                                  s.id === section.id
+                                    ? { ...s, bindings: s.bindings.filter((b) => b.field !== binding.field) }
+                                    : s
+                                ),
+                              })
+                            }
+                          >
+                            <Trash2 size={15} aria-hidden="true" />
+                          </button>
+                        </DragItem>
+                      ))}
+                      {!section.bindings.length && (
+                        <p className="engine-drop-hint">
+                          از «ورودی‌های آماده» یک ورودی اضافه کنید یا آن را به اینجا بکشید.
+                        </p>
+                      )}
+                    </div>
+                  </DragItem>
+                ))}
+              </main>
+              <aside className="engine-binding-settings">
+                <div className="engine-side-panel-heading">
+                  <span className="engine-step-badge">۳</span>
+                  <div>
+                    <h3>تنظیمات ورودی</h3>
+                    <p>رفتار ورودی انتخاب‌شده را فقط در همین فرم تغییر دهید.</p>
                   </div>
-                </DragItem>
-              ))}
-            </main>
-            <aside className="engine-binding-settings">
-              <div className="engine-side-panel-heading">
-                <span className="engine-step-badge">۳</span>
-                <div>
-                  <h3>تنظیمات ورودی</h3>
-                  <p>رفتار ورودی انتخاب‌شده را فقط در همین فرم تغییر دهید.</p>
                 </div>
-              </div>
-              {selectedBinding && selectedField ? (
-                <>
-                  <div className="engine-selected-field">
-                    <span>ورودی انتخاب‌شده</span>
-                    <strong>{selectedField.title}</strong>
-                    <small dir="ltr">{selectedField.code}</small>
-                  </div>
-                  <label>
-                    عنوان در این فرم (اختیاری)
-                    <input
-                      placeholder={selectedField.title}
-                      value={selectedBinding.title || ""}
-                      onChange={(e) => updateBinding({ title: e.target.value })}
-                    />
-                  </label>
-                  {[
-                    ["required", "پر کردن آن اجباری است"],
-                    ["hidden", "در این فرم نمایش داده نشود"],
-                    ["readonly", "فقط نمایشی (قابل تغییر نیست)"],
-                  ].map(([key, title]) => (
-                    <label className="engine-checkbox" key={key}>
-                      <input
-                        type="checkbox"
-                        disabled={Boolean(
-                          form.data?.locked_fields?.includes(selectedBinding.field) &&
-                          ["hidden", "required"].includes(key)
-                        )}
-                        checked={Boolean(
-                          selectedBinding[key as keyof FieldBinding] ??
-                          selectedField.config[key as keyof typeof selectedField.config]
-                        )}
-                        onChange={(e) => updateBinding({ [key]: e.target.checked })}
+                {selectedBinding && selectedField ? (
+                  <>
+                    <div className="engine-selected-field">
+                      <span>ورودی انتخاب‌شده</span>
+                      <strong>{selectedField.title}</strong>
+                      <small dir="ltr">{selectedField.code}</small>
+                    </div>
+                    {draft.sections.length > 1 && (
+                      <SearchableSelect
+                        showLabel
+                        label="انتقال ورودی به بخش"
+                        value={selected!.section}
+                        options={draft.sections.map((section) => ({
+                          id: section.id,
+                          title: section.title || "بخش بدون عنوان",
+                        }))}
+                        onChange={(sectionId) => {
+                          setDraft(moveBinding(draft, selected!.section, selected!.field, sectionId));
+                          setSelected({ section: sectionId, field: selected!.field });
+                        }}
                       />
-                      {title}
+                    )}
+                    <label>
+                      عنوان در این فرم (اختیاری)
+                      <input
+                        placeholder={selectedField.title}
+                        value={selectedBinding.title || ""}
+                        onChange={(e) => updateBinding({ title: e.target.value })}
+                      />
                     </label>
-                  ))}
-                  <DefaultValueEditor
-                    field={selectedField}
-                    value={
-                      selectedBinding.default &&
-                      typeof selectedBinding.default === "object" &&
-                      "dynamic" in selectedBinding.default
-                        ? null
-                        : selectedBinding.default
-                    }
-                    onChange={(value) => updateBinding({ default: value })}
-                  />
-                  <button
-                    type="button"
-                    className="button button-ghost"
-                    onClick={() => updateBinding({ default: undefined })}
-                  >
-                    بازگشت به مقدار اولیهٔ تنظیمات ورودی
-                  </button>
-                  <SearchableSelect
-                    showLabel
-                    label="پر شدن خودکار هنگام ثبت رکورد جدید"
-                    value={automaticDefaultMode(selectedBinding, selectedField.config)}
-                    options={[
-                      { id: "", title: "بدون مقدار اولیهٔ خودکار" },
-                      { id: "current_user", title: "کاربر جاری" },
-                      { id: "today", title: "امروز" },
-                      { id: "now", title: "زمان جاری" },
-                    ].filter((option) => !option.id || dynamicDefaultsFor(selectedField.kind).includes(option.id))}
-                    onChange={(v) =>
-                      updateBinding({ default: v ? { dynamic: v as "today" | "now" | "current_user" } : null })
-                    }
-                  />
-                  <p>
-                    این مقدار فقط هنگام ساخت رکورد جدید از کاربر واردشده، تاریخ امروز یا زمان جاری گرفته می‌شود؛ رکوردهای
-                    قبلی و ویرایش‌های بعدی را تغییر نمی‌دهد. «بدون مقدار اولیهٔ خودکار» پیش‌فرض این فرم را پاک می‌کند؛ دکمهٔ
-                    بالا تنظیم اصلی ورودی را دوباره اعمال می‌کند.
-                  </p>
-                  {(["view_roles", "edit_roles"] as const).map((key) => (
-                    <fieldset key={key}>
-                      <legend>
-                        {key === "view_roles" ? "چه کسانی این ورودی را ببینند؟" : "چه کسانی بتوانند آن را تغییر دهند؟"}
-                      </legend>
-                      <label className="engine-checkbox">
+                    {[
+                      ["required", "پر کردن آن اجباری است"],
+                      ["hidden", "در این فرم نمایش داده نشود"],
+                      ["readonly", "فقط نمایشی (قابل تغییر نیست)"],
+                    ].map(([key, title]) => (
+                      <label className="engine-checkbox" key={key}>
                         <input
                           type="checkbox"
-                          checked={selectedBinding[key] == null}
-                          onChange={(e) => updateBinding({ [key]: e.target.checked ? null : [] })}
+                          disabled={Boolean(
+                            form.data?.locked_fields?.includes(selectedBinding.field) &&
+                            ["hidden", "required"].includes(key)
+                          )}
+                          checked={Boolean(
+                            selectedBinding[key as keyof FieldBinding] ??
+                            selectedField.config[key as keyof typeof selectedField.config]
+                          )}
+                          onChange={(e) => updateBinding({ [key]: e.target.checked })}
                         />
-                        همه کسانی که به رکورد دسترسی دارند
+                        {title}
                       </label>
-                      {selectedBinding[key] != null && (
-                        <CompactMultiSelector
-                          label={key === "view_roles" ? "نقش‌های مجاز مشاهده" : "نقش‌های مجاز ویرایش"}
-                          options={roles.map((r) => ({ id: r.id, title: r.name }))}
-                          selected={selectedBinding[key] || []}
-                          onChange={(v) => updateBinding({ [key]: v })}
-                        />
-                      )}
-                    </fieldset>
-                  ))}
-                  <ConditionEditor
-                    label="فقط در شرایط خاص اجباری شود"
-                    description="بدون شرط، اجباری بودن فقط از تنظیم «اجباری» پیروی می‌کند."
-                    value={selectedBinding.required_if}
-                    fields={conditionFieldsFor(selectedBinding.field)}
-                    lookupValues={lookupValues}
-                    onChange={(required_if) => updateBinding({ required_if })}
-                  />
-                  <ConditionEditor
-                    label="فقط در شرایط خاص نمایش داده شود"
-                    description="بدون شرط، این ورودی همیشه در فرم دیده می‌شود."
-                    value={selectedBinding.visible_if}
-                    fields={conditionFieldsFor(selectedBinding.field)}
-                    lookupValues={lookupValues}
-                    onChange={(visible_if) => updateBinding({ visible_if })}
-                  />
-                </>
-              ) : (
-                <div className="engine-empty-selection">
-                  <strong>ورودی‌ای انتخاب نشده</strong>
-                  <p>روی یکی از ورودی‌های چیدمان بزنید تا تنظیماتش اینجا نمایش داده شود.</p>
-                </div>
-              )}
-            </aside>
-          </div>
-        </DndContext>
+                    ))}
+                    <details className="engine-advanced-setting engine-binding-advanced">
+                      <summary>تنظیمات پیشرفتهٔ این ورودی</summary>
+                      <div className="engine-advanced-content">
+                        <section className="engine-advanced-group" aria-label="مقدار اولیه">
+                          <h4>مقدار اولیه</h4>
+                          <DefaultValueEditor
+                            field={selectedField}
+                            value={
+                              selectedBinding.default &&
+                              typeof selectedBinding.default === "object" &&
+                              "dynamic" in selectedBinding.default
+                                ? null
+                                : selectedBinding.default
+                            }
+                            onChange={(value) => updateBinding({ default: value })}
+                          />
+                          <button
+                            type="button"
+                            className="button button-ghost"
+                            onClick={() => updateBinding({ default: undefined })}
+                          >
+                            استفاده از پیش‌فرض اصلی ورودی
+                          </button>
+                          <SearchableSelect
+                            showLabel
+                            label="پر شدن خودکار هنگام ثبت رکورد جدید"
+                            value={automaticDefaultMode(selectedBinding, selectedField.config)}
+                            options={[
+                              { id: "", title: "بدون مقدار اولیهٔ خودکار" },
+                              { id: "current_user", title: "کاربر جاری" },
+                              { id: "today", title: "امروز" },
+                              { id: "now", title: "زمان جاری" },
+                            ].filter(
+                              (option) => !option.id || dynamicDefaultsFor(selectedField.kind).includes(option.id)
+                            )}
+                            onChange={(v) =>
+                              updateBinding({ default: v ? { dynamic: v as "today" | "now" | "current_user" } : null })
+                            }
+                          />
+                          <p className="engine-advanced-note">
+                            پر شدن خودکار فقط هنگام ثبت رکورد جدید انجام می‌شود؛ رکوردهای قبلی و ویرایش‌های بعدی تغییر
+                            نمی‌کنند. «بدون مقدار اولیهٔ خودکار» پیش‌فرض همین فرم را پاک می‌کند. دکمهٔ بالا، پیش‌فرض اصلی ورودی
+                            را دوباره اعمال می‌کند.
+                          </p>
+                        </section>
+                        <section className="engine-advanced-group" aria-label="دسترسی به ورودی">
+                          <h4>دسترسی به ورودی</h4>
+                          {(["view_roles", "edit_roles"] as const).map((key) => (
+                            <fieldset key={key}>
+                              <legend>
+                                {key === "view_roles"
+                                  ? "چه کسانی این ورودی را ببینند؟"
+                                  : "چه کسانی بتوانند آن را تغییر دهند؟"}
+                              </legend>
+                              <label className="engine-checkbox">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedBinding[key] == null}
+                                  onChange={(e) => updateBinding({ [key]: e.target.checked ? null : [] })}
+                                />
+                                همه کسانی که به رکورد دسترسی دارند
+                              </label>
+                              {selectedBinding[key] != null && (
+                                <CompactMultiSelector
+                                  label={key === "view_roles" ? "نقش‌های مجاز مشاهده" : "نقش‌های مجاز ویرایش"}
+                                  options={roles.map((r) => ({ id: r.id, title: r.name }))}
+                                  selected={selectedBinding[key] || []}
+                                  onChange={(v) => updateBinding({ [key]: v })}
+                                />
+                              )}
+                            </fieldset>
+                          ))}
+                        </section>
+                        <section className="engine-advanced-group" aria-label="شرط‌های ورودی">
+                          <h4>شرط‌های ورودی</h4>
+                          <ConditionEditor
+                            label="فقط در شرایط خاص اجباری شود"
+                            description="بدون شرط، اجباری بودن فقط از تنظیم «اجباری» پیروی می‌کند."
+                            value={selectedBinding.required_if}
+                            fields={conditionFieldsFor(selectedBinding.field)}
+                            lookupValues={lookupValues}
+                            onChange={(required_if) => updateBinding({ required_if })}
+                          />
+                          <ConditionEditor
+                            label="فقط در شرایط خاص نمایش داده شود"
+                            description="بدون شرط، این ورودی همیشه در فرم دیده می‌شود."
+                            value={selectedBinding.visible_if}
+                            fields={conditionFieldsFor(selectedBinding.field)}
+                            lookupValues={lookupValues}
+                            onChange={(visible_if) => updateBinding({ visible_if })}
+                          />
+                        </section>
+                      </div>
+                    </details>
+                  </>
+                ) : (
+                  <div className="engine-empty-selection">
+                    <strong>ورودی‌ای انتخاب نشده</strong>
+                    <p>روی یکی از ورودی‌های چیدمان بزنید تا تنظیماتش اینجا نمایش داده شود.</p>
+                  </div>
+                )}
+              </aside>
+            </div>
+          </DndContext>
+        </fieldset>
       </div>
       <section className="engine-live-preview" hidden={viewMode !== "preview"}>
         <h3>پیش‌نمایش فرم</h3>
-        <p>فرم را همان‌طور که کاربران می‌بینند امتحان کنید؛ چیزی ذخیره نمی‌شود.</p>
-        <SchemaDrivenForm schema={liveSchema} values={preview} onChange={setPreview} {...transport} />
+        <p>ورودی‌ها و پیام خطا را امتحان کنید. دادهٔ این پیش‌نمایش ثبت نمی‌شود.</p>
+        <div className="engine-workspace-subnav" role="group" aria-label="حالت پیش‌نمایش">
+          <button
+            type="button"
+            aria-pressed={previewMode === "create"}
+            onClick={() => {
+              setPreviewMode("create");
+              setPreview({});
+              setPreviewErrors({});
+            }}
+          >
+            حالت ثبت
+          </button>
+          <button
+            type="button"
+            aria-pressed={previewMode === "edit"}
+            onClick={() => {
+              setPreviewMode("edit");
+              setPreviewErrors({});
+            }}
+          >
+            حالت ویرایش
+          </button>
+        </div>
+        <p>
+          {previewMode === "edit"
+            ? "نمای ویرایش با دادهٔ آزمایشی همین صفحه نشان داده می‌شود؛ دسترسی واقعی هر رکورد در زمان ویرایش بررسی می‌شود."
+            : "نمای ثبت رکورد جدید"}
+        </p>
+        <SchemaDrivenForm
+          schema={previewSchema}
+          values={preview}
+          errors={previewErrors}
+          onChange={(values) => {
+            setPreview(values);
+            setPreviewErrors({});
+          }}
+          {...transport}
+        />
+        <Button variant="secondary" onClick={() => setPreviewErrors(validateSchemaValues(previewSchema, preview))}>
+          بررسی خطاهای فرم
+        </Button>
       </section>
       <section className="engine-version-history" hidden={viewMode !== "versions"}>
         <h3>نسخه‌های قبلی فرم</h3>

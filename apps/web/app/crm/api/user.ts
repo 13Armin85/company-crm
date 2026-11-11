@@ -132,7 +132,7 @@ export const useAppearance = () =>
         theme: (["light", "dark", "system"].includes(selectedTheme)
           ? selectedTheme
           : "system") as AppearancePreferences["theme"],
-        accent: String(value.hamkar_accent ?? "#4F46E5"),
+        accent: normalizeAccent(value.hamkar_accent),
         density: value.hamkar_density === "compact" ? "compact" : "comfortable",
         lastWorkspaceId: data.last_workspace_id ? String(data.last_workspace_id) : undefined,
         raw: value,
@@ -257,3 +257,11 @@ export const useSelectWorkspace = () => {
     },
   });
 };
+
+/** Accent "#4F46E5" was the v1 default; profiles that never chose one move to the v2 brand. */
+export const DEFAULT_ACCENT = "#2A4BD0";
+function normalizeAccent(value: unknown) {
+  const accent = typeof value === "string" ? value.trim() : "";
+  if (!/^#[0-9a-f]{6}$/i.test(accent) || accent.toUpperCase() === "#4F46E5") return DEFAULT_ACCENT;
+  return accent.toUpperCase();
+}

@@ -1,6 +1,7 @@
 import { ErrorNotice } from "../error-state";
 import { useState } from "react";
 import { Link } from "react-router";
+import { ChevronDown, Link2, Plus, Unlink } from "lucide-react";
 import { SchemaDrivenForm } from "@plane/ui";
 import type { SchemaField } from "@plane/ui";
 import { stateNameFa } from "../issue-status";
@@ -9,9 +10,35 @@ import { errorMessage, useWorkspaceAccess } from "../api";
 import { useEngineQuery, useEngineRecord, useEngineMutation, useEngineSchema } from "./api";
 import { EngineRecordForm, useSchemaTransport } from "./record-form";
 import type { ViewResult } from "./view-types";
+import type { LinkField } from "./relation-link-data";
 
-function RelatedSection({ code, id, field }: { code: string; id: string; field: SchemaField }) {
-  const [open, setOpen] = useState(false);
+type RelatedResult = ViewResult & {
+  entity: string;
+  can_create?: boolean;
+  link_fields?: LinkField[];
+  link_data?: Record<string, Record<string, unknown>[]>;
+  link_labels?: Record<string, string>;
+};
+
+const linkValue = (value: unknown) =>
+  value === undefined || value === null || value === ""
+    ? "—"
+    : typeof value === "number"
+      ? value.toLocaleString("fa-IR")
+      : String(value);
+
+export function RelatedSection({
+  code,
+  id,
+  field,
+  defaultOpen = false,
+}: {
+  code: string;
+  id: string;
+  field: SchemaField;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
   const [target, setTarget] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
   const [page, setPage] = useState(1);
@@ -19,7 +46,7 @@ function RelatedSection({ code, id, field }: { code: string; id: string; field: 
   const record = useEngineRecord(code, id);
   const transport = useSchemaTransport(code, "", false, id);
   const mutation = useEngineMutation();
-  const rows = useEngineQuery<ViewResult & { entity: string }>(
+  const rows = useEngineQuery<RelatedResult>(
     "related-records",
     `entities/${code}/records/${id}/related/${field.code}/?page=${page}&page_size=10`,
     open
@@ -38,84 +65,121 @@ function RelatedSection({ code, id, field }: { code: string; id: string; field: 
     return result;
   };
   const editable = record.data?.can_edit && !field.config.readonly;
+  const linkFields = rows.data?.link_fields || [];
+  const count = rows.data?.count || 0;
+  const pages = Math.max(1, Math.ceil(count / 10));
+  const bodyId = `related-${field.code}`;
   return (
-    <section className="engine-view-settings">
-      <Button variant="ghost" onClick={() => setOpen(!open)}>
-        {field.title} {open ? "▴" : "▾"}
-      </Button>
+    <section className={`engine-related-card${open ? " is-open" : ""}`}>
+      <button
+        type="button"
+        className="engine-related-head"
+        aria-expanded={open}
+        aria-controls={bodyId}
+        onClick={() => setOpen(!open)}
+      >
+        <span className="engine-related-icon" aria-hidden="true">
+          <Link2 size={16} />
+        </span>
+        <span className="engine-related-title">{field.title}</span>
+        {rows.data && <span className="engine-related-count">{count.toLocaleString("fa-IR")}</span>}
+        <ChevronDown className="engine-related-chevron" size={17} aria-hidden="true" />
+      </button>
       {open && (
-        <>
+        <div className="engine-related-body" id={bodyId}>
           {rows.isLoading ? (
-            <p>در حال دریافت…</p>
-          ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>عنوان</th>
-                  <th>شماره</th>
-                  <th>وضعیت</th>
-                  <th>عملیات</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.data?.results.map((row) => (
-                  <tr key={row.id}>
-                    <td>
-                      <Link to={`/entities/${rows.data?.entity}/${row.id}`}>{row.title}</Link>
-                    </td>
-                    <td>{row.number}</td>
-                    <td>
-                      {["task_status", "ticket_state"]
-                        .map((key) =>
-                          row.values[key]
-                            ? rows.data?.labels[key]?.[String(row.values[key])]?.title || String(row.values[key])
-                            : null
-                        )
-                        .find(Boolean) || "—"}
-                    </td>
-                    <td>
-                      {editable && (
-                        <Button
-                          variant="danger"
-                          onClick={() => {
-                            if (window.confirm("این رکورد از ارتباط جدا شود؟"))
-                              void write(row.id, "detach").catch(() => {});
-                          }}
-                        >
-                          جدا کردن
-                        </Button>
-                      )}
-                    </td>
+            <p className="engine-related-empty">در حال دریافت…</p>
+          ) : count ? (
+            <div className="engine-related-table-wrap">
+              <table className="engine-related-table">
+                <thead>
+                  <tr>
+                    <th>عنوان</th>
+                    <th>شماره</th>
+                    <th>وضعیت</th>
+                    {linkFields.map((item) => (
+                      <th key={item.code}>{item.title}</th>
+                    ))}
+                    {editable && <th aria-label="عملیات" />}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {rows.data?.results.map((row) => (
+                    <tr key={row.id}>
+                      <td className="engine-related-name">
+                        <Link to={`/entities/${rows.data?.entity}/${row.id}`}>{row.title}</Link>
+                        {row.is_active === false && <span className="engine-badge is-inactive">غیرفعال</span>}
+                      </td>
+                      <td className="engine-related-number">{row.number || "—"}</td>
+                      <td>
+                        {["task_status", "ticket_state"]
+                          .map((key) =>
+                            row.values[key]
+                              ? rows.data?.labels[key]?.[String(row.values[key])]?.title || String(row.values[key])
+                              : null
+                          )
+                          .find(Boolean) || "—"}
+                      </td>
+                      {linkFields.map((item) => (
+                        <td key={item.code}>
+                          {(rows.data?.link_data?.[row.id] || [])
+                            .map((data) =>
+                              item.kind === "select"
+                                ? rows.data?.link_labels?.[String(data[item.code])] || linkValue(data[item.code])
+                                : linkValue(data[item.code])
+                            )
+                            .join("، ") || "—"}
+                        </td>
+                      ))}
+                      {editable && (
+                        <td className="engine-related-actions">
+                          <button
+                            type="button"
+                            className="engine-related-detach"
+                            aria-label={`جدا کردن ${row.title}`}
+                            onClick={() => {
+                              if (window.confirm("این رکورد از ارتباط جدا شود؟"))
+                                void write(row.id, "detach").catch(() => {});
+                            }}
+                          >
+                            <Unlink size={14} aria-hidden="true" />
+                            <span>جدا کردن</span>
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="engine-related-empty">رکورد مرتبطی وجود ندارد.</p>
           )}
-          {!rows.isLoading && !rows.data?.count && <p>رکورد مرتبطی وجود ندارد.</p>}
-          {Boolean(rows.data?.count) && (
-            <div className="engine-actions">
-              <span>{rows.data?.count.toLocaleString("fa-IR")} رکورد مرتبط</span>
-              <Button variant="secondary" disabled={page === 1} onClick={() => setPage(page - 1)}>
-                قبلی
-              </Button>
-              <Button
-                variant="secondary"
-                disabled={page * 10 >= (rows.data?.count || 0)}
-                onClick={() => setPage(page + 1)}
-              >
-                بعدی
-              </Button>
+          {count > 10 && (
+            <div className="engine-related-pager">
+              <span>
+                صفحهٔ {page.toLocaleString("fa-IR")} از {pages.toLocaleString("fa-IR")} · {count.toLocaleString("fa-IR")}{" "}
+                رکورد مرتبط
+              </span>
+              <div>
+                <Button variant="secondary" disabled={page === 1} onClick={() => setPage(page - 1)}>
+                  قبلی
+                </Button>
+                <Button variant="secondary" disabled={page >= pages} onClick={() => setPage(page + 1)}>
+                  بعدی
+                </Button>
+              </div>
             </div>
           )}
           {editable && (
-            <>
+            <div className="engine-related-attach">
               <SchemaDrivenForm
                 {...transport}
                 schema={{
                   entity: code,
                   title: field.title,
                   schema_version: 1,
-                  fields: [{ ...field, config: { ...field.config, required: false } }],
+                  fields: [{ ...field, title: "اتصال رکورد", config: { ...field.config, required: false } }],
                   layout: { tabs: [], sections: [{ id: "attach", columns: 1, bindings: [{ field: field.code }] }] },
                 }}
                 values={{ [field.code]: field.config.multiple ? target : target[0] || null }}
@@ -129,38 +193,46 @@ function RelatedSection({ code, id, field }: { code: string; id: string; field: 
                   )
                 }
               />
-              <Button
-                disabled={!target.length || mutation.isPending}
-                onClick={() => {
-                  const selected = [...target];
-                  setTarget([]);
-                  void write(selected, "attach").catch(() =>
-                    setTarget((current) => (current.length ? current : selected))
-                  );
-                }}
-              >
-                اتصال رکورد موجود
-              </Button>
-              <Button variant="secondary" onClick={() => setCreating(!creating)}>
-                افزودن رکورد مرتبط
-              </Button>
+              <div className="engine-related-attach-actions">
+                <Button
+                  disabled={!target.length || mutation.isPending}
+                  onClick={() => {
+                    const selected = [...target];
+                    setTarget([]);
+                    void write(selected, "attach").catch(() =>
+                      setTarget((current) => (current.length ? current : selected))
+                    );
+                  }}
+                >
+                  <Link2 size={15} aria-hidden="true" />
+                  اتصال رکورد موجود
+                </Button>
+                {rows.data?.can_create && (
+                  <Button variant="secondary" onClick={() => setCreating(!creating)}>
+                    <Plus size={15} aria-hidden="true" />
+                    افزودن رکورد مرتبط
+                  </Button>
+                )}
+              </div>
               {creating && field.relation_entity && (
-                <EngineRecordForm
-                  code={field.relation_entity}
-                  onSaved={(created) =>
-                    void write(created.id, "attach")
-                      .then(() => setCreating(false))
-                      .catch(() => {})
-                  }
-                  onCancel={() => setCreating(false)}
-                />
+                <div className="engine-related-create">
+                  <EngineRecordForm
+                    code={field.relation_entity}
+                    onSaved={(created) =>
+                      void write(created.id, "attach")
+                        .then(() => setCreating(false))
+                        .catch(() => {})
+                    }
+                    onCancel={() => setCreating(false)}
+                  />
+                </div>
               )}
-            </>
+            </div>
           )}
           {(rows.error || mutation.error) && (
             <ErrorNotice message={errorMessage(rows.error || mutation.error, "عملیات رکوردهای مرتبط انجام نشد.")} />
           )}
-        </>
+        </div>
       )}
     </section>
   );
@@ -174,11 +246,16 @@ export function RelatedRecords({ code, id }: { code: string; id: string }) {
   );
   if (!access?.can("Relation.View") || !fields?.length) return null;
   return (
-    <section aria-label="رکوردهای مرتبط">
-      <h3>رکوردهای مرتبط</h3>
-      {fields.map((field) => (
-        <RelatedSection key={`${id}:${field.code}`} code={code} id={id} field={field} />
-      ))}
+    <section className="engine-related" aria-label="رکوردهای مرتبط">
+      <header className="engine-related-header">
+        <h3>رکوردهای مرتبط</h3>
+        <span>{fields.length.toLocaleString("fa-IR")} ارتباط</span>
+      </header>
+      <div className="engine-related-list">
+        {fields.map((field) => (
+          <RelatedSection key={`${id}:${field.code}`} code={code} id={id} field={field} />
+        ))}
+      </div>
     </section>
   );
 }

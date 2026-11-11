@@ -6,6 +6,103 @@ import { Button } from "../components";
 import { errorMessage, useWorkspaceAccess } from "../api";
 import { useEngineCatalog, useEngineQuery, useEngineMutation } from "./api";
 import type { ViewSchema } from "./view-types";
+import type { LookupDefinition } from "./api";
+import type { LinkField } from "./relation-link-data";
+import { useEngineDefinitions } from "./api";
+
+export const deleteBehaviors = [
+  { id: "block", title: "مسدود کن", summary: "هنگام حذف: مسدودسازی" },
+  { id: "detach", title: "فقط ارتباط را جدا کن", summary: "هنگام حذف: جدا کردن پیوند" },
+  {
+    id: "soft_deactivate",
+    title: "رکورد را غیرفعال کن و پیوندها را نگه دار",
+    summary: "هنگام حذف: غیرفعال‌سازی نرم",
+  },
+];
+const linkKinds = [
+  { id: "integer", title: "عدد صحیح" },
+  { id: "decimal", title: "عدد اعشاری" },
+  { id: "short_text", title: "متن کوتاه" },
+  { id: "select", title: "فهرست انتخابی" },
+];
+
+export function LinkFieldsEditor({ value, onChange }: { value: LinkField[]; onChange: (value: LinkField[]) => void }) {
+  const lookups = useEngineDefinitions<LookupDefinition>("lookups");
+  const set = (index: number, change: Partial<LinkField>) =>
+    onChange(value.map((field, position) => (position === index ? { ...field, ...change } : field)));
+  return (
+    <div className="engine-relations-link-fields">
+      <span className="engine-relations-section-title">۳. فیلدهای روی خود ارتباط</span>
+      <p className="engine-relations-helper">
+        مثل تعداد محصول در سفارش یا نقش مخاطب در پروژه؛ هنگام اتصال هر رکورد پرسیده می‌شوند.
+      </p>
+      {value.map((field, index) => (
+        <div className="engine-relations-form-row" key={index}>
+          <label>
+            عنوان
+            <input
+              required
+              value={field.title}
+              maxLength={255}
+              onChange={(event) => set(index, { title: event.target.value })}
+            />
+          </label>
+          <label>
+            کد انگلیسی
+            <input
+              required
+              dir="ltr"
+              pattern="[a-z][a-z0-9_]*"
+              value={field.code}
+              maxLength={60}
+              onChange={(event) => set(index, { code: event.target.value })}
+            />
+          </label>
+          <SearchableSelect
+            label="نوع"
+            value={field.kind}
+            options={linkKinds}
+            onChange={(kind) => set(index, { kind: kind as LinkField["kind"] })}
+          />
+          {field.kind === "select" && (
+            <SearchableSelect
+              label="فهرست انتخابی"
+              value={field.lookup || ""}
+              options={(lookups.data || [])
+                .filter((lookup) => lookup.is_active)
+                .map((lookup) => ({ id: lookup.code, title: lookup.title }))}
+              onChange={(lookup) => set(index, { lookup })}
+            />
+          )}
+          <label className="engine-checkbox">
+            <input
+              type="checkbox"
+              checked={Boolean(field.config.required)}
+              onChange={(event) => set(index, { config: { ...field.config, required: event.target.checked } })}
+            />
+            اجباری
+          </label>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => onChange(value.filter((_, position) => position !== index))}
+          >
+            حذف فیلد
+          </Button>
+        </div>
+      ))}
+      <Button
+        type="button"
+        variant="secondary"
+        onClick={() =>
+          onChange([...value, { code: `field_${value.length + 1}`, title: "", kind: "integer", config: {} }])
+        }
+      >
+        افزودن فیلد ارتباط
+      </Button>
+    </div>
+  );
+}
 
 type Relation = {
   id: string;
@@ -17,6 +114,9 @@ type Relation = {
   left_required: boolean;
   right_required: boolean;
   on_delete: string;
+  allow_duplicates?: boolean;
+  hierarchical?: boolean;
+  link_fields?: LinkField[];
   link_count: number;
 };
 type RelationDraft = Omit<Relation, "id" | "link_count">;
@@ -190,6 +290,9 @@ export function RelationSettings({ entityCode }: { entityCode?: string } = {}) {
     left_required: false,
     right_required: false,
     on_delete: "block",
+    allow_duplicates: false,
+    hierarchical: false,
+    link_fields: [],
   });
   const [data, setData] = useState<RelationDraft>(empty);
   const [editing, setEditing] = useState<string | null>(null);
@@ -250,8 +353,16 @@ export function RelationSettings({ entityCode }: { entityCode?: string } = {}) {
                   </div>
                 </div>
                 <div className="engine-relations-item-footer">
-                  <span>{relation.on_delete === "detach" ? "هنگام حذف: جدا کردن پیوند" : "هنگام حذف: مسدودسازی"}</span>
+                  <span>
+                    {deleteBehaviors.find((behavior) => behavior.id === relation.on_delete)?.summary ||
+                      "هنگام حذف: مسدودسازی"}
+                  </span>
                   {(relation.left_required || relation.right_required) && <span>پیوند اجباری</span>}
+                  {relation.allow_duplicates && <span>اتصال تکراری مجاز</span>}
+                  {relation.hierarchical && <span>سلسله‌مراتبی</span>}
+                  {Boolean(relation.link_fields?.length) && (
+                    <span>فیلدهای ارتباط: {relation.link_fields?.map((field) => field.title).join("، ")}</span>
+                  )}
                 </div>
                 {(access?.can("Relation.Edit") || access?.can("Relation.Delete")) && (
                   <div className="engine-rules-rule-actions">
@@ -268,6 +379,9 @@ export function RelationSettings({ entityCode }: { entityCode?: string } = {}) {
                             left_required: relation.left_required,
                             right_required: relation.right_required,
                             on_delete: relation.on_delete,
+                            allow_duplicates: Boolean(relation.allow_duplicates),
+                            hierarchical: Boolean(relation.hierarchical),
+                            link_fields: relation.link_fields || [],
                           });
                           setEditing(relation.id);
                         }}
@@ -314,7 +428,11 @@ export function RelationSettings({ entityCode }: { entityCode?: string } = {}) {
                   .mutateAsync({
                     path: `relations/${editing ? editing + "/" : ""}`,
                     method: editing ? "patch" : "post",
-                    data,
+                    data: {
+                      ...data,
+                      allow_duplicates: data.kind === "many_to_many" && Boolean(data.allow_duplicates),
+                      hierarchical: data.left_entity === data.right_entity && Boolean(data.hierarchical),
+                    },
                   })
                   .then(() => {
                     setData(empty());
@@ -392,10 +510,7 @@ export function RelationSettings({ entityCode }: { entityCode?: string } = {}) {
                 <SearchableSelect
                   label="هنگام حذف یا غیرفعال کردن رکورد"
                   value={data.on_delete}
-                  options={[
-                    { id: "block", title: "مسدود کن" },
-                    { id: "detach", title: "فقط ارتباط را جدا کن" },
-                  ]}
+                  options={deleteBehaviors}
                   onChange={(value) => setData({ ...data, on_delete: value })}
                 />
                 <div className="engine-relations-required-options">
@@ -415,7 +530,33 @@ export function RelationSettings({ entityCode }: { entityCode?: string } = {}) {
                     />
                     ارتباط در سمت دوم اجباری است
                   </label>
+                  <label className="engine-checkbox">
+                    <input
+                      type="checkbox"
+                      disabled={data.kind !== "many_to_many"}
+                      checked={Boolean(data.allow_duplicates) && data.kind === "many_to_many"}
+                      onChange={(event) => setData({ ...data, allow_duplicates: event.target.checked })}
+                    />
+                    امکان تکرار (اتصال دوباره به همان رکورد با دادهٔ متفاوت؛ فقط چند به چند)
+                  </label>
+                  {data.left_entity && data.left_entity === data.right_entity && (
+                    <label className="engine-checkbox">
+                      <input
+                        type="checkbox"
+                        disabled={data.kind === "many_to_many"}
+                        checked={Boolean(data.hierarchical)}
+                        onChange={(event) => setData({ ...data, hierarchical: event.target.checked })}
+                      />
+                      سلسله‌مراتبی (جلوگیری از چرخه، مثل مشتری مادر و زیرمجموعه)
+                    </label>
+                  )}
                 </div>
+              </div>
+              <div className="engine-relations-form-section">
+                <LinkFieldsEditor
+                  value={data.link_fields || []}
+                  onChange={(link_fields) => setData({ ...data, link_fields })}
+                />
               </div>
               <div className="engine-relations-preview" aria-live="polite">
                 <span>نمای ارتباط در فرم‌ها</span>

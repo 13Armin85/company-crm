@@ -783,7 +783,11 @@ class EntityQuery:
         for sort in sorts:
             if not isinstance(sort, dict):
                 raise ValidationError("تنظیم مرتب‌سازی معتبر نیست.")
-            self.describe(sort.get("field"))
+            described = self.describe(sort.get("field"))
+            if described["kind"] == "relation" and described["config"].get("multiple"):
+                raise ValidationError(
+                    "مرتب‌سازی فقط روی سمت «یک» ارتباط ممکن است، نه ارتباط چندتایی."
+                )
             if sort.get("direction") not in {"asc", "desc"}:
                 raise ValidationError("جهت مرتب‌سازی معتبر نیست.")
         result["sort"] = [
@@ -1036,13 +1040,30 @@ class EntityQuery:
         for sort in self.spec.get("sort", []):
             if sort["field"] == group:
                 continue
-            alias = self.scalar(sort["field"])
+            alias = self.sort_alias(sort["field"])
             ordering.append(
                 F(alias).desc(nulls_last=True)
                 if sort["direction"] == "desc"
                 else F(alias).asc(nulls_last=True)
             )
         return self.rows.order_by(*(ordering or ["-created_at"]), "id")
+
+    def sort_alias(self, path):
+        """A single relation sorts by the related record's title, not by its id."""
+        field = self.describe(path)
+        if (
+            field["kind"] == "relation"
+            and "." not in path
+            and not field["config"].get("multiple")
+        ):
+            try:
+                child = self.child(field)
+                title = f"{path}.{child.entity.title_field}"
+                if self.path_allowed(title):
+                    return self.scalar(title)
+            except (ValidationError, PermissionDenied):
+                pass
+        return self.scalar(path)
 
     def projection(self):
         paths = {c["field"] for c in self.spec["columns"]}

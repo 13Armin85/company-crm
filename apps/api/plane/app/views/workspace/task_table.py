@@ -21,7 +21,7 @@ from plane.app.services.table_page import list_values, normalize, paginate
 from plane.app.services.task_policy import is_workspace_administrator
 from plane.app.views.base import BaseAPIView
 from plane.app.views.workspace.task_history import PersonalIssueSerializer
-from plane.db.models import Issue, IssueActivity, IssueAssignee, Notification, Project, WorkspaceTask
+from plane.db.models import Issue, IssueActivity, IssueAssignee, Notification, Project, Workspace, WorkspaceTask
 
 STANDALONE_STATUS = {
     "Todo": "todo",
@@ -169,6 +169,14 @@ class TaskTableEndpoint(BaseAPIView):
         search = request.query_params.get("q", "").strip()
         if search:
             rows = rows.filter(pk__in=rows.filter(_search(search)).values("pk"))
+        # Ticket 5 ready filters (من / بدون مسئول / عقب‌افتاده / بسته‌شده) on top of the same visibility,
+        # tab and filters; counts are computed on the server before the preset narrows the rows.
+        from plane.app.services.ticket_core import category_expression, deadline_badges, preset_counts, preset_filter
+
+        extra["preset_counts"] = preset_counts(rows, user)
+        preset = request.query_params.get("preset", "")
+        if preset and preset != "all":
+            rows = preset_filter(rows, preset, user)
         rows = rows.order_by("-created_at", "id")
 
         def serialize(chunk):
@@ -195,14 +203,27 @@ class TaskTableEndpoint(BaseAPIView):
                 for item, task in zip(WorkspaceTaskSerializer(tasks, many=True).data, tasks)
             }
             results = []
+            deadlines = deadline_badges(ids, Workspace.objects.get(slug=slug)) if ids else {}
+            categories = dict(
+                Issue.objects.filter(id__in=ids).annotate(work_category=category_expression()).values_list("id", "work_category")
+            )
             for row in chunk:
                 if row.id in project_items:
                     item = project_items[row.id]
                     item.was_assigned_to_me = flags[row.id]
                     data = PersonalIssueSerializer(item, context={"user_id": user.id}).data
-                    results.append({"kind": "issue", "item": data})
+                    results.append(
+                        {"kind": "issue", "item": data, "deadline": deadlines.get(str(row.id)), "category": categories.get(row.id)}
+                    )
                 elif str(row.id) in task_data:
-                    results.append({"kind": "task", "item": task_data[str(row.id)]})
+                    results.append(
+                        {
+                            "kind": "task",
+                            "item": task_data[str(row.id)],
+                            "deadline": deadlines.get(str(row.id)),
+                            "category": categories.get(row.id),
+                        }
+                    )
             return results
 
         return paginate(request, rows, serialize, extra={**extra, "is_admin": admin})

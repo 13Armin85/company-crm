@@ -421,13 +421,9 @@ class IssueViewSet(BaseViewSet):
         routing_rule = None
         routing_rule_id = request.data.get("routing_rule_id")
         if routing_rule_id:
-            routing_rule = TicketRoutingRule.objects.filter(
-                id=routing_rule_id,
-                workspace=project.workspace,
-                is_active=True,
-                unit__is_active=True,
-                required_role__is_active=True,
-            ).first()
+            from plane.app.services.ticket_routing import usable_rule
+
+            routing_rule = usable_rule(project.workspace, routing_rule_id)
             if routing_rule is None:
                 return Response(
                     {"routing_rule_id": ["Routing rule is invalid or inactive."]},
@@ -451,8 +447,12 @@ class IssueViewSet(BaseViewSet):
             serializer.save()
             routing_decision = None
             if routing_rule is not None:
-                routing_decision = TicketRoutingService.route(
-                    serializer.instance, routing_rule, actor_id=request.user.id
+                from plane.app.services.ticket_routing import AUTO
+
+                routing_decision = (
+                    TicketRoutingService.route_auto(serializer.instance, actor_id=request.user.id)
+                    if routing_rule is AUTO
+                    else TicketRoutingService.route(serializer.instance, routing_rule, actor_id=request.user.id)
                 )
 
             # Track the issue
@@ -679,6 +679,11 @@ class IssueViewSet(BaseViewSet):
     @transaction.atomic
     def partial_update(self, request, slug, project_id, pk=None):
         queryset = self.get_queryset()
+        target = queryset.filter(pk=pk).select_related("project", "workspace").first()
+        if target is not None:
+            from plane.app.services.ticket_core import require_owner
+
+            require_owner(target, request.user, request)  # read-only participants (ticket 5)
         queryset = self.apply_annotations(queryset)
 
         skip_activity = request.data.pop("skip_activity", False)
@@ -794,6 +799,9 @@ class IssueViewSet(BaseViewSet):
     @require_permission("Issue.Delete")
     def destroy(self, request, slug, project_id, pk=None):
         issue = Issue.objects.get(workspace__slug=slug, project_id=project_id, pk=pk)
+        from plane.app.services.ticket_core import require_owner
+
+        require_owner(issue, request.user, request)
 
         issue.delete()
         # delete the issue from recent visits

@@ -23,9 +23,13 @@ from .workspace import urlpatterns as workspace_urls
 from .timezone import urlpatterns as timezone_urls
 from .exporter import urlpatterns as exporter_urls
 from .entity import urlpatterns as entity_urls
+from .work_calendar import urlpatterns as work_calendar_urls
+from .workflow import urlpatterns as workflow_urls
 
 urlpatterns = [
     *entity_urls,
+    *work_calendar_urls,
+    *workflow_urls,
     *analytic_urls,
     *asset_urls,
     *cycle_urls,

@@ -1,4 +1,5 @@
 import { useContext } from "react";
+import { TicketDeadlineBadge } from "../ticket/deadline-badge";
 import { Link } from "react-router";
 import { IdentifierBadge, SearchableSelect } from "@plane/ui";
 import { CalendarDays, Check, Circle, Folder, UserRound } from "lucide-react";
@@ -138,6 +139,7 @@ export function WorkTable({
                       {issue.name}
                     </Link>
                   )}
+                  <TicketDeadlineBadge badge={issue.deadline ?? undefined} />
                   <small className="surface-work-sender">
                     {personal && <UserRound size={12} aria-hidden="true" />} فرستنده:{" "}
                     {issue.sender?.displayName || "نامشخص"}
@@ -171,7 +173,11 @@ export function WorkTable({
             <td>
               <div className="surface-work-assignee">
                 <Avatar member={issue.assignee} size="sm" />
-                <span>{issue.assignee?.displayName || "بدون مسئول"}</span>
+                {issue.assignee ? (
+                  <span>{issue.assignee.displayName}</span>
+                ) : (
+                  <span className="ticket-pill ticket-pill-warning">بدون مسئول</span>
+                )}
               </div>
             </td>
             <td className="surface-work-actions">

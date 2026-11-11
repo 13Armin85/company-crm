@@ -1,0 +1,619 @@
+/*
+ * Application shell v3 — "rail + workspace".
+ * Rail (always dark ink) picks a job; the panel lists that job's pages; the workspace
+ * is a flat white sheet. Logical properties keep it correct in RTL.
+ */
+.app-shell {
+  min-height: 100vh;
+  background: var(--bg);
+}
+.skip-link {
+  position: fixed;
+  z-index: 200;
+  inset-block-start: 8px;
+  inset-inline-start: 8px;
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  color: var(--text-on-accent);
+  background: var(--accent);
+  font-weight: 700;
+  transform: translateY(-200%);
+}
+.skip-link:focus {
+  transform: none;
+}
+.page-content:focus {
+  outline: none;
+}
+
+/* ───── Rail ───── */
+.shell-rail {
+  position: fixed;
+  z-index: 45;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: var(--rail-width);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 10px 8px 12px;
+  color: var(--rail-text);
+  background: var(--rail-bg);
+}
+.shell-rail-brand {
+  display: grid;
+  place-items: center;
+  height: 44px;
+  margin-bottom: 10px;
+  border-radius: var(--radius-md);
+}
+.shell-rail-logo {
+  width: 40px;
+  height: 34px;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  background: #fff;
+  object-fit: contain;
+}
+.shell-rail-groups {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+}
+.shell-rail-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  width: 100%;
+  min-height: 58px;
+  padding: 6px 2px;
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--rail-text);
+  background: transparent;
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) ease,
+    color var(--duration-fast) ease;
+}
+.shell-rail-item:hover {
+  color: var(--rail-text-strong);
+  background: var(--rail-hover);
+}
+.shell-rail-item:focus-visible {
+  box-shadow: 0 0 0 2px var(--rail-bg), 0 0 0 4px var(--accent-ink);
+}
+.shell-rail-icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  transition: background-color var(--duration-fast) ease;
+}
+.shell-rail-icon b {
+  position: absolute;
+  inset-block-start: -4px;
+  inset-inline-end: -2px;
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding-inline: 4px;
+  border: 2px solid var(--rail-bg);
+  border-radius: 999px;
+  color: #fff;
+  background: var(--danger);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+}
+.shell-rail-label {
+  font-size: var(--fs-2xs);
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.shell-rail-item.is-selected .shell-rail-icon {
+  background: var(--rail-hover);
+}
+.shell-rail-item.is-active {
+  color: var(--rail-text-strong);
+}
+.shell-rail-item.is-active .shell-rail-icon {
+  color: #fff;
+  background: var(--accent);
+}
+.shell-rail-toggle {
+  min-height: 44px;
+}
+
+/* ───── Section panel ───── */
+.shell-panel {
+  position: fixed;
+  z-index: 40;
+  inset-block: 0;
+  inset-inline-start: var(--rail-width);
+  width: var(--panel-width);
+  display: flex;
+  flex-direction: column;
+  border-inline-end: 1px solid var(--border);
+  background: var(--panel-bg);
+  transition:
+    transform var(--duration-base) var(--ease-out),
+    visibility var(--duration-base);
+}
+.shell-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: var(--header-height);
+  padding: 0 18px;
+  border-bottom: 1px solid var(--border);
+}
+.shell-panel-head small {
+  display: block;
+  color: var(--text-muted);
+  font-size: var(--fs-2xs);
+  font-weight: 600;
+  line-height: 1.2;
+}
+.shell-panel-head h2 {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: 800;
+  line-height: 1.4;
+}
+.shell-panel-close {
+  display: none;
+}
+.shell-panel-groups {
+  display: none;
+}
+.shell-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 12px 10px 20px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+.shell-links {
+  display: grid;
+  gap: 2px;
+}
+.shell-link,
+.shell-section .sidebar-pages a {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  transition:
+    background-color var(--duration-fast) ease,
+    color var(--duration-fast) ease;
+}
+.shell-link > span,
+.shell-section .sidebar-pages a > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.shell-link svg,
+.shell-section .sidebar-pages a svg {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+}
+.shell-link:hover,
+.shell-section .sidebar-pages a:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+.shell-link.active,
+.shell-section .sidebar-pages a.active {
+  color: var(--text-primary);
+  background: var(--surface);
+  box-shadow:
+    0 0 0 1px var(--border),
+    var(--shadow-xs);
+  font-weight: 700;
+}
+.shell-link.active svg,
+.shell-section .sidebar-pages a.active svg {
+  color: var(--accent);
+}
+.shell-link b {
+  margin-inline-start: auto;
+  min-width: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  color: var(--text-on-accent);
+  background: var(--accent);
+  font-size: var(--fs-2xs);
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+}
+.shell-swatch {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-radius: 3px;
+  background: var(--text-muted);
+}
+.shell-section {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.shell-section h3,
+.shell-section .sidebar-pages > p {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 10px 6px;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+.shell-section h3 button,
+.shell-section .sidebar-pages > p button {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+.shell-section h3 button:hover,
+.shell-section .sidebar-pages > p button:hover {
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+}
+.shell-section .sidebar-pages {
+  display: grid;
+  gap: 2px;
+}
+.shell-section .sidebar-pages-empty {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  background: transparent;
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.shell-section .sidebar-pages-empty:hover {
+  border-color: var(--accent-border);
+  color: var(--accent-ink);
+  background: var(--accent-softer);
+}
+.shell-empty {
+  margin: 4px 10px;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+
+/* ───── Workspace ───── */
+.shell-main {
+  min-height: 100vh;
+  margin-inline-start: calc(var(--rail-width) + var(--panel-width));
+  transition: margin var(--duration-base) var(--ease-out);
+}
+.shell-header {
+  position: sticky;
+  z-index: 30;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  height: var(--header-height);
+  padding: 0 24px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg) 90%, transparent);
+  backdrop-filter: saturate(1.5) blur(12px);
+}
+.shell-header-start,
+.shell-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.shell-header-start {
+  gap: 12px;
+}
+.shell-menu-button {
+  display: none;
+}
+.shell-workspace {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 220px;
+}
+.shell-workspace > span {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-xs);
+  color: var(--text-on-accent);
+  background: var(--accent);
+  font-size: var(--fs-xs);
+  font-weight: 800;
+}
+.shell-workspace b {
+  overflow: hidden;
+  font-size: var(--fs-md);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.shell-header .breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding-inline-start: 12px;
+  border-inline-start: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+.shell-header .breadcrumb a:hover {
+  color: var(--text-primary);
+}
+.shell-header .breadcrumb span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.shell-header .breadcrumb b {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.shell-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min(340px, 28vw);
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  background: var(--surface-soft);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast) ease,
+    background-color var(--duration-fast) ease;
+}
+.shell-search:hover {
+  border-color: var(--border-strong);
+  background: var(--surface);
+}
+.shell-search > span {
+  min-width: 0;
+  margin-inline-end: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.shell-search kbd {
+  flex: 0 0 auto;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-xs);
+  color: var(--text-muted);
+  background: var(--surface);
+  font: 600 var(--fs-2xs) / 18px Vazirmatn;
+  direction: ltr;
+  white-space: nowrap;
+}
+.shell-create {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-on-accent);
+  background: var(--accent);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) ease;
+}
+.shell-create:hover {
+  background: var(--accent-hover);
+}
+.shell-header .icon-button {
+  width: 36px;
+  height: 36px;
+}
+.shell-header .user-avatar {
+  width: 34px;
+  height: 34px;
+  margin-inline-start: 4px;
+}
+
+/* ───── Collapsed panel ───── */
+.app-shell.is-panel-collapsed .shell-panel {
+  visibility: hidden;
+  transform: translateX(105%);
+}
+.app-shell.is-panel-collapsed .shell-main {
+  margin-inline-start: var(--rail-width);
+}
+
+.shell-backdrop {
+  display: none;
+}
+
+/* ───── Responsive ───── */
+@media (max-width: 1180px) {
+  .shell-header .breadcrumb {
+    display: none;
+  }
+  .shell-search {
+    width: 200px;
+  }
+}
+@media (max-width: 980px) {
+  /* Panel floats over the workspace instead of pushing it. */
+  .shell-main,
+  .app-shell.is-panel-collapsed .shell-main {
+    margin-inline-start: var(--rail-width);
+  }
+  .shell-panel,
+  .app-shell.is-panel-collapsed .shell-panel {
+    z-index: 70;
+    visibility: hidden;
+    box-shadow: var(--shadow-lg);
+    transform: translateX(105%);
+  }
+  .app-shell.is-mobile-nav-open .shell-panel {
+    visibility: visible;
+    transform: none;
+  }
+  .app-shell.is-mobile-nav-open .shell-backdrop {
+    position: fixed;
+    z-index: 65;
+    inset: 0;
+    display: block;
+    border: 0;
+    background: var(--overlay);
+  }
+  .shell-panel-close {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    background: var(--surface);
+  }
+  .shell-search {
+    width: 38px;
+    justify-content: center;
+    padding: 0;
+  }
+  .shell-search > span,
+  .shell-search kbd {
+    display: none;
+  }
+}
+@media (max-width: 760px) {
+  .shell-rail {
+    display: none;
+  }
+  .shell-main,
+  .app-shell.is-panel-collapsed .shell-main {
+    margin-inline-start: 0;
+  }
+  .shell-panel,
+  .app-shell.is-panel-collapsed .shell-panel {
+    inset-inline-start: 0;
+    width: min(86vw, 320px);
+  }
+  .shell-panel-groups {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    scrollbar-width: none;
+  }
+  .shell-panel-groups button {
+    flex: 0 0 auto;
+    min-height: 34px;
+    padding: 0 12px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--text-secondary);
+    background: var(--surface);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+  }
+  .shell-panel-groups button.is-selected {
+    border-color: var(--accent);
+    color: var(--text-on-accent);
+    background: var(--accent);
+  }
+  .shell-menu-button {
+    display: inline-grid;
+  }
+  .shell-header {
+    gap: 6px;
+    padding: 0 12px;
+  }
+  .shell-header-actions {
+    gap: 4px;
+  }
+  .shell-workspace {
+    max-width: 140px;
+  }
+  .shell-create {
+    width: 36px;
+    padding: 0;
+    justify-content: center;
+  }
+  .shell-create > span {
+    display: none;
+  }
+}
+@media (max-width: 420px) {
+  .shell-workspace > span {
+    display: none;
+  }
+}
+
+/* The active page always carries an accent tick, so it reads in both themes. */
+.shell-link.active::before,
+.shell-section .sidebar-pages a.active::before {
+  content: "";
+  position: absolute;
+  inset-block: 9px;
+  inset-inline-start: 0;
+  width: 3px;
+  border-start-end-radius: 3px;
+  border-end-end-radius: 3px;
+  background: var(--accent);
+}
+:root[data-theme="dark"] .shell-link.active,
+:root[data-theme="dark"] .shell-section .sidebar-pages a.active {
+  background: var(--surface-hover);
+  box-shadow: none;
+}

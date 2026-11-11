@@ -108,6 +108,8 @@ def notify_workspace_task(task, actor_id, previous=None):
 
 
 def subscribe_assignee(issue, user_id):
+    if not issue.project_id:
+        return  # issue_subscribers.project_id is NOT NULL; standalone work has no subscriber row
     IssueSubscriber.objects.get_or_create(
         issue=issue,
         subscriber_id=user_id,

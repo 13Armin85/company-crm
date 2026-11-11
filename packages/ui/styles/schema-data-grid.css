@@ -11,7 +11,7 @@
   position: relative;
   max-width: 100%;
   border: 1px solid var(--schema-grid-border);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   background: var(--schema-grid-background);
   color: var(--text-primary, #111827);
   scrollbar-width: thin;
@@ -25,7 +25,7 @@
   border-spacing: 0;
   width: 100%;
   table-layout: fixed;
-  font-size: 13px;
+  font-size: var(--fs-md);
 }
 .schema-data-grid tr {
   display: grid;
@@ -83,7 +83,7 @@
   bottom: 0;
   z-index: 4;
   background: var(--schema-grid-header);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 500;
 }
 .schema-data-grid tfoot td {
@@ -143,7 +143,7 @@
 }
 .schema-grid-scroll-hint {
   margin: 10px 4px 0;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   line-height: 1.9;
   color: var(--text-secondary, #4b5563);
 }

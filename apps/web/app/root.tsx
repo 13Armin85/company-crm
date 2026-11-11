@@ -5,6 +5,7 @@ import { clearFieldValidation, localizeInvalidField } from "./crm/form-validatio
 import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
 import type { LinksFunction, MetaFunction } from "react-router";
 import appStyles from "@/styles/index.css?url";
+import workspaceStyles from "@/styles/workspace.css?url";
 import vazirmatn from "@plane/tailwind-config/fonts/Vazirmatn-Variable.woff2?url";
 import { COMPANY_BRAND_VERSION } from "@plane/constants";
 import appleTouchIcon from "@/app/assets/favicon/apple-touch-icon.png?url";
@@ -19,6 +20,7 @@ export const links: LinksFunction = () => [
   { rel: "apple-touch-icon", sizes: "180x180", href: appleTouchIcon },
   { rel: "manifest", href: `/site.webmanifest.json?v=${COMPANY_BRAND_VERSION}` },
   { rel: "stylesheet", href: appStyles },
+  { rel: "stylesheet", href: workspaceStyles },
   { rel: "preload", href: vazirmatn, as: "font", type: "font/woff2", crossOrigin: "anonymous" },
 ];
 

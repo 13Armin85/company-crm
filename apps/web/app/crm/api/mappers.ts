@@ -98,7 +98,7 @@ export const mapMember = (row: Record<string, unknown>, index = 0): Member => {
       : "",
     roles: Array.isArray(row.organization_roles) ? (row.organization_roles as Member["roles"]) : [],
     isActive: row.is_active !== false && person.is_active !== false,
-    avatarColor: ["#4f46e5", "#ec4899", "#0ea5e9", "#f59e0b"][index % 4],
+    avatarColor: ["#2a4bd0", "#be185d", "#0e7490", "#b45309"][index % 4],
   };
 };
 export const mapState = (item: Record<string, unknown>): ProjectState => ({
@@ -126,7 +126,7 @@ export const mapProject = (item: Record<string, unknown>): Project => {
           ? item.description_text
           : "",
     color: String(
-      (item.logo_props as { icon?: { color?: string } } | undefined)?.icon?.color ?? item.color ?? "#4f46e5"
+      (item.logo_props as { icon?: { color?: string } } | undefined)?.icon?.color ?? item.color ?? "#2a4bd0"
     ),
     progress: total ? Math.round((done / total) * 100) : 0,
     totalIssues: total,

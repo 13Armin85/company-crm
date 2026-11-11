@@ -1,7 +1,7 @@
 /** A work-item row with its inline actions menu. */
 import { IdentifierBadge, SearchableSelect } from "@plane/ui";
 import { Popover, PopoverButton, PopoverPanel } from "@headlessui/react";
-import { useContext, useMemo } from "react";
+import { useContext, useMemo, useState } from "react";
 import { ChoiceLabelsContext } from "../choice-label-context";
 import { Link, useNavigate } from "react-router";
 import {
@@ -12,9 +12,13 @@ import {
   FolderKanban,
   Inbox,
   MoreHorizontal,
+  Phone,
+  Share2,
   Trash2,
   UserRoundCog,
 } from "lucide-react";
+import { TicketRowDialog } from "../ticket/row-dialogs";
+import type { RowDialog } from "../ticket/row-dialogs";
 import {
   useCurrentUser,
   useDeleteIssue,
@@ -200,6 +204,13 @@ export function IssueActionsMenu({
     !protectedFields.has(issue.scope === "project" ? "assignee_ids" : "assignee_id") &&
     canTransferIssue(issue, currentUser?.id, can, project ? [project] : projects);
   const canDelete = !readOnly && can("Issue.Delete");
+  // Ticket 5: first-contact resolution and referral straight from the row (the server re-checks both).
+  const [ticketDialog, setTicketDialog] = useState<RowDialog | null>(null);
+  const ownsTicket =
+    Boolean(currentUser?.id) && (issue.assignee?.id === currentUser?.id || issue.sender?.id === currentUser?.id);
+  const canContact = !readOnly && issue.status !== "Done" && ownsTicket;
+  const canRefer =
+    !readOnly && (can("Routing.Route") || (Boolean(currentUser?.id) && issue.assignee?.id === currentUser?.id));
   const pending = transferDisabled || reassignIssue.isPending;
   const eligibleMembers = issue.scope === "project" ? members : (transferMembers ?? members);
   const transferOptions = eligibleMembers
@@ -230,8 +241,12 @@ export function IssueActionsMenu({
               status: semanticStatus[option.id] || ("Todo" as Status),
             }))
         : statuses.map((status) => ({ id: status, title: statusFa[status], status }));
-  if (!canChangeStatus && !canTransfer && !canDelete) return null;
+  if (!canChangeStatus && !canTransfer && !canDelete && !canContact && !canRefer) return null;
   return (
+    <>
+    {ticketDialog && (
+      <TicketRowDialog issueId={issue.id} kind={ticketDialog} onClose={() => setTicketDialog(null)} />
+    )}
     <Popover className="issue-actions" onPointerDown={(event) => event.stopPropagation()}>
       {({ close }) => (
         <>
@@ -251,6 +266,32 @@ export function IssueActionsMenu({
               <FileText size={15} aria-hidden="true" />
               جزئیات و فرم کامل
             </Link>
+            {canContact && (
+              <button
+                className="issue-action-item"
+                role="menuitem"
+                onClick={() => {
+                  setTicketDialog("contact");
+                  close();
+                }}
+              >
+                <Phone size={15} aria-hidden="true" />
+                حل در تماس
+              </button>
+            )}
+            {canRefer && (
+              <button
+                className="issue-action-item"
+                role="menuitem"
+                onClick={() => {
+                  setTicketDialog("refer");
+                  close();
+                }}
+              >
+                <Share2 size={15} aria-hidden="true" />
+                {issue.assignee ? "ارجاع" : "ارجاع تیکت بدون مسئول"}
+              </button>
+            )}
             {canChangeStatus && showStatus && (
               <section className="issue-action-section" aria-label="تغییر وضعیت">
                 <small>تغییر وضعیت</small>
@@ -324,6 +365,7 @@ export function IssueActionsMenu({
         </>
       )}
     </Popover>
+    </>
   );
 }
 

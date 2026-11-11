@@ -232,13 +232,8 @@ def explain_permission(user, workspace, permission_code):
     )
 
 
-def can_manage_absence(actor, target, workspace, code, *, request=None):
-    if not has_permission(actor, workspace, code, request=request):
-        return False
-    if has_permission(actor, workspace, "Absence.ManageAll", request=request):
-        return True
-    if actor.id == target.id:
-        return False
+def _org_scope(workspace, request=None):
+    """Active units and each user's units (membership or management), cached per request."""
     scopes = getattr(request, "_crm_absence_scope", {}) if request is not None else {}
     key = str(workspace.id)
     if key not in scopes:
@@ -254,18 +249,58 @@ def can_manage_absence(actor, target, workspace, code, *, request=None):
         scopes[key] = (units, target_units)
         if request is not None:
             request._crm_absence_scope = scopes
-    units, target_units = scopes[key]
-    targets = target_units.get(target.id, set())
-    for unit_id in targets:
-        unit = units.get(unit_id)
-        visited = set()
-        # The manager of the target's unit, or any ancestor manager, may act.
+    return scopes[key]
+
+
+def manager_chains(target, workspace, *, request=None):
+    """For each unit of ``target`` (sorted by title), the managers above them, nearest first.
+
+    Units without a manager and units the target manages are skipped, so the
+    first entry of a chain is the target's direct manager and the next one the
+    upper manager. Each entry is ``(manager_id, unit)``. This is the single
+    implementation of "direct" / "ancestor" scope shared by absences, work
+    schedules and workflow assignee resolution.
+    """
+    units, target_units = _org_scope(workspace, request)
+    chains = []
+    for unit_id in sorted(target_units.get(target.id, set()), key=lambda uid: (units[uid].title, str(uid))):
+        unit, visited, chain = units.get(unit_id), set(), []
         while unit and unit.id not in visited:
             visited.add(unit.id)
-            if unit.manager_id == actor.id:
-                return True
+            if unit.manager_id and unit.manager_id != target.id and (not chain or chain[-1][0] != unit.manager_id):
+                chain.append((unit.manager_id, unit))
             unit = units.get(unit.parent_id)
-    return False
+        chains.append((units[unit_id], chain))
+    return chains
+
+
+def management_relation(actor, target, workspace, *, request=None):
+    """Return "direct", "ancestor" or None for actor's managerial scope over target.
+
+    Shared by absences and work schedules: the nearest manager above the target
+    (skipping units the target manages and units without a manager) is
+    "direct"; any manager further up is "ancestor". Unit delegates are not part
+    of the scope.
+    """
+    if actor.id == target.id:
+        return None
+    relation = None
+    for _, chain in manager_chains(target, workspace, request=request):
+        for index, (manager_id, _) in enumerate(chain):
+            if manager_id == actor.id:
+                if index == 0:
+                    return "direct"
+                relation = "ancestor"
+                break
+    return relation
+
+
+def can_manage_absence(actor, target, workspace, code, *, request=None):
+    if not has_permission(actor, workspace, code, request=request):
+        return False
+    if has_permission(actor, workspace, "Absence.ManageAll", request=request):
+        return True
+    return management_relation(actor, target, workspace, request=request) is not None
 
 
 ADMIN_REQUIRED = {"User.View", "User.Role.Assign", "Role.View", "Role.Permission.Assign", "Access.UserException.Manage"}

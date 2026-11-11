@@ -119,7 +119,7 @@ describe("native form customization", () => {
         </QueryClientProvider>
       );
     const html = renderTable();
-    expect(html).toContain("<td>7</td>");
+    expect(html).toContain('<td data-column="field:score">7</td>');
     expect(html.indexOf("امتیاز")).toBeLessThan(html.indexOf("نام نقش"));
     expect(html).not.toContain("متن مخفی جدول");
     vi.stubGlobal("localStorage", {
@@ -130,9 +130,9 @@ describe("native form customization", () => {
     });
     try {
       const filtered = renderTable();
-      expect(filtered).not.toContain("<th>امتیاز</th>");
-      expect(filtered).not.toContain("<td>7</td>");
-      expect(filtered).toContain("<th>نام نقش</th>");
+      expect(filtered).not.toContain('<th data-column="field:score">امتیاز</th>');
+      expect(filtered).not.toContain('<td data-column="field:score">7</td>');
+      expect(filtered).toContain('<th data-column="native:نام نقش">نام نقش</th>');
     } finally {
       vi.unstubAllGlobals();
     }

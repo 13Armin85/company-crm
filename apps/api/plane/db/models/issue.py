@@ -102,7 +102,7 @@ class IssueManager(SoftDeletionManager):
 
 
 class Issue(ChangeTrackerMixin, ProjectBaseModel):
-    TRACKED_FIELDS = ["state_id"]
+    TRACKED_FIELDS = ["state_id", "status", "priority", "target_date", "type_id", "project_id", "parent_id"]
 
     project = models.ForeignKey(
         "db.Project",
@@ -189,6 +189,21 @@ class Issue(ChangeTrackerMixin, ProjectBaseModel):
         null=True,
         blank=True,
     )
+
+    # Ticket 5 — the single source of truth for a ticket's working-time deadline.
+    # target_minutes: per-ticket override (None → type default → no target).
+    target_minutes = models.PositiveIntegerField(null=True, blank=True)
+    # First entry into the "in progress" category; never moved afterwards.
+    target_started_at = models.DateTimeField(null=True, blank=True)
+    # Current running segment: deadline = add_working_time(anchor_at, anchor_minutes).
+    # anchor_at is NULL while the ticket is closed; anchor_minutes then holds what is left.
+    target_anchor_at = models.DateTimeField(null=True, blank=True)
+    target_anchor_minutes = models.IntegerField(null=True, blank=True)
+    target_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    # {"source": person|team|company|exception, "source_id": ..., "user_id": ...}
+    target_calendar = models.JSONField(default=dict, blank=True)
+    overdue_flagged_at = models.DateTimeField(null=True, blank=True)
+    overdue_reminded_at = models.DateTimeField(null=True, blank=True)
 
     issue_objects = IssueManager()
 

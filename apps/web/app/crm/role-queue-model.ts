@@ -62,3 +62,8 @@ export function isLongWaiting(entry: TicketRoleQueueEntry, now = Date.now()) {
   const time = entryTime(entry);
   return time !== undefined && now - time >= 86_400_000;
 }
+
+/** Ticket 5: an entry without a role is the "unassigned" queue (nobody available); managers refer it. */
+export function isUnassignedEntry(entry: { requiredRoleId?: string | null }): boolean {
+  return !entry.requiredRoleId || entry.requiredRoleId === "null" || entry.requiredRoleId === "undefined";
+}

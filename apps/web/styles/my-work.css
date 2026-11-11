@@ -10,7 +10,7 @@
   gap: 14px;
   padding: 20px;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   background: var(--surface);
   text-align: start;
   color: var(--text-primary);
@@ -29,13 +29,13 @@
   box-shadow: 0 3px 14px color-mix(in srgb, var(--stat-color) 9%, transparent);
 }
 .my-work-stat.tone-warm {
-  --stat-color: #c56818;
+  --stat-color: var(--orange);
 }
 .my-work-stat.tone-blue {
-  --stat-color: #3982cc;
+  --stat-color: var(--blue);
 }
 .my-work-stat.tone-green {
-  --stat-color: #21946b;
+  --stat-color: var(--green);
 }
 .my-work-stat-icon {
   display: grid;
@@ -43,7 +43,7 @@
   width: 42px;
   height: 42px;
   flex-shrink: 0;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   color: var(--stat-color);
   background: color-mix(in srgb, var(--stat-color) 10%, var(--surface));
 }
@@ -54,24 +54,24 @@
 }
 .my-work-stat-copy > span {
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 500;
 }
 .my-work-stat-copy strong {
-  font-size: 29px;
+  font-size: var(--fs-5xl);
   line-height: 1.25;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 .my-work-stat-copy small {
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: var(--fs-xs);
   line-height: 1.8;
 }
 .my-work-page .my-work-content {
   padding: 0;
   overflow: hidden;
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
 }
 .my-work-content-heading {
   display: flex;
@@ -82,12 +82,12 @@
 }
 .my-work-content-heading h2 {
   margin: 0 0 5px;
-  font-size: 15px;
+  font-size: var(--fs-lg);
 }
 .my-work-content-heading p {
   margin: 0;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   line-height: 1.9;
 }
 .my-work-filters {
@@ -110,7 +110,7 @@
 }
 .my-work-results {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   padding: 14px 24px 4px;
 }
 .my-work-error {
@@ -133,7 +133,7 @@
 .my-work-content .personal-work-table th {
   background: var(--surface-soft);
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   font-weight: 500;
   padding: 13px 18px;
   text-align: start;
@@ -142,7 +142,7 @@
 .my-work-content .personal-work-table td {
   padding: 19px 18px;
   border-top: 1px solid var(--border);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   vertical-align: middle;
 }
 .my-work-content .personal-work-table th:first-child,
@@ -170,14 +170,14 @@
   width: 30px;
   height: 30px;
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
 }
 .state-done .personal-work-marker {
-  color: #21946b;
+  color: var(--green);
 }
 .personal-work-table .surface-work-title {
-  font-size: 13px;
+  font-size: var(--fs-md);
   line-height: 1.9;
   min-width: 0;
 }
@@ -236,19 +236,19 @@
   .my-work-stat-icon {
     width: 30px;
     height: 30px;
-    border-radius: 9px;
+    border-radius: var(--radius-sm);
   }
   .my-work-stat-icon svg {
     width: 16px;
   }
   .my-work-stat-copy > span {
-    font-size: 10px;
+    font-size: var(--fs-xs);
   }
   .my-work-stat-copy strong {
-    font-size: 24px;
+    font-size: var(--fs-4xl);
   }
   .my-work-stat-copy small {
-    font-size: 9px;
+    font-size: var(--fs-2xs);
   }
   .my-work-content-heading {
     align-items: flex-start;

@@ -11,4 +11,5 @@ export * from "./issues";
 export * from "./notifications";
 export * from "./organization";
 export * from "./routing";
+export * from "./work-calendar";
 export { useAccess as useWorkspaceAccess } from "../access/api";

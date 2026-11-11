@@ -27,9 +27,13 @@ from plane.app.services.entity_numbering import (
 )
 from plane.app.services.entity_relations import (
     CARDINALITY,
+    ON_DELETE,
     relation_payload,
     attach_field,
     sync_projection,
+    normalize_link_fields,
+    definition_conflict,
+    recompute_keys,
 )
 from uuid import uuid4
 from django.db.models import Q
@@ -271,21 +275,32 @@ class EngineRelationDefinitionsEndpoint(EngineAPIView):
             )
             for side in ("left", "right")
         }
+        flags = {
+            key: request.data.get(key, getattr(relation, key) if relation else False)
+            for key in ("allow_duplicates", "hierarchical")
+        }
         if (
             kind not in CARDINALITY
-            or on_delete not in {"block", "detach"}
+            or on_delete not in ON_DELETE
             or any(type(value) is not bool for value in required.values())
+            or any(type(value) is not bool for value in flags.values())
         ):
-            raise ValidationError("نوع، رفتار حذف یا وضعیت اجباری ارتباط معتبر نیست.")
-        if (
-            relation
-            and relation.links.exists()
-            and any(
-                old and not new
-                for old, new in zip(CARDINALITY[relation.kind], CARDINALITY[kind])
+            raise ValidationError(
+                "نوع، رفتار حذف (فقط مسدودسازی، جدا کردن یا غیرفعال‌سازی نرم) یا گزینه‌های ارتباط معتبر نیست."
             )
-        ):
-            raise ValidationError("ارتباط دارای داده فقط به نوع آزادتر قابل تغییر است.")
+        if flags["allow_duplicates"] and kind != "many_to_many":
+            raise ValidationError("امکان تکرار فقط برای ارتباط چند به چند قابل استفاده است.")
+        link_fields = normalize_link_fields(
+            workspace,
+            request.data.get(
+                "link_fields", relation.link_fields if relation else []
+            ),
+        )
+        conflict = definition_conflict(
+            relation, kind, required, flags["allow_duplicates"], flags["hierarchical"], link_fields
+        )
+        if conflict:
+            raise ValidationError(conflict)
         entities, titles = {}, {}
         for side in ("left", "right"):
             entities[side] = (
@@ -308,6 +323,10 @@ class EngineRelationDefinitionsEndpoint(EngineAPIView):
                 or len(titles[side]) > 255
             ):
                 raise ValidationError("نام هر دو سمت ارتباط الزامی است.")
+        if flags["hierarchical"] and entities["left"].id != entities["right"].id:
+            raise ValidationError("ارتباط سلسله‌مراتبی فقط بین یک جدول و خودش ممکن است.")
+        if flags["hierarchical"] and kind == "many_to_many":
+            raise ValidationError("ارتباط سلسله‌مراتبی نمی‌تواند چند به چند باشد.")
         if not relation:
             relation = EntityRelation(
                 id=uuid4(),
@@ -323,6 +342,8 @@ class EngineRelationDefinitionsEndpoint(EngineAPIView):
                 "required": required[side],
                 "relation_id": str(relation.id),
                 "relation_side": side,
+                "link_fields": link_fields,
+                "self_relation": entities["left"].id == entities["right"].id,
             }
             if field:
                 field.title, field.config = titles[side].strip(), {
@@ -341,12 +362,18 @@ class EngineRelationDefinitionsEndpoint(EngineAPIView):
                 )
                 setattr(relation, f"{side}_field", field)
                 attach_field(entities[side], field, request.user)
+        duplicates_changed = bool(before) and before["allow_duplicates"] != flags["allow_duplicates"]
         relation.kind, relation.on_delete = kind, on_delete
         relation.left_required, relation.right_required = (
             required["left"],
             required["right"],
         )
+        relation.allow_duplicates = flags["allow_duplicates"]
+        relation.hierarchical = flags["hierarchical"]
+        relation.link_fields = link_fields
         relation.save()
+        if duplicates_changed:
+            recompute_keys(relation)
         if before and before["kind"] != kind:
             sync_projection(
                 relation, "left", relation.links.values_list("left_id", flat=True)
@@ -397,7 +424,7 @@ class EngineRelationDefinitionsEndpoint(EngineAPIView):
             field.config = {
                 key: value
                 for key, value in field.config.items()
-                if key not in {"relation_id", "required"}
+                if key not in {"relation_id", "required", "link_fields", "self_relation"}
             }
             field.is_active = False
             field.save()
@@ -536,6 +563,38 @@ class EngineRelatedRecordsEndpoint(EngineAPIView):
             {"code": f["code"], "title": f["title"], "kind": f["kind"]}
             for f in child.fields.values()
         ]
+        from plane.app.services.entity_records import permission
+
+        result["can_create"] = permission(child.entity, request.user, "create", request)
+        relation = EntityRelation.objects.filter(
+            id=field["config"].get("relation_id")
+        ).first()
+        result["link_fields"] = relation.link_fields if relation else []
+        result["link_data"] = {}
+        if relation and relation.link_fields:
+            from plane.app.services.entity_relations import link_entries, side
+
+            direction = side(relation, field)
+            visible = {row["id"] for row in result["results"]}
+            for entry in link_entries(relation, direction, identifier):
+                if entry["id"] in visible:
+                    result["link_data"].setdefault(entry["id"], []).append(entry["data"])
+            from plane.db.models import LookupValue
+
+            selects = [f["code"] for f in relation.link_fields if f["kind"] == "select"]
+            chosen = {
+                str(data.get(code))
+                for items in result["link_data"].values()
+                for data in items
+                for code in selects
+                if data.get(code)
+            }
+            result["link_labels"] = {
+                str(value.id): value.title
+                for value in LookupValue.objects.filter(
+                    category__workspace=entity.workspace, id__in=chosen
+                )
+            }
         return Response(result)
 
     @transaction.atomic
@@ -563,6 +622,26 @@ class EngineRelatedRecordsEndpoint(EngineAPIView):
         else:
             ids = [item for item in ids if item not in targets]
         value = ids if field["config"].get("multiple") else (ids[-1] if ids else None)
+        relation = EntityRelation.objects.filter(
+            id=field["config"].get("relation_id")
+        ).first()
+        if relation and relation.link_fields:
+            from plane.app.services.entity_relations import link_entries, side
+
+            entries = [
+                entry
+                for entry in link_entries(relation, side(relation, field), identifier)
+                if entry["id"] in ids
+            ]
+            if action == "attach":
+                data = request.data.get("data") or {}
+                entries += [
+                    {"id": target, "data": data}
+                    for target in targets
+                    if relation.allow_duplicates
+                    or target not in {entry["id"] for entry in entries}
+                ]
+            request._engine_relation_data = {field_code: entries}
         result = save_record(
             entity,
             request.user,
@@ -571,6 +650,40 @@ class EngineRelatedRecordsEndpoint(EngineAPIView):
             identifier,
         )
         return Response(result)
+
+
+class EngineDeletePreviewEndpoint(EngineAPIView):
+    """Dry run of the relation delete rules for one record; nothing is changed."""
+
+    def get(self, request, slug, code, identifier):
+        entity = self.entity(slug, code)
+        from plane.app.services.entity_records import get_record, permission
+        from plane.app.services.entity_relations import before_delete
+
+        mode = "deactivate" if request.query_params.get("mode") == "deactivate" else "delete"
+        if not permission(
+            entity, request.user, "edit" if mode == "deactivate" else "delete", request
+        ):
+            from rest_framework.exceptions import PermissionDenied
+
+            raise PermissionDenied("مجوز حذف یا غیرفعال کردن این رکورد را ندارید.")
+        row, native = get_record(entity, request.user, identifier, request)
+        impacts = before_delete(
+            entity, identifier, request.user, request, preview=True, mode=mode
+        )
+        blocked = any(impact["blocked"] for impact in impacts)
+        soft = any(impact["behavior"] == "soft_deactivate" for impact in impacts)
+        return Response(
+            {
+                "impacts": impacts,
+                "blocked": blocked,
+                "result": "blocked"
+                if blocked
+                else "deactivate"
+                if soft or mode == "deactivate"
+                else "delete",
+            }
+        )
 
 
 class EngineFieldUsageEndpoint(EngineAPIView):

@@ -1,7 +1,6 @@
 """Personal dashboards and scoped team monitoring."""
 
 from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
 
 from django.db import transaction
 from django.shortcuts import get_object_or_404
@@ -13,6 +12,7 @@ from plane.app.services.access_control import has_permission
 from plane.app.services.dashboard_layout import WIDGETS, add_widget, default_layout, make_tab, personal_layout, save_layout, shared_tabs, starter_widgets
 from plane.app.services.dashboard_team import settings_for, save_team_settings, subordinate_units, team_cards, validate_rules, color_for
 from plane.app.services.dashboard_widgets import widget_data
+from plane.app.services.work_calendar import calendar_zone
 from plane.app.services.entity_records import emit_definition, get_record, record_payload, save_record
 from plane.db.models import (
     DashboardConfiguration, EntityType, EntityEvent, Issue, Notification,
@@ -110,7 +110,8 @@ def _issue_idle_alerts(workspace, manager, result):
         if not settings.alert_enabled:
             return
         now = timezone.now()
-        local = now.astimezone(ZoneInfo("Asia/Tehran"))
+        # The alert window is the manager's own setting; the zone comes from the work calendar.
+        local = now.astimezone(calendar_zone(workspace))
         if not settings.workday_start <= local.time() < settings.workday_end:
             return
         changed = False

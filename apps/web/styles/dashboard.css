@@ -28,7 +28,7 @@
 .custom-dashboard textarea {
   min-height: 38px;
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
   color: inherit;
   padding: 0.4rem 0.65rem;
@@ -41,7 +41,7 @@
 }
 .dashboard-tab {
   border: 1px solid var(--border);
-  border-radius: 11px;
+  border-radius: var(--radius-md);
   background: var(--surface);
   padding: 0.15rem 0.3rem;
 }
@@ -95,8 +95,8 @@
   background: var(--surface);
   color: var(--text-primary);
   border: 1px solid var(--border);
-  border-radius: 16px;
-  box-shadow: 0 3px 18px #1018280a;
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow);
   overflow: hidden;
 }
 .dashboard-widget > header {
@@ -109,7 +109,7 @@
   margin: 0;
 }
 .dashboard-widget > header small {
-  color: #8c63a2;
+  color: var(--purple);
 }
 .dashboard-widget > header button:hover,
 .dashboard-tab button:hover {
@@ -132,7 +132,7 @@
   left: 3rem;
   top: 2.8rem;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 0.5rem 1rem;
   background: var(--accent);
   color: white;
@@ -158,7 +158,7 @@
 }
 .dashboard-widget-skeleton span {
   height: 34px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: linear-gradient(90deg, var(--surface-soft), var(--border), var(--surface-soft));
   background-size: 200% 100%;
   animation: dashboard-shimmer 1.2s infinite;
@@ -173,7 +173,7 @@
 }
 .dashboard-widget-error {
   padding: 1.2rem;
-  color: #a93232;
+  color: var(--red);
 }
 .dashboard-counter,
 .dashboard-progress {
@@ -253,7 +253,7 @@
 .dashboard-links a,
 .dashboard-age button {
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   padding: 0.7rem;
   color: inherit;
   background: transparent;
@@ -270,19 +270,19 @@
 }
 .dashboard-shared-label {
   padding: 0.6rem 0.9rem;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--accent) 9%, transparent);
 }
 .dashboard-shared button {
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   margin-inline-end: 0.5rem;
 }
 .dashboard-overlay {
   position: fixed;
   inset: 0;
   z-index: 1100;
-  background: #0e19335c;
+  background: var(--overlay);
   display: flex;
   justify-content: flex-start;
 }
@@ -300,7 +300,7 @@ body:has(.dashboard-overlay) .selector-single-options {
   background: var(--surface);
   color: var(--text-primary);
   padding: 1.2rem;
-  box-shadow: 0 0 30px #0002;
+  box-shadow: var(--shadow-lg);
 }
 .dashboard-drawer > header {
   display: flex;
@@ -354,7 +354,7 @@ body:has(.dashboard-overlay) .selector-single-options {
   gap: 0.3rem;
   min-height: 86px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: transparent;
   color: inherit;
   text-align: right;
@@ -393,7 +393,7 @@ body:has(.dashboard-overlay) .selector-single-options {
 }
 .dashboard-team-toolbar button {
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: var(--radius-xs);
 }
 .dashboard-team-summary {
   flex-wrap: wrap;
@@ -401,7 +401,7 @@ body:has(.dashboard-overlay) .selector-single-options {
 }
 .dashboard-team-summary button {
   border: 0;
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   padding: 0.4rem 0.8rem;
   cursor: pointer;
 }
@@ -418,7 +418,7 @@ body:has(.dashboard-overlay) .selector-single-options {
   flex: none;
   padding: 0.35rem 0.65rem;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   cursor: grab;
 }
 .dashboard-team-cards {
@@ -438,7 +438,7 @@ body:has(.dashboard-overlay) .selector-single-options {
   text-align: right;
   border: 1px solid var(--border);
   border-right-width: 5px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--surface);
   color: inherit;
   padding: 0.8rem;
@@ -488,37 +488,37 @@ body:has(.dashboard-overlay) .selector-single-options {
   justify-content: space-between;
 }
 .team-green {
-  border-color: #2c9e73;
-  color: #177753;
+  border-color: color-mix(in srgb, var(--green) 55%, var(--border));
+  color: color-mix(in srgb, var(--green) 80%, var(--text-primary));
 }
 .team-red {
-  border-color: #d65e67;
-  color: #ad3945;
+  border-color: color-mix(in srgb, var(--red) 55%, var(--border));
+  color: color-mix(in srgb, var(--red) 80%, var(--text-primary));
 }
 .team-gray {
-  border-color: #aab1bd;
-  color: #717987;
+  border-color: color-mix(in srgb, var(--text-muted) 55%, var(--border));
+  color: color-mix(in srgb, var(--text-muted) 80%, var(--text-primary));
 }
 .team-yellow {
-  border-color: #e2b83f;
-  color: #93761b;
+  border-color: color-mix(in srgb, var(--yellow) 55%, var(--border));
+  color: color-mix(in srgb, var(--yellow) 80%, var(--text-primary));
 }
 .team-orange {
-  border-color: #df8b49;
-  color: #a95e27;
+  border-color: color-mix(in srgb, var(--orange) 55%, var(--border));
+  color: color-mix(in srgb, var(--orange) 80%, var(--text-primary));
 }
 .team-blue {
-  border-color: #648bc6;
-  color: #3e68a7;
+  border-color: color-mix(in srgb, var(--blue) 55%, var(--border));
+  color: color-mix(in srgb, var(--blue) 80%, var(--text-primary));
 }
 .dashboard-team-card.team-green {
-  background: color-mix(in srgb, #2c9e73 7%, var(--surface));
+  background: color-mix(in srgb, var(--green) 7%, var(--surface));
 }
 .dashboard-team-card.team-red {
-  background: color-mix(in srgb, #d65e67 7%, var(--surface));
+  background: color-mix(in srgb, var(--red) 7%, var(--surface));
 }
 .dashboard-team-card.team-gray {
-  background: color-mix(in srgb, #aab1bd 9%, var(--surface));
+  background: color-mix(in srgb, var(--text-muted) 9%, var(--surface));
 }
 .dashboard-team-card.compact {
   min-height: 75px;
@@ -580,12 +580,6 @@ body:has(.dashboard-overlay) .selector-single-options {
   min-width: 0;
 }
 :root[data-theme="dark"] .custom-dashboard {
-  --surface: #15181e;
-  --surface-soft: #1a1e25;
-  --border: #262b35;
-  --text-primary: #f3f4f6;
-  --text-secondary: #c3c7ce;
-  --text-muted: #7b8491;
   --dashboard-border: color-mix(in srgb, var(--accent) 13%, var(--border));
   --dashboard-shadow: 0 12px 34px rgb(0 0 0 / 24%);
   color: var(--text-primary);
@@ -596,7 +590,7 @@ body:has(.dashboard-overlay) .selector-single-options {
   color: var(--text-primary);
 }
 :root[data-theme="dark"] .page-content:has(> .custom-dashboard) {
-  background: #0f1115;
+  background: var(--bg);
 }
 .dashboard-actions {
   max-width: 100%;
@@ -604,7 +598,7 @@ body:has(.dashboard-overlay) .selector-single-options {
 }
 .dashboard-actions .button {
   min-height: 40px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   white-space: nowrap;
 }
 .custom-dashboard select,
@@ -613,7 +607,7 @@ body:has(.dashboard-overlay) .selector-single-options {
   min-width: 0;
   min-height: 41px;
   border-color: var(--dashboard-border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--surface);
   color: var(--text-primary);
 }
@@ -627,15 +621,15 @@ body:has(.dashboard-overlay) .selector-single-options {
   min-width: 0;
   padding: 7px;
   border: 1px solid var(--dashboard-border);
-  border-radius: 16px;
+  border-radius: var(--radius-xl);
   background: color-mix(in srgb, var(--surface-soft) 75%, var(--surface));
-  box-shadow: 0 5px 18px rgb(15 23 42 / 3%);
+  box-shadow: var(--shadow);
 }
 .dashboard-tab {
   gap: 4px;
   min-height: 42px;
   border-color: transparent;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: transparent;
   transition:
     background 150ms,
@@ -654,7 +648,7 @@ body:has(.dashboard-overlay) .selector-single-options {
   min-height: 34px;
   padding-inline: 12px;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 650;
   white-space: nowrap;
 }
@@ -670,7 +664,7 @@ body:has(.dashboard-overlay) .selector-single-options {
   place-items: center;
   width: 28px;
   height: 28px;
-  border-radius: 7px;
+  border-radius: var(--radius-xs);
   color: var(--text-secondary);
 }
 .dashboard-tab-tools button:hover {
@@ -686,7 +680,7 @@ body:has(.dashboard-overlay) .selector-single-options {
   place-items: center;
   width: 36px;
   height: 36px;
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   background: var(--accent);
   color: white;
 }
@@ -695,9 +689,9 @@ body:has(.dashboard-overlay) .selector-single-options {
   margin-top: 16px;
   padding: 13px 16px;
   border: 1px dashed color-mix(in srgb, var(--accent) 32%, var(--border));
-  border-radius: 13px;
+  border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--accent) 4%, var(--surface));
-  font-size: 12px;
+  font-size: var(--fs-sm);
   line-height: 1.8;
 }
 .dashboard-widget-grid {
@@ -706,7 +700,7 @@ body:has(.dashboard-overlay) .selector-single-options {
 }
 .dashboard-widget {
   border-color: var(--dashboard-border);
-  border-radius: 17px;
+  border-radius: var(--radius-xl);
   background: var(--surface);
   box-shadow: var(--dashboard-shadow);
   transition:
@@ -716,7 +710,7 @@ body:has(.dashboard-overlay) .selector-single-options {
 }
 .dashboard-widget:hover {
   border-color: color-mix(in srgb, var(--accent) 26%, var(--border));
-  box-shadow: 0 16px 38px rgb(15 23 42 / 8%);
+  box-shadow: var(--shadow-md);
   transform: translateY(-2px);
 }
 .dashboard-widget > header {
@@ -735,7 +729,7 @@ body:has(.dashboard-overlay) .selector-single-options {
 .dashboard-widget > header h2 {
   min-width: 0;
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: var(--fs-md);
   font-weight: 750;
   line-height: 1.6;
   overflow-wrap: anywhere;
@@ -746,7 +740,7 @@ body:has(.dashboard-overlay) .selector-single-options {
   width: 34px;
   height: 34px;
   flex: none;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--accent) 9%, var(--surface));
   color: var(--accent);
 }
@@ -756,7 +750,7 @@ body:has(.dashboard-overlay) .selector-single-options {
   width: 29px;
   height: 29px;
   padding: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   color: var(--text-muted);
 }
 .dashboard-widget > header button:hover {
@@ -768,7 +762,7 @@ body:has(.dashboard-overlay) .selector-single-options {
   border-radius: 999px;
   background: var(--surface-soft);
   color: var(--text-secondary);
-  font-size: 10px;
+  font-size: var(--fs-xs);
 }
 .dashboard-counter,
 .dashboard-progress {
@@ -787,7 +781,7 @@ body:has(.dashboard-overlay) .selector-single-options {
 .dashboard-counter span,
 .dashboard-progress small {
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 .dashboard-progress > span,
 .team-workload {
@@ -809,7 +803,7 @@ body:has(.dashboard-overlay) .selector-single-options {
 }
 .dashboard-mini-table table {
   min-width: 100%;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 .dashboard-mini-table th {
   color: var(--text-secondary);
@@ -851,11 +845,11 @@ body:has(.dashboard-overlay) .selector-single-options {
 }
 .dashboard-calendar-title strong {
   color: var(--text-primary);
-  font-size: 15px;
+  font-size: var(--fs-lg);
 }
 .dashboard-calendar-title span {
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--fs-sm);
 }
 .dashboard-calendar-actions {
   gap: 5px;
@@ -868,11 +862,11 @@ body:has(.dashboard-overlay) .selector-single-options {
   min-height: 33px;
   padding: 5px 8px;
   border: 1px solid var(--dashboard-border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--text-secondary);
   font: inherit;
-  font-size: 11px;
+  font-size: var(--fs-sm);
   cursor: pointer;
 }
 .dashboard-calendar-actions button:hover {
@@ -881,7 +875,7 @@ body:has(.dashboard-overlay) .selector-single-options {
 }
 .dashboard-calendar-toolbar .persian-date-trigger {
   min-height: 34px;
-  font-size: 11px;
+  font-size: var(--fs-sm);
 }
 .dashboard-calendar-weekdays,
 .dashboard-calendar-grid {
@@ -895,7 +889,7 @@ body:has(.dashboard-overlay) .selector-single-options {
 .dashboard-calendar-weekdays span {
   padding: 5px 2px;
   color: var(--text-secondary);
-  font-size: 10px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   text-align: center;
 }
@@ -904,7 +898,7 @@ body:has(.dashboard-overlay) .selector-single-options {
   min-height: 74px;
   padding: 6px;
   border: 1px solid var(--dashboard-border);
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
 }
 .dashboard-calendar-day.outside {
@@ -921,7 +915,7 @@ body:has(.dashboard-overlay) .selector-single-options {
   gap: 2px;
   margin-bottom: 5px;
   color: var(--text-primary);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   font-weight: 750;
 }
 .dashboard-calendar-day.today .dashboard-calendar-day-heading > span {
@@ -935,7 +929,7 @@ body:has(.dashboard-overlay) .selector-single-options {
 }
 .dashboard-calendar-day-heading small {
   color: var(--text-secondary);
-  font-size: 9px;
+  font-size: var(--fs-2xs);
   font-weight: 500;
 }
 .dashboard-calendar-day a {
@@ -946,7 +940,7 @@ body:has(.dashboard-overlay) .selector-single-options {
   border-radius: 5px;
   background: color-mix(in srgb, var(--accent) 10%, var(--surface));
   color: var(--accent);
-  font-size: 9px;
+  font-size: var(--fs-2xs);
   text-decoration: none;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -954,13 +948,13 @@ body:has(.dashboard-overlay) .selector-single-options {
 .dashboard-calendar-status {
   margin: 10px 0 0;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   text-align: center;
 }
 .dashboard-links a,
 .dashboard-age button {
   border-color: var(--dashboard-border);
-  border-radius: 11px;
+  border-radius: var(--radius-md);
   background: var(--surface-soft);
   transition:
     border-color 150ms,
@@ -976,7 +970,7 @@ body:has(.dashboard-overlay) .selector-single-options {
 .dashboard-error {
   margin-top: 16px;
   border: 1px dashed var(--dashboard-border);
-  border-radius: 15px;
+  border-radius: var(--radius-xl);
   background: var(--surface);
   color: var(--text-secondary);
   line-height: 1.9;
@@ -993,17 +987,17 @@ body:has(.dashboard-overlay) .selector-single-options {
   width: 50px;
   height: 50px;
   margin-bottom: 5px;
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--accent) 9%, var(--surface));
   color: var(--accent);
 }
 .dashboard-empty strong {
   color: var(--text-primary);
-  font-size: 15px;
+  font-size: var(--fs-lg);
 }
 .dashboard-empty p {
   margin: 0 0 7px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 .dashboard-empty-small {
   margin: 15px;
@@ -1011,27 +1005,27 @@ body:has(.dashboard-overlay) .selector-single-options {
 .dashboard-shared {
   padding: 18px;
   border: 1px solid var(--dashboard-border);
-  border-radius: 16px;
+  border-radius: var(--radius-xl);
   background: var(--surface);
 }
 .dashboard-shared h2 {
   margin: 0 0 12px;
-  font-size: 15px;
+  font-size: var(--fs-lg);
 }
 .dashboard-shared button {
   min-height: 36px;
   border-color: var(--dashboard-border);
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
 }
 .dashboard-shared-label {
   margin: 15px 0 0;
   border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--accent) 6%, var(--surface));
   color: var(--text-secondary);
 }
 .dashboard-overlay {
-  background: rgb(13 20 37 / 58%);
+  background: var(--overlay);
   backdrop-filter: blur(3px);
 }
 .dashboard-drawer {
@@ -1047,7 +1041,7 @@ body:has(.dashboard-overlay) .selector-single-options {
   place-items: center;
   width: 34px;
   height: 34px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
 .dashboard-drawer > header button:hover {
   background: var(--surface-soft);
@@ -1061,14 +1055,14 @@ body:has(.dashboard-overlay) .selector-single-options {
 .dashboard-gallery h3 {
   margin-bottom: 9px;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 .dashboard-gallery button {
   min-height: 105px;
   border-color: var(--dashboard-border);
-  border-radius: 13px;
+  border-radius: var(--radius-lg);
   background: var(--surface);
-  box-shadow: 0 4px 12px rgb(15 23 42 / 3%);
+  box-shadow: var(--shadow);
 }
 .dashboard-gallery button:hover {
   border-color: var(--accent);
@@ -1089,7 +1083,7 @@ body:has(.dashboard-overlay) .selector-single-options {
 .dashboard-team-summary button {
   min-height: 38px;
   border: 1px solid var(--dashboard-border);
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
 }
 .dashboard-team-summary button.active {
@@ -1101,14 +1095,14 @@ body:has(.dashboard-overlay) .selector-single-options {
 .dashboard-team-card {
   gap: 11px;
   padding: 15px;
-  border-radius: 12px;
-  box-shadow: 0 3px 14px rgb(15 23 42 / 3%);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
   transition:
     box-shadow 150ms,
     transform 150ms;
 }
 .dashboard-team-card:hover {
-  box-shadow: 0 9px 24px rgb(15 23 42 / 8%);
+  box-shadow: var(--shadow-md);
   transform: translateY(-2px);
 }
 .team-avatar {
@@ -1121,7 +1115,7 @@ body:has(.dashboard-overlay) .selector-single-options {
   border-color: var(--dashboard-border);
 }
 .dashboard-resize button {
-  border-radius: 7px;
+  border-radius: var(--radius-xs);
 }
 .dashboard-resize button:hover {
   background: var(--surface-soft);
@@ -1143,7 +1137,7 @@ body:has(.dashboard-overlay) .selector-single-options {
 @media (max-width: 760px) {
   .custom-dashboard .page-header {
     min-height: 0;
-    padding: 21px;
+    padding: 0 0 16px;
   }
   .custom-dashboard .page-header::after {
     opacity: 0.45;
@@ -1189,7 +1183,7 @@ body:has(.dashboard-overlay) .selector-single-options {
   }
   .dashboard-calendar-day a {
     padding: 2px;
-    font-size: 8px;
+    font-size: var(--fs-2xs);
   }
   .dashboard-actions > .dashboard-role-picker,
   .dashboard-actions > .button,
@@ -1207,10 +1201,10 @@ body:has(.dashboard-overlay) .selector-single-options {
     flex-direction: column;
   }
   .dashboard-content-heading h2 {
-    font-size: 18px;
+    font-size: var(--fs-2xl);
   }
   .dashboard-widget-count {
-    font-size: 10px;
+    font-size: var(--fs-xs);
   }
   .dashboard-widget-full {
     inset: 8px;
@@ -1254,15 +1248,14 @@ body:has(.dashboard-overlay) .selector-single-options {
   align-items: center;
   justify-content: space-between;
   gap: 18px 24px;
-  margin-bottom: 18px;
-  padding: 22px 26px;
-  overflow: hidden;
-  border: 1px solid var(--dashboard-border);
-  border-radius: 20px;
-  background:
-    radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--accent) 13%, transparent), transparent 55%),
-    var(--surface);
-  box-shadow: var(--dashboard-shadow);
+  margin-bottom: 8px;
+  padding: 0 0 20px;
+  overflow: visible;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
 }
 .dashboard-hero-text {
   display: grid;
@@ -1274,24 +1267,25 @@ body:has(.dashboard-overlay) .selector-single-options {
   align-items: center;
   gap: 6px;
   width: fit-content;
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--accent) 9%, var(--surface));
-  color: var(--accent);
-  font-size: 11px;
-  font-weight: 650;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  font-weight: 600;
 }
 .dashboard-hero h1 {
   margin: 4px 0 0;
   color: var(--text-primary);
-  font-size: clamp(22px, 2.2vw, 28px);
+  font-size: clamp(22px, 1.9vw, 28px);
+  font-weight: 800;
   line-height: 1.45;
   overflow-wrap: anywhere;
 }
 .dashboard-hero p {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--fs-md);
   line-height: 1.8;
 }
 .dashboard-hero .dashboard-actions {
@@ -1304,13 +1298,13 @@ body:has(.dashboard-overlay) .selector-single-options {
 }
 .dashboard-view-switch > span {
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   font-weight: 600;
 }
 .custom-dashboard .dashboard-view-switch .selector-input-row {
   min-height: 40px;
   border-color: var(--dashboard-border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--surface);
 }
 .custom-dashboard .dashboard-view-switch .selector-input-row input {
@@ -1365,7 +1359,7 @@ body:has(.dashboard-overlay) .selector-single-options {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  font-size: 13px;
+  font-size: var(--fs-md);
 }
 .custom-dashboard .dashboard-tab > button[role="tab"]:hover {
   color: var(--text-primary);
@@ -1376,7 +1370,7 @@ body:has(.dashboard-overlay) .selector-single-options {
   border-radius: 999px;
   background: var(--surface-soft);
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   text-align: center;
 }
@@ -1392,11 +1386,11 @@ body:has(.dashboard-overlay) .selector-single-options {
   margin-inline-start: 6px;
   padding: 6px 10px;
   border: 1px dashed var(--dashboard-border);
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-secondary);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   cursor: pointer;
 }
 .dashboard-add-tab:hover {
@@ -1428,7 +1422,7 @@ body:has(.dashboard-overlay) .selector-single-options {
 .custom-dashboard .dashboard-widget-icon {
   width: 30px;
   height: 30px;
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
 }
 .custom-dashboard .dashboard-widget > header > div:last-child {
   gap: 2px;
@@ -1450,7 +1444,7 @@ body:has(.dashboard-overlay) .selector-single-options {
 }
 @media (max-width: 760px) {
   .dashboard-hero {
-    padding: 18px;
+    padding: 0 0 16px;
   }
   .dashboard-hero .dashboard-actions,
   .dashboard-view-switch {
@@ -1463,5 +1457,65 @@ body:has(.dashboard-overlay) .selector-single-options {
 @media (prefers-reduced-motion: reduce) {
   .custom-dashboard .dashboard-widget > header > div:last-child {
     transition: none;
+  }
+}
+
+/* v2: widget headers never squeeze the title into a column of single letters. */
+.custom-dashboard .dashboard-widget > header {
+  gap: 8px;
+  min-height: 52px;
+  padding: 8px 12px 8px 8px;
+  background: var(--surface);
+}
+.custom-dashboard .dashboard-widget > header > div:first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.custom-dashboard .dashboard-widget > header > div:last-child {
+  flex: 0 0 auto;
+  gap: 2px;
+}
+.custom-dashboard .dashboard-widget > header h2 {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--fs-md);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.custom-dashboard .dashboard-widget > header button {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: var(--radius-xs);
+  color: var(--text-muted);
+}
+.custom-dashboard .dashboard-widget > header button:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+.custom-dashboard .dashboard-widget > header {
+  position: relative;
+}
+@media (hover: hover) and (pointer: fine) {
+  .custom-dashboard .dashboard-widget > header > div:last-child {
+    position: absolute;
+    inset-block: 6px;
+    inset-inline-end: 6px;
+    padding-inline-start: 16px;
+    background: linear-gradient(to left, transparent, var(--surface) 16px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--duration-fast) ease;
+  }
+  .custom-dashboard .dashboard-widget:hover > header > div:last-child,
+  .custom-dashboard .dashboard-widget:focus-within > header > div:last-child {
+    pointer-events: auto;
+  }
+  .custom-dashboard .dashboard-widget:hover > header > div:last-child,
+  .custom-dashboard .dashboard-widget:focus-within > header > div:last-child {
+    opacity: 1;
   }
 }

@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { TicketPresetBar } from "../ticket/preset-bar";
+import type { PresetId } from "../ticket/model";
 import { LayoutDashboard, List, Plus } from "lucide-react";
 import { Navigate } from "react-router";
 import { zonedDateTime } from "@plane/ui";
@@ -28,6 +30,7 @@ export default function IssuesPage() {
   const [draft, setDraft] = useState(filters);
   const [filterOpen, setFilterOpen] = useState(false);
   const [tab, setTab] = useState("received");
+  const [preset, setPreset] = useState<PresetId>("all");
   const { data: access, isLoading: accessLoading } = useWorkspaceAccess();
   const isAdmin = access?.is_admin === true;
   const { data: projects = [], isLoading: projectsLoading } = useProjects();
@@ -41,13 +44,14 @@ export default function IssuesPage() {
   const today = zonedDateTime(new Date(), currentUser?.timeZone)!.date;
   const search = useDebouncedValue(query);
   const activeTab = isAdmin ? "all" : tab;
-  const paging = useTablePaging("issues", [search, activeTab, filters]);
+  const paging = useTablePaging("issues", [search, activeTab, filters, preset]);
   const table = useTasksTable({
     view: "all",
     tab: activeTab,
     q: search,
     filters,
     today,
+    preset,
     ...paging,
     enabled: Boolean(access),
   });
@@ -105,6 +109,7 @@ export default function IssuesPage() {
           ]}
         />
       )}
+      <TicketPresetBar value={preset} counts={table.data?.preset_counts} onChange={setPreset} />
       <div className="content-toolbar issues-toolbar">
         <div className="view-switcher">
           <button className={view === "list" ? "active" : ""} onClick={() => setView("list")}>

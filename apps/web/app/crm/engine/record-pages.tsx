@@ -11,6 +11,9 @@ import { persianDate, plainText } from "../utils";
 import { EngineRecordForm } from "./record-form";
 import { EntityRecordSummary } from "./record-summary";
 import { RelatedRecords } from "./related-records";
+import { WorkflowPanel } from "../workflow/panel";
+import { TicketCorePanel } from "../ticket/ticket-panel";
+import { DeletePreviewDialog } from "./delete-preview";
 import { useEngineCatalog, useEngineQuery, useEngineRecord, useEngineMutation } from "./api";
 import type { AuditEvent, EnginePage } from "./api";
 import { entityDisplayTitle } from "./presentation";
@@ -114,6 +117,17 @@ const eventTitles: Record<string, string> = {
   "record.status_changed": "تغییر وضعیت",
   "record.deactivated": "غیرفعال‌سازی",
   "record.activated": "فعال‌سازی",
+  "workflow.started": "شروع گردش‌کار",
+  "workflow.transition": "اقدام گردش‌کار",
+  "workflow.reassigned": "ارجاع مدیریتی",
+  "workflow.paused": "توقف مرحله",
+  "workflow.resumed": "ازسرگیری مرحله",
+  "workflow.delay_reported": "گزارش دیرکرد",
+  "workflow.extension_requested": "درخواست تمدید",
+  "workflow.extension_decided": "بررسی تمدید",
+  "workflow.converted_to_standard": "انتقال به مسیر عادی",
+  "workflow.migrated": "انتقال به نسخهٔ دیگر",
+  "workflow.error": "خطای گردش‌کار",
 };
 export function EntityRecordPage() {
   const { code = "", recordId = "new" } = useParams(),
@@ -122,8 +136,9 @@ export function EntityRecordPage() {
     [subtype, setSubtype] = useState("");
   const { data: catalog } = useEngineCatalog(),
     entity = catalog?.entities.find((e) => e.code === code);
-  const { data: record } = useEngineRecord(code, creating ? "" : recordId),
+  const { data: record, error: recordError } = useEngineRecord(code, creating ? "" : recordId),
     mutation = useEngineMutation();
+  const recordStatus = (recordError as { response?: { status?: number } } | null)?.response?.status;
   const inverse = useEngineQuery<{ results: EnginePage["results"] }>(
     "relations",
     `entities/${code}/records/${recordId}/relations/`,
@@ -135,34 +150,45 @@ export function EntityRecordPage() {
     !creating
   );
   const subtypes = catalog?.entities.filter((e) => e.parent === entity?.id && e.is_active) || [];
+  const [previewing, setPreviewing] = useState<"delete" | "deactivate" | null>(null);
+  const run = (kind: "delete" | "active", confirm = false) =>
+    mutation.mutateAsync({
+      path: `entities/${code}/records/${recordId}/${kind === "delete" && confirm ? "?confirm_relations=true" : ""}`,
+      method: kind === "delete" ? "delete" : "patch",
+      data: kind === "active" ? { is_active: !record?.is_active, confirm_relations: confirm } : undefined,
+    });
   const action = async (kind: "delete" | "active") => {
-    if (
-      !window.confirm(
-        kind === "delete"
-          ? "این رکورد حذف شود؟ داده مرتبط ممکن است همچنان به آن ارجاع دهد."
-          : `رکورد ${record?.is_active ? "غیرفعال" : "فعال"} شود؟`
-      )
-    )
+    // Deleting or deactivating first shows the server's dry run of the relation rules.
+    if (kind === "delete" || record?.is_active) {
+      setPreviewing(kind === "delete" ? "delete" : "deactivate");
       return;
-    const run = (confirm = false) =>
-      mutation.mutateAsync({
-        path: `entities/${code}/records/${recordId}/${kind === "delete" && confirm ? "?confirm_relations=true" : ""}`,
-        method: kind === "delete" ? "delete" : "patch",
-        data: kind === "active" ? { is_active: !record?.is_active, confirm_relations: confirm } : undefined,
-      });
+    }
+    if (!window.confirm("رکورد فعال شود؟")) return;
+    await run("active").catch(() => {});
+  };
+  const confirmPreview = async (result: "blocked" | "delete" | "deactivate") => {
+    const kind = previewing === "delete" ? "delete" : "active";
     try {
-      await run();
-      if (kind === "delete") navigate(`/entities/${code}`);
-    } catch (error) {
-      if (
-        (error as { response?: { status: number } }).response?.status === 409 &&
-        window.confirm("این رکورد ارتباط فعال دارد. با وجود این ارتباط‌ها ادامه می‌دهید؟")
-      ) {
-        await run(true);
-        if (kind === "delete") navigate(`/entities/${code}`);
-      }
+      await run(kind, true);
+      setPreviewing(null);
+      // A soft deactivation keeps the record; stay on it so the inactive state is visible.
+      if (kind === "delete" && result === "delete") navigate(`/entities/${code}`);
+    } catch {
+      setPreviewing(null);
     }
   };
+  if (!creating && (recordStatus === 403 || recordStatus === 404))
+    return (
+      <div className="engine-record-page">
+        <section role="alert" className="panel">
+          <h2>این رکورد پیدا نشد یا اجازهٔ دیدن آن را ندارید</h2>
+          <p>اگر فکر می‌کنید باید به آن دسترسی داشته باشید، با مدیر خود تماس بگیرید.</p>
+          <Link className="button button-secondary" to={`/entities/${code}`}>
+            بازگشت به فهرست
+          </Link>
+        </section>
+      </div>
+    );
   return (
     <div className="engine-record-page">
       <PageHeader
@@ -200,8 +226,21 @@ export function EntityRecordPage() {
           />
         </div>
       )}
+      {previewing && (
+        <DeletePreviewDialog
+          code={code}
+          id={recordId}
+          mode={previewing}
+          pending={mutation.isPending}
+          onConfirm={(result) => void confirmPreview(result)}
+          onClose={() => setPreviewing(null)}
+        />
+      )}
+      {mutation.error && <ErrorNotice message={errorMessage(mutation.error, "عملیات انجام نشد.")} />}
       {!creating && <EntityRecordSummary code={code} id={recordId} />}
-      {!creating && <RelatedRecords code={code} id={recordId} />}
+      {!creating && code === "ticket" && <TicketCorePanel id={recordId} />}
+      {!creating && <WorkflowPanel code={code} id={recordId} />}
+      {!creating && code !== "ticket" && <RelatedRecords code={code} id={recordId} />}
       <div className="engine-record-card">
         <EngineRecordForm
           key={`${code}:${recordId}:${subtype}`}

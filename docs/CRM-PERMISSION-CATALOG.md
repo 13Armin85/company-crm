@@ -51,6 +51,7 @@ Generated from the developer-owned registry. Technical codes are stable and work
 | `Routing.Queue.ViewAll`            | Routing          | مسیریابی: مشاهده همه صف‌ها          | مجوز مشاهده همه صف‌ها در بخش مسیریابی          | no          |
 | `Routing.Route`                    | Routing          | مسیریابی: ارجاع                     | مجوز ارجاع در بخش مسیریابی                     | yes         |
 | `Routing.View`                     | Routing          | مسیریابی: مشاهده                    | مجوز مشاهده در بخش مسیریابی                    | yes         |
+| `Ticket.TargetSet`                 | Ticket           | تیکت: تعیین و تغییر مدت هدف         | تعیین مدت هدف نوع تیکت و هر تیکت (با دلیل)     | no          |
 | `User.ChangePassword`              | User             | کاربران / اعضای تیم: تغییر رمز عبور | مجوز تغییر رمز عبور در بخش کاربران / اعضای تیم | no          |
 | `User.Create`                      | User             | کاربران / اعضای تیم: ایجاد          | مجوز ایجاد در بخش کاربران / اعضای تیم          | no          |
 | `User.Delete`                      | User             | کاربران / اعضای تیم: حذف            | مجوز حذف در بخش کاربران / اعضای تیم            | no          |
@@ -66,3 +67,5 @@ The system admin role is initialized with the catalog. Subsequent synchronizatio
 Add technical codes in the registry, provide a migration for existing workspaces and update API checks/tests. Run `python manage.py sync_crm_permissions` using the normal deployment process.
 
 `Role.Delete` and `OrganizationUnit.Delete` authorize soft deletion independently of `Disable`. Status changes use PATCH; DELETE requires the new code. Migration `0131_crm_delete_permissions` creates only the two missing catalog entries and grants newly created entries to active system admin roles in existing workspaces. Re-running it preserves deliberately removed grants; custom roles receive no automatic grants. The role permission screen is `/roles/<role_id>/permissions`; the general catalog remains developer-owned.
+
+**Ticket 5 (هستهٔ تیکت و ارجاع).** Only `Ticket.TargetSet` is new (migration `0159_ticket_five_permissions`, granted to the system admin role). Routing rules reuse `Routing.Manage` (create, edit and order rules), the unassigned queue reuses `Routing.Queue.ViewAll` + `Routing.Route`, and rule preview uses `Routing.View`. Approving a deadline extension has no permission code: only the assignee's direct manager or that manager's active delegate may decide. Extension requests and delay reports are limited to the primary assignee or their active delegate. The same codes are listed for the web UI in `apps/web/app/crm/access/permission-map.ts` (`ticketActionPermissions`).

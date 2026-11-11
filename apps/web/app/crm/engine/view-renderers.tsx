@@ -20,6 +20,7 @@ import type { ViewDefinition, ViewField, ViewResult, ViewRow } from "./view-type
 import { entityDisplaySchema } from "./presentation";
 import { RelatedListPreview } from "./related-records";
 import { DuplicateFeedback, duplicateDetails } from "./duplicate-feedback";
+import { TicketDeadlineBadge } from "../ticket/deadline-badge";
 
 export { ViewValue, appearance, numberText } from "./view-value";
 
@@ -149,9 +150,12 @@ export function ViewRenderer({
           </span>
         )}
         {field?.kind !== "relation" && (path === "title" || columns[0]?.field === path) ? (
-          <Link draggable={false} to={`/entities/${code}/${row.id}`}>
-            <ViewValue field={field} value={row.values[path]} labels={data.labels[path]} style={style} />
-          </Link>
+          <>
+            <Link draggable={false} to={`/entities/${code}/${row.id}`}>
+              <ViewValue field={field} value={row.values[path]} labels={data.labels[path]} style={style} />
+            </Link>
+            {columns[0]?.field === path && <TicketDeadlineBadge badge={data.ticket_deadlines?.[row.id]} />}
+          </>
         ) : (
           <ViewValue field={field} value={row.values[path]} labels={data.labels[path]} style={style} />
         )}
@@ -219,6 +223,7 @@ export function ViewRenderer({
         <Link draggable={false} to={`/entities/${code}/${row.id}`}>
           {row.number}
         </Link>
+        <TicketDeadlineBadge badge={data.ticket_deadlines?.[row.id]} />
         {row.styles.row.icon && (
           <span role="img" aria-label={row.styles.row.icon}>
             {icons[row.styles.row.icon]}

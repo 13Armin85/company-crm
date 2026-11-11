@@ -3,6 +3,25 @@
 # See the LICENSE file for details.
 
 from django.urls import path
+from plane.app.views.workspace.ticket import (
+    RoutingRuleOrderEndpoint,
+    RoutingRulePreviewEndpoint,
+    TicketAutoRouteEndpoint,
+    TicketContactEndpoint,
+    TicketCoreEndpoint,
+    TicketDelayReportEndpoint,
+    TicketExtensionDecisionEndpoint,
+    TicketExtensionEndpoint,
+    TicketExtensionInboxEndpoint,
+    TicketExtensionPreviewEndpoint,
+    TicketHistoryEndpoint,
+    TicketParentEndpoint,
+    TicketReferEndpoint,
+    TicketReferralResponseEndpoint,
+    TicketTargetEndpoint,
+    TicketTypeListEndpoint,
+    TicketTypeTargetEndpoint,
+)
 from plane.app.views.workspace.task_history import TaskHistoryEndpoint
 from plane.app.views.workspace.task_table import TaskTableEndpoint
 from plane.app.views.workspace.access import (
@@ -124,6 +143,23 @@ urlpatterns = [
         TicketRoutingRuleListEndpoint.as_view(),
         name="ticket-routing-rules",
     ),
+    path("workspaces/<str:slug>/organization/routing-rules/order/", RoutingRuleOrderEndpoint.as_view()),
+    path("workspaces/<str:slug>/organization/routing-rules/preview/", RoutingRulePreviewEndpoint.as_view()),
+    path("workspaces/<str:slug>/tickets/<uuid:issue_id>/core/", TicketCoreEndpoint.as_view()),
+    path("workspaces/<str:slug>/tickets/<uuid:issue_id>/target/", TicketTargetEndpoint.as_view()),
+    path("workspaces/<str:slug>/tickets/<uuid:issue_id>/parent/", TicketParentEndpoint.as_view()),
+    path("workspaces/<str:slug>/tickets/<uuid:issue_id>/extension/preview/", TicketExtensionPreviewEndpoint.as_view()),
+    path("workspaces/<str:slug>/tickets/<uuid:issue_id>/extension/", TicketExtensionEndpoint.as_view()),
+    path("workspaces/<str:slug>/tickets/<uuid:issue_id>/delay-report/", TicketDelayReportEndpoint.as_view()),
+    path("workspaces/<str:slug>/tickets/<uuid:issue_id>/contact/", TicketContactEndpoint.as_view()),
+    path("workspaces/<str:slug>/tickets/<uuid:issue_id>/refer/", TicketReferEndpoint.as_view()),
+    path("workspaces/<str:slug>/tickets/<uuid:issue_id>/referral/respond/", TicketReferralResponseEndpoint.as_view()),
+    path("workspaces/<str:slug>/tickets/<uuid:issue_id>/history/", TicketHistoryEndpoint.as_view()),
+    path("workspaces/<str:slug>/tickets/<uuid:issue_id>/route/", TicketAutoRouteEndpoint.as_view()),
+    path("workspaces/<str:slug>/ticket-types/", TicketTypeListEndpoint.as_view()),
+    path("workspaces/<str:slug>/ticket-types/<uuid:type_id>/target/", TicketTypeTargetEndpoint.as_view()),
+    path("workspaces/<str:slug>/ticket-extensions/inbox/", TicketExtensionInboxEndpoint.as_view()),
+    path("workspaces/<str:slug>/ticket-extensions/<uuid:extension_id>/decide/", TicketExtensionDecisionEndpoint.as_view()),
     path(
         "workspaces/<str:slug>/organization/routing-rules/<uuid:rule_id>/",
         TicketRoutingRuleDetailEndpoint.as_view(),

@@ -1,7 +1,7 @@
 from django.urls import path
 from plane.app.views.workspace.dashboard import DashboardEndpoint, DashboardRoleEndpoint, DashboardWidgetEndpoint, DashboardWidgetCreateEndpoint, DashboardTeamEndpoint, DashboardTeamSettingsEndpoint, DashboardTeamDetailEndpoint, DashboardTeamAssignEndpoint, DashboardTeamRemindEndpoint
 from plane.app.views.workspace.entity_import import EngineRecordImportEndpoint
-from plane.app.views.workspace.entity_governance import EngineFieldUsageEndpoint
+from plane.app.views.workspace.entity_governance import EngineFieldUsageEndpoint, EngineDeletePreviewEndpoint
 from plane.app.views.workspace.entity_governance import EngineLookupColumnEndpoint, EngineRelatedRecordsEndpoint
 from plane.app.views.workspace.entity_governance import EngineUniqueRulesEndpoint, EngineSettingsEndpoint, EngineNumberingEndpoint, EngineRelationDefinitionsEndpoint
 from plane.app.views.workspace.surface import SurfaceEndpoint, SurfaceFieldEndpoint, SurfaceValuesEndpoint, SurfaceOptionsEndpoint, SurfaceFileEndpoint
@@ -42,6 +42,7 @@ urlpatterns = [
     path("workspaces/<str:slug>/engine/definitions/fields/<uuid:identifier>/usage/", EngineFieldUsageEndpoint.as_view()),
     path("workspaces/<str:slug>/engine/entities/<str:code>/lookup-columns/", EngineLookupColumnEndpoint.as_view()),
     path("workspaces/<str:slug>/engine/entities/<str:code>/records/<uuid:identifier>/related/<str:field_code>/", EngineRelatedRecordsEndpoint.as_view()),
+    path("workspaces/<str:slug>/engine/entities/<str:code>/records/<uuid:identifier>/delete-preview/", EngineDeletePreviewEndpoint.as_view()),
     path("workspaces/<str:slug>/engine/relations/", EngineRelationDefinitionsEndpoint.as_view()),
     path("workspaces/<str:slug>/engine/relations/<uuid:identifier>/", EngineRelationDefinitionsEndpoint.as_view()),
     path("workspaces/<str:slug>/engine/entities/<str:code>/numbering-rules/", EngineNumberingEndpoint.as_view()),

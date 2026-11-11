@@ -219,6 +219,9 @@ export function DashboardWidgetSettings({
               onChange={(event) => set("group_by", event.target.value)}
             >
               <option value="">انتخاب کنید</option>
+              {String(widget.config.entity || "ticket") === "ticket" && (
+                <option value="__work_category__">دستهٔ وضعیت (انجام‌نشده / در حال انجام / انجام‌شده)</option>
+              )}
               {fields
                 .filter((field) => field.filterable)
                 .map((field) => (

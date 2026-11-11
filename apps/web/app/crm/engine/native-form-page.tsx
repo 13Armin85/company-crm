@@ -1,6 +1,7 @@
 import { Navigate, useNavigate, useParams } from "react-router";
 import { Button, PageHeader } from "../components";
 import { EngineRecordForm } from "./record-form";
+import { TicketCorePanel } from "../ticket/ticket-panel";
 
 const pages: Record<string, { title: string; path: string }> = {
   ticket: { title: "کار", path: "/issues" },
@@ -24,6 +25,7 @@ export default function NativeFormPage() {
           </Button>
         }
       />
+      {(code === "ticket" || code === "task") && recordId && <TicketCorePanel id={recordId} />}
       <EngineRecordForm code={code} id={recordId} onSaved={back} onCancel={back} />
     </div>
   );

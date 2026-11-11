@@ -4,6 +4,7 @@ import json
 from datetime import datetime
 from uuid import UUID
 
+from django.http import Http404
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
@@ -102,6 +103,12 @@ def edit_grants(entity, user, request=None):
 
 def record_edit_actions(entity, user, native=None, request=None):
     grants = edit_grants(entity, user, request)
+    if native is not None and entity.adapter == "ticket":
+        from .ticket_core import is_owner
+
+        if not is_owner(native, user, request):
+            # Ticket 5, decision 6: approvers / referral participants are read-only.
+            return {"edit": False, "assign": False, "status": False}
     if native is not None and entity.adapter == "leave":
         grants["edit"] = grants["edit"] and can_manage_absence(
             user, native.user, entity.workspace, "Absence.Edit", request=request
@@ -171,17 +178,44 @@ def record_queryset(entity, user, request=None):
 def get_record(entity, user, identifier, request=None, lock=False):
     require_action(entity, user, "view", request)
     if entity.adapter:
-        native = get_object_or_404(
-            native_queryset(entity, user, request), id=identifier
-        )
+        try:
+            native = get_object_or_404(
+                native_queryset(entity, user, request), id=identifier
+            )
+        except Http404:
+            native = _workflow_read(entity, user, identifier, request, lock)
+            if native is None:
+                raise
+            native = get_object_or_404(base_native_rows(entity), id=identifier)
         row = EntityRecord.objects.filter(entity=entity, source_id=native.id).first()
     else:
         rows = record_queryset(entity, user, request)
         if lock:
             rows = rows.select_for_update()
-        row = get_object_or_404(rows, id=identifier)
+        try:
+            row = get_object_or_404(rows, id=identifier)
+        except Http404:
+            if _workflow_read(entity, user, identifier, request, lock) is None:
+                raise
+            row = get_object_or_404(
+                EntityRecord.objects.filter(entity=entity, workspace=entity.workspace),
+                id=identifier,
+            )
         native = None
     return row, native
+
+
+def _workflow_read(entity, user, identifier, request, lock):
+    """Read-only access for people taking part in the record's workflow.
+
+    Never used for writes: every save/delete path loads the record with
+    ``lock=True`` and therefore keeps the record's normal visibility rules.
+    """
+    if lock:
+        return None
+    from .workflow_engine import is_participant
+
+    return True if is_participant(entity, identifier, user, request) else None
 
 
 def all_values(entity, row=None, native=None, subtype=None):
@@ -320,12 +354,47 @@ def record_payload(entity, user, row=None, native=None, request=None):
             and actions[field_edit_action(entity, field)]
             for code, field in fields.items()
         ),
+        "relation_data": relation_link_data(entity, fields, permitted, identifier),
         "can_deactivate": actions["edit"],
         "can_delete": permission(entity, user, "delete", request),
         "native_url": (
             f"/projects/{identifier}" if entity.adapter == "project" else None
         ),
     }
+
+
+def relation_link_data(entity, fields, permitted, identifier):
+    """Link data of permitted relation values, for relations that define link fields."""
+    from plane.db.models import EntityRelation
+
+    result = {}
+    ids = {
+        field["config"]["relation_id"]: code
+        for code, field in fields.items()
+        if field["kind"] == "relation"
+        and field["config"].get("relation_id")
+        and code in permitted
+    }
+    if not ids:
+        return result
+    for relation in EntityRelation.objects.filter(id__in=list(ids)).select_related(
+        "left_field"
+    ):
+        if not relation.link_fields:
+            continue
+        code = ids[str(relation.id)]
+        direction = "left" if relation.left_field.code == code else "right"
+        opposite = "right" if direction == "left" else "left"
+        value = permitted.get(code)
+        allowed = set(value if isinstance(value, list) else [value] if value else [])
+        result[code] = [
+            {"id": str(target), "data": data or {}}
+            for target, data in relation.links.filter(**{f"{direction}_id": identifier})
+            .order_by("created_at", "id")
+            .values_list(f"{opposite}_id", "data")
+            if str(target) in allowed
+        ]
+    return result
 
 
 def emit(
@@ -849,7 +918,7 @@ def save_native(
                 {
                     **data,
                     **(
-                        {"routing_rule_id": str(routing_rule.id)}
+                        {"routing_rule_id": str(getattr(routing_rule, "id", "auto"))}
                         if routing_rule
                         else {}
                     ),
@@ -953,15 +1022,18 @@ def save_native(
             )
         serializer.is_valid(raise_exception=True)
         native = serializer.save()
+        if routing_rule:
+            from .ticket_routing import TicketRoutingService, AUTO
+
+            if routing_rule is AUTO:
+                TicketRoutingService.route_auto(native, actor_id=user.id)
+            else:
+                TicketRoutingService.route(native, routing_rule, actor_id=user.id)
         if not native.project_id:
             from .crm_notifications import notify_workspace_task
 
             notify_workspace_task(native, user.id, previous_task)
             return native
-        if routing_rule:
-            from .ticket_routing import TicketRoutingService
-
-            TicketRoutingService.route(native, routing_rule, actor_id=user.id)
         from plane.bgtasks.issue_activities_task import issue_activity
         from plane.utils.host import base_host
 
@@ -1098,6 +1170,15 @@ def save_record(entity, user, payload, request=None, identifier=None):
         .order_by("code")
     )
     old = all_values(entity, row, native, subtype)
+    if not creating:
+        from .workflow_engine import step_field_lock
+
+        # A running workflow step owns the status and may lock fields it does not allow editing.
+        locked = step_field_lock(
+            entity, native.id if native else row.id, payload.get("values", {}), old
+        )
+        if locked:
+            raise PermissionDenied(locked)
     values, fields = validate_values(
         entity, user, payload.get("values", {}), old, subtype, creating, request
     )
@@ -1105,16 +1186,11 @@ def save_record(entity, user, payload, request=None, identifier=None):
     if payload.get("routing_rule_id"):
         if not creating or entity.adapter != "ticket":
             raise ValidationError("قاعده ارجاع فقط هنگام ایجاد تیکت قابل انتخاب است.")
-        from plane.db.models import TicketRoutingRule
+        from .ticket_routing import usable_rule
 
-        routing_rule = get_object_or_404(
-            TicketRoutingRule,
-            workspace=entity.workspace,
-            id=payload["routing_rule_id"],
-            is_active=True,
-            unit__is_active=True,
-            required_role__is_active=True,
-        )
+        routing_rule = usable_rule(entity.workspace, payload["routing_rule_id"])
+        if routing_rule is None:
+            raise ValidationError({"routing_rule_id": "قاعدهٔ ارجاع معتبر یا فعال نیست."})
     if entity.adapter:
         try:
             native = save_native(
@@ -1223,6 +1299,14 @@ def save_record(entity, user, payload, request=None, identifier=None):
                 old.get(code),
                 value,
             )
+    if creating:
+        from .workflow_actions import auto_start
+
+        # Same transaction: a record of a type with a published workflow starts it immediately.
+        if auto_start(entity, subtype, public_id, user, request=request):
+            row.refresh_from_db()
+            if native is not None:
+                native.refresh_from_db()
     result = record_payload(entity, user, row, native, request)
     result["warnings"] = getattr(request, "_engine_unique_warnings", [])
     return result
@@ -1277,7 +1361,20 @@ def delete_record(
     from .entity_relations import before_delete
 
     if deactivate is not False:
-        before_delete(entity, identifier, user, request, apply=True)
+        impacts = before_delete(
+            entity,
+            identifier,
+            user,
+            request,
+            apply=True,
+            mode="deactivate" if deactivate else "delete",
+        )
+        if deactivate is None and any(
+            impact["behavior"] == "soft_deactivate" for impact in impacts
+        ):
+            # Soft deactivation: the record stays, links stay, it is only marked inactive.
+            require_action(entity, user, "edit", request)
+            deactivate = True
     refs = list(references_to(entity, identifier))
     if refs and not confirm:
         from rest_framework.exceptions import APIException
@@ -1335,3 +1432,109 @@ def delete_record(
             row.deleted_at = timezone.now()
             row.save()
         emit(entity, user, "record.deleted", UUID(str(identifier)), before=before)
+
+
+def apply_workflow_status(entity, actor, record_id, status_code, metadata=None):
+    """Write a workflow step's status onto the record; runs inside the caller's transaction.
+
+    The workflow is the authorization for this write (the caller checked who may
+    run the transition). The record keeps owning its status: the same status
+    validation (active ``task-status`` value, ``UserAbsence`` rules such as no
+    overlapping scheduled absences), the record revision and the
+    ``record.status_changed`` event of a normal save are kept.
+    Returns True when the status changed.
+    """
+    from .workflow_engine import STATE_GROUPS, status_field
+
+    metadata = metadata or {}
+    field = status_field(entity, metadata.get("definition_settings"))
+    if entity.adapter == "leave":
+        native = UserAbsence.objects.select_for_update().get(
+            workspace=entity.workspace, id=record_id
+        )
+        before = native.status
+        if before == status_code:
+            return False
+        if status_code not in UserAbsence.Status.values:
+            raise ValidationError("وضعیت مرحله برای درخواست مرخصی معتبر نیست.")
+        native.status = status_code
+        try:
+            native.full_clean(exclude=["created_by", "updated_by"])
+        except DjangoValidationError as exc:
+            if "starts_at" in getattr(exc, "message_dict", {}):
+                raise ValidationError(
+                    "این بازهٔ مرخصی با غیبت ثبت‌شدهٔ دیگری هم‌پوشانی دارد و قابل تأیید نیست."
+                ) from exc
+            raise ValidationError("اطلاعات درخواست مرخصی معتبر نیست.") from exc
+        native.save(update_fields=["status", "updated_at"])
+        after = status_code
+    elif entity.adapter in {"ticket", "task"}:
+        native = (
+            ADAPTERS[entity.adapter]
+            .objects.select_for_update()
+            .get(workspace=entity.workspace, id=record_id)
+        )
+        if not LookupValue.objects.filter(
+            category__workspace=entity.workspace,
+            category__code="task-status",
+            category__is_active=True,
+            code=status_code,
+            is_active=True,
+        ).exists():
+            raise ValidationError("وضعیت مرحله در فهرست وضعیت کارها فعال نیست.")
+        if entity.adapter == "ticket" and native.project_id:
+            group = STATE_GROUPS.get(status_code, "started")
+            state = (
+                State.objects.filter(project_id=native.project_id, group=group)
+                .order_by("-default", "sequence")
+                .first()
+            )
+            if state is None:
+                raise ValidationError(
+                    "پروژهٔ این کار وضعیتی متناظر با وضعیت مرحلهٔ گردش‌کار ندارد."
+                )
+            before, after = str(native.state_id or ""), str(state.id)
+            if before == after:
+                return False
+            native.state = state
+            native.save()
+        else:
+            before, after = native.status, status_code
+            if before == after:
+                return False
+            native.status = status_code
+            native.save()
+    else:
+        row = EntityRecord.objects.select_for_update().get(
+            entity=entity, id=record_id
+        )
+        if not field:
+            raise ValidationError("فیلد وضعیت این موجودیت در گردش‌کار تعیین نشده است.")
+        before, after = row.data.get(field), status_code
+        if before == after:
+            return False
+        row.data = {**row.data, field: status_code}
+        row.revision += 1
+        row.save()
+    if entity.adapter:
+        from .entity_directory import ensure_directory_record
+
+        sidecar = ensure_directory_record(entity, native)
+        sidecar = EntityRecord.objects.select_for_update().get(id=sidecar.id)
+        sidecar.revision += 1
+        sidecar.save(update_fields=["revision", "updated_at"])
+    emit(
+        entity,
+        actor,
+        "record.status_changed",
+        record_id,
+        field,
+        before,
+        after,
+        metadata={
+            key: value
+            for key, value in metadata.items()
+            if key != "definition_settings"
+        },
+    )
+    return True

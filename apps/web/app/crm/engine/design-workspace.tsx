@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import { CloseOutline, SearchOutline } from "@makeplane/propel/icons";
-import { Eye, GitBranch, History, LayoutTemplate, ListChecks, ShieldCheck, Table2 } from "lucide-react";
+import { GitBranch, LayoutTemplate, Plus, SearchX, Table2 } from "lucide-react";
+import { NewPageDialog } from "./sidebar-pages";
 import { normalizePersianSearch } from "@plane/ui";
 import { Button, Skeleton } from "../components";
 import { errorMessage, useWorkspaceAccess } from "../api";
@@ -12,19 +13,21 @@ import { OfficialTableDesigner } from "./official-table-designer";
 import { EntityRules, GovernanceSettings } from "./governance-settings";
 import { FieldLifecycleSettings } from "./field-lifecycle-settings";
 import { RelationSettings } from "./relation-settings";
+import { WorkflowDesigner } from "../workflow/designer";
 import { useEngineCatalog, useEngineDefinitions, useEngineForm, useEngineQuery } from "./api";
 import type { FieldDefinition } from "./api";
 
-type DesignTab = "fields" | "layout" | "preview" | "versions" | "table" | "rules" | "relations";
+type DesignTab = "fields" | "layout" | "preview" | "versions" | "table" | "rules" | "relations" | "workflow";
 type Surface = { code: string; path: string; title: string; native_columns: string[] };
-const tabs: { id: DesignTab; label: string; hint: string; icon: typeof ListChecks }[] = [
-  { id: "fields", label: "ورودی‌های فرم", hint: "چه اطلاعاتی از کاربر گرفته شود", icon: ListChecks },
-  { id: "layout", label: "چیدمان فرم", hint: "ترتیب ورودی‌ها، بخش‌ها و تب‌ها", icon: LayoutTemplate },
-  { id: "preview", label: "پیش‌نمایش", hint: "امتحان فرم همان‌طور که کاربر می‌بیند", icon: Eye },
-  { id: "versions", label: "نسخه‌های قبلی", hint: "بازگشت به چیدمان‌های قبلی", icon: History },
-  { id: "table", label: "ستون‌های جدول", hint: "ستون‌ها و تب‌های فهرست", icon: Table2 },
-  { id: "rules", label: "قواعد ثبت", hint: "جلوگیری از تکرار و شماره‌گذاری خودکار", icon: ShieldCheck },
-  { id: "relations", label: "ارتباط‌ها", hint: "اتصال به بخش‌های دیگر", icon: GitBranch },
+const tabs: { id: DesignTab; label: string; hint: string }[] = [
+  { id: "fields", label: "همه ورودی‌ها", hint: "ویرایش تعریف ورودی‌های موجود" },
+  { id: "layout", label: "طراحی فرم", hint: "ورودی‌ها را پیدا کنید، به فرم بیفزایید و ترتیبشان را تغییر دهید" },
+  { id: "preview", label: "پیش‌نمایش فرم", hint: "فرم ثبت و ویرایش را امتحان کنید" },
+  { id: "versions", label: "نسخه‌های قبلی", hint: "بازگشت به چیدمان‌های قبلی" },
+  { id: "table", label: "طراحی جدول", hint: "ستون‌ها و نمای رسمی جدول" },
+  { id: "rules", label: "قواعد ثبت", hint: "جلوگیری از تکرار و شماره‌گذاری خودکار" },
+  { id: "relations", label: "ارتباط‌ها", hint: "اتصال به بخش‌های دیگر" },
+  { id: "workflow", label: "گردش‌کار", hint: "مرحله‌ها، تأییدها و مهلت‌های فرایند" },
 ];
 const surfaceCodes = new Set(["ticket", "project", "leave", "users", "units", "roles", "routing", "cycles"]);
 const nativePaths: Record<string, string> = {
@@ -40,10 +43,11 @@ export function DesignWorkspace() {
   const fields = useEngineDefinitions<FieldDefinition>("fields");
   const surfaces = useEngineQuery<{ results: Surface[] }>("surfaces", "surfaces/");
   const { data: access } = useWorkspaceAccess();
-  const [code, setCode] = useState("ticket");
-  const [tab, setTab] = useState<DesignTab>("fields");
+  const [code, setCode] = useState("");
+  const [tab, setTab] = useState<DesignTab>("layout");
   const [search, setSearch] = useState("");
   const [general, setGeneral] = useState(false);
+  const [creatingPage, setCreatingPage] = useState(false);
   const form = useEngineForm(code, Boolean(catalog.data?.entities.some((item) => item.code === code)));
   const entities = (catalog.data?.entities || []).filter((item) => item.is_active && item.code !== "task");
   const entity = entities.find((item) => item.code === code);
@@ -58,7 +62,18 @@ export function DesignWorkspace() {
     )
       return;
     setCode(next);
-    setTab("fields");
+    setTab("layout");
+  };
+  const selectTab = (next: DesignTab) => {
+    if (tab === "table" && next !== "table") {
+      const dirty = useUIStore.getState().dirtyForms;
+      if (
+        (dirty.includes(`page-studio:${surfaceCode}`) || dirty.includes(`official-table:${code}`)) &&
+        !window.confirm("تغییرات ذخیره‌نشدهٔ جدول کنار گذاشته شود؟")
+      )
+        return;
+    }
+    setTab(next);
   };
   if (catalog.isLoading || fields.isLoading || surfaces.isLoading) return <Skeleton rows={8} />;
   if (catalog.error || fields.error || surfaces.error)
@@ -84,15 +99,16 @@ export function DesignWorkspace() {
     normalizePersianSearch(item.title + item.code).includes(normalizePersianSearch(search))
   );
   const currentTab = tabs.find((item) => item.id === tab)!;
+  const formTab = (["fields", "layout", "preview", "versions"] as DesignTab[]).includes(tab);
   return (
-    <div className="engine-workspace">
+    <div className="engine-workspace" dir="rtl">
       <aside className="engine-workspace-sidebar" aria-label="فرم‌ها و جدول‌ها">
         <header>
           <strong>فرم‌ها و جدول‌ها</strong>
-          <small>{entities.length.toLocaleString("fa-IR")} فرم قابل تنظیم</small>
+          <small>{entities.length.toLocaleString("fa-IR")} بخش قابل تنظیم</small>
         </header>
         <div className="engine-entity-search">
-          <label htmlFor="engine-entity-search-input">جستجوی فرم</label>
+          <label htmlFor="engine-entity-search-input">جستجوی بخش</label>
           <div className="engine-entity-search-control">
             <SearchOutline aria-hidden="true" />
             <input
@@ -109,7 +125,7 @@ export function DesignWorkspace() {
             )}
           </div>
         </div>
-        <nav aria-label="انتخاب فرم">
+        <nav aria-label="انتخاب بخش">
           {list.map((item) => (
             <button
               type="button"
@@ -123,7 +139,29 @@ export function DesignWorkspace() {
             </button>
           ))}
         </nav>
-        {!list.length && <p>فرمی با این نام پیدا نشد.</p>}
+        {!list.length && (
+          <div className="engine-search-empty" role="status">
+            <span className="engine-search-empty-icon" aria-hidden="true">
+              <SearchX size={22} />
+            </span>
+            <strong>{search.trim() ? `بخشی با «${search.trim()}» پیدا نشد` : "هنوز بخشی وجود ندارد"}</strong>
+            <p>املای نام را بررسی کنید یا با کد انگلیسی بخش جستجو کنید.</p>
+            <div className="engine-search-empty-actions">
+              {search && (
+                <Button variant="secondary" onClick={() => setSearch("")}>
+                  پاک کردن جستجو
+                </Button>
+              )}
+              {access?.can("EntityType.Create") && access?.can("FormDesigner.Publish") && (
+                <Button onClick={() => setCreatingPage(true)}>
+                  <Plus size={15} aria-hidden="true" />
+                  {search.trim() ? `ساخت صفحهٔ «${search.trim()}»` : "ساخت صفحهٔ جدید"}
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+        {creatingPage && <NewPageDialog initialTitle={search.trim()} onClose={() => setCreatingPage(false)} />}
         {access?.can("View.Official.Manage") && (
           <Button variant="ghost" onClick={() => setGeneral(true)}>
             تنظیمات عمومی جدول‌ها
@@ -137,7 +175,7 @@ export function DesignWorkspace() {
               <div>
                 <small>فرم و جدول</small>
                 <h2>{entity.code === "ticket" ? "کارها" : entity.title}</h2>
-                <p>فرم ثبت و ویرایش یکی است؛ ستون‌های جدول و قواعد ثبت را از تب‌های پایین تنظیم کنید.</p>
+                <p>فرم ثبت و ویرایش و جدول این بخش را از مسیرهای جدا تنظیم کنید.</p>
               </div>
               <Link
                 className="button button-secondary"
@@ -146,34 +184,84 @@ export function DesignWorkspace() {
                 مشاهده صفحه
               </Link>
             </header>
-            <nav className="engine-workspace-tabs" aria-label="بخش‌های طراحی">
-              {tabs.map((item, index) => (
+            <nav className="engine-workspace-primary" aria-label="انتخاب فرم یا جدول">
+              <button
+                type="button"
+                className={formTab ? "active" : ""}
+                aria-current={formTab ? "page" : undefined}
+                onClick={() => selectTab("layout")}
+              >
+                <LayoutTemplate size={20} aria-hidden="true" />
+                <strong>فرم</strong>
+                <small>ورودی‌ها، ترتیب و پیش‌نمایش ثبت و ویرایش</small>
+              </button>
+              <button
+                type="button"
+                className={tab === "table" ? "active" : ""}
+                aria-current={tab === "table" ? "page" : undefined}
+                onClick={() => selectTab("table")}
+              >
+                <Table2 size={20} aria-hidden="true" />
+                <strong>جدول</strong>
+                <small>ستون‌ها و نمایی که کاربران می‌بینند</small>
+              </button>
+              {entity && !["user", "unit", "project"].includes(entity.adapter) && access?.can("Workflow.View") && (
                 <button
                   type="button"
-                  key={item.id}
-                  className={tab === item.id ? "active" : ""}
-                  aria-current={tab === item.id ? "page" : undefined}
-                  onClick={() => setTab(item.id)}
+                  className={tab === "workflow" ? "active" : ""}
+                  aria-current={tab === "workflow" ? "page" : undefined}
+                  onClick={() => selectTab("workflow")}
                 >
-                  <span className="engine-workspace-tab-symbol" aria-hidden="true">
-                    <item.icon size={19} strokeWidth={1.8} />
-                  </span>
-                  <span className="engine-workspace-tab-copy">
-                    <strong>{item.label}</strong>
-                    <small>{item.hint}</small>
-                  </span>
-                  <span className="engine-workspace-tab-index" aria-hidden="true">
-                    {(index + 1).toLocaleString("fa-IR")}
-                  </span>
+                  <GitBranch size={20} aria-hidden="true" />
+                  <strong>گردش‌کار</strong>
+                  <small>مرحله‌ها، تأییدها و مهلت‌ها</small>
                 </button>
-              ))}
+              )}
             </nav>
+            {formTab && (
+              <nav className="engine-workspace-subnav" aria-label="کارهای فرم">
+                <button
+                  type="button"
+                  aria-current={tab === "layout" ? "page" : undefined}
+                  onClick={() => selectTab("layout")}
+                >
+                  طراحی فرم
+                </button>
+                <button
+                  type="button"
+                  aria-current={tab === "preview" ? "page" : undefined}
+                  onClick={() => selectTab("preview")}
+                >
+                  پیش‌نمایش فرم
+                </button>
+              </nav>
+            )}
+            <details
+              className="engine-workspace-advanced"
+              open={!["layout", "preview", "table"].includes(tab) ? true : undefined}
+            >
+              <summary>تنظیمات پیشرفته</summary>
+              <nav aria-label="تنظیمات پیشرفته طراحی">
+                {tabs
+                  .filter((item) => ["fields", "versions", "rules", "relations"].includes(item.id))
+                  .map((item) => (
+                    <button
+                      type="button"
+                      key={item.id}
+                      aria-current={tab === item.id ? "page" : undefined}
+                      onClick={() => selectTab(item.id)}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+              </nav>
+            </details>
             <section className="engine-workspace-panel" aria-label={currentTab.label}>
               <div className="engine-workspace-panel-heading">
                 <h3>{currentTab.label}</h3>
                 <p>{currentTab.hint}</p>
               </div>
-              <div hidden={!(["fields", "layout", "preview", "versions"] as DesignTab[]).includes(tab)}>
+              <div hidden={!formTab}>
                 {fields.data && (
                   <FormDesigner
                     key={entity.id}
@@ -189,15 +277,18 @@ export function DesignWorkspace() {
                   {surface?.native_columns.length ? (
                     <section className="engine-design-section-card">
                       <h4>ستون‌ها و تب‌های جدول</h4>
-                      <p>برای همه کاربران اعمال می‌شود. هر کاربر می‌تواند از «تب‌های من» تب‌ها را برای خودش پنهان کند.</p>
+                      <p>این ستون‌ها و تب‌ها پس از ذخیره روی جدول این صفحه برای کاربران اعمال می‌شوند.</p>
                       <PageEditor key={surfaceCode} code={surfaceCode} embedded tableOnly />
                     </section>
                   ) : null}
                   {surface?.native_columns.length ? (
                     <details className="engine-design-section-card engine-optional-section">
                       <summary>
-                        <strong>نماهای آماده «جدول من»</strong>
-                        <small>اختیاری؛ فقط وقتی کاربران «جدول من» را باز می‌کنند استفاده می‌شود.</small>
+                        <strong>نماهای رسمی ذخیره‌شده</strong>
+                        <small>
+                          این نماها در فهرست نماهای کاربران دیده می‌شوند. نمای شخصی هر کاربر از صفحهٔ جدول خودش ذخیره
+                          می‌شود.
+                        </small>
                       </summary>
                       <OfficialTableDesigner key={code} code={code} />
                     </details>
@@ -215,10 +306,14 @@ export function DesignWorkspace() {
                 </div>
               )}
               {tab === "relations" && <RelationSettings key={code} entityCode={code} />}
+              {tab === "workflow" && <WorkflowDesigner key={code} entity={code} />}
             </section>
           </>
         ) : (
-          <p>برای شروع، یکی از فرم‌های فهرست را انتخاب کنید.</p>
+          <section className="engine-workspace-start">
+            <h2>فرم و جدول کدام بخش را تنظیم می‌کنید؟</h2>
+            <p>نام بخش را جستجو کنید و از فهرست انتخاب کنید. سپس «فرم» یا «جدول» را باز کنید.</p>
+          </section>
         )}
       </main>
       {general && (

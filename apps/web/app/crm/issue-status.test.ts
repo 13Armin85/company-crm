@@ -30,7 +30,7 @@ describe("issue workflow status mapping", () => {
     ["started", "در حال انجام", "In Progress"],
     ["started", "بازبینی", "Review"],
     ["completed", "انجام‌شده", "Done"],
-    ["cancelled", "مسدود", "Blocked"],
+    ["cancelled", "مسدود", "Done"],
     [" UNSTARTED ", "شروع نشده", "Todo"],
     ["completed", "Custom active label", "Done"],
     [undefined, "Unstarted", "Todo"],

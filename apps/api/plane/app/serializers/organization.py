@@ -88,13 +88,62 @@ class OrganizationUnitSerializer(serializers.ModelSerializer):
 
 
 class TicketRoutingRuleSerializer(serializers.ModelSerializer):
-    unit_id = serializers.PrimaryKeyRelatedField(source="unit", queryset=OrganizationUnit.objects.all())
+    unit_id = serializers.PrimaryKeyRelatedField(
+        source="unit", queryset=OrganizationUnit.objects.all(), required=False, allow_null=True
+    )
     required_role_id = serializers.PrimaryKeyRelatedField(
         source="required_role",
         queryset=OrganizationRole.objects.all(),
+        required=False,
+        allow_null=True,
     )
-    role_name = serializers.CharField(source="required_role.name", read_only=True)
-    unit_title = serializers.CharField(source="unit.title", read_only=True)
+    target_user_id = serializers.PrimaryKeyRelatedField(
+        source="target_user", queryset=User.objects.all(), required=False, allow_null=True
+    )
+    role_name = serializers.CharField(source="required_role.name", read_only=True, default="")
+    unit_title = serializers.CharField(source="unit.title", read_only=True, default="")
+    target_user_name = serializers.CharField(source="target_user.display_name", read_only=True, default="")
+    method_title = serializers.CharField(source="get_method_display", read_only=True)
+
+    def validate_conditions(self, value):
+        from plane.app.services.ticket_routing import CONDITION_KEYS
+
+        if not isinstance(value, dict) or set(value) - set(CONDITION_KEYS):
+            raise serializers.ValidationError("شرط‌های قاعده معتبر نیستند.")
+        expression = value.get("expression")
+        if expression is not None:
+            from plane.app.services.entity_rules import validate_condition
+            from plane.app.services.workflow_engine import entity_fields
+            from plane.db.models import EntityType
+
+            workspace = self.context.get("workspace")
+            entity = EntityType.objects.filter(workspace=workspace, code="ticket", parent__isnull=True).first()
+            if entity is None:
+                raise serializers.ValidationError("موجودیت تیکت برای شرط پیشرفته پیدا نشد.")
+            try:
+                validate_condition(expression, entity_fields(entity))
+            except Exception as exc:
+                raise serializers.ValidationError(str(getattr(exc, "detail", exc)))
+        for key, items in value.items():
+            if key == "expression":
+                continue
+            if not isinstance(items, list) or not all(isinstance(item, str) for item in items):
+                raise serializers.ValidationError("هر شرط باید فهرستی از مقادیر باشد.")
+        return value
+
+    def validate_member_ids(self, value):
+        if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+            raise serializers.ValidationError("اعضای قاعده باید فهرستی از شناسه‌ها باشند.")
+        return value
+
+    def validate(self, attrs):
+        method = attrs.get("method", getattr(self.instance, "method", "manager"))
+        user = attrs.get("target_user", getattr(self.instance, "target_user", None))
+        if method == "user" and user is None:
+            raise serializers.ValidationError({"target_user_id": "برای روش «فرد ثابت» فرد را انتخاب کنید."})
+        if method == "group" and not attrs.get("required_role", getattr(self.instance, "required_role", None)):
+            raise serializers.ValidationError({"required_role_id": "برای روش «گروه ثابت» نقش گروه را انتخاب کنید."})
+        return attrs
 
     class Meta:
         model = TicketRoutingRule
@@ -106,10 +155,18 @@ class TicketRoutingRuleSerializer(serializers.ModelSerializer):
             "required_role_id",
             "role_name",
             "is_active",
+            "position",
+            "conditions",
+            "method",
+            "method_title",
+            "target_user_id",
+            "target_user_name",
+            "member_ids",
+            "cursor",
             "created_at",
             "updated_at",
         )
-        read_only_fields = ("id", "created_at", "updated_at")
+        read_only_fields = ("id", "cursor", "created_at", "updated_at")
 
 
 class TicketRoutingDecisionSerializer(serializers.ModelSerializer):
@@ -125,6 +182,11 @@ class TicketRoutingDecisionSerializer(serializers.ModelSerializer):
             "assigned_user_name",
             "resolved_unit_id",
             "resolved_unit_title",
+            "rule_id",
+            "method",
+            "reason",
+            "details",
+            "response",
             "created_at",
         )
 
@@ -159,4 +221,6 @@ class TicketRoleQueueEntrySerializer(serializers.ModelSerializer):
         )
 
     def get_issue_identifier(self, obj):
+        if not obj.issue.project_id:
+            return f"#{obj.issue.sequence_id}"
         return f"{obj.issue.project.identifier}-{obj.issue.sequence_id}"

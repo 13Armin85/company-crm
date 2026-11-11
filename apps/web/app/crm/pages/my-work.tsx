@@ -1,4 +1,6 @@
 import { ErrorState } from "../error-state";
+import { TicketPresetBar } from "../ticket/preset-bar";
+import type { PresetId } from "../ticket/model";
 import { useState } from "react";
 import { CalendarClock, Check, CheckCheck, ArrowUpLeft, LayoutDashboard, List, ListTodo } from "lucide-react";
 import { zonedDateTime } from "@plane/ui";
@@ -25,8 +27,9 @@ export default function MyWorkPage() {
   const { data: members = [] } = useMembers();
   const today = zonedDateTime(new Date(), currentUser?.timeZone)!.date;
   const search = useDebouncedValue(query);
-  const paging = useTablePaging("my-work", [search, tab]);
-  const table = useTasksTable({ view: "mine", tab, q: search, today, ...paging, enabled: Boolean(access) });
+  const [preset, setPreset] = useState<PresetId>("all");
+  const paging = useTablePaging("my-work", [search, tab, preset]);
+  const table = useTasksTable({ view: "mine", tab, q: search, today, preset, ...paging, enabled: Boolean(access) });
   const visible = table.data?.rows ?? [];
   const counts = table.data?.tab_counts ?? {};
   const isLoading = !access || table.isLoading;
@@ -137,6 +140,7 @@ export default function MyWorkPage() {
         </div>
         <div className="my-work-filters">
           <TabBar chooserKey="my-work-status" items={items} active={tab} onChange={setTab} />
+          <TicketPresetBar value={preset} counts={table.data?.preset_counts} onChange={setPreset} />
           <SearchBox value={query} onChange={setQuery} placeholder="جستجوی عنوان، شناسه یا فرستنده…" />
         </div>
         <div className="my-work-results" role="status">

@@ -65,6 +65,7 @@ export function TableTabPicker({
   hiddenColumns = [],
   onHiddenColumnsChange,
   onDeleteTab,
+  inline = false,
 }: {
   tabs: { id: string; title: string }[];
   hidden: string[];
@@ -75,6 +76,8 @@ export function TableTabPicker({
   hiddenColumns?: string[];
   onHiddenColumnsChange?: (hidden: string[]) => void;
   onDeleteTab?: (id: string) => void;
+  /** Opens as a band under the toolbar that pushes content down instead of floating over it. */
+  inline?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const options = includeMain ? [{ id: MAIN_TABLE_TAB, title: "جدول اصلی" }, ...tabs] : tabs;
@@ -82,7 +85,7 @@ export function TableTabPicker({
   const shown = options.filter((tab) => normalizePersianSearch(tab.title).includes(normalizePersianSearch(query)));
   const visibleCount = options.filter((tab) => !hidden.includes(tab.id)).length;
   return (
-    <Popover className="table-tab-picker">
+    <Popover className={`table-tab-picker${inline ? " is-inline" : ""}`}>
       <PopoverButton className="surface-table-action table-tab-picker-trigger">
         <Eye size={15} aria-hidden="true" />
         تب‌های من
@@ -92,7 +95,11 @@ export function TableTabPicker({
             : `${visibleCount.toLocaleString("fa-IR")} از ${options.length.toLocaleString("fa-IR")}`}
         </span>
       </PopoverButton>
-      <PopoverPanel anchor="bottom end" className="table-tab-picker-panel" dir="rtl">
+      <PopoverPanel
+        anchor={inline ? undefined : "bottom end"}
+        className={`table-tab-picker-panel${inline ? " is-inline" : ""}`}
+        dir="rtl"
+      >
         {options.length > 1 && (
           <div className="table-tab-picker-actions">
             <button type="button" onClick={() => onChange([])} disabled={!hidden.length}>

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { SearchableSelect } from "@plane/ui";
 import { DefaultValueEditor, dynamicDefaultsFor } from "./default-value-editor";
 import type { FieldConfig, FieldKind, FieldValue } from "@plane/ui";
-import { useOrganizationPermissions } from "../api";
+import { errorMessage, useOrganizationPermissions } from "../api";
 import { Button } from "../components";
 import { useEngineMutation, useEngineDefinitions, useEngineCatalog } from "./api";
 import type { EntityDefinition, FieldDefinition, LookupDefinition, LookupOptionDefinition } from "./api";
@@ -48,7 +48,9 @@ export function DefinitionEditor({
     code:
       kind === "lookups" || kind === "values"
         ? `${kind === "lookups" ? "list" : "option"}_${browserId().replaceAll("-", "").slice(0, 10)}`
-        : "",
+        : kind === "fields"
+          ? `field_${browserId().replaceAll("-", "").slice(0, 12)}`
+          : "",
     title: "",
     description: "",
     is_active: true,
@@ -196,26 +198,29 @@ export function DefinitionEditor({
             onChange={(e) => set("title", e.target.value)}
           />
         </label>
-        <label>
-          کد یکتا (انگلیسی)
-          <input
-            required
-            dir="ltr"
-            pattern="[a-z][a-z0-9_\-]*"
-            title="با حرف کوچک انگلیسی شروع شود؛ فقط حرف، عدد، خط تیره یا زیرخط"
-            placeholder="customer_phone"
-            disabled={Boolean(row?.id) && (kind !== "fields" || locked)}
-            value={data.code || ""}
-            onChange={(e) => set("code", e.target.value.toLowerCase().replace(/\s+/g, "_"))}
-          />
-          <small>
-            {kind === "fields" && locked
-              ? "این ورودی داده ثبت‌شده دارد؛ کد آن ثابت می‌ماند."
-              : kind === "lookups" || kind === "values"
-                ? "کد به‌صورت خودکار ساخته شده است؛ فقط در صورت نیاز آن را تغییر دهید."
-                : "برای گزارش‌ها و اتصال‌ها استفاده می‌شود و در فرم دیده نمی‌شود."}
-          </small>
-        </label>
+        <details className="engine-advanced-setting" open={kind !== "fields" || Boolean(row?.id) ? true : undefined}>
+          <summary>کد و تنظیمات فنی</summary>
+          <label>
+            کد یکتا (انگلیسی)
+            <input
+              required
+              dir="ltr"
+              pattern="[a-z][a-z0-9_\-]*"
+              title="با حرف کوچک انگلیسی شروع شود؛ فقط حرف، عدد، خط تیره یا زیرخط"
+              placeholder="customer_phone"
+              disabled={Boolean(row?.id) && (kind !== "fields" || locked)}
+              value={data.code || ""}
+              onChange={(e) => set("code", e.target.value.toLowerCase().replace(/\s+/g, "_"))}
+            />
+            <small>
+              {kind === "fields" && locked
+                ? "این ورودی داده ثبت‌شده دارد؛ کد آن ثابت می‌ماند."
+                : kind === "lookups" || kind === "values"
+                  ? "کد به‌صورت خودکار ساخته شده است؛ فقط در صورت نیاز آن را تغییر دهید."
+                  : "برای گزارش‌ها و اتصال‌ها استفاده می‌شود و در فرم دیده نمی‌شود."}
+            </small>
+          </label>
+        </details>
       </div>
       {(kind === "entities" || kind === "lookups") && (
         <label>
@@ -392,159 +397,250 @@ export function DefinitionEditor({
               setPreviewValue(null);
             }}
           />
-          <label>
-            راهنمای کوتاه زیر ورودی (اختیاری)
-            <textarea
-              value={data.help_text || ""}
-              placeholder="مثلاً شماره را با ۰۹ شروع کنید"
-              onChange={(e) => set("help_text", e.target.value)}
-            />
-          </label>
-          {textKinds.has(data.kind || "") && (
+          <details
+            className="engine-advanced-setting"
+            open={
+              choiceKinds.has(data.kind || "") || ["relation", "computed"].includes(data.kind || "") || Boolean(row?.id)
+                ? true
+                : undefined
+            }
+          >
+            <summary>تنظیمات پیشرفتهٔ ورودی</summary>
             <label>
-              متن نمونه داخل کادر (اختیاری)
-              <input value={data.placeholder || ""} onChange={(e) => set("placeholder", e.target.value)} />
-            </label>
-          )}
-          {choiceKinds.has(data.kind || "") && (
-            <InlineLookupEditor
-              lookupId={data.lookup}
-              onChange={(id) => set("lookup", id)}
-              lookups={lookups}
-              values={lookupValues}
-              selectionDisabled={locked}
-            />
-          )}
-          <fieldset disabled={locked} className="engine-config-fields">
-            <legend>قواعد پر کردن</legend>
-            {data.kind === "relation" && (
-              <>
-                <SearchableSelect
-                  label="به کدام بخش متصل شود؟"
-                  disabled={locked}
-                  value={data.relation_entity || ""}
-                  options={catalog?.entities.filter((e) => !e.parent).map((e) => ({ id: e.id, title: e.title })) || []}
-                  onChange={(v) => set("relation_entity", v || null)}
-                />
-                <label className="engine-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={config.multiple || false}
-                    onChange={(e) => updateConfig({ multiple: e.target.checked })}
-                  />
-                  امکان انتخاب چند مورد
-                </label>
-              </>
-            )}
-            <div className="engine-editor-grid">
-              {[
-                ["required", "پر کردن آن اجباری است"],
-                ["readonly", "فقط نمایشی (کاربر نمی‌تواند تغییر دهد)"],
-                ["unique", "مقدار تکراری ثبت نشود"],
-              ].map(([key, title]) => (
-                <label className="engine-checkbox" key={key}>
-                  <input
-                    type="checkbox"
-                    checked={Boolean(config[key as keyof FieldConfig])}
-                    onChange={(e) => updateConfig({ [key]: e.target.checked })}
-                  />
-                  {title}
-                </label>
-              ))}
-            </div>
-            <label className="engine-checkbox">
-              <input
-                type="checkbox"
-                checked={config.editable_after_create !== false}
-                onChange={(e) => updateConfig({ editable_after_create: e.target.checked })}
+              راهنمای کوتاه زیر ورودی (اختیاری)
+              <textarea
+                value={data.help_text || ""}
+                placeholder="مثلاً شماره را با ۰۹ شروع کنید"
+                onChange={(e) => set("help_text", e.target.value)}
               />
-              بعد از ثبت هم قابل ویرایش باشد
             </label>
-            <div className="engine-editor-grid">
-              {[
-                ["min", "کمترین مقدار مجاز"],
-                ["max", "بیشترین مقدار مجاز"],
-                ["min_length", "کمترین تعداد حرف"],
-                ["max_length", "بیشترین تعداد حرف"],
-              ]
-                .filter(([key]) =>
-                  key.endsWith("_length") ? textKinds.has(data.kind || "") : numberKinds.has(data.kind || "")
-                )
-                .map(([key, title]) => (
-                  <label key={key}>
-                    {title}
+            {textKinds.has(data.kind || "") && (
+              <label>
+                متن نمونه داخل کادر (اختیاری)
+                <input value={data.placeholder || ""} onChange={(e) => set("placeholder", e.target.value)} />
+              </label>
+            )}
+            {choiceKinds.has(data.kind || "") && (
+              <InlineLookupEditor
+                lookupId={data.lookup}
+                onChange={(id) => set("lookup", id)}
+                lookups={lookups}
+                values={lookupValues}
+                selectionDisabled={locked}
+              />
+            )}
+            <fieldset disabled={locked} className="engine-config-fields">
+              <legend>قواعد پر کردن</legend>
+              {data.kind === "relation" && (
+                <>
+                  <SearchableSelect
+                    label="به کدام بخش متصل شود؟"
+                    disabled={locked}
+                    value={data.relation_entity || ""}
+                    options={
+                      catalog?.entities.filter((e) => !e.parent).map((e) => ({ id: e.id, title: e.title })) || []
+                    }
+                    onChange={(v) => set("relation_entity", v || null)}
+                  />
+                  <label className="engine-checkbox">
                     <input
-                      type="number"
-                      value={
-                        typeof config[key as keyof FieldConfig] === "number"
-                          ? Number(config[key as keyof FieldConfig])
-                          : ""
-                      }
-                      onChange={(e) => {
-                        const next = { ...config };
-                        if (e.target.value === "") delete next[key as "min"];
-                        else next[key as "min"] = Number(e.target.value);
-                        set("config", next);
-                      }}
+                      type="checkbox"
+                      checked={config.multiple || false}
+                      onChange={(e) => updateConfig({ multiple: e.target.checked })}
                     />
+                    امکان انتخاب چند مورد
+                  </label>
+                </>
+              )}
+              <div className="engine-editor-grid">
+                {[
+                  ["required", "پر کردن آن اجباری است"],
+                  ["readonly", "فقط نمایشی (کاربر نمی‌تواند تغییر دهد)"],
+                  ["unique", "مقدار تکراری ثبت نشود"],
+                ].map(([key, title]) => (
+                  <label className="engine-checkbox" key={key}>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(config[key as keyof FieldConfig])}
+                      onChange={(e) => updateConfig({ [key]: e.target.checked })}
+                    />
+                    {title}
                   </label>
                 ))}
-            </div>
-            {data.kind === "money" && (
-              <label>
-                واحد پول (مثلاً ریال)
-                <input value={config.unit || ""} onChange={(e) => updateConfig({ unit: e.target.value })} />
-              </label>
-            )}
-            {data.kind === "rating" && (
-              <label>
-                تعداد ستاره
+              </div>
+              <label className="engine-checkbox">
                 <input
-                  type="number"
-                  min={1}
-                  max={10}
-                  value={config.stars || 5}
-                  onChange={(e) => updateConfig({ stars: Number(e.target.value) })}
+                  type="checkbox"
+                  checked={config.editable_after_create !== false}
+                  onChange={(e) => updateConfig({ editable_after_create: e.target.checked })}
                 />
+                بعد از ثبت هم قابل ویرایش باشد
               </label>
-            )}
-            {data.kind === "file" && (
-              <>
+              <div className="engine-editor-grid">
+                {[
+                  ["min", "کمترین مقدار مجاز"],
+                  ["max", "بیشترین مقدار مجاز"],
+                  ["min_length", "کمترین تعداد حرف"],
+                  ["max_length", "بیشترین تعداد حرف"],
+                ]
+                  .filter(([key]) =>
+                    key.endsWith("_length") ? textKinds.has(data.kind || "") : numberKinds.has(data.kind || "")
+                  )
+                  .map(([key, title]) => (
+                    <label key={key}>
+                      {title}
+                      <input
+                        type="number"
+                        value={
+                          typeof config[key as keyof FieldConfig] === "number"
+                            ? Number(config[key as keyof FieldConfig])
+                            : ""
+                        }
+                        onChange={(e) => {
+                          const next = { ...config };
+                          if (e.target.value === "") delete next[key as "min"];
+                          else next[key as "min"] = Number(e.target.value);
+                          set("config", next);
+                        }}
+                      />
+                    </label>
+                  ))}
+              </div>
+              {data.kind === "money" && (
                 <label>
-                  نوع فایل‌های مجاز (مثلاً pdf، jpg)
-                  <input
-                    dir="ltr"
-                    value={config.extensions?.join(", ") || ""}
-                    onChange={(e) =>
-                      updateConfig({
-                        extensions: e.target.value
-                          .split(/[,،]/)
-                          .map((v) => v.trim().toLowerCase().replace(/^\./, ""))
-                          .filter(Boolean),
-                      })
-                    }
-                  />
+                  واحد پول (مثلاً ریال)
+                  <input value={config.unit || ""} onChange={(e) => updateConfig({ unit: e.target.value })} />
                 </label>
+              )}
+              {data.kind === "rating" && (
                 <label>
-                  حداکثر حجم هر فایل (مگابایت)
+                  تعداد ستاره
                   <input
                     type="number"
                     min={1}
-                    step={1}
-                    value={Math.round((config.max_file_size ?? 5242880) / 1048576)}
-                    onChange={(e) => updateConfig({ max_file_size: Math.max(1, Number(e.target.value)) * 1048576 })}
+                    max={10}
+                    value={config.stars || 5}
+                    onChange={(e) => updateConfig({ stars: Number(e.target.value) })}
                   />
                 </label>
-              </>
+              )}
+              {data.kind === "file" && (
+                <>
+                  <label>
+                    نوع فایل‌های مجاز (مثلاً pdf، jpg)
+                    <input
+                      dir="ltr"
+                      value={config.extensions?.join(", ") || ""}
+                      onChange={(e) =>
+                        updateConfig({
+                          extensions: e.target.value
+                            .split(/[,،]/)
+                            .map((v) => v.trim().toLowerCase().replace(/^\./, ""))
+                            .filter(Boolean),
+                        })
+                      }
+                    />
+                  </label>
+                  <label>
+                    حداکثر حجم هر فایل (مگابایت)
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={Math.round((config.max_file_size ?? 5242880) / 1048576)}
+                      onChange={(e) => updateConfig({ max_file_size: Math.max(1, Number(e.target.value)) * 1048576 })}
+                    />
+                  </label>
+                </>
+              )}
+              {data.kind === "computed" ? (
+                <FormulaEditor
+                  value={config.formula}
+                  onChange={(formula) => updateConfig({ formula })}
+                  fields={fields}
+                />
+              ) : (
+                <fieldset>
+                  <legend>مقدار اولیه</legend>
+                  <SearchableSelect
+                    label="ورودی با چه مقداری پر شود؟"
+                    disabled={locked}
+                    value={defaultMode}
+                    options={[
+                      { id: "constant", title: "خالی یا یک مقدار ثابت" },
+                      { id: "current_user", title: "کاربر جاری" },
+                      { id: "today", title: "امروز" },
+                      { id: "now", title: "زمان جاری" },
+                    ].filter((option) => option.id === "constant" || dynamicDefaultsFor(data.kind).includes(option.id))}
+                    onChange={(mode) =>
+                      updateConfig({
+                        default_dynamic: mode === "constant" ? "" : (mode as "today" | "now" | "current_user"),
+                        default: null,
+                      })
+                    }
+                  />
+                  {defaultMode === "constant" && data.kind && (
+                    <DefaultValueEditor
+                      field={{
+                        id: row?.id,
+                        code: data.code || "",
+                        kind: data.kind,
+                        config,
+                        lookup: data.lookup,
+                        relation_entity: data.relation_entity,
+                      }}
+                      value={constant ?? null}
+                      onChange={(value) => updateConfig({ default: value })}
+                      disabled={locked}
+                    />
+                  )}
+                </fieldset>
+              )}
+              <ConditionEditor
+                label="فقط در شرایط خاص اجباری شود"
+                description="بدون شرط، اجباری بودن فقط از گزینه «اجباری» بالا پیروی می‌کند."
+                value={config.required_if}
+                onChange={(required_if) => updateConfig({ required_if })}
+                fields={conditionFields}
+                lookupValues={lookupValues}
+              />
+              <ConditionEditor
+                label="فقط در شرایط خاص نمایش داده شود"
+                description="بدون شرط، این ورودی همیشه در فرم دیده می‌شود."
+                value={config.visible_if}
+                onChange={(visible_if) => updateConfig({ visible_if })}
+                fields={conditionFields}
+                lookupValues={lookupValues}
+              />
+            </fieldset>
+            {data.kind && data.kind !== "computed" && (
+              <fieldset className="engine-field-preview">
+                <legend>
+                  پیش‌نمایش ورودی {data.kind === "rich_text" ? "متن غنی" : data.kind === "percent" ? "درصد" : ""}
+                </legend>
+                <small>این کادر همان نوع ورودی را در فرم نشان می‌دهد. مقداری که اینجا وارد می‌کنید ذخیره نمی‌شود.</small>
+                <DefaultValueEditor
+                  field={{
+                    id: row?.id,
+                    code: data.code || "preview_value",
+                    kind: data.kind,
+                    config,
+                    lookup: data.lookup,
+                    relation_entity: data.relation_entity,
+                  }}
+                  value={previewValue}
+                  onChange={setPreviewValue}
+                  disabled={data.kind === "file"}
+                  label="نمونهٔ ورودی"
+                  showClear={false}
+                />
+              </fieldset>
             )}
-            {data.kind === "computed" ? (
-              <FormulaEditor value={config.formula} onChange={(formula) => updateConfig({ formula })} fields={fields} />
-            ) : (
+            {locked && data.kind !== "computed" && (
               <fieldset>
-                <legend>مقدار اولیه</legend>
+                <legend>مقدار اولیه ورودی</legend>
                 <SearchableSelect
                   label="ورودی با چه مقداری پر شود؟"
-                  disabled={locked}
                   value={defaultMode}
                   options={[
                     { id: "constant", title: "خالی یا یک مقدار ثابت" },
@@ -559,134 +655,64 @@ export function DefinitionEditor({
                     })
                   }
                 />
-                {defaultMode === "constant" && data.kind && (
+                {defaultMode === "constant" && (
                   <DefaultValueEditor
                     field={{
                       id: row?.id,
                       code: data.code || "",
-                      kind: data.kind,
+                      kind: data.kind!,
                       config,
                       lookup: data.lookup,
                       relation_entity: data.relation_entity,
                     }}
                     value={constant ?? null}
                     onChange={(value) => updateConfig({ default: value })}
-                    disabled={locked}
                   />
                 )}
               </fieldset>
             )}
-            <ConditionEditor
-              label="فقط در شرایط خاص اجباری شود"
-              description="بدون شرط، اجباری بودن فقط از گزینه «اجباری» بالا پیروی می‌کند."
-              value={config.required_if}
-              onChange={(required_if) => updateConfig({ required_if })}
-              fields={conditionFields}
-              lookupValues={lookupValues}
-            />
-            <ConditionEditor
-              label="فقط در شرایط خاص نمایش داده شود"
-              description="بدون شرط، این ورودی همیشه در فرم دیده می‌شود."
-              value={config.visible_if}
-              onChange={(visible_if) => updateConfig({ visible_if })}
-              fields={conditionFields}
-              lookupValues={lookupValues}
-            />
-          </fieldset>
-          {data.kind && data.kind !== "computed" && (
-            <fieldset className="engine-field-preview">
-              <legend>
-                پیش‌نمایش ورودی {data.kind === "rich_text" ? "متن غنی" : data.kind === "percent" ? "درصد" : ""}
-              </legend>
-              <small>این کادر همان نوع ورودی را در فرم نشان می‌دهد. مقداری که اینجا وارد می‌کنید ذخیره نمی‌شود.</small>
-              <DefaultValueEditor
-                field={{
-                  id: row?.id,
-                  code: data.code || "preview_value",
-                  kind: data.kind,
-                  config,
-                  lookup: data.lookup,
-                  relation_entity: data.relation_entity,
-                }}
-                value={previewValue}
-                onChange={setPreviewValue}
-                disabled={data.kind === "file"}
-                label="نمونهٔ ورودی"
-                showClear={false}
-              />
-            </fieldset>
-          )}
-          {locked && data.kind !== "computed" && (
             <fieldset>
-              <legend>مقدار اولیه ورودی</legend>
-              <SearchableSelect
-                label="ورودی با چه مقداری پر شود؟"
-                value={defaultMode}
-                options={[
-                  { id: "constant", title: "خالی یا یک مقدار ثابت" },
-                  { id: "current_user", title: "کاربر جاری" },
-                  { id: "today", title: "امروز" },
-                  { id: "now", title: "زمان جاری" },
-                ].filter((option) => option.id === "constant" || dynamicDefaultsFor(data.kind).includes(option.id))}
-                onChange={(mode) =>
-                  updateConfig({
-                    default_dynamic: mode === "constant" ? "" : (mode as "today" | "now" | "current_user"),
-                    default: null,
-                  })
-                }
-              />
-              {defaultMode === "constant" && (
-                <DefaultValueEditor
-                  field={{
-                    id: row?.id,
-                    code: data.code || "",
-                    kind: data.kind!,
-                    config,
-                    lookup: data.lookup,
-                    relation_entity: data.relation_entity,
-                  }}
-                  value={constant ?? null}
-                  onChange={(value) => updateConfig({ default: value })}
-                />
-              )}
-            </fieldset>
-          )}
-          <fieldset>
-            <legend>نمایش در جدول و جستجو</legend>
-            <label className="engine-checkbox">
-              <input
-                type="checkbox"
-                checked={Boolean(data.hidden_from_form)}
-                onChange={(e) => {
-                  if (
-                    window.confirm(
-                      e.target.checked
-                        ? "فیلد از فرم مخفی شود؟ داده‌های قبلی در جدول باقی می‌مانند و فقط‌خواندنی هستند."
-                        : "فیلد دوباره در فرم فعال شود؟"
-                    )
-                  )
-                    set("hidden_from_form", e.target.checked);
-                }}
-              />
-              دیگر در فرم نمایش داده نشود (داده‌های قبلی حفظ می‌شود)
-            </label>
-            {[
-              ["show_in_summary", "در خلاصه رکورد نمایش داده شود"],
-              ["searchable", "در جستجو پیدا شود"],
-              ["filterable", "در فیلترها قابل انتخاب باشد"],
-              ["table_visible", "به‌عنوان ستون جدول قابل انتخاب باشد"],
-            ].map(([key, title]) => (
-              <label className="engine-checkbox" key={key}>
+              <legend>نمایش در جدول و جستجو</legend>
+              <label className="engine-checkbox">
                 <input
                   type="checkbox"
-                  checked={Boolean(data[key as keyof EditableDefinition] ?? key !== "show_in_summary")}
-                  onChange={(e) => setData((old) => ({ ...old, [key]: e.target.checked }))}
+                  checked={Boolean(data.hidden_from_form)}
+                  onChange={(e) => {
+                    if (
+                      window.confirm(
+                        e.target.checked
+                          ? "فیلد از فرم مخفی شود؟ داده‌های قبلی در جدول باقی می‌مانند و فقط‌خواندنی هستند."
+                          : "فیلد دوباره در فرم فعال شود؟"
+                      )
+                    )
+                      set("hidden_from_form", e.target.checked);
+                  }}
                 />
-                {title}
+                دیگر در فرم نمایش داده نشود (داده‌های قبلی حفظ می‌شود)
               </label>
-            ))}
-          </fieldset>
+              {[
+                ["show_in_summary", "در خلاصه رکورد نمایش داده شود"],
+                ["searchable", "در جستجو پیدا شود"],
+                ["filterable", "در فیلترها قابل انتخاب باشد"],
+                ["table_visible", "به‌عنوان ستون جدول قابل انتخاب باشد"],
+              ].map(([key, title]) => (
+                <label className="engine-checkbox" key={key}>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(data[key as keyof EditableDefinition] ?? key !== "show_in_summary")}
+                    onChange={(e) => setData((old) => ({ ...old, [key]: e.target.checked }))}
+                  />
+                  {title}
+                </label>
+              ))}
+            </fieldset>
+          </details>
         </>
+      )}
+      {mutation.error && (
+        <p role="alert">
+          {errorMessage(mutation.error, "ورودی ساخته نشد؛ اطلاعات را بررسی کنید. متن واردشده حفظ شده است.")}
+        </p>
       )}
       <footer className="engine-form-footer">
         <Button type="submit" disabled={mutation.isPending}>

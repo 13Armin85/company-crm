@@ -22,6 +22,8 @@ class IssueType(BaseModel):
     level = models.FloatField(default=0)
     external_source = models.CharField(max_length=255, null=True, blank=True)
     external_id = models.CharField(max_length=255, blank=True, null=True)
+    # Ticket 5: default target duration (working minutes) for tickets of this type.
+    target_minutes = models.PositiveIntegerField(null=True, blank=True)
 
     class Meta:
         verbose_name = "Issue Type"

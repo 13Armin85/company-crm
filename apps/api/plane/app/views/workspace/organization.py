@@ -526,18 +526,29 @@ class OrganizationUserProfileEndpoint(BaseAPIView):
 class TicketRoutingRuleListEndpoint(BaseAPIView):
     @require_permission("Routing.View")
     def get(self, request, slug):
-        rows = TicketRoutingRule.objects.filter(workspace__slug=slug).select_related("unit", "required_role")
+        rows = TicketRoutingRule.objects.filter(workspace__slug=slug).select_related(
+            "unit", "required_role", "target_user"
+        ).order_by("position", "name", "id")
+        from plane.app.services.ticket_routing import shadowed_rules
+
+        workspace_id = Workspace.objects.filter(slug=slug).values_list("id", flat=True).first()
+        shadowed = shadowed_rules(workspace_id)
+
+        def serialize(chunk):
+            data = TicketRoutingRuleSerializer(chunk, many=True).data
+            for item in data:
+                item["shadowed_by"] = shadowed.get(str(item["id"]))
+            return data
+
         if wants_page(request):
-            rows = rows.filter(
-                search_q(search_terms(request), ["name", "unit__title", "required_role__name"])
-            ).order_by("-is_active", "name", "id")
-            return paginate(request, rows, lambda chunk: TicketRoutingRuleSerializer(chunk, many=True).data)
-        return Response(TicketRoutingRuleSerializer(rows, many=True).data)
+            rows = rows.filter(search_q(search_terms(request), ["name", "unit__title", "required_role__name"]))
+            return paginate(request, rows, serialize)
+        return Response(serialize(rows))
 
     @require_permission("Routing.Manage")
     def post(self, request, slug):
         workspace = get_object_or_404(Workspace, slug=slug)
-        serializer = TicketRoutingRuleSerializer(data=request.data)
+        serializer = TicketRoutingRuleSerializer(data=request.data, context={"workspace": workspace})
         serializer.is_valid(raise_exception=True)
         rule = TicketRoutingRule(workspace=workspace, **serializer.validated_data)
         try:
@@ -552,9 +563,13 @@ class TicketRoutingRuleDetailEndpoint(BaseAPIView):
     @require_permission("Routing.Manage")
     def patch(self, request, slug, rule_id):
         rule = get_object_or_404(TicketRoutingRule, workspace__slug=slug, id=rule_id)
-        serializer = TicketRoutingRuleSerializer(rule, data=request.data, partial=True)
+        serializer = TicketRoutingRuleSerializer(
+            rule, data=request.data, partial=True, context={"workspace": rule.workspace}
+        )
         serializer.is_valid(raise_exception=True)
-        for field in ("name", "unit", "required_role", "is_active"):
+        for field in (
+            "name", "unit", "required_role", "is_active", "position", "conditions", "method", "target_user", "member_ids"
+        ):
             if field in serializer.validated_data:
                 setattr(rule, field, serializer.validated_data[field])
         try:
@@ -575,7 +590,9 @@ class TicketRoutingRuleDetailEndpoint(BaseAPIView):
 class TicketRouteEndpoint(BaseAPIView):
     @require_permission("Routing.Route")
     def post(self, request, slug, issue_id):
-        issue = get_object_or_404(Issue, id=issue_id, workspace__slug=slug)
+        from plane.app.services.ticket_core import visible_ticket
+
+        issue = visible_ticket(get_object_or_404(Workspace, slug=slug), request.user, issue_id, request)
         rule = get_object_or_404(TicketRoutingRule, id=request.data.get("rule_id"), workspace__slug=slug)
         try:
             decision = TicketRoutingService.route(issue, rule, actor_id=request.user.id)
@@ -590,10 +607,13 @@ class TicketRoleQueueEndpoint(BaseAPIView):
         from plane.app.services.project_visibility import visible_projects
 
         rows = TicketRoleQueueEntry.objects.filter(
+            Q(issue__project__isnull=True)
+            | Q(
+                issue__project_id__in=visible_projects(
+                    Project.objects.filter(workspace__slug=slug), request.user, slug,
+                ).values("id")
+            ),
             issue__workspace__slug=slug, status=TicketRoleQueueEntry.Status.OPEN,
-            issue__project_id__in=visible_projects(
-                Project.objects.filter(workspace__slug=slug), request.user, slug,
-            ).values("id"),
         ).select_related("issue", "issue__project", "rule", "required_role", "claimed_by")
         if not has_permission(request.user, slug, "Routing.Queue.ViewAll", request=request):
             active_roles = UserOrganizationRole.objects.filter(
@@ -615,13 +635,22 @@ class TicketRoleQueueClaimEndpoint(BaseAPIView):
         from plane.app.services.project_visibility import visible_projects
 
         entry = get_object_or_404(
-            TicketRoleQueueEntry.objects.select_for_update().select_related("issue", "required_role"),
+            # Lock only the queue row: rule/required_role are nullable since ticket 5 (outer joins).
+            TicketRoleQueueEntry.objects.select_for_update(of=("self",)).select_related("issue", "required_role"),
+            Q(issue__project__isnull=True)
+            | Q(
+                issue__project_id__in=visible_projects(
+                    Project.objects.filter(workspace__slug=slug), request.user, slug,
+                ).values("id")
+            ),
             id=queue_id,
             issue__workspace__slug=slug,
-            issue__project_id__in=visible_projects(
-                Project.objects.filter(workspace__slug=slug), request.user, slug,
-            ).values("id"),
         )
+        if entry.required_role_id is None:
+            return Response(
+                {"error": "این تیکت در صف بدون مسئول است؛ مدیر صف آن را ارجاع می‌دهد."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         if entry.status != TicketRoleQueueEntry.Status.OPEN:
             return Response({"error": "Queue entry is no longer open."}, status=status.HTTP_409_CONFLICT)
         if entry.issue.created_by_id == request.user.id:

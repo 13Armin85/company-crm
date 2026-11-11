@@ -1,4 +1,11 @@
-import { displayPersianDate, parseDateOnly, PersianCalendarNavigation, persianMonths, zonedDateTime } from "@plane/ui";
+import {
+  displayPersianDate,
+  jalaliToDateOnly,
+  parseDateOnly,
+  PersianCalendarNavigation,
+  persianMonths,
+  zonedDateTime,
+} from "@plane/ui";
 import { useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { jalaaliMonthLength, toGregorian } from "jalaali-js";
@@ -15,6 +22,10 @@ export function IssueCalendar({
   isLoading,
   toolbarEnd,
   showAgenda = false,
+  value,
+  onValueChange,
+  renderDay,
+  emptyHidden = false,
 }: {
   issues: Issue[];
   projects: Project[];
@@ -22,10 +33,21 @@ export function IssueCalendar({
   isLoading?: boolean;
   toolbarEnd?: ReactNode;
   showAgenda?: boolean;
+  /** Controlled selected date (YYYY-MM-DD); uncontrolled when omitted. */
+  value?: string;
+  onValueChange?: (value: string) => void;
+  /** Extra content per day cell, e.g. work-calendar layers. */
+  renderDay?: (date: string) => ReactNode;
+  emptyHidden?: boolean;
 }) {
   const todayValue = zonedDateTime(new Date(), timeZone)!.date;
   const today = parseDateOnly(todayValue)!;
-  const [date, setDate] = useState<string>();
+  const [ownDate, setOwnDate] = useState<string>();
+  const date = value ?? ownDate;
+  const setDate = (next: string) => {
+    setOwnDate(next);
+    onValueChange?.(next);
+  };
   const currentDate = date ?? todayValue;
   const chosen = parseDateOnly(currentDate)!;
   const selected = { year: chosen.jy, month: chosen.jm };
@@ -84,6 +106,10 @@ export function IssueCalendar({
                 }
               >
                 <span>{day >= 1 && day <= days ? toFa(day) : ""}</span>
+                {renderDay &&
+                  day >= 1 &&
+                  day <= days &&
+                  renderDay(jalaliToDateOnly(selected.year, selected.month, day))}
                 {events.get(day)?.map((issue) => {
                   const project = projects.find((item) => item.id === issue.projectId);
                   return (
@@ -102,7 +128,7 @@ export function IssueCalendar({
               </div>
             ))}
           </div>
-          {!events.size && (
+          {!events.size && !emptyHidden && (
             <EmptyState
               title="موعدی در این ماه ثبت نشده"
               description="ماه و سال را تغییر دهید یا برای کارها موعد تعیین کنید."

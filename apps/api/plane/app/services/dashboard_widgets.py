@@ -83,6 +83,9 @@ def _metric(query, config):
     return json_value(result["value"] or 0)
 
 
+WORK_CATEGORY = "__work_category__"
+
+
 def _ticket_rows(query):
     if query.entity.code != "ticket":
         raise ValidationError("این ویجت به دادهٔ کارها نیاز دارد.")
@@ -162,6 +165,26 @@ def _chart_labels(query, path, values):
 
 
 
+RESTRICTED = "__restricted__"
+
+
+def _restricted_count(query, path, alias):
+    """Rows whose stored relation points only at records hidden from the viewer."""
+    field = query.describe(path)
+    if field["kind"] != "relation" or "." in path or field["binding"].get("source"):
+        return 0
+    hidden = Q(**{f"{alias}__isnull": True})
+    if field["config"].get("multiple"):
+        hidden |= Q(**{alias: []})
+    return (
+        query.rows.filter(hidden)
+        .exclude(**{f"data__{path}__isnull": True})
+        .exclude(**{f"data__{path}": None})
+        .exclude(**{f"data__{path}": []})
+        .count()
+    )
+
+
 def _activity_value_labels(query, rows, fields):
     """Readable titles for stored choice, user, relation and state values in activity events."""
     from .entity_view_export import value_labels
@@ -234,8 +257,15 @@ def widget_data(widget, request, workspace):
         if entity.code != "ticket":
             raise ValidationError("فهرست کارهای من به موجودیت کارها نیاز دارد.")
         size = min(30, max(1, int(config.get("rows", 8))))
-        issues = _ticket_rows(query).filter(Q(assignee=request.user) | Q(issue_assignee__assignee=request.user)).distinct().exclude(status__in=["done", "cancelled"])
-        issues = issues.filter(Q(state__isnull=True) | ~Q(state__group__in=["completed", "cancelled"]))
+        from .ticket_core import open_q
+
+        # One status mapping (ticket 5, ن۶): "open" = not in the done category.
+        issues = (
+            _ticket_rows(query)
+            .filter(Q(assignee=request.user) | Q(issue_assignee__assignee=request.user))
+            .filter(open_q())
+            .distinct()
+        )
         count = issues.count()
         ordered_ids = list(issues.annotate(priority_rank=Case(
             When(priority="urgent", then=Value(0)), When(priority="high", then=Value(1)),
@@ -260,6 +290,17 @@ def widget_data(widget, request, workspace):
     if kind == "unassigned":
         query.system_filter("unassigned")
         return {"type": kind, **query.execute(1, min(30, max(1, int(config.get("rows", 8)))))}
+    if kind == "chart" and config.get("group_by") == WORK_CATEGORY:
+        # Status report by the three categories of ticket 5 (ن۶), from the same server function.
+        from .ticket_core import CATEGORY_TITLES, category_expression
+
+        counts = dict(
+            _ticket_rows(query).annotate(work_category=category_expression()).order_by()
+            .values_list("work_category").annotate(count=Count("id"))
+        )
+        points = [{"label": key, "value": counts.get(key, 0)} for key in CATEGORY_TITLES]
+        return {"type": kind, "chart": config.get("chart", "bar"), "points": points, "labels": dict(CATEGORY_TITLES),
+                "drilldown": {"entity": entity.code, "view_id": config.get("view_id")}}
     if kind == "chart":
         path = config.get("group_by")
         if not query.path_allowed(path, "filterable"):
@@ -284,7 +325,18 @@ def widget_data(widget, request, workspace):
                 series.add(category)
             return {"type": kind, "chart": "stacked", "points": list(points.values())[:30], "series": sorted(series), "labels": _chart_labels(query, path, group_values), "series_labels": _chart_labels(query, stack, stack_values), "drilldown": {"entity": entity.code, "view_id": config.get("view_id")}}
         values = list(query.rows.order_by().values(alias).annotate(count=Count("id")).order_by("-count")[:30])
-        return {"type": kind, "chart": config.get("chart", "bar"), "points": [{"label": json_value(row[alias]), "value": row["count"]} for row in values], "labels": _chart_labels(query, path, [json_value(row[alias]) for row in values]), "drilldown": {"entity": entity.code, "view_id": config.get("view_id")}}
+        points = [{"label": json_value(row[alias]), "value": row["count"]} for row in values]
+        labels = _chart_labels(query, path, [json_value(row[alias]) for row in values])
+        restricted = _restricted_count(query, path, alias)
+        if restricted:
+            # Links to records the viewer may not see are counted together, never titled.
+            for point in points:
+                if point["label"] in (None, []):
+                    point["value"] -= restricted
+            points = [point for point in points if point["value"] > 0]
+            points.append({"label": RESTRICTED, "value": restricted})
+            labels[RESTRICTED] = "بدون دسترسی"
+        return {"type": kind, "chart": config.get("chart", "bar"), "points": points, "labels": labels, "drilldown": {"entity": entity.code, "view_id": config.get("view_id")}}
     if kind == "progress":
         from .entity_rules import condition_fields
 
@@ -385,7 +437,9 @@ def widget_data(widget, request, workspace):
         names = dict(User.objects.filter(id__in=[row["assignee_id"] for row in counts]).values_list("id", "first_name"))
         return {"type": kind, "items": [{"user_id": str(row["assignee_id"]), "name": names.get(row["assignee_id"]) or str(row["assignee_id"]), "count": row["count"]} for row in counts]}
     if kind == "age":
-        issues = _ticket_rows(query).exclude(state__group__in=["completed", "cancelled"])
+        from .ticket_core import open_q
+
+        issues = _ticket_rows(query).filter(open_q())
         now = timezone.now()
         return {"type": kind, "buckets": [issues.filter(created_at__gte=now - timedelta(days=1)).count(), issues.filter(created_at__lt=now - timedelta(days=1), created_at__gte=now - timedelta(days=3)).count(), issues.filter(created_at__lt=now - timedelta(days=3)).count()]}
     raise ValidationError("داده ویجت قابل محاسبه نیست.")

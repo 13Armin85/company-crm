@@ -168,9 +168,12 @@ def value_labels(query, records):
             )
             objects = child.rows.filter(
                 Q(id__in=values) | Q(source_id__in=values)
-            ).values("id", "source_id", title)
+            ).values("id", "source_id", "is_active", title)
             labels = {
-                str(v["source_id"] or v["id"]): {"title": v[title] or "رکورد"}
+                str(v["source_id"] or v["id"]): {
+                    "title": v[title] or "رکورد",
+                    **({"inactive": True} if not v["is_active"] else {}),
+                }
                 for v in objects
             }
         elif field["kind"] == "file":

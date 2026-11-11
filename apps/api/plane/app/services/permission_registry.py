@@ -128,6 +128,47 @@ TICKET_SEVEN_PERMISSIONS = {
 PERMISSION_REGISTRY.update({code: {"name": title, "description": title, "category": "Dashboard", "is_delegatable": False, "is_active": True} for code, title in TICKET_SEVEN_PERMISSIONS.items()})
 MEMBER_PERMISSIONS.add("Dashboard.Personal.Manage")
 
+WORK_CALENDAR_PERMISSIONS = {
+    "WorkSchedule.ViewOwn": "مشاهده برنامه کاری خود",
+    "WorkSchedule.EditOwn": "ویرایش برنامه کاری خود",
+    "WorkSchedule.ViewTeam": "مشاهده برنامه کاری زیرمجموعه مستقیم",
+    "WorkSchedule.EditTeam": "ویرایش برنامه کاری زیرمجموعه مستقیم",
+    "WorkSchedule.ViewHierarchy": "مشاهده برنامه کاری زیرمجموعه‌های غیرمستقیم",
+    "WorkSchedule.EditPast": "ثبت تغییر برنامه کاری با تاریخ گذشته",
+    "WorkSchedule.ManageDefaults": "مدیریت برنامه کاری پیش‌فرض شرکت و واحدها",
+    "WorkEvent.Create": "ایجاد جلسه، مأموریت و رویداد کاری",
+    "WorkEvent.Manage": "مدیریت رویدادهای کاری زیرمجموعه",
+}
+PERMISSION_REGISTRY.update({code: {"name": title, "description": title, "category": code.split(".")[0], "is_delegatable": False, "is_active": True} for code, title in WORK_CALENDAR_PERMISSIONS.items()})
+WORK_CALENDAR_MEMBER_PERMISSIONS = {"WorkSchedule.ViewOwn", "WorkEvent.Create"}
+MEMBER_PERMISSIONS.update(WORK_CALENDAR_MEMBER_PERMISSIONS)
+
+WORKFLOW_PERMISSIONS = {
+    "Workflow.View": "مشاهده گردش‌کار",
+    "Workflow.Design": "طراحی و ویرایش پیش‌نویس گردش‌کار",
+    "Workflow.Publish": "انتشار نسخه گردش‌کار",
+    "Workflow.Reassign": "ارجاع مدیریتی مرحله گردش‌کار",
+    "Workflow.Migrate": "انتقال فرایند فعال به نسخه دیگر",
+    "Workflow.ViewAll": "مشاهده همه فرایندهای گردش‌کار",
+}
+PERMISSION_REGISTRY.update(
+    {
+        code: {"name": title, "description": title, "category": "Workflow", "is_delegatable": False, "is_active": True}
+        for code, title in WORKFLOW_PERMISSIONS.items()
+    }
+)
+WORKFLOW_MEMBER_PERMISSIONS = {"Workflow.View"}
+MEMBER_PERMISSIONS.update(WORKFLOW_MEMBER_PERMISSIONS)
+
+# Ticket 5: only the target-duration code is new; routing/queue reuse Routing.*.
+TICKET_PERMISSIONS = {"Ticket.TargetSet": "تعیین و تغییر مدت هدف تیکت"}
+PERMISSION_REGISTRY.update(
+    {
+        code: {"name": title, "description": title, "category": "Ticket", "is_delegatable": False, "is_active": True}
+        for code, title in TICKET_PERMISSIONS.items()
+    }
+)
+
 
 def sync_permission_catalog(workspace):
     from plane.db.models import OrganizationPermission

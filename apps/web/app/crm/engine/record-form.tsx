@@ -1,13 +1,25 @@
 import { ErrorNotice, ErrorState } from "../error-state";
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
+import { Check } from "lucide-react";
 import { SchemaDrivenForm, validateSchemaValues, fieldVisible } from "@plane/ui";
 import type { FormValues, OptionsLoader, SchemaField, SchemaOption } from "@plane/ui";
 import type { TFileHandler } from "@plane/editor";
 import { api, errorMessage } from "../api";
 import { useUIStore } from "../store";
 import { Button, Skeleton } from "../components";
-import { useEngineSchema, useEngineRecord, useEngineSlug, enginePath, useEngineMutation, fieldErrors } from "./api";
+import {
+  useEngineCatalog,
+  useEngineSchema,
+  useEngineRecord,
+  useEngineSlug,
+  enginePath,
+  useEngineMutation,
+  fieldErrors,
+} from "./api";
+import { AccessModal } from "../access/components";
+import { RelationFieldExtras, alignEntries, linkFieldsOf, missingLinkData, selectedIds } from "./relation-link-data";
+import type { LinkEntry } from "./relation-link-data";
 import type { EngineRecord } from "./api";
 import { entityDisplaySchema } from "./presentation";
 import { DuplicateFeedback, duplicateDetails } from "./duplicate-feedback";
@@ -88,10 +100,12 @@ export function useSchemaTransport(code: string, subtype = "", library = false, 
         ...(selected?.length ? { selected: selected.join(",") } : {}),
         ...(resolve ? { resolve: "true" } : {}),
         ...(library ? { library: "true" } : {}),
+        // A self relation never offers the record being edited.
+        ...(record && field.config.self_relation ? { exclude: record } : {}),
       });
       return (await api.get(`${enginePath(slug)}/entities/${code}/options/${field.code}/?${params}`)).data;
     },
-    [code, slug, subtype, library]
+    [code, slug, subtype, library, record]
   );
   const uploadFile = useCallback(
     async (field: SchemaField, file: File): Promise<SchemaOption> => {
@@ -152,125 +166,201 @@ export function EngineRecordForm({
   const [values, setValues] = useState<FormValues>({}),
     [errors, setErrors] = useState<Record<string, string>>({}),
     [readyKey, setReadyKey] = useState("");
+  // Values and revision the form was loaded from: an external change (e.g. a workflow step)
+  // reloads an untouched form instead of making it look edited.
+  const [baseline, setBaseline] = useState<{ values: FormValues; revision?: number }>({ values: {} });
   const [savedWithWarning, setSavedWithWarning] = useState<EngineRecord | null>(null);
+  const [links, setLinks] = useState<Record<string, LinkEntry[]>>({});
+  const [quickCreate, setQuickCreate] = useState<SchemaField | null>(null);
+  const catalog = useEngineCatalog();
   const setDirty = useUIStore((s) => s.setFormDirty);
   const schema = schemaQuery.data,
     record = recordQuery.data;
   const key = `${code}:${subtype}:${id}`;
+  const dirty = readyKey === key && JSON.stringify(values) !== JSON.stringify(baseline.values);
   useEffect(() => {
-    if (!schema || (id && !record) || readyKey === key) return;
-    setValues({ ...schema.defaults, ...(record?.values || initialValues) });
+    if (!schema || (id && !record)) return;
+    const changedOutside = readyKey === key && record && record.revision !== baseline.revision && !dirty;
+    if (readyKey === key && !changedOutside) return;
+    const loaded = { ...schema.defaults, ...(record?.values || initialValues) };
+    setValues(loaded);
+    setBaseline({ values: loaded, revision: record?.revision });
+    setLinks(record?.relation_data || {});
     setReadyKey(key);
     setErrors({});
-  }, [schema, record, id, initialValues, key, readyKey]);
-  const dirty =
-    readyKey === key &&
-    JSON.stringify(values) !== JSON.stringify({ ...schema?.defaults, ...(record?.values || initialValues) });
+  }, [schema, record, id, initialValues, key, readyKey, baseline.revision, dirty]);
   useEffect(() => {
     onDirtyChange?.(dirty && !readOnly);
     setDirty(`entity:${key}`, dirty && !readOnly);
     return () => setDirty(`entity:${key}`, false);
   }, [dirty, key, readOnly, setDirty, onDirtyChange]);
   const canEdit = !readOnly && (!id || Boolean(record?.can_edit));
+  const relationFields = (schema?.fields || []).filter(
+    (field) =>
+      field.kind === "relation" &&
+      field.is_active &&
+      !field.config.readonly &&
+      Boolean(field.config.relation_id) &&
+      (!visibleFields || visibleFields.includes(field.code)) &&
+      fieldVisible(field, values, schema!)
+  );
+  const canCreate = (entity?: string | null) =>
+    Boolean(catalog.data?.entities.find((item) => item.code === entity && !item.parent)?.can_create);
+  const linkEntries = (field: SchemaField) => alignEntries(selectedIds(values[field.code]), links[field.code]);
   const failure = schemaQuery.error || recordQuery.error || mutation.error;
   if (schemaQuery.isLoading || (id && recordQuery.isLoading) || (readyKey !== key && !failure))
     return <Skeleton rows={4} />;
   if (!schema)
     return <ErrorState message={errorMessage(failure, "فرم منتشرشده دریافت نشد. دوباره صفحه را بارگذاری کنید.")} />;
+  function relationData() {
+    const entries = Object.fromEntries(
+      relationFields.filter((field) => linkFieldsOf(field).length).map((field) => [field.code, linkEntries(field)])
+    );
+    return Object.keys(entries).length ? entries : null;
+  }
   return (
-    <form
-      className="engine-record-form"
-      onSubmit={async (event) => {
-        event.preventDefault();
-        if (!canEdit || mutation.isPending) return;
-        const invalid = validateSchemaValues(schema, values);
-        setErrors(invalid);
-        if (Object.keys(invalid).length) return;
-        const payload = Object.fromEntries(
-          schema.fields
-            .filter(
-              (f) =>
-                f.is_active &&
-                fieldVisible(f, values, schema) &&
-                f.kind !== "computed" &&
-                !f.config.readonly &&
-                !(id && f.config.editable_after_create === false) &&
-                (id
-                  ? JSON.stringify(values[f.code]) !== JSON.stringify(record?.values[f.code])
-                  : values[f.code] !== undefined)
-            )
-            .map((f) => [f.code, values[f.code]])
-        );
-        try {
-          const result = (await mutation.mutateAsync({
-            path: `entities/${code}/records/${id ? `${id}/` : ""}`,
-            method: id ? "patch" : "post",
-            data: { values: payload, ...(id ? { revision: record?.revision } : {}), ...(subtype ? { subtype } : {}) },
-          })) as EngineRecord;
-          setDirty(`entity:${key}`, false);
-          setReadyKey("");
-          if (result.warnings?.length) setSavedWithWarning(result);
-          else onSaved?.(result);
-        } catch (error) {
-          setErrors(fieldErrors(error));
-        }
-      }}
-    >
-      <ErrorNotice message={failure && errorMessage(failure, "ذخیره انجام نشد؛ مقادیر و دسترسی خود را بررسی کنید.")} />
-      <DuplicateFeedback details={duplicateDetails(mutation.error)} />
-      {savedWithWarning && (
-        <>
-          <p role="status">رکورد با هشدار ثبت شد.</p>
-          <DuplicateFeedback details={savedWithWarning.warnings || []} />
-          <Button
-            onClick={() => {
-              onSaved?.(savedWithWarning);
-              setSavedWithWarning(null);
+    <>
+      <form
+        className="engine-record-form"
+        onSubmit={async (event) => {
+          event.preventDefault();
+          if (!canEdit || mutation.isPending) return;
+          const invalid = validateSchemaValues(schema, values);
+          for (const field of relationFields) {
+            const message = missingLinkData(linkFieldsOf(field), linkEntries(field));
+            if (message && !invalid[field.code]) invalid[field.code] = message;
+          }
+          setErrors(invalid);
+          if (Object.keys(invalid).length) return;
+          const payload = Object.fromEntries(
+            schema.fields
+              .filter(
+                (f) =>
+                  f.is_active &&
+                  fieldVisible(f, values, schema) &&
+                  f.kind !== "computed" &&
+                  !f.config.readonly &&
+                  !(id && f.config.editable_after_create === false) &&
+                  (id
+                    ? JSON.stringify(values[f.code]) !== JSON.stringify(record?.values[f.code])
+                    : values[f.code] !== undefined)
+              )
+              .map((f) => [f.code, values[f.code]])
+          );
+          try {
+            const result = (await mutation.mutateAsync({
+              path: `entities/${code}/records/${id ? `${id}/` : ""}`,
+              method: id ? "patch" : "post",
+              data: {
+                values: payload,
+                ...(relationData() ? { relation_data: relationData() } : {}),
+                ...(id ? { revision: record?.revision } : {}),
+                ...(subtype ? { subtype } : {}),
+              },
+            })) as EngineRecord;
+            setDirty(`entity:${key}`, false);
+            setReadyKey("");
+            if (result.warnings?.length) setSavedWithWarning(result);
+            else onSaved?.(result);
+          } catch (error) {
+            setErrors(fieldErrors(error));
+          }
+        }}
+      >
+        <ErrorNotice
+          message={failure && errorMessage(failure, "ذخیره انجام نشد؛ مقادیر و دسترسی خود را بررسی کنید.")}
+        />
+        <DuplicateFeedback details={duplicateDetails(mutation.error)} />
+        {savedWithWarning && (
+          <>
+            <p role="status">رکورد با هشدار ثبت شد.</p>
+            <DuplicateFeedback details={savedWithWarning.warnings || []} />
+            <Button
+              onClick={() => {
+                onSaved?.(savedWithWarning);
+                setSavedWithWarning(null);
+              }}
+            >
+              ادامه
+            </Button>
+          </>
+        )}
+        <SchemaDrivenForm
+          schema={entityDisplaySchema(
+            visibleFields
+              ? {
+                  ...schema,
+                  layout: {
+                    tabs: [],
+                    sections: [
+                      {
+                        id: "summary",
+                        columns: 1,
+                        bindings: visibleFields
+                          .filter((fieldCode) => schema.fields.some((field) => field.code === fieldCode))
+                          .map((field) => ({ field })),
+                      },
+                    ],
+                  },
+                }
+              : schema
+          )}
+          values={values}
+          onChange={setValues}
+          errors={errors}
+          disabled={!canEdit || mutation.isPending}
+          editing={Boolean(id)}
+          {...transport}
+          renderFieldAddon={(field) =>
+            canEdit && relationFields.some((item) => item.code === field.code) ? (
+              <RelationFieldExtras
+                field={field}
+                entries={linkEntries(field)}
+                canCreate={canCreate(field.relation_entity)}
+                disabled={mutation.isPending}
+                onChange={(entries) => setLinks({ ...links, [field.code]: entries })}
+                onCreate={() => setQuickCreate(field)}
+              />
+            ) : null
+          }
+        />
+        <footer className="engine-form-footer">
+          {canEdit && (
+            <Button type="submit" disabled={mutation.isPending || Boolean(savedWithWarning)}>
+              {mutation.isPending ? (
+                "در حال ذخیره…"
+              ) : (
+                <>
+                  <Check size={16} strokeWidth={2.4} aria-hidden="true" />
+                  {id ? "ذخیره تغییرات" : "ثبت"}
+                </>
+              )}
+            </Button>
+          )}
+          {onCancel && (
+            <Button type="button" variant="secondary" onClick={onCancel} disabled={mutation.isPending}>
+              بستن
+            </Button>
+          )}
+        </footer>
+      </form>
+      {quickCreate?.relation_entity && (
+        // Rendered outside the outer form so the nested form's submit cannot bubble into it.
+        <AccessModal title={`ساخت ${quickCreate.title}`} onClose={() => setQuickCreate(null)}>
+          <EngineRecordForm
+            code={quickCreate.relation_entity}
+            onSaved={(created) => {
+              const field = quickCreate;
+              setValues((current) => ({
+                ...current,
+                [field.code]: field.config.multiple ? [...selectedIds(current[field.code]), created.id] : created.id,
+              }));
+              setQuickCreate(null);
             }}
-          >
-            ادامه
-          </Button>
-        </>
+            onCancel={() => setQuickCreate(null)}
+          />
+        </AccessModal>
       )}
-      <SchemaDrivenForm
-        schema={entityDisplaySchema(
-          visibleFields
-            ? {
-                ...schema,
-                layout: {
-                  tabs: [],
-                  sections: [
-                    {
-                      id: "summary",
-                      columns: 1,
-                      bindings: visibleFields
-                        .filter((fieldCode) => schema.fields.some((field) => field.code === fieldCode))
-                        .map((field) => ({ field })),
-                    },
-                  ],
-                },
-              }
-            : schema
-        )}
-        values={values}
-        onChange={setValues}
-        errors={errors}
-        disabled={!canEdit || mutation.isPending}
-        editing={Boolean(id)}
-        {...transport}
-      />
-      <footer className="engine-form-footer">
-        {canEdit && (
-          <Button type="submit" disabled={mutation.isPending || Boolean(savedWithWarning)}>
-            {mutation.isPending ? "در حال ذخیره…" : id ? "ذخیره تغییرات" : "ثبت"}
-          </Button>
-        )}
-        {onCancel && (
-          <Button type="button" variant="secondary" onClick={onCancel} disabled={mutation.isPending}>
-            بستن
-          </Button>
-        )}
-      </footer>
-    </form>
+    </>
   );
 }

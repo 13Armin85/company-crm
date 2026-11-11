@@ -95,13 +95,26 @@ export function useTasksTable({
   q,
   filters,
   today,
+  preset,
   ...paging
-}: Paging & { view: "all" | "mine"; tab: string; q: string; filters?: IssueFilters; today: string }) {
+}: Paging & {
+  view: "all" | "mine";
+  tab: string;
+  q: string;
+  filters?: IssueFilters;
+  today: string;
+  preset?: string;
+}) {
   const client = useQueryClient();
   return usePagedTable<
-    { kind: "issue" | "task"; item: Raw },
+    { kind: "issue" | "task"; item: Raw; deadline?: Issue["deadline"]; category?: Issue["category"] },
     Issue,
-    { tab_counts: Record<string, number>; stats?: { completed_this_week: number }; is_admin: boolean }
+    {
+      tab_counts: Record<string, number>;
+      stats?: { completed_this_week: number };
+      is_admin: boolean;
+      preset_counts?: Record<string, number>;
+    }
   >({
     key: "issues",
     path: (slug) => `/api/workspaces/${slug}/tasks/table/`,
@@ -117,6 +130,7 @@ export function useTasksTable({
       deadline: filters?.deadline,
       due_from: filters?.dueFrom,
       due_to: filters?.dueTo,
+      preset: preset && preset !== "all" ? preset : undefined,
     },
     ...paging,
     map: async (rows) => {
@@ -140,11 +154,13 @@ export function useTasksTable({
           ])
         )
       );
-      return rows.map((row) =>
-        row.kind === "issue"
+      return rows.map((row) => ({
+        ...(row.kind === "issue"
           ? mapIssue(row.item, String(row.item.project_id), states[String(row.item.project_id)] ?? [])
-          : mapWorkspaceTask(row.item, [])
-      );
+          : mapWorkspaceTask(row.item, [])),
+        deadline: row.deadline ?? null,
+        category: row.category ?? null,
+      }));
     },
   });
 }

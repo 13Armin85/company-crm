@@ -16,7 +16,7 @@
   border-top: 1px solid var(--border);
 }
 .schema-section h3 {
-  font-size: 14px;
+  font-size: var(--fs-lg);
   font-weight: 600;
   line-height: 1.9;
   margin: 0 0 20px;
@@ -41,7 +41,7 @@
   grid-column: 1 / -1;
 }
 .schema-field > label {
-  font-size: 13px;
+  font-size: var(--fs-md);
   color: var(--text-secondary);
   font-weight: 500;
 }
@@ -54,13 +54,13 @@
   width: 100%;
   min-height: 46px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 9px 12px;
   background: var(--surface);
   color: var(--text-primary);
   box-sizing: border-box;
   min-width: 0;
-  font-size: 13px;
+  font-size: var(--fs-md);
   line-height: 1.9;
   transition: border-color 0.15s;
 }
@@ -85,14 +85,14 @@
 .schema-field > small,
 .schema-number > small {
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   line-height: 1.9;
 }
 .schema-field p[role="alert"],
 .engine-settings p[role="alert"],
 .engine-record-form > p[role="alert"] {
   color: var(--schema-error, #dc2626);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   line-height: 1.9;
 }
 .schema-field input:disabled,
@@ -177,7 +177,7 @@
 }
 .schema-picker-status {
   padding: 8px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-secondary);
 }
 .schema-picker-more {
@@ -186,7 +186,7 @@
   border: 0;
   background: transparent;
   color: var(--accent);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   cursor: pointer;
 }
 .schema-tag-input {
@@ -197,7 +197,7 @@
   min-height: 46px;
   padding: 6px 8px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
   box-sizing: border-box;
 }
@@ -236,7 +236,7 @@
 .schema-stars button {
   border: 0;
   padding: 3px;
-  font-size: 26px;
+  font-size: var(--fs-4xl);
   background: transparent;
   cursor: pointer;
 }
@@ -244,7 +244,7 @@
   min-height: 42px;
   display: block;
   padding: 10px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--surface-soft);
 }
 .schema-files > div {
@@ -262,10 +262,10 @@
   min-height: 72px;
   padding: 16px;
   border: 1px dashed var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--surface-soft);
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--fs-md);
   cursor: pointer;
 }
 .schema-file-upload input {
@@ -298,7 +298,7 @@
 .schema-files a,
 .schema-relation-preview a {
   color: var(--accent);
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 .schema-relation-preview {
   position: relative;

@@ -9,4 +9,4 @@ class DbConfig(AppConfig):
     name = "plane.db"
 
     def ready(self):
-        from plane.db.signals import crm_access  # noqa: F401
+        from plane.db.signals import crm_access, ticket_lifecycle  # noqa: F401

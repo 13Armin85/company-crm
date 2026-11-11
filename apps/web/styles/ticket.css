@@ -1,0 +1,945 @@
+/* Ticket 5: target-time card, overdue banner, referral card, history timeline, dialogs and routing rules. */
+.ticket-core {
+  display: grid;
+  gap: 12px;
+  margin-block: 12px;
+  min-width: 0;
+  container-type: inline-size;
+}
+.ticket-core-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
+  gap: 12px;
+  align-items: start;
+}
+/* Break on the space the panel really has (page sidebars included), not on the viewport. */
+@container (max-width: 760px) {
+  .ticket-core-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ticket-core-side {
+    order: -1;
+  }
+}
+.ticket-core-main,
+.ticket-core-side {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.ticket-card,
+.ticket-history {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.ticket-card > header,
+.ticket-history > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ticket-card h3,
+.ticket-history h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+.ticket-tone-warning {
+  border-color: color-mix(in srgb, var(--orange) 55%, var(--border));
+}
+.ticket-tone-danger {
+  border-color: color-mix(in srgb, var(--red) 55%, var(--border));
+}
+.ticket-pill,
+.ticket-deadline-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.ticket-pill-neutral {
+  background: color-mix(in srgb, var(--text-secondary) 14%, transparent);
+  color: var(--text-secondary);
+}
+.ticket-pill-info {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--text-primary);
+}
+.ticket-pill-warning {
+  background: color-mix(in srgb, var(--orange) 18%, transparent);
+  color: var(--orange);
+}
+.ticket-pill-danger {
+  background: color-mix(in srgb, var(--red) 16%, transparent);
+  color: var(--red);
+}
+.ticket-pill-success {
+  background: color-mix(in srgb, var(--green) 16%, transparent);
+  color: var(--green);
+}
+.ticket-facts {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+.ticket-facts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ticket-facts dt,
+.ticket-muted,
+.ticket-hint,
+.ticket-why {
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+}
+.ticket-muted,
+.ticket-hint {
+  margin: 0;
+}
+.ticket-facts dd {
+  margin: 0;
+  text-align: end;
+}
+.ticket-summary {
+  margin: 0;
+  font-weight: 600;
+}
+.ticket-calendar {
+  border-bottom: 1px dotted var(--text-secondary);
+  cursor: help;
+}
+.ticket-progress {
+  height: 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-secondary) 18%, transparent);
+  overflow: hidden;
+}
+.ticket-progress > span {
+  display: block;
+  height: 100%;
+  background: var(--text-secondary);
+}
+.ticket-tone-warning .ticket-progress > span {
+  background: var(--orange);
+}
+.ticket-tone-danger .ticket-progress > span {
+  background: var(--red);
+}
+.ticket-pending {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--orange) 10%, transparent);
+}
+.ticket-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.ticket-action {
+  display: inline-grid;
+  gap: 2px;
+}
+.ticket-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--red) 10%, transparent);
+  color: var(--red);
+}
+.ticket-banner > span {
+  flex: 1;
+  min-width: 200px;
+}
+.ticket-error-text,
+.ticket-errors {
+  color: var(--red);
+}
+.ticket-errors {
+  margin: 0;
+  padding-inline-start: 18px;
+}
+.ticket-chips,
+.ticket-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ticket-presets {
+  margin-block: 8px;
+}
+.ticket-chip {
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.ticket-chip.is-active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  font-weight: 600;
+}
+.ticket-chip:focus-visible,
+.ticket-outcome:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.ticket-chip-count {
+  margin-inline-start: 6px;
+  color: var(--text-secondary);
+}
+.ticket-timeline {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ticket-event {
+  display: flex;
+  gap: 8px;
+}
+.ticket-event > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ticket-history > header .ticket-chips {
+  flex: 1 1 100%;
+}
+.ticket-card,
+.ticket-history,
+.ticket-facts dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ticket-event small {
+  color: var(--text-secondary);
+}
+.ticket-event-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.ticket-event-delay .ticket-event-icon {
+  background: color-mix(in srgb, var(--red) 14%, transparent);
+  color: var(--red);
+}
+.ticket-event-contact .ticket-event-icon {
+  background: color-mix(in srgb, var(--green) 14%, transparent);
+  color: var(--green);
+}
+.ticket-dialog {
+  display: grid;
+  gap: 12px;
+  padding: 20px;
+  max-width: min(560px, calc(100vw - 32px));
+}
+.ticket-dialog label {
+  display: grid;
+  gap: 4px;
+}
+.ticket-dialog textarea {
+  min-height: 80px;
+}
+.ticket-dialog footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.ticket-duration {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.ticket-duration legend {
+  margin-bottom: 4px;
+}
+.ticket-duration label {
+  flex: 1;
+}
+.ticket-dialog .ticket-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ticket-preview {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.ticket-outcomes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+}
+.ticket-outcome {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 56px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ticket-outcome.is-active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.ticket-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ticket-inbox-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.ticket-inbox-row > div {
+  display: grid;
+  gap: 2px;
+}
+.routing-rules-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.routing-rule-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.routing-rule-row[draggable="true"] {
+  cursor: grab;
+}
+.routing-rule-row.is-dragging {
+  opacity: 0.6;
+}
+.routing-rule-text {
+  display: grid;
+  flex: 1;
+  min-width: 220px;
+  gap: 2px;
+}
+.routing-rule-warning {
+  color: var(--orange);
+  font-size: var(--fs-sm);
+}
+.routing-test {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-lg);
+}
+.routing-rule-form {
+  display: grid;
+  gap: 10px;
+}
+
+/* ---------------------------------------------------------------- redesign: hierarchy and the deadline track */
+.ticket-card {
+  gap: 12px;
+  padding: 16px;
+  box-shadow: none;
+}
+.ticket-card > header h3 {
+  font-size: var(--fs-md, 1rem);
+  font-weight: 700;
+}
+.ticket-card-glyph {
+  color: var(--text-secondary);
+}
+.ticket-card-footer {
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+/* Target card: the one loud element. The working time left/late is the headline. */
+.ticket-target {
+  position: relative;
+  overflow: hidden;
+  border-inline-start: 4px solid var(--text-secondary);
+}
+.ticket-target.ticket-tone-info {
+  border-inline-start-color: var(--accent);
+}
+.ticket-target.ticket-tone-warning {
+  border-inline-start-color: var(--orange);
+}
+.ticket-target.ticket-tone-danger {
+  border-inline-start-color: var(--red);
+  background: color-mix(in srgb, var(--red) 5%, var(--surface));
+}
+.ticket-target.ticket-tone-success {
+  border-inline-start-color: var(--green);
+}
+.ticket-target-figure {
+  margin: 0;
+  font-size: clamp(1.35rem, 1.1rem + 1.2cqi, 1.75rem);
+  font-weight: 800;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+}
+.ticket-tone-warning .ticket-target-figure {
+  color: var(--orange);
+}
+.ticket-tone-danger .ticket-target-figure {
+  color: var(--red);
+}
+.ticket-target-empty {
+  margin: 0;
+  padding: 14px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  text-align: center;
+}
+.ticket-track {
+  display: grid;
+  gap: 8px;
+}
+.ticket-track-bar {
+  position: relative;
+  height: 10px;
+  border-radius: 999px;
+  background: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--text-secondary) 14%, transparent) 0 6px,
+    color-mix(in srgb, var(--text-secondary) 8%, transparent) 6px 12px
+  );
+}
+.ticket-track-fill {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: inline-size 400ms ease;
+}
+.ticket-tone-warning .ticket-track-fill {
+  background: var(--orange);
+}
+.ticket-tone-danger .ticket-track-fill {
+  background: var(--red);
+}
+.ticket-tone-success .ticket-track-fill {
+  background: var(--green);
+}
+.ticket-track-now {
+  position: absolute;
+  inset-block: -4px;
+  inline-size: 3px;
+  margin-inline-start: -1.5px;
+  border-radius: 2px;
+  background: var(--text-primary);
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.ticket-track-ends {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: var(--fs-sm);
+}
+.ticket-track-ends > span {
+  display: grid;
+  gap: 2px;
+}
+.ticket-track-ends > span:last-child {
+  text-align: end;
+}
+.ticket-track-ends small,
+.ticket-target-meta dt,
+.ticket-quote small {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+.ticket-target-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+.ticket-target-meta > div {
+  display: grid;
+  gap: 2px;
+}
+.ticket-target-meta dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0;
+  font-weight: 600;
+}
+.ticket-target-meta dd small {
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+.ticket-calendar {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-bottom: 1px dotted var(--text-secondary);
+}
+.ticket-calendar:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+.ticket-quote {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 8px 12px;
+  border-inline-start: 3px solid color-mix(in srgb, var(--red) 60%, transparent);
+  background: color-mix(in srgb, var(--red) 6%, transparent);
+  border-radius: var(--radius-sm);
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
+}
+
+/* Overdue strip: one sentence, one action. */
+.ticket-banner {
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--red) 35%, transparent);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--red) 8%, var(--surface));
+  color: var(--text-primary);
+}
+.ticket-banner-icon {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 36px;
+  block-size: 36px;
+  flex: none;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--red) 16%, transparent);
+  color: var(--red);
+}
+.ticket-banner-text {
+  display: grid;
+  gap: 2px;
+}
+.ticket-banner-text strong {
+  color: var(--red);
+}
+.ticket-banner-text small {
+  color: var(--text-secondary);
+}
+
+/* Details: icon + muted label, value carries the weight; empty values recede. */
+.ticket-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+  margin: 0;
+}
+.ticket-details > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.ticket-details dt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+.ticket-details dd {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.ticket-details > .is-empty dd {
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+.ticket-details-wide {
+  grid-column: 1 / -1;
+}
+.ticket-children ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.ticket-children a {
+  display: inline-block;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: var(--fs-sm);
+}
+
+/* Referral: the hand-off reads as people, not as a sentence. */
+.ticket-handoff {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.ticket-person {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-secondary) 12%, transparent);
+  font-weight: 600;
+  font-size: var(--fs-sm);
+}
+.ticket-person.is-current {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.ticket-chain {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-sm);
+}
+.ticket-chain li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ticket-chip-static {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  background: color-mix(in srgb, var(--text-secondary) 12%, transparent);
+}
+.ticket-chip-static.is-accepted {
+  background: color-mix(in srgb, var(--green) 16%, transparent);
+  color: var(--green);
+}
+.ticket-chip-static.is-rejected {
+  background: color-mix(in srgb, var(--red) 14%, transparent);
+  color: var(--red);
+}
+
+/* History: a connected timeline; the dot colour says what kind of change it was. */
+.ticket-history {
+  padding: 16px;
+}
+.ticket-timeline {
+  position: relative;
+  gap: 0;
+}
+.ticket-event {
+  position: relative;
+  gap: 12px;
+  padding-block-end: 16px;
+}
+.ticket-event:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 13px;
+  inset-block: 28px 0;
+  inline-size: 2px;
+  background: var(--border);
+}
+.ticket-event-icon {
+  position: relative;
+  z-index: 1;
+  inline-size: 28px;
+  block-size: 28px;
+  background: color-mix(in srgb, var(--text-secondary) 14%, var(--surface));
+  color: var(--text-secondary);
+}
+.ticket-event-deadline .ticket-event-icon,
+.ticket-event-extension .ticket-event-icon {
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface));
+  color: var(--accent);
+}
+.ticket-event-assignee .ticket-event-icon {
+  background: color-mix(in srgb, var(--orange) 18%, var(--surface));
+  color: var(--orange);
+}
+.ticket-event-lifecycle .ticket-event-icon,
+.ticket-event-contact .ticket-event-icon {
+  background: color-mix(in srgb, var(--green) 18%, var(--surface));
+  color: var(--green);
+}
+.ticket-event-delay .ticket-event-icon {
+  background: color-mix(in srgb, var(--red) 16%, var(--surface));
+  color: var(--red);
+}
+.ticket-event-body {
+  display: grid;
+  flex: 1;
+  gap: 3px;
+  min-width: 0;
+  padding-top: 3px;
+}
+.ticket-event-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+.ticket-event-head time,
+.ticket-event-actor {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+.ticket-event-change {
+  justify-self: start;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--text-secondary) 9%, transparent);
+  font-size: var(--fs-sm);
+}
+.ticket-event-reason {
+  font-size: var(--fs-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ticket-track-fill {
+    transition: none;
+  }
+}
+@container (max-width: 420px) {
+  .ticket-details {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* The icon keeps its circle; only the text column grows. */
+.ticket-banner > .ticket-banner-icon {
+  flex: 0 0 36px;
+  min-width: 0;
+}
+.ticket-banner > .ticket-banner-text {
+  flex: 1 1 180px;
+}
+
+/* Kanban grouped by ن۶ category: existing status columns sit under انجام‌نشده / در حال انجام / انجام‌شده. */
+.kanban-board.kanban-board-grouped {
+  display: flex;
+  align-items: stretch;
+  gap: 14px;
+  overflow-x: auto;
+}
+.kanban-category {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 8px;
+  flex: none;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--text-secondary);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--text-secondary) 4%, transparent);
+}
+.kanban-category-in_progress {
+  border-top-color: var(--accent);
+}
+.kanban-category-done {
+  border-top-color: var(--green);
+}
+.kanban-category-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+.kanban-category-title b {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+.kanban-category-columns {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(min(78vw, 230px), 260px);
+  gap: 10px;
+}
+
+/* ۶.۲ header: number + title, status, actions; then the facts line. */
+.ticket-header {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.ticket-header-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.ticket-header-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+.ticket-header-number {
+  padding: 1px 8px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--text-secondary) 12%, transparent);
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+.ticket-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.ticket-status-select {
+  display: inline-grid;
+  gap: 2px;
+}
+.ticket-status-select select {
+  min-height: 36px;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-inline-start: 4px solid var(--text-secondary);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-primary);
+  font: inherit;
+  font-weight: 600;
+}
+.ticket-status-select.is-in_progress select {
+  border-inline-start-color: var(--accent);
+}
+.ticket-status-select.is-done select {
+  border-inline-start-color: var(--green);
+}
+.ticket-status-select select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.ticket-header-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+.ticket-header-facts > div {
+  display: flex;
+  gap: 6px;
+}
+.ticket-header-facts dt {
+  color: var(--text-secondary);
+}
+.ticket-header-facts dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+/* Main column: shortcut, then tabs. */
+.ticket-shortcut {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.ticket-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.ticket-tab {
+  min-height: 38px;
+  padding: 6px 14px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ticket-tab.is-active {
+  border-bottom-color: var(--accent);
+  color: var(--text-primary);
+}
+.ticket-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.ticket-children-panel {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+.ticket-children-panel p {
+  margin: 0;
+}
+.sr-only {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

@@ -41,6 +41,17 @@ export type Formula =
   | { dynamic: "today" }
   | { op: "add" | "subtract" | "multiply" | "divide" | "date_diff"; args: [Formula, Formula] };
 export interface FieldConfig {
+  /** Relation fields: the EntityRelation they belong to and its per-link field definitions. */
+  relation_id?: string;
+  relation_side?: "left" | "right";
+  self_relation?: boolean;
+  link_fields?: {
+    code: string;
+    title: string;
+    kind: "integer" | "decimal" | "short_text" | "select";
+    lookup?: string | null;
+    config: { required?: boolean; min?: number; max?: number };
+  }[];
   secret?: boolean;
   required?: boolean;
   hidden?: boolean;
@@ -148,6 +159,8 @@ export interface SchemaFormProps {
   fileHref?: (field: SchemaField, id: string) => string;
   relationHref?: (field: SchemaField, id: string) => string;
   renderRelationPreview?: (field: SchemaField, id: string) => ReactNode;
+  /** Extra controls rendered under a field, e.g. relation link data or quick create. */
+  renderFieldAddon?: (field: SchemaField) => ReactNode;
   renderRichText?: (
     field: SchemaField,
     value: string,

@@ -1,32 +1,10 @@
 import { ErrorState } from "./error-state";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BusinessChoicesProvider } from "./engine/choice-provider";
-import { BrandLogo, ModalVisibilityContext } from "@plane/ui";
+import { ModalVisibilityContext } from "@plane/ui";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { Navigate, NavLink, Outlet, useBlocker, useLocation, useNavigate } from "react-router";
-import {
-  Bell,
-  Building2,
-  CalendarDays,
-  CheckSquare2,
-  ChevronsLeft,
-  ChevronsRight,
-  ChevronDown,
-  CircleHelp,
-  FolderKanban,
-  GitBranch,
-  Home,
-  Inbox,
-  Menu,
-  Moon,
-  Plus,
-  Search,
-  ShieldCheck,
-  Settings,
-  Sun,
-  Users,
-  X,
-} from "lucide-react";
+import { Bell, Menu, Moon, Plus, Search, Sun } from "lucide-react";
 import {
   useAppearance,
   useCurrentUser,
@@ -56,21 +34,8 @@ import {
   publishSessionEnd,
   subscribeToSessionEnd,
 } from "./access/session-events";
+import { ShellNavigation } from "./app-shell";
 
-const navItems = [
-  { to: "/", label: "خانه", icon: Home, end: true },
-  { to: "/projects", label: "پروژه‌ها", icon: FolderKanban },
-  { to: "/issues", label: "همه کارها", icon: CheckSquare2, adminOnly: true },
-  { to: "/my-work", label: "کارهای من", icon: CheckSquare2 },
-  { to: "/inbox", label: "صندوق ورودی", icon: Inbox },
-  { to: "/calendar", label: "تقویم", icon: CalendarDays },
-  { to: "/team", label: "اعضای تیم", icon: Users, adminOnly: true },
-  { to: "/organization", label: "ساختار سازمانی", icon: Building2, adminOnly: true },
-  { to: "/roles", label: "نقش‌های سازمانی", icon: ShieldCheck, adminOnly: true },
-  { to: "/routing", label: "ارجاع هوشمند", icon: GitBranch },
-  { to: "/absences", label: "عدم حضور", icon: CalendarDays },
-  { to: "/settings/engine", label: "طراحی فرم‌ها و جدول‌ها", icon: Settings },
-];
 
 function AppLayout() {
   const location = useLocation();
@@ -88,7 +53,7 @@ function AppLayout() {
   const setTheme = useUIStore((state) => state.setTheme);
   const workspaceSlug = useUIStore((state) => state.workspaceSlug);
   const setWorkspaceSlug = useUIStore((state) => state.setWorkspaceSlug);
-  const { data: workspaces = [], error: workspaceError } = useWorkspaces();
+  const { data: workspaces = [], error: workspaceError, isPending: workspacesPending } = useWorkspaces();
   const { data: appearance } = useAppearance();
   const updateAppearance = useUpdateAppearance();
   const { data: projects = [] } = useProjects();
@@ -174,89 +139,40 @@ function AppLayout() {
   }, [dirtyForms.length]);
 
   const workspace = workspaces.find((item) => item.slug === workspaceSlug) ?? workspaces[0];
+  const can = useMemo(() => (code: string) => access?.can(code) === true, [access]);
   return (
     <div
-      className={`app-shell ${collapsed ? "sidebar-collapsed" : ""} ${mobileSidebarOpen ? "mobile-sidebar-open" : ""}`}
+      className={`app-shell ${collapsed ? "is-panel-collapsed" : ""} ${mobileSidebarOpen ? "is-mobile-nav-open" : ""}`}
     >
-      <aside className="sidebar" id="primary-navigation">
-        <div className="brand">
-          <BrandLogo className="brand-mark" />
-          <strong>هم‌کار</strong>
-          <button
-            type="button"
-            className="mobile-sidebar-close"
-            aria-label="بستن منوی اصلی"
-            onClick={() => setMobileSidebarOpen(false)}
-          >
-            <X size={20} />
-          </button>
-        </div>
-        <nav className="main-nav">
-          {navItems
-            .filter((item) => canAccessPath(item.to, (code) => access?.can(code) === true))
-            .map(({ to, label, icon: Icon, end }) => (
-              <NavLink
-                to={to}
-                end={end}
-                key={to}
-                title={collapsed ? label : undefined}
-                onClick={() => setMobileSidebarOpen(false)}
-              >
-                <Icon size={19} />
-                <span>{label}</span>
-                {to === "/inbox" && unreadCount > 0 && <b>{toFa(unreadCount)}</b>}
-              </NavLink>
-            ))}
-        </nav>
-        <div className="recent-projects">
-          <p>
-            پروژه‌های اخیر{" "}
-            {access?.can("Project.Create") && (
-              <button onClick={() => setCreate(true, "project")}>
-                <Plus size={14} />
-              </button>
-            )}
-          </p>
-          {projects.slice(0, 3).map((project) => (
-            <NavLink
-              key={project.id}
-              to={`/projects/${project.id}`}
-              title={collapsed ? project.name : undefined}
-              onClick={() => setMobileSidebarOpen(false)}
-            >
-              <i style={{ background: project.color }} />
-              <span>{project.name}</span>
-            </NavLink>
-          ))}
-        </div>
-        <div className="sidebar-bottom">
-          <NavLink to="/settings" onClick={() => setMobileSidebarOpen(false)}>
-            <Settings size={19} />
-            <span>تنظیمات</span>
-          </NavLink>
-          <NavLink to="/help" onClick={() => setMobileSidebarOpen(false)}>
-            <CircleHelp size={19} />
-            <span>راهنما و پشتیبانی</span>
-          </NavLink>
-        </div>
-        <button className="collapse-button" onClick={() => setCollapsed(!collapsed)}>
-          {collapsed ? <ChevronsLeft size={17} /> : <ChevronsRight size={17} />}
-          <span>جمع‌کردن منو</span>
-        </button>
-      </aside>
+      <a className="skip-link" href="#main-content">
+        رفتن به محتوای اصلی
+      </a>
+      <ShellNavigation
+        can={can}
+        collapsed={collapsed}
+        mobileOpen={mobileSidebarOpen}
+        unreadCount={unreadCount}
+        projects={projects}
+        canCreateProject={access?.can("Project.Create") === true}
+        canCreatePage={Boolean(access?.can("EntityType.Create") && access?.can("FormDesigner.Publish"))}
+        onCreateProject={() => setCreate(true, "project")}
+        onToggleCollapsed={() => setCollapsed(!collapsed)}
+        onOpenMobile={() => setMobileSidebarOpen(true)}
+        onCloseMobile={() => setMobileSidebarOpen(false)}
+      />
       <button
         type="button"
-        className="mobile-sidebar-backdrop"
+        className="shell-backdrop"
         aria-label="بستن منوی اصلی"
         tabIndex={mobileSidebarOpen ? 0 : -1}
         onClick={() => setMobileSidebarOpen(false)}
       />
-      <div className="app-area">
-        <header className="topbar">
-          <div className="topbar-start">
+      <div className="shell-main">
+        <header className="shell-header">
+          <div className="shell-header-start">
             <button
               type="button"
-              className="icon-button mobile-menu-button"
+              className="icon-button shell-menu-button"
               aria-label="بازکردن منوی اصلی"
               aria-controls="primary-navigation"
               aria-expanded={mobileSidebarOpen}
@@ -264,22 +180,27 @@ function AppLayout() {
             >
               <Menu size={20} />
             </button>
-            <span className="workspace-name" title={workspace?.name}>
-              {workspace?.name ?? "شرکت"}
+            <span className="shell-workspace" title={workspace?.name}>
+              <span aria-hidden="true">{(workspace?.name ?? "ش").trim().charAt(0)}</span>
+              <b>{workspace?.name ?? "شرکت"}</b>
             </span>
             <Breadcrumb />
           </div>
-          <div className="topbar-actions">
-            <button className="global-search" onClick={() => setCommand(true)}>
-              <Search size={17} />
-              <span>جستجو در هم‌کار...</span>
+          <div className="shell-header-actions">
+            <button type="button" className="shell-search" onClick={() => setCommand(true)}>
+              <Search size={16} aria-hidden="true" />
+              <span>جستجو یا اجرای فرمان…</span>
               <kbd>Ctrl K</kbd>
             </button>
             {canCreate && (
-              <button className="create-button" aria-label="ایجاد" onClick={() => setCreate(true, "issue")}>
-                <Plus size={17} />
-                <span>ایجاد</span>
-                <ChevronDown size={13} />
+              <button
+                type="button"
+                className="shell-create"
+                aria-label="ایجاد کار جدید"
+                onClick={() => setCreate(true, "issue")}
+              >
+                <Plus size={17} aria-hidden="true" />
+                <span>کار جدید</span>
               </button>
             )}
             <IconButton
@@ -287,7 +208,7 @@ function AppLayout() {
               className={`notification-button ${unreadCount ? "has-notification" : ""}`}
               onClick={() => setNotifications(true)}
             >
-              <Bell size={19} />
+              <Bell size={18} />
               {unreadCount > 0 && (
                 <span
                   className="notification-badge"
@@ -300,14 +221,14 @@ function AppLayout() {
               )}
             </IconButton>
             <IconButton
-              label="تغییر پوسته"
+              label={resolvedDark ? "پوسته روشن" : "پوسته تیره"}
               onClick={() => {
                 const next = resolvedDark ? "light" : "dark";
                 setTheme(next);
                 updateAppearance.mutate({ theme: next });
               }}
             >
-              {resolvedDark ? <Sun size={19} /> : <Moon size={19} />}
+              {resolvedDark ? <Sun size={18} /> : <Moon size={18} />}
             </IconButton>
             <NavLink to="/settings?section=profile" className="user-avatar" aria-label="حساب کاربری">
               {currentUser?.avatarUrl ? (
@@ -319,13 +240,21 @@ function AppLayout() {
             </NavLink>
           </div>
         </header>
-        <main className="page-content">
+        <main className="page-content" id="main-content" tabIndex={-1}>
           {workspaceError || accessError ? (
             <ErrorState message="اطلاعات شرکت دریافت نشد؛ اتصال را بررسی کنید." />
+          ) : workspacesPending ? (
+            <div className="page-status" role="status">
+              در حال بارگذاری فضای کاری…
+            </div>
           ) : !workspaces.length ? (
-            <p role="status">عضویت فعالی در یک شرکت ندارید.</p>
+            <p className="page-status" role="status">
+              عضویت فعالی در یک شرکت ندارید.
+            </p>
           ) : !access ? (
-            <div role="status">در حال بررسی دسترسی…</div>
+            <div className="page-status" role="status">
+              در حال بررسی دسترسی…
+            </div>
           ) : canAccessPath(location.pathname, access.can) ? (
             <Outlet />
           ) : (

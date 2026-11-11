@@ -1,6 +1,7 @@
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { ErrorNotice } from "../error-notice";
 import { Combobox, ComboboxButton, ComboboxInput, ComboboxOption, ComboboxOptions } from "@headlessui/react";
+import { Check, ChevronDown } from "lucide-react";
 
 export const normalizePersianSearch = (text: string) =>
   text
@@ -43,6 +44,7 @@ export function SearchableSelect({
   showLabel?: boolean;
 }) {
   const [query, setQuery] = useState("");
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const generatedId = useId();
   const inputId = id || generatedId;
   const filtered = options.filter((option) =>
@@ -81,9 +83,13 @@ export function SearchableSelect({
               options.find((option) => option.id === current)?.title ?? selectedLabel ?? ""
             }
             onChange={(event) => setQuery(event.target.value)}
+            onClick={(event) => {
+              if (!disabled && !loading && event.currentTarget.getAttribute("aria-expanded") !== "true")
+                buttonRef.current?.click();
+            }}
           />
-          <ComboboxButton type="button" aria-label={`باز کردن ${label}`}>
-            ⌄
+          <ComboboxButton ref={buttonRef} type="button" aria-label={`باز کردن ${label}`}>
+            <ChevronDown className="selector-chevron" size={16} strokeWidth={2.2} aria-hidden="true" />
           </ComboboxButton>
         </div>
         <ComboboxOptions
@@ -107,9 +113,14 @@ export function SearchableSelect({
               >
                 {filtered.length ? (
                   <>
-                    {option.title}
-                    {option.disabled && " (غیرفعال)"}
-                    {option.description && <small dir="auto">{option.description}</small>}
+                    <span className="selector-option-text">
+                      {option.title}
+                      {option.disabled && " (غیرفعال)"}
+                      {option.description && <small dir="auto">{option.description}</small>}
+                    </span>
+                    {option.id === value && (
+                      <Check className="selector-option-check" size={15} strokeWidth={2.4} aria-hidden="true" />
+                    )}
                   </>
                 ) : (
                   <p role="status">{option.title}</p>

@@ -2,25 +2,28 @@ from django.db.models import Q
 
 from .access_control import has_permission
 from .project_visibility import visible_projects
-from plane.db.models import Project
+from plane.db.models import Project, Workspace
 
 
 def visible_issues(queryset, user, workspace, *, request=None):
-    queryset = queryset.filter(
-        Q(project__isnull=True)
-        | Q(
-            project_id__in=visible_projects(
-                Project.objects.filter(workspace__slug=workspace),
-                user,
-                workspace,
-            ).values("id")
-        )
+    project_ok = Q(project__isnull=True) | Q(
+        project_id__in=visible_projects(
+            Project.objects.filter(workspace__slug=workspace),
+            user,
+            workspace,
+        ).values("id")
     )
     if has_permission(user, workspace, "Issue.ViewAll", request=request):
-        return queryset
-    return queryset.filter(
+        return queryset.filter(project_ok)
+    from .ticket_core import participant_q
+
+    workspace_row = Workspace.objects.filter(slug=workspace).first() if isinstance(workspace, str) else workspace
+    owners = (
         Q(created_by=user)
         | Q(issue_assignee__assignee=user, issue_assignee__deleted_at__isnull=True)
         | Q(project__created_by=user)
         | Q(project__project_lead=user)
-    ).distinct()
+    )
+    # Ticket 5, decision 6: extension approvers and referral participants see the ticket
+    # read-only even outside the project; editing still requires an owner relation.
+    return queryset.filter((project_ok & owners) | participant_q(user, workspace_row)).distinct()

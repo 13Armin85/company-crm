@@ -493,6 +493,7 @@ export function SurfaceTable({
         </div>
         <div className="surface-table-actions">
           <TableTabPicker
+            inline
             tabs={tabs}
             hidden={tabView.hidden}
             onChange={tabView.setHidden}
@@ -544,7 +545,9 @@ export function SurfaceTable({
               const native = column.startsWith("native:"),
                 title = column.slice(column.indexOf(":") + 1);
               return (
-                <th key={column}>{native ? title : fields.find((f) => f.code === title)?.title || "فیلد غیرفعال"}</th>
+                <th key={column} data-column={column}>
+                  {native ? title : fields.find((f) => f.code === title)?.title || "فیلد غیرفعال"}
+                </th>
               );
             })}
           </tr>
@@ -571,14 +574,19 @@ export function SurfaceTable({
                 if (column.startsWith("native:")) {
                   const index = headings.findIndex((heading) => (textOf(heading) || "عملیات") === name);
                   return index >= 0 && isValidElement(cells[index]) ? (
-                    cloneElement(cells[index], { key: column })
+                    cloneElement(cells[index] as ReactElement<{ "data-column"?: string }>, {
+                      key: column,
+                      "data-column": column,
+                    })
                   ) : (
-                    <td key={column}>—</td>
+                    <td key={column} data-column={column}>
+                      —
+                    </td>
                   );
                 }
                 const field = fields.find((f) => f.code === name);
                 return (
-                  <td key={column}>
+                  <td key={column} data-column={column}>
                     {field ? (
                       <SurfaceFieldValue
                         code={code}
