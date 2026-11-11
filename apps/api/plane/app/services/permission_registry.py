@@ -169,6 +169,28 @@ PERMISSION_REGISTRY.update(
     }
 )
 
+# Ticket 6: leave requests, Word templates and signature images. Approvals use the workflow engine.
+LEAVE_PERMISSIONS = {
+    "LeaveRequest.Create": "ثبت درخواست مرخصی برای خود",
+    "LeaveRequest.ViewAll": "مشاهده همه درخواست‌های مرخصی",
+    "LeaveTemplate.Manage": "مدیریت قالب Word درخواست مرخصی",
+    "Signature.Manage": "بارگذاری و مدیریت تصویر امضای کاربران",
+}
+PERMISSION_REGISTRY.update(
+    {
+        code: {
+            "name": title,
+            "description": title,
+            "category": code.split(".")[0],
+            "is_delegatable": False,
+            "is_active": True,
+        }
+        for code, title in LEAVE_PERMISSIONS.items()
+    }
+)
+LEAVE_MEMBER_PERMISSIONS = {"LeaveRequest.Create"}
+MEMBER_PERMISSIONS.update(LEAVE_MEMBER_PERMISSIONS)
+
 
 def sync_permission_catalog(workspace):
     from plane.db.models import OrganizationPermission

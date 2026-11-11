@@ -16,6 +16,18 @@ from plane.utils.path_validator import sanitize_filename
 from .base import BaseModel
 
 
+# CRM files served only through permission-checked CRM endpoints, never by Plane's asset APIs.
+PRIVATE_CRM_ASSET_TYPES = [
+    "CRM_FIELD",
+    "CRM_FIELD_DEFAULT",
+    "CRM_VIEW_EXPORT",
+    "CRM_LEAVE_ATTACHMENT",
+    "CRM_LEAVE_DOCUMENT",
+    "CRM_LEAVE_TEMPLATE",
+    "CRM_SIGNATURE",
+]
+
+
 def get_upload_path(instance, filename):
     filename = sanitize_filename(filename) or uuid4().hex
     if instance.workspace_id is not None:

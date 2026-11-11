@@ -20,6 +20,7 @@ from rest_framework.permissions import AllowAny
 # Module imports
 from ..base import BaseAPIView
 from plane.db.models import FileAsset, Workspace, Project, User, WorkspaceMember, ProjectMember
+from plane.db.models.asset import PRIVATE_CRM_ASSET_TYPES
 from plane.settings.storage import S3Storage
 from plane.app.permissions import allow_permission, ROLE
 from plane.utils.cache import invalidate_cache_directly
@@ -32,7 +33,7 @@ class UserAssetsV2Endpoint(BaseAPIView):
     """This endpoint is used to upload user profile images."""
 
     def asset_delete(self, asset_id):
-        asset = FileAsset.objects.exclude(entity_type__in=["CRM_FIELD", "CRM_FIELD_DEFAULT", "CRM_VIEW_EXPORT"]).filter(id=asset_id).first()
+        asset = FileAsset.objects.exclude(entity_type__in=PRIVATE_CRM_ASSET_TYPES).filter(id=asset_id).first()
         if asset is None:
             return
         asset.is_deleted = True
@@ -146,7 +147,7 @@ class UserAssetsV2Endpoint(BaseAPIView):
         asset_key = f"{uuid.uuid4().hex}-{name}"
 
         # Create a File Asset
-        asset = FileAsset.objects.exclude(entity_type__in=["CRM_FIELD", "CRM_FIELD_DEFAULT", "CRM_VIEW_EXPORT"]).create(
+        asset = FileAsset.objects.exclude(entity_type__in=PRIVATE_CRM_ASSET_TYPES).create(
             attributes={"name": name, "type": type, "size": size_limit},
             asset=asset_key,
             size=size_limit,
@@ -171,7 +172,7 @@ class UserAssetsV2Endpoint(BaseAPIView):
 
     def patch(self, request, asset_id):
         # get the asset id
-        asset = FileAsset.objects.exclude(entity_type__in=["CRM_FIELD", "CRM_FIELD_DEFAULT", "CRM_VIEW_EXPORT"]).get(id=asset_id, user_id=request.user.id)
+        asset = FileAsset.objects.exclude(entity_type__in=PRIVATE_CRM_ASSET_TYPES).get(id=asset_id, user_id=request.user.id)
         # get the storage metadata
         asset.is_uploaded = True
         # get the storage metadata
@@ -191,7 +192,7 @@ class UserAssetsV2Endpoint(BaseAPIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def delete(self, request, asset_id):
-        asset = FileAsset.objects.exclude(entity_type__in=["CRM_FIELD", "CRM_FIELD_DEFAULT", "CRM_VIEW_EXPORT"]).get(id=asset_id, user_id=request.user.id)
+        asset = FileAsset.objects.exclude(entity_type__in=PRIVATE_CRM_ASSET_TYPES).get(id=asset_id, user_id=request.user.id)
         asset.is_deleted = True
         asset.deleted_at = timezone.now()
         # get the entity and save the asset id for the request field
@@ -236,7 +237,7 @@ class WorkspaceFileAssetEndpoint(BaseAPIView):
         return {}
 
     def asset_delete(self, asset_id):
-        asset = FileAsset.objects.exclude(entity_type__in=["CRM_FIELD", "CRM_FIELD_DEFAULT", "CRM_VIEW_EXPORT"]).filter(id=asset_id).first()
+        asset = FileAsset.objects.exclude(entity_type__in=PRIVATE_CRM_ASSET_TYPES).filter(id=asset_id).first()
         # Check if the asset exists
         if asset is None:
             return
@@ -390,7 +391,7 @@ class WorkspaceFileAssetEndpoint(BaseAPIView):
         asset_key = f"{workspace.id}/{uuid.uuid4().hex}-{name}"
 
         # Create a File Asset
-        asset = FileAsset.objects.exclude(entity_type__in=["CRM_FIELD", "CRM_FIELD_DEFAULT", "CRM_VIEW_EXPORT"]).create(
+        asset = FileAsset.objects.exclude(entity_type__in=PRIVATE_CRM_ASSET_TYPES).create(
             attributes={"name": name, "type": type, "size": size_limit},
             asset=asset_key,
             size=size_limit,
@@ -417,7 +418,7 @@ class WorkspaceFileAssetEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def patch(self, request, slug, asset_id):
         # get the asset id
-        asset = FileAsset.objects.exclude(entity_type__in=["CRM_FIELD", "CRM_FIELD_DEFAULT", "CRM_VIEW_EXPORT"]).get(id=asset_id, workspace__slug=slug)
+        asset = FileAsset.objects.exclude(entity_type__in=PRIVATE_CRM_ASSET_TYPES).get(id=asset_id, workspace__slug=slug)
         # enforce project-level access for project-bound assets
         if not self.has_project_asset_access(request, asset):
             return Response(
@@ -444,7 +445,7 @@ class WorkspaceFileAssetEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def delete(self, request, slug, asset_id):
-        asset = FileAsset.objects.exclude(entity_type__in=["CRM_FIELD", "CRM_FIELD_DEFAULT", "CRM_VIEW_EXPORT"]).get(id=asset_id, workspace__slug=slug)
+        asset = FileAsset.objects.exclude(entity_type__in=PRIVATE_CRM_ASSET_TYPES).get(id=asset_id, workspace__slug=slug)
         # enforce project-level access for project-bound assets
         if not self.has_project_asset_access(request, asset):
             return Response(
@@ -461,7 +462,7 @@ class WorkspaceFileAssetEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def get(self, request, slug, asset_id):
         # get the asset id
-        asset = FileAsset.objects.exclude(entity_type__in=["CRM_FIELD", "CRM_FIELD_DEFAULT", "CRM_VIEW_EXPORT"]).get(id=asset_id, workspace__slug=slug)
+        asset = FileAsset.objects.exclude(entity_type__in=PRIVATE_CRM_ASSET_TYPES).get(id=asset_id, workspace__slug=slug)
         # enforce project-level access for project-bound assets
         if not self.has_project_asset_access(request, asset):
             return Response(
@@ -495,7 +496,7 @@ class StaticFileAssetEndpoint(BaseAPIView):
 
     def get(self, request, asset_id):
         # get the asset id
-        asset = FileAsset.objects.exclude(entity_type__in=["CRM_FIELD", "CRM_FIELD_DEFAULT", "CRM_VIEW_EXPORT"]).get(id=asset_id)
+        asset = FileAsset.objects.exclude(entity_type__in=PRIVATE_CRM_ASSET_TYPES).get(id=asset_id)
 
         # Check if the asset is uploaded
         if not asset.is_uploaded:
@@ -538,7 +539,7 @@ class AssetRestoreEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def post(self, request, slug, asset_id):
-        asset = FileAsset.all_objects.exclude(entity_type__in=["CRM_FIELD", "CRM_FIELD_DEFAULT", "CRM_VIEW_EXPORT"]).get(id=asset_id, workspace__slug=slug)
+        asset = FileAsset.all_objects.exclude(entity_type__in=PRIVATE_CRM_ASSET_TYPES).get(id=asset_id, workspace__slug=slug)
         asset.is_deleted = False
         asset.deleted_at = None
         asset.save(update_fields=["is_deleted", "deleted_at"])
@@ -619,7 +620,7 @@ class ProjectAssetEndpoint(BaseAPIView):
         asset_key = f"{workspace.id}/{uuid.uuid4().hex}-{name}"
 
         # Create a File Asset
-        asset = FileAsset.objects.exclude(entity_type__in=["CRM_FIELD", "CRM_FIELD_DEFAULT", "CRM_VIEW_EXPORT"]).create(
+        asset = FileAsset.objects.exclude(entity_type__in=PRIVATE_CRM_ASSET_TYPES).create(
             attributes={"name": name, "type": type, "size": size_limit},
             asset=asset_key,
             size=size_limit,
@@ -647,7 +648,7 @@ class ProjectAssetEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def patch(self, request, slug, project_id, pk):
         # get the asset id
-        asset = FileAsset.objects.exclude(entity_type__in=["CRM_FIELD", "CRM_FIELD_DEFAULT", "CRM_VIEW_EXPORT"]).get(id=pk, workspace__slug=slug, project_id=project_id)
+        asset = FileAsset.objects.exclude(entity_type__in=PRIVATE_CRM_ASSET_TYPES).get(id=pk, workspace__slug=slug, project_id=project_id)
         # get the storage metadata
         asset.is_uploaded = True
         # get the storage metadata
@@ -663,7 +664,7 @@ class ProjectAssetEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def delete(self, request, slug, project_id, pk):
         # Get the asset
-        asset = FileAsset.objects.exclude(entity_type__in=["CRM_FIELD", "CRM_FIELD_DEFAULT", "CRM_VIEW_EXPORT"]).get(id=pk, workspace__slug=slug, project_id=project_id)
+        asset = FileAsset.objects.exclude(entity_type__in=PRIVATE_CRM_ASSET_TYPES).get(id=pk, workspace__slug=slug, project_id=project_id)
         # Check deleted assets
         asset.is_deleted = True
         asset.deleted_at = timezone.now()
@@ -674,7 +675,7 @@ class ProjectAssetEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def get(self, request, slug, project_id, pk):
         # get the asset id
-        asset = FileAsset.objects.exclude(entity_type__in=["CRM_FIELD", "CRM_FIELD_DEFAULT", "CRM_VIEW_EXPORT"]).get(workspace__slug=slug, project_id=project_id, pk=pk)
+        asset = FileAsset.objects.exclude(entity_type__in=PRIVATE_CRM_ASSET_TYPES).get(workspace__slug=slug, project_id=project_id, pk=pk)
 
         # Check if the asset is uploaded
         if not asset.is_uploaded:
@@ -717,7 +718,7 @@ class ProjectBulkAssetEndpoint(BaseAPIView):
         # unassociated-or-same-project bound prevent cross-project/user IDOR (a caller can
         # only touch their own uploads, cannot move an asset in from another project, and
         # @allow_permission already scopes them to this project).
-        assets = FileAsset.objects.exclude(entity_type__in=["CRM_FIELD", "CRM_FIELD_DEFAULT", "CRM_VIEW_EXPORT"]).filter(
+        assets = FileAsset.objects.exclude(entity_type__in=PRIVATE_CRM_ASSET_TYPES).filter(
             id__in=asset_ids,
             workspace__slug=slug,
             created_by=request.user,
@@ -772,7 +773,7 @@ class AssetCheckEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def get(self, request, slug, asset_id):
-        asset = FileAsset.all_objects.exclude(entity_type__in=["CRM_FIELD", "CRM_FIELD_DEFAULT", "CRM_VIEW_EXPORT"]).filter(id=asset_id, workspace__slug=slug, deleted_at__isnull=True).exists()
+        asset = FileAsset.all_objects.exclude(entity_type__in=PRIVATE_CRM_ASSET_TYPES).filter(id=asset_id, workspace__slug=slug, deleted_at__isnull=True).exists()
         return Response({"exists": asset}, status=status.HTTP_200_OK)
 
 
@@ -832,7 +833,7 @@ class DuplicateAssetEndpoint(BaseAPIView):
 
         storage = S3Storage(request=request)
         # Restrict the source asset to the same destination workspace to prevent cross-workspace asset copying
-        original_asset = FileAsset.objects.exclude(entity_type__in=["CRM_FIELD", "CRM_FIELD_DEFAULT", "CRM_VIEW_EXPORT"]).filter(
+        original_asset = FileAsset.objects.exclude(entity_type__in=PRIVATE_CRM_ASSET_TYPES).filter(
             id=asset_id,
             is_uploaded=True,
             workspace=workspace,
@@ -843,7 +844,7 @@ class DuplicateAssetEndpoint(BaseAPIView):
 
         sanitized_name = sanitize_filename(original_asset.attributes.get("name")) or "unnamed"
         destination_key = f"{workspace.id}/{uuid.uuid4().hex}-{sanitized_name}"
-        duplicated_asset = FileAsset.objects.exclude(entity_type__in=["CRM_FIELD", "CRM_FIELD_DEFAULT", "CRM_VIEW_EXPORT"]).create(
+        duplicated_asset = FileAsset.objects.exclude(entity_type__in=PRIVATE_CRM_ASSET_TYPES).create(
             attributes={
                 "name": original_asset.attributes.get("name"),
                 "type": original_asset.attributes.get("type"),
@@ -860,7 +861,7 @@ class DuplicateAssetEndpoint(BaseAPIView):
         )
         storage.copy_object(original_asset.asset, destination_key)
         # Update the is_uploaded field for all newly created assets
-        FileAsset.objects.exclude(entity_type__in=["CRM_FIELD", "CRM_FIELD_DEFAULT", "CRM_VIEW_EXPORT"]).filter(id=duplicated_asset.id).update(is_uploaded=True)
+        FileAsset.objects.exclude(entity_type__in=PRIVATE_CRM_ASSET_TYPES).filter(id=duplicated_asset.id).update(is_uploaded=True)
 
         return Response({"asset_id": str(duplicated_asset.id)}, status=status.HTTP_200_OK)
 
@@ -871,7 +872,7 @@ class WorkspaceAssetDownloadEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def get(self, request, slug, asset_id):
         try:
-            asset = FileAsset.objects.exclude(entity_type__in=["CRM_FIELD", "CRM_FIELD_DEFAULT", "CRM_VIEW_EXPORT"]).get(
+            asset = FileAsset.objects.exclude(entity_type__in=PRIVATE_CRM_ASSET_TYPES).get(
                 id=asset_id,
                 workspace__slug=slug,
                 is_uploaded=True,
@@ -898,7 +899,7 @@ class ProjectAssetDownloadEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="PROJECT")
     def get(self, request, slug, project_id, asset_id):
         try:
-            asset = FileAsset.objects.exclude(entity_type__in=["CRM_FIELD", "CRM_FIELD_DEFAULT", "CRM_VIEW_EXPORT"]).get(
+            asset = FileAsset.objects.exclude(entity_type__in=PRIVATE_CRM_ASSET_TYPES).get(
                 id=asset_id,
                 workspace__slug=slug,
                 project_id=project_id,

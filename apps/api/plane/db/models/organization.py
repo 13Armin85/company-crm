@@ -301,6 +301,10 @@ class UserAbsence(BaseModel):
     ends_at = models.DateTimeField()
     reason = models.TextField(blank=True)
     status = models.CharField(max_length=12, choices=Status.choices, default=Status.SCHEDULED)
+    # Additive (ticket 6): the substitute named on the leave request this absence came from.
+    substitute = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
 
     class Meta:
         db_table = "user_absences"
