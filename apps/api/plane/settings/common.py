@@ -347,7 +347,9 @@ CELERY_ACCEPT_CONTENT = ["application/json"]
 
 CELERY_IMPORTS = (
     "plane.app.services.entity_view_export",
+    "plane.app.services.report_export",
     # scheduled tasks
+    "plane.bgtasks.daily_report_reminders",
     "plane.bgtasks.dashboard_alerts",
     "plane.bgtasks.workflow_reminders",
     "plane.bgtasks.ticket_overdue",

@@ -257,12 +257,22 @@ class EntityEvent(BaseModel):
                 condition=models.Q(event_type="portal.feedback", deleted_at__isnull=True),
                 name="crm_portal_one_feedback",
             ),
+            # Ticket 8: at most one daily-report reminder per person and day; record_id is the
+            # deterministic key from daily_report_reminders.reminder_key.
+            models.UniqueConstraint(
+                fields=["record_id"],
+                condition=models.Q(event_type="daily_report.reminder_sent", deleted_at__isnull=True),
+                name="crm_daily_report_one_reminder",
+            ),
         ]
 
 
 class EntityViewExport(BaseModel):
     workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE)
-    entity = models.ForeignKey(EntityType, on_delete=models.PROTECT)
+    # Ticket 8: a report export has no engine entity; it names its report source instead.
+    entity = models.ForeignKey(EntityType, null=True, blank=True, on_delete=models.PROTECT)
+    report_source = models.CharField(max_length=40, blank=True, default="")
+    progress = models.PositiveSmallIntegerField(default=0)
     user = models.ForeignKey("db.User", on_delete=models.CASCADE)
     definition = models.JSONField(default=dict)
     format = models.CharField(max_length=4)

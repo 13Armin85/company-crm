@@ -215,6 +215,34 @@ PERMISSION_REGISTRY.update(
 )
 
 
+# Ticket 8 (catalog section "گزارش روزانه و گزارش‌ها"). A "Team"/"ViewAll" code only allows asking for a
+# wider report; the people actually shown always come from report_scope (organization + delegation).
+REPORT_PERMISSIONS = {
+    "DailyReport.Submit": "ثبت گزارش روزانهٔ کار خود",
+    "DailyReport.Team.View": "مشاهدهٔ وضعیت گزارش روزانهٔ تیم",
+    "DailyReport.Reminder.Manage": "مدیریت یادآوری گزارش روزانه (شرکت و واحد)",
+    "Report.View": "مشاهدهٔ گزارش‌های پایهٔ خود",
+    "Report.Team.View": "مشاهدهٔ گزارش‌های تیم و زیرمجموعه",
+    "Report.ViewAll": "مشاهدهٔ گزارش‌های همهٔ افراد شرکت",
+    "Report.Build": "ساخت و ذخیرهٔ گزارش",
+    "Report.Share": "اشتراک‌گذاری گزارش ذخیره‌شده با نقش یا واحد",
+    "Report.Export": "دریافت خروجی CSV/Excel گزارش",
+}
+PERMISSION_REGISTRY.update(
+    {
+        code: {
+            "name": title,
+            "description": title,
+            "category": code.split(".")[0],
+            "is_delegatable": False,
+            "is_active": True,
+        }
+        for code, title in REPORT_PERMISSIONS.items()
+    }
+)
+REPORT_MEMBER_PERMISSIONS = {"DailyReport.Submit", "Report.View"}
+MEMBER_PERMISSIONS.update(REPORT_MEMBER_PERMISSIONS)
+
 def sync_permission_catalog(workspace):
     from plane.db.models import OrganizationPermission
 

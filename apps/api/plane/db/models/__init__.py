@@ -144,3 +144,4 @@ from .leave import (
     SignatureImage,
 )
 from .portal import PORTAL_ATTACHMENT, PortalAccount, PortalAuditLog, PortalSession
+from .daily_report import DailyReport, DailyReportItem, SavedReport

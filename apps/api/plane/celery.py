@@ -50,6 +50,10 @@ app.conf.beat_schedule = {
         "task": "plane.bgtasks.ticket_overdue.mark_overdue_tickets",
         "schedule": crontab(minute="*/5"),
     },
+    "daily-report-reminders": {
+        "task": "plane.bgtasks.daily_report_reminders.send_daily_report_reminders",
+        "schedule": crontab(minute="*/15"),
+    },
     "workflow-due-reminders": {
         "task": "plane.bgtasks.workflow_reminders.send_workflow_reminders",
         "schedule": crontab(minute="*/5"),

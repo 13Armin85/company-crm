@@ -111,6 +111,22 @@ def _from_row(day, row, source, source_id, reason):
     )
 
 
+def _chain_of(units, direct_unit_ids):
+    """Unit precedence of one person: direct units (by title), then their ancestors, breadth-first."""
+    direct = sorted(direct_unit_ids, key=lambda unit_id: units.get(unit_id, {}).get("title", ""))
+    chain, frontier = [], [unit_id for unit_id in direct if unit_id in units]
+    while frontier:
+        next_frontier = []
+        for unit_id in frontier:
+            if unit_id not in chain:
+                chain.append(unit_id)
+                parent = units[unit_id]["parent_id"]
+                if parent in units:
+                    next_frontier.append(parent)
+        frontier = next_frontier
+    return chain
+
+
 def _covers(version, day):
     return version.effective_from <= day and (version.effective_to is None or version.effective_to >= day)
 
@@ -152,24 +168,10 @@ class ScheduleResolver:
                 "id", "parent_id", "title"
             )
         }
-        direct = sorted(
-            OrganizationUnitMember.objects.filter(
-                unit__workspace=self.workspace, unit__is_active=True, user=self.user, is_active=True
-            ).values_list("unit_id", flat=True),
-            key=lambda unit_id: units.get(unit_id, {}).get("title", ""),
-        )
-        chain, frontier = [], [unit_id for unit_id in direct if unit_id in units]
-        # Breadth-first: every direct unit before any ancestor.
-        while frontier:
-            next_frontier = []
-            for unit_id in frontier:
-                if unit_id not in chain:
-                    chain.append(unit_id)
-                    parent = units[unit_id]["parent_id"]
-                    if parent in units:
-                        next_frontier.append(parent)
-            frontier = next_frontier
-        return chain
+        direct = OrganizationUnitMember.objects.filter(
+            unit__workspace=self.workspace, unit__is_active=True, user=self.user, is_active=True
+        ).values_list("unit_id", flat=True)
+        return _chain_of(units, direct)
 
     @staticmethod
     def _version_day(versions, day, source):
@@ -214,6 +216,63 @@ class ScheduleResolver:
                     result.append((a, b))
             day += timedelta(days=1)
         return result
+
+
+def bulk_resolvers(workspace, users, date_from, date_to):
+    """One ``ScheduleResolver`` per person, loaded with a constant number of queries.
+
+    Same precedence and data as ``ScheduleResolver`` (it is the same class); used by team
+    reports so that resolving 50 people does not issue 50 × 4 queries.
+    """
+    from collections import defaultdict
+
+    users = list(users)
+    ids = [user.id for user in users]
+    exceptions = defaultdict(list)
+    for row in WorkScheduleException.objects.filter(
+        workspace=workspace,
+        user_id__in=ids,
+        status=WorkScheduleException.Status.ACTIVE,
+        date_from__lte=date_to,
+        date_to__gte=date_from,
+    ).order_by("-created_at"):
+        exceptions[row.user_id].append(row)
+    units = {
+        row["id"]: row
+        for row in OrganizationUnit.objects.filter(workspace=workspace, is_active=True).values(
+            "id", "parent_id", "title"
+        )
+    }
+    direct = defaultdict(list)
+    for user_id, unit_id in OrganizationUnitMember.objects.filter(
+        unit__workspace=workspace, unit__is_active=True, user_id__in=ids, is_active=True
+    ).values_list("user_id", "unit_id"):
+        direct[user_id].append(unit_id)
+    chains = {user_id: _chain_of(units, direct[user_id]) for user_id in ids}
+    chain_units = {unit_id for chain in chains.values() for unit_id in chain}
+    period = Q(effective_from__lte=date_to) & (Q(effective_to__isnull=True) | Q(effective_to__gte=date_from))
+    versions = list(
+        WorkSchedule.objects.filter(workspace=workspace)
+        .filter(period)
+        .filter(Q(scope="person", user_id__in=ids) | Q(scope="unit", unit_id__in=chain_units) | Q(scope="company"))
+        .prefetch_related("days")
+    )
+    unit_versions = {}
+    for row in versions:
+        if row.scope == "unit":
+            unit_versions.setdefault(row.unit_id, []).append(row)
+    company = [row for row in versions if row.scope == "company"]
+    result = {}
+    for user in users:
+        resolver = ScheduleResolver.__new__(ScheduleResolver)
+        resolver.workspace, resolver.user, resolver.zone = workspace, user, calendar_zone(workspace)
+        resolver.exceptions = exceptions[user.id]
+        resolver.unit_chain = chains[user.id]
+        resolver.person = [row for row in versions if row.scope == "person" and row.user_id == user.id]
+        resolver.units = {unit_id: unit_versions.get(unit_id, []) for unit_id in resolver.unit_chain}
+        resolver.company = company
+        result[user.id] = resolver
+    return result
 
 
 def schedule_for(user, day, workspace):

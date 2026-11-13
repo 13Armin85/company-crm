@@ -27,6 +27,7 @@ from .work_calendar import urlpatterns as work_calendar_urls
 from .workflow import urlpatterns as workflow_urls
 from .leave import urlpatterns as leave_urls
 from .portal import urlpatterns as portal_urls
+from .reports import urlpatterns as report_urls
 
 urlpatterns = [
     *entity_urls,
@@ -34,6 +35,7 @@ urlpatterns = [
     *workflow_urls,
     *leave_urls,
     *portal_urls,
+    *report_urls,
     *analytic_urls,
     *asset_urls,
     *cycle_urls,

@@ -116,7 +116,8 @@ def persian_errors(value, status_code=400, field=None):
         return value
     if field and re.fullmatch(r"_unique\d+", field):
         return value
-    if field == "fields" and isinstance(value, list) and all(isinstance(item, str) and re.fullmatch(r"[a-zA-Z0-9_-]+", item) for item in value):
+    # Machine field keys: "fields" (engine) and "missing" (ticket 8: columns a saved report lost).
+    if field in ("fields", "missing") and isinstance(value, list) and all(isinstance(item, str) and re.fullmatch(r"[a-zA-Z0-9_-]+", item) for item in value):
         return value
     if isinstance(value, dict):
         if set(value) == {"path", "label", "message"}:

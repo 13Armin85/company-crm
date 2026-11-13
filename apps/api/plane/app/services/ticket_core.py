@@ -1302,35 +1302,101 @@ def history(issue, kind=None):
     ]
 
 
-def deadline_badges(issue_ids, workspace, now=None):
-    """Compact deadline state for a page of list/kanban rows (bounded by the page size)."""
+def deadline_states(issues, workspace, now=None):
+    """{issue_id: state} for issues with a target — the one mapping of ن۳ for many rows.
+
+    States: ``closed`` / ``not_started`` / ``overdue`` / ``near_due`` / ``running``.
+    Near-due: remaining time ≤ ``NEAR_DUE_PERCENT`` of the total; for deadlines within a
+    week the remaining *working* minutes of the calendar user are used (decision 9).
+    Loads type defaults, calendar users and their schedules in bulk (no per-row queries).
+    """
+    from .work_calendar import bulk_resolvers
+    from .workflow_engine import company_calendar_user
+
     now = now or timezone.now()
-    rows = Issue.objects.filter(id__in=[i for i in issue_ids if i], workspace=workspace).select_related("state", "workspace")
-    result = {}
-    for issue in rows:
-        if not issue.target_at and not effective_minutes(issue)[0]:
+    issues = list(issues)
+    type_minutes_map = dict(
+        IssueType.objects.filter(id__in={i.type_id for i in issues if i.type_id}).values_list("id", "target_minutes")
+    )
+    result, near_candidates = {}, []
+    for issue in issues:
+        if not issue.target_at and not (issue.target_minutes or type_minutes_map.get(issue.type_id)):
             continue
-        category = category_of(issue)
-        if category == DONE and issue.target_started_at:
-            state = "closed"
-        elif issue.target_anchor_at is None:
-            state = "not_started"
+        if category_of(issue) == DONE and issue.target_started_at:
+            result[issue.id] = "closed"
+        elif issue.target_anchor_at is None or issue.target_at is None:
+            result[issue.id] = "not_started"
         elif now > issue.target_at:
-            state = "overdue"
+            result[issue.id] = "overdue"
         else:
             total = (issue.target_calendar or {}).get("total") or 0
             threshold = total * NEAR_DUE_PERCENT / 100
             wall = (issue.target_at - now).total_seconds() / 60
-            near = wall <= threshold or (
-                wall <= 7 * 24 * 60 and working_minutes_between(calendar_user(issue), now, issue.target_at, workspace) <= threshold
+            if wall <= threshold:
+                result[issue.id] = "near_due"
+            elif wall <= 7 * 24 * 60:
+                near_candidates.append((issue, threshold))
+            else:
+                result[issue.id] = "running"
+    if near_candidates:
+        stored = {
+            issue.id: (issue.target_calendar or {}).get("user_id") for issue, _ in near_candidates
+        }
+        primary = {}
+        for row in (
+            IssueAssignee.objects.filter(
+                issue_id__in=[i.id for i, _ in near_candidates], deleted_at__isnull=True, assignee__is_active=True
             )
-            state = "near_due" if near else "running"
-        result[str(issue.id)] = {
-            "state": state,
+            .order_by("created_at", "id")
+            .values("issue_id", "assignee_id")
+        ):
+            primary.setdefault(row["issue_id"], row["assignee_id"])
+        stored_users = {u.id: u for u in User.objects.filter(id__in=[v for v in stored.values() if v])}
+        company = company_calendar_user()
+        users = {}
+        for issue, _ in near_candidates:
+            user = stored_users.get(_uuid_or_none(stored[issue.id]))
+            if user is None and primary.get(issue.id):
+                user = User(id=primary[issue.id])
+            users[issue.id] = user or company
+        distinct = {u.id: u for u in users.values()}
+        zone = calendar_zone(workspace)
+        last = max(issue.target_at for issue, _ in near_candidates).astimezone(zone).date()
+        resolvers = bulk_resolvers(workspace, distinct.values(), now.astimezone(zone).date(), last)
+        for issue, threshold in near_candidates:
+            resolver = resolvers[users[issue.id].id]
+            seconds = sum((b - a).total_seconds() for a, b in resolver.working_intervals(now, issue.target_at))
+            result[issue.id] = "near_due" if int(seconds // 60) <= threshold else "running"
+    return result
+
+
+def _uuid_or_none(value):
+    from uuid import UUID
+
+    try:
+        return UUID(str(value)) if value else None
+    except ValueError:
+        return None
+
+
+def deadline_badges(issue_ids, workspace, now=None):
+    """Compact deadline state for a page of list/kanban rows (bounded by the page size)."""
+    now = now or timezone.now()
+    rows = list(
+        Issue.objects.filter(id__in=[i for i in issue_ids if i], workspace=workspace).select_related(
+            "state", "workspace"
+        )
+    )
+    states = deadline_states(rows, workspace, now)
+    return {
+        str(issue.id): {
+            "state": states[issue.id],
             "target_at": iso(issue.target_at, workspace),
             "target_text": fa_moment(issue.target_at, workspace),
         }
-    return result
+        for issue in rows
+        if issue.id in states
+    }
 
 
 # ---------------------------------------------------------------- ن۱ / ن۱۱ core fields

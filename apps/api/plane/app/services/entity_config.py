@@ -238,8 +238,8 @@ def export_config(workspace):
         "forms": forms,
         "surfaces": [
             {"code": row.code, "definition": deepcopy(row.definition)}
-            # Ticket 7: the customer-portal settings are workspace-specific and owned by portal_settings.
-            for row in SurfaceConfiguration.objects.filter(workspace=workspace).exclude(code="customer-portal")
+            # Ticket 7/8: customer-portal and daily-report settings are workspace-specific and owned by their services.
+            for row in SurfaceConfiguration.objects.filter(workspace=workspace).exclude(code__in=("customer-portal", "daily-report"))
         ],
     }
 
