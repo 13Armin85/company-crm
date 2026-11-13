@@ -46,6 +46,7 @@ import { errorMessage } from "../api";
 import { Button, Skeleton } from "../components";
 import { RelatedRecords } from "../engine/related-records";
 import { TicketHeader, TicketTabs } from "./ticket-header";
+import { PortalTab } from "./portal-tab";
 import type { TicketTab } from "./ticket-header";
 import { api, useSlug } from "../api/client";
 import { Link } from "react-router";
@@ -620,6 +621,7 @@ export function ContactDialog({
   const [contactAt, setContactAt] = useState<string | null>(null);
   const [summary, setSummary] = useState("");
   const [resolved, setResolved] = useState<boolean | null>(null);
+  const [notifyCustomer, setNotifyCustomer] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const mutation = useContactResolve(id);
   const errors = contactErrors({ channel, contactName, summary, resolved });
@@ -636,7 +638,14 @@ export function ContactDialog({
         setSubmitted(true);
         if (errors.length || resolved === null) return;
         mutation.mutate(
-          { channel, contact_name: contactName, summary, resolved, ...(contactAt ? { contact_at: contactAt } : {}) },
+          {
+            channel,
+            contact_name: contactName,
+            summary,
+            resolved,
+            ...(contactAt ? { contact_at: contactAt } : {}),
+            ...(card.portal ? { notify_customer: notifyCustomer } : {}),
+          },
           { onSuccess: onClose }
         );
       }}
@@ -689,6 +698,12 @@ export function ContactDialog({
           <RefreshCw size={18} aria-hidden /> حل نشد — ادامه در مسیر عادی
         </button>
       </div>
+      {card.portal && (
+        <label className="ticket-check">
+          <input type="checkbox" checked={notifyCustomer} onChange={(event) => setNotifyCustomer(event.target.checked)} />
+          <span>اطلاع به مشتری — خلاصهٔ تماس در درگاه مشتری نمایش داده شود (در غیر این صورت فقط داخلی می‌ماند)</span>
+        </label>
+      )}
       <Errors items={submitted ? errors : []} />
       {mutation.error && <Errors items={[errorMessage(mutation.error, "ثبت تماس انجام نشد.")]} />}
     </Dialog>
@@ -1188,6 +1203,7 @@ export function TicketCorePanel({ id }: { id: string }) {
           />
           <div role="tabpanel" id={`ticket-tabpanel-${tab}`} aria-labelledby={`ticket-tab-${tab}`}>
             {tab === "history" && <TicketHistory id={id} />}
+            {tab === "portal" && <PortalTab id={id} />}
             {tab === "referrals" && (
               <section className="ticket-history" aria-label="ارجاع‌ها">
                 <ReferralList card={data} />

@@ -119,6 +119,34 @@ def company_calendar_user():
     return User(id=UUID(int=0))
 
 
+# ---------------------------------------------------------------- record sources
+#
+# A record source lets a record that is not an entity-engine adapter (e.g. a leave
+# request with its own versions and documents) run on this engine unchanged. A
+# source is an object with: ``get(workspace, record_id)``, ``status_options(entity)``,
+# ``status(native)``, ``subject(native)``, ``title(native)``, ``values(native)``,
+# ``apply_status(entity, actor, record_id, code, metadata)``, ``can_view(actor,
+# native, request)``, ``blocks_transition(instance, row)`` (message or None),
+# ``can_cancel(actor, instance, native)``, ``on_cancel(instance, actor, reason, now)``
+# and ``default_graph(definition)``.
+
+RECORD_SOURCE_MODULES = ("plane.app.services.leave_requests",)
+_record_sources = {}
+
+
+def register_record_source(adapter, source):
+    _record_sources[adapter] = source
+
+
+def record_source(entity):
+    if not _record_sources:
+        from importlib import import_module
+
+        for name in RECORD_SOURCE_MODULES:
+            import_module(name)
+    return _record_sources.get(getattr(entity, "adapter", "") or "")
+
+
 # ---------------------------------------------------------------- graph
 
 
@@ -153,6 +181,9 @@ def status_field(entity, definition_settings=None):
 
 def status_options(entity, definition_settings=None):
     """Active statuses of this record type; workflows never define their own statuses."""
+    source = record_source(entity)
+    if source is not None:
+        return source.status_options(entity)
     if entity.adapter == "leave":
         return [{"code": code, "title": title} for code, title in LEAVE_STATUSES]
     if entity.adapter in {"ticket", "task"}:
@@ -363,6 +394,9 @@ def record_parts(entity, record_id):
     """(sidecar row, native row) of a record by its public id; no access checks."""
     from .entity_records import ADAPTERS
 
+    source = record_source(entity)
+    if source is not None:
+        return None, source.get(entity.workspace, record_id)
     if entity.adapter:
         native = ADAPTERS[entity.adapter].objects.filter(workspace=entity.workspace, id=record_id).first()
         row = EntityRecord.objects.filter(entity=entity, source_id=record_id).first()
@@ -373,6 +407,9 @@ def record_parts(entity, record_id):
 def record_values(entity, row, native):
     from .entity_records import all_values
 
+    source = record_source(entity)
+    if source is not None:
+        return source.values(native) if native is not None else {}
     values = all_values(entity, row, native)
     try:
         return compute(entity_fields(entity, row.subtype if row else None), values, strict=False)
@@ -381,6 +418,9 @@ def record_values(entity, row, native):
 
 
 def record_status(entity, row, native, definition_settings=None):
+    source = record_source(entity)
+    if source is not None:
+        return source.status(native) if native is not None else None
     if entity.adapter == "leave":
         return native.status if native else None
     if entity.adapter in {"ticket", "task"} and native is not None:
@@ -393,6 +433,9 @@ def record_status(entity, row, native, definition_settings=None):
 
 def record_subject(entity, row, native, definition_settings=None, values=None):
     """The person a record is about: leave owner, else a configured user field, else creator."""
+    source = record_source(entity)
+    if source is not None:
+        return source.subject(native) if native is not None else None
     if entity.adapter == "leave" and native is not None:
         return native.user
     code = (definition_settings or {}).get("subject_field")
@@ -406,6 +449,9 @@ def record_subject(entity, row, native, definition_settings=None, values=None):
 
 
 def record_title(entity, row, native):
+    source = record_source(entity)
+    if source is not None:
+        return source.title(native) if native is not None else entity.title
     if native is not None:
         for name in ("name", "title", "reason"):
             if getattr(native, name, ""):
@@ -687,9 +733,13 @@ def allowed_transitions(instance, step_run, actor, values, now=None):
     if actor_role(actor, step_run, instance.workspace, now) is None:
         return []
     visited = visited_steps(instance)
+    source = record_source(instance.entity)
     result = []
     for row in transitions_from(instance.version.graph, instance.current_step):
         if row.get("auto"):
+            continue
+        # The record owns this move (e.g. "sign and submit" of a leave request).
+        if source is not None and source.blocks_transition(instance, row):
             continue
         if row.get("kind") == "return" and row.get("to") not in visited:
             continue
@@ -1005,6 +1055,7 @@ def instance_payload(instance, actor, request=None, now=None):
         ),
         "can_migrate": has_permission(actor, workspace, "Workflow.Migrate", request=request)
         and instance.status in {WorkflowInstance.Status.RUNNING, WorkflowInstance.Status.ERROR},
+        "can_cancel": can_cancel(actor, instance),
     }
     steps = steps_of(instance.version.graph)
     migration_target = None
@@ -1050,6 +1101,17 @@ def instance_payload(instance, actor, request=None, now=None):
         "timeline": timeline(instance),
         "contact_channels": contact_channels(workspace) if fast else [],
     }
+
+
+def can_cancel(actor, instance):
+    """Whether ``actor`` may cancel this active instance; only records whose source allows it."""
+    if instance.status not in {WorkflowInstance.Status.RUNNING, WorkflowInstance.Status.ERROR}:
+        return False
+    source = record_source(instance.entity)
+    if source is None:
+        return False
+    _, native = record_parts(instance.entity, instance.record_id)
+    return native is not None and bool(source.can_cancel(actor, instance, native))
 
 
 def _subtype(instance):

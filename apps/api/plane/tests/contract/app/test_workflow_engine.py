@@ -901,6 +901,8 @@ def test_two_concurrent_approvals_apply_only_once(org):
             outcomes.append("ok")
         except engine.Conflict:
             outcomes.append("conflict")
+        except Exception as error:  # surfaced in the assertion message below
+            outcomes.append(repr(error))
         finally:
             connection.close()
 
@@ -983,7 +985,7 @@ def _leave_graph(definition_statuses=None):
         "transitions": [
             move("submit", "request", "manager", label="ارسال درخواست"),
             move(
-                "approve", "manager", "approved", "approve", "تأیید", condition={"field": "leave_type", "op": "empty"}
+                "approve", "manager", "approved", "approve", "تأیید", condition={"field": "reason", "op": "not_empty"}
             ),
             move(
                 "escalate",
@@ -991,7 +993,7 @@ def _leave_graph(definition_statuses=None):
                 "upper",
                 "approve",
                 "تأیید و ارسال به بالادست",
-                condition={"field": "leave_type", "op": "not_empty"},
+                condition={"field": "reason", "op": "empty"},
             ),
             move("reject", "manager", "rejected", "reject", "رد"),
             move("return", "manager", "request", "return", "بازگشت برای اصلاح"),

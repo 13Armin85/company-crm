@@ -202,6 +202,12 @@ class Issue(ChangeTrackerMixin, ProjectBaseModel):
     target_at = models.DateTimeField(null=True, blank=True, db_index=True)
     # {"source": person|team|company|exception, "source_id": ..., "user_id": ...}
     target_calendar = models.JSONField(default=dict, blank=True)
+    # Ticket 7: customer portal. The submitting portal account (never a fake internal
+    # ``created_by``) and the triage stage of a portal request ("" for internal tickets).
+    portal_account = models.ForeignKey(
+        "db.PortalAccount", on_delete=models.PROTECT, null=True, blank=True, related_name="requests"
+    )
+    portal_stage = models.CharField(max_length=20, blank=True, default="")
     overdue_flagged_at = models.DateTimeField(null=True, blank=True)
     overdue_reminded_at = models.DateTimeField(null=True, blank=True)
 
@@ -590,8 +596,16 @@ class IssueComment(ChangeTrackerMixin, ProjectBaseModel):
         null=True,
     )
     attachments = ArrayField(models.URLField(), size=10, blank=True, default=list)
+    # Ticket 7: project-less tickets carry comments too (relaxed from NOT NULL).
+    project = models.ForeignKey(
+        "db.Project", on_delete=models.CASCADE, related_name="project_issuecomment", null=True, blank=True
+    )
     issue = models.ForeignKey(
         Issue, on_delete=models.CASCADE, related_name="issue_comments"
+    )
+    # Ticket 7: author of an EXTERNAL comment written by a customer (``actor`` is then NULL).
+    portal_account = models.ForeignKey(
+        "db.PortalAccount", on_delete=models.PROTECT, null=True, blank=True, related_name="messages"
     )
     # System can also create comment
     actor = models.ForeignKey(

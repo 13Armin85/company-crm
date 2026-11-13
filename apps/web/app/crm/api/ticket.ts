@@ -119,6 +119,8 @@ export interface TicketCard {
   read_only: boolean;
   contact_channels: { code: string; title: string }[];
   can: { refer: boolean; contact: boolean };
+  /** Ticket 7: submitted through the customer portal. */
+  portal?: boolean;
 }
 
 export interface HistoryEvent {
@@ -246,6 +248,7 @@ export const useContactResolve = (id: string) =>
     contact_at?: string;
     summary: string;
     resolved: boolean;
+    notify_customer?: boolean;
   }>(id, (slug) => `${base(slug, id)}contact/`, { success: "تماس ثبت شد", error: "ثبت تماس انجام نشد" });
 
 export const useReferTicket = (id: string) =>

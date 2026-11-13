@@ -25,6 +25,8 @@ PRIVATE_CRM_ASSET_TYPES = [
     "CRM_LEAVE_DOCUMENT",
     "CRM_LEAVE_TEMPLATE",
     "CRM_SIGNATURE",
+    # Ticket 7: portal request/message files are served only by permission-checked endpoints.
+    "CRM_PORTAL_ATTACHMENT",
 ]
 
 

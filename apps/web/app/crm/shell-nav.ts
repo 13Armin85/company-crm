@@ -2,14 +2,18 @@
 import {
   Building2,
   CalendarDays,
+  CalendarOff,
   CheckSquare2,
   CircleHelp,
   Database,
+  FileText,
   FolderKanban,
   GitBranch,
+  Globe,
   Home,
   Inbox,
   LayoutGrid,
+  PenLine,
   ListTodo,
   Settings,
   ShieldCheck,
@@ -35,6 +39,7 @@ export const shellGroups: ShellGroup[] = [
       { to: "/inbox", label: "صندوق ورودی", icon: Inbox },
       { to: "/my-work", label: "کارهای من", icon: ListTodo },
       { to: "/workflow-inbox", label: "منتظر اقدام من", icon: Workflow },
+      { to: "/leave-requests", label: "درخواست مرخصی", icon: CalendarOff },
       { to: "/calendar", label: "تقویم", icon: CalendarDays },
     ],
   },
@@ -66,6 +71,8 @@ export const shellGroups: ShellGroup[] = [
       { to: "/roles", label: "نقش‌های سازمانی", icon: ShieldCheck },
       { to: "/routing", label: "ارجاع هوشمند", icon: GitBranch },
       { to: "/absences", label: "عدم حضور", icon: UserX },
+      { to: "/leave-templates", label: "قالب فرم مرخصی", icon: FileText },
+      { to: "/signatures", label: "تصویر امضای کاربران", icon: PenLine },
     ],
   },
   {
@@ -76,6 +83,7 @@ export const shellGroups: ShellGroup[] = [
     items: [
       { to: "/settings", label: "تنظیمات حساب و شرکت", icon: Settings, end: true },
       { to: "/settings/engine", label: "طراحی فرم‌ها و جدول‌ها", icon: SlidersHorizontal },
+      { to: "/portal-settings", label: "درگاه مشتری", icon: Globe },
       { to: "/help", label: "راهنما و پشتیبانی", icon: CircleHelp },
     ],
   },
@@ -87,14 +95,11 @@ const matches = (item: ShellItem, pathname: string) =>
 /** Picks the group that owns a path; project pages belong to "work", record pages to "data". */
 export function groupForPath(pathname: string): string {
   if (pathname.startsWith("/entities")) return "data";
-  const owner = shellGroups.find((group) =>
-    group.items.some((item) => item.to !== "/" && matches(item, pathname))
-  );
+  const owner = shellGroups.find((group) => group.items.some((item) => item.to !== "/" && matches(item, pathname)));
   if (owner) return owner.id;
   if (pathname.startsWith("/edit") || pathname.startsWith("/projects")) return "work";
   return "home";
 }
-
 
 /** The most specific page icon for a path, falling back to its section's icon. */
 export function iconForPath(pathname: string): LucideIcon {

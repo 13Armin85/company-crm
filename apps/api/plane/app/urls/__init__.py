@@ -25,11 +25,15 @@ from .exporter import urlpatterns as exporter_urls
 from .entity import urlpatterns as entity_urls
 from .work_calendar import urlpatterns as work_calendar_urls
 from .workflow import urlpatterns as workflow_urls
+from .leave import urlpatterns as leave_urls
+from .portal import urlpatterns as portal_urls
 
 urlpatterns = [
     *entity_urls,
     *work_calendar_urls,
     *workflow_urls,
+    *leave_urls,
+    *portal_urls,
     *analytic_urls,
     *asset_urls,
     *cycle_urls,

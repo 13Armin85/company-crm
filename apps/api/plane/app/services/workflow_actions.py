@@ -347,6 +347,9 @@ def _clean_graph(graph):
 
 
 def blank_graph(definition):
+    source = engine.record_source(definition.entity)
+    if source is not None:
+        return source.default_graph(definition)
     statuses = [row["code"] for row in _status_rows(definition)]
     first = statuses[0] if statuses else ""
     last = statuses[-1] if statuses else ""
@@ -621,10 +624,20 @@ def _run_transition(instance, run, actor, row, reason, now, *, explicit=None, da
         changed_values=engine.json_safe(changed),
         **({"data": data} if data else {}),
     )
+    _after_transition(instance, actor, row, reason)
+
+
+def _after_transition(instance, actor, row, reason):
+    """Let a record source react (e.g. notify the next approver and the requester)."""
+    source = engine.record_source(instance.entity)
+    hook = getattr(source, "after_transition", None)
+    if hook is not None:
+        hook(instance, actor, row, reason)
 
 
 @transaction.atomic
-def transition(workspace, actor, instance_id, data, request=None, now=None):
+def transition(workspace, actor, instance_id, data, request=None, now=None, *, via_source=False):
+    """Run a manual transition. ``via_source`` is set only by a record source that owns the move."""
     now = now or timezone.now()
     instance = _locked_instance(workspace, instance_id, data.get("revision"))
     _require_running(instance)
@@ -637,6 +650,11 @@ def transition(workspace, actor, instance_id, data, request=None, now=None):
     )
     if row is None or row.get("auto"):
         raise ValidationError({"transition": "این انتقال از مرحلهٔ جاری مجاز نیست."})
+    source = engine.record_source(instance.entity)
+    if source is not None and not via_source:
+        message = source.blocks_transition(instance, row)
+        if message:
+            raise ValidationError({"transition": message})
     label = row.get("label") or engine.TRANSITION_KINDS.get(row.get("kind"), "")
     if row.get("kind") == "return" and row.get("to") not in engine.visited_steps(instance):
         raise ValidationError({"transition": "بازگشت فقط به مرحله‌ای که قبلاً پیموده شده مجاز است."})
@@ -725,6 +743,7 @@ def reassign(workspace, actor, instance_id, data, request=None, now=None):
     )
     _bump(instance)
     _audit(instance, actor, "workflow.reassigned", before, after, reason, recovered_from_error=was_error)
+    _after_transition(instance, actor, {"kind": "reassign"}, reason)
     return instance
 
 
@@ -1128,6 +1147,39 @@ def migrate(workspace, actor, instance_id, data, request=None, now=None):
     _enter(instance, target, actor, now)
     _bump(instance)
     _audit(instance, actor, "workflow.migrated", before, preview["after"], reason, problems=preview["problems"])
+    return instance
+
+
+@transaction.atomic
+def cancel(workspace, actor, instance_id, data, request=None, now=None):
+    """Cancel an active instance on behalf of its record (only where the record source allows it).
+
+    The open step is closed, a ``cancel`` decision and an audit event are recorded
+    and the record source updates the record itself (e.g. a leave request becomes
+    "cancelled"). Nothing is deleted.
+    """
+    now = now or timezone.now()
+    instance = _locked_instance(workspace, instance_id, data.get("revision"))
+    if instance.status not in {WorkflowInstance.Status.RUNNING, WorkflowInstance.Status.ERROR}:
+        raise ValidationError("این فرایند فعال نیست و لغو آن ممکن نیست.")
+    if not engine.can_cancel(actor, instance):
+        raise PermissionDenied("اجازهٔ لغو این درخواست را ندارید.")
+    reason = _reason(data, required=False)
+    run = (
+        WorkflowStepRun.objects.select_for_update(of=("self",))
+        .filter(instance=instance, status=WorkflowStepRun.Status.ACTIVE)
+        .first()
+    )
+    if run is not None:
+        _close_run(run, "cancel", now)
+    before = {"step": instance.current_step, "status": instance.status}
+    _decide(instance, run, "cancel", actor, reason=reason, from_step=instance.current_step)
+    instance.status = WorkflowInstance.Status.CANCELLED
+    instance.completed_at = now
+    instance.error_message = ""
+    _bump(instance)
+    engine.record_source(instance.entity).on_cancel(instance, actor, reason, now)
+    _audit(instance, actor, "workflow.cancelled", before, {"status": instance.status}, reason)
     return instance
 
 

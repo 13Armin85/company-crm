@@ -147,6 +147,7 @@ export const PRESETS = [
   { id: "unassigned", label: "بدون مسئول" },
   { id: "overdue", label: "عقب‌افتاده" },
   { id: "closed", label: "بسته‌شده" },
+  { id: "portal", label: "درگاه: منتظر تریاژ" },
 ] as const;
 
 export type PresetId = (typeof PRESETS)[number]["id"];
@@ -171,6 +172,7 @@ export const HISTORY_KINDS = [
   { id: "contact", label: "تماس" },
   { id: "lifecycle", label: "بستن/بازگشایی" },
   { id: "fields", label: "فیلدها" },
+  { id: "portal", label: "درگاه و برآورد" },
 ] as const;
 
 export const EVENT_TITLES: Record<string, string> = {
@@ -197,6 +199,22 @@ export const EVENT_TITLES: Record<string, string> = {
   "record.updated": "ویرایش تیکت",
   "record.deactivated": "غیرفعال‌سازی تیکت",
   "record.activated": "فعال‌سازی تیکت",
+  // Ticket 7: customer portal and quotes.
+  "portal.request_submitted": "ثبت درخواست از درگاه مشتری",
+  "portal.customer_message": "پیام مشتری",
+  "portal.reply": "پاسخ به مشتری",
+  "portal.internal_note": "یادداشت داخلی",
+  "portal.request_approved": "تأیید درخواست درگاه",
+  "portal.request_rejected": "رد درخواست درگاه",
+  "portal.info_requested": "درخواست تکمیل اطلاعات از مشتری",
+  "portal.info_provided": "پاسخ مشتری به درخواست تکمیل",
+  "portal.feedback": "بازخورد مشتری",
+  "portal.feedback_edited": "ویرایش بازخورد مشتری",
+  "quote.created": "ساخت برآورد",
+  "quote.sent": "ارسال برآورد",
+  "quote.approved": "تأیید برآورد توسط مشتری",
+  "quote.rejected": "رد برآورد توسط مشتری",
+  "quote.revision_requested": "درخواست اصلاح برآورد",
 };
 
 /** Form field codes of the ticket entity → what users call them (generic record events). */

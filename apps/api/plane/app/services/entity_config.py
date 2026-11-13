@@ -170,7 +170,7 @@ def portable_layout(layout, workspace, importing=False):
 
 def export_config(workspace):
     entities = []
-    for row in EntityType.objects.filter(workspace=workspace).select_related("parent"):
+    for row in EntityType.objects.filter(workspace=workspace).exclude(adapter="leave_request").select_related("parent"):
         data = dict(EntityTypeSerializer(row, context={"workspace": workspace}).data)
         data.pop("id")
         data["parent"] = row.parent.code if row.parent_id else None
@@ -238,7 +238,8 @@ def export_config(workspace):
         "forms": forms,
         "surfaces": [
             {"code": row.code, "definition": deepcopy(row.definition)}
-            for row in SurfaceConfiguration.objects.filter(workspace=workspace)
+            # Ticket 7: the customer-portal settings are workspace-specific and owned by portal_settings.
+            for row in SurfaceConfiguration.objects.filter(workspace=workspace).exclude(code="customer-portal")
         ],
     }
 

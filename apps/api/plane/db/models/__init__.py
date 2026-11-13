@@ -143,3 +143,4 @@ from .leave import (
     LeaveTemplateVersion,
     SignatureImage,
 )
+from .portal import PORTAL_ATTACHMENT, PortalAccount, PortalAuditLog, PortalSession

@@ -88,6 +88,23 @@ const fieldLabels: Record<string, string> = {
   value: "مقدار",
   start: "تاریخ شروع",
   end: "تاریخ پایان",
+  // Leave requests, Word templates and signature images (ticket 6).
+  mode: "شیوهٔ مدت",
+  start_date: "تاریخ شروع",
+  end_date: "تاریخ پایان",
+  start_time: "ساعت شروع",
+  end_time: "ساعت پایان",
+  reason: "دلیل",
+  substitute: "جانشین",
+  attachments: "پیوست‌ها",
+  file: "فایل",
+  expires_at: "تاریخ انقضا",
+  template: "قالب فرم",
+  fingerprint: "پیش‌نمایش سند",
+  confirm: "تأیید صریح",
+  signature_id: "تصویر امضا",
+  grant: "اجازهٔ درج امضا",
+  revision: "نسخهٔ درخواست",
 };
 const machineKeys = new Set(["code", "error_code", "status_code", "type"]);
 

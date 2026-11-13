@@ -245,6 +245,19 @@ class EntityEvent(BaseModel):
                 fields=["workspace", "entity", "record_id"], name="crm_event_record_idx"
             )
         ]
+        constraints = [
+            # Ticket 7: a quote version is decided once; a ticket gets one customer feedback.
+            models.UniqueConstraint(
+                fields=["record_id"],
+                condition=models.Q(event_type="quote.decided", deleted_at__isnull=True),
+                name="crm_quote_one_decision",
+            ),
+            models.UniqueConstraint(
+                fields=["record_id"],
+                condition=models.Q(event_type="portal.feedback", deleted_at__isnull=True),
+                name="crm_portal_one_feedback",
+            ),
+        ]
 
 
 class EntityViewExport(BaseModel):

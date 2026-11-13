@@ -47,6 +47,8 @@ def _card(workspace, user, issue, request):
         "status": core.status_payload(issue, user, request),
         "read_only": not core.is_owner(issue, user, request),
         "contact_channels": contact_channels(workspace),
+        # Ticket 7: a portal request offers "inform the customer" on contact and the correspondence tab.
+        "portal": bool(issue.portal_account_id),
         "can": {
             "refer": core.is_owner(issue, user, request)
             and (

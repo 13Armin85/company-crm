@@ -80,9 +80,7 @@ class SignatureImage(BaseModel):
     sha256 = models.CharField(max_length=64)
     size = models.PositiveIntegerField(default=0)
     is_current = models.BooleanField(default=True)
-    uploaded_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+"
-    )
+    uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+")
     replaced_at = models.DateTimeField(null=True, blank=True)
     consent_at = models.DateTimeField(null=True, blank=True)
     consent_revoked_at = models.DateTimeField(null=True, blank=True)
@@ -171,9 +169,7 @@ class LeaveRequestVersion(BaseModel):
     template_version = models.ForeignKey(
         LeaveTemplateVersion, null=True, blank=True, on_delete=models.PROTECT, related_name="used_in"
     )
-    document = models.ForeignKey(
-        "db.FileAsset", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
-    )
+    document = models.ForeignKey("db.FileAsset", null=True, blank=True, on_delete=models.PROTECT, related_name="+")
     document_sha256 = models.CharField(max_length=64, blank=True)
     # The exact values written into the signed document (frozen with the version).
     document_values = models.JSONField(default=dict)

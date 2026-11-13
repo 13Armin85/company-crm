@@ -126,10 +126,13 @@ def preset_filter(queryset, preset, user, now=None):
         return queryset.filter(overdue_q(now))
     if preset == "closed":
         return queryset.exclude(open_q())
+    if preset == "portal":
+        # Ticket 7: the portal triage queue is a filter on the same work list, not a separate page.
+        return queryset.filter(portal_account__isnull=False, portal_stage__in=("pending", "awaiting_customer"))
     raise ValidationError({"preset": "فیلتر آماده معتبر نیست."})
 
 
-PRESETS = ("all", "mine", "unassigned", "overdue", "closed")
+PRESETS = ("all", "mine", "unassigned", "overdue", "closed", "portal")
 
 
 def preset_counts(queryset, user, now=None):
@@ -1176,6 +1179,8 @@ def contact_resolve(workspace, actor, issue_id, data, request=None, now=None):
         "contact_text": fa_moment(contact_at, workspace),
         "summary": summary,
         "resolved": resolved,
+        # Ticket 7 (decision 7.10): optionally tell the customer through the portal thread.
+        "notified_customer": data.get("notify_customer") is True,
     }
     instance = (
         WorkflowInstance.objects.filter(
@@ -1201,6 +1206,10 @@ def contact_resolve(workspace, actor, issue_id, data, request=None, now=None):
                 workflow_actions.to_standard(
                     workspace, actor, instance.id, {"reason": summary, "revision": instance.revision}, request, now
                 )
+        if contact["notified_customer"]:
+            from .portal_requests import notify_contact
+
+            notify_contact(issue, actor, contact, request)
         record(issue, actor, "ticket.contact", reason=summary, contact=contact)
         routed = None
         if instance is None:
@@ -1225,6 +1234,24 @@ EVENT_KINDS = {
     "contact": ("ticket.contact",),
     "lifecycle": ("ticket.closed", "ticket.reopened"),
     "fields": ("ticket.field_changed",),
+    # Ticket 7: customer portal and quotes on the same ticket history.
+    "portal": (
+        "portal.request_submitted",
+        "portal.customer_message",
+        "portal.reply",
+        "portal.internal_note",
+        "portal.request_approved",
+        "portal.request_rejected",
+        "portal.info_requested",
+        "portal.info_provided",
+        "portal.feedback",
+        "portal.feedback_edited",
+        "quote.created",
+        "quote.sent",
+        "quote.approved",
+        "quote.rejected",
+        "quote.revision_requested",
+    ),
 }
 
 

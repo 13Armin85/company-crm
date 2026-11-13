@@ -95,6 +95,7 @@ def page(request):
 
 class EngineAPIView(BaseAPIView):
     permission_classes = [WorkspaceScopePermission]
+    allow_record_sources = False
 
     def workspace(self, slug):
         return get_object_or_404(Workspace, slug=slug)
@@ -102,9 +103,13 @@ class EngineAPIView(BaseAPIView):
     def entity(self, slug, code):
         if code == "task":
             code = "ticket"
-        return get_object_or_404(
+        entity = get_object_or_404(
             EntityType.objects.select_related("workspace"), workspace__slug=slug, code=code, parent__isnull=True
         )
+        # Workflow-only record types (leave requests) are not generic engine records.
+        if entity.adapter == "leave_request" and not self.allow_record_sources:
+            raise Http404()
+        return entity
 
     def require(self, request, workspace, code):
         if not has_permission(request.user, workspace, code, request=request):
@@ -212,6 +217,8 @@ class EngineCatalogEndpoint(EngineAPIView):
         entities = list(
             EntityType.objects.filter(workspace=workspace)
             .exclude(code="task", parent__isnull=True)
+            # Leave requests have their own pages (ticket 6); they are a workflow record only.
+            .exclude(adapter="leave_request")
             .select_related("workspace", "parent", "parent__workspace")
         )
         designer = has_permission(request.user, workspace, "EntityType.View", request=request) or has_permission(

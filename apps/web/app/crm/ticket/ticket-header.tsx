@@ -139,7 +139,7 @@ export function TicketHeader({ card, onAction }: { card: TicketCard; onAction: (
   );
 }
 
-export type TicketTab = "history" | "referrals" | "related" | "children";
+export type TicketTab = "history" | "portal" | "referrals" | "related" | "children";
 
 export function TicketTabs({
   active,
@@ -152,6 +152,7 @@ export function TicketTabs({
 }) {
   const tabs: [TicketTab, string][] = [
     ["history", "سابقه"],
+    ["portal", "مکاتبات"],
     ["referrals", "ارجاع‌ها"],
     ["related", "مرتبط‌ها"],
     ["children", "زیرتیکت‌ها"],

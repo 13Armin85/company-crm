@@ -192,6 +192,29 @@ LEAVE_MEMBER_PERMISSIONS = {"LeaveRequest.Create"}
 MEMBER_PERMISSIONS.update(LEAVE_MEMBER_PERMISSIONS)
 
 
+# Ticket 7 (catalog section "درگاه مشتری"): customer portal, triage, replies, quotes and feedback.
+PORTAL_PERMISSIONS = {
+    "Portal.Account.Manage": "مدیریت حساب‌های درگاه مشتری",
+    "Portal.Settings.Manage": "مدیریت تنظیمات درگاه مشتری",
+    "Portal.Request.Triage": "تریاژ درخواست‌های درگاه (تأیید، رد، درخواست تکمیل)",
+    "Portal.Reply": "پاسخ قابل‌مشاهده برای مشتری",
+    "Quote.Manage": "ساخت، ارسال و نسخه‌گذاری برآورد هزینه",
+    "Portal.Feedback.View": "مشاهدهٔ بازخورد و امتیاز مشتری",
+}
+PERMISSION_REGISTRY.update(
+    {
+        code: {
+            "name": title,
+            "description": title,
+            "category": code.split(".")[0],
+            "is_delegatable": False,
+            "is_active": True,
+        }
+        for code, title in PORTAL_PERMISSIONS.items()
+    }
+)
+
+
 def sync_permission_catalog(workspace):
     from plane.db.models import OrganizationPermission
 
@@ -257,3 +280,4 @@ def initialize_bulk_memberships(memberships):
                 UserOrganizationRole.objects.get_or_create(
                     workspace_id=membership.workspace_id, user_id=membership.member_id, role=role
                 )
+

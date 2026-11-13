@@ -582,17 +582,7 @@ def initialize_engine(workspace):
         LookupValue.objects.get_or_create(
             category=statuses, code=code, defaults={"title": title, "position": pos}
         )
-    leave_types, _ = LookupCategory.objects.get_or_create(
-        workspace=workspace,
-        code="leave-type",
-        defaults={"title": "نوع مرخصی", "is_system": True},
-    )
-    for pos, (code, title) in enumerate(
-        (("annual", "استحقاقی"), ("sick", "استعلاجی"), ("unpaid", "بدون حقوق"))
-    ):
-        LookupValue.objects.get_or_create(
-            category=leave_types, code=code, defaults={"title": title, "position": pos}
-        )
+    # Ticket 6: the leave category (annual, sick, …) is owned by another system; it is never seeded here.
     types = {}
     for code, title, adapter, prefix in (
         ("ticket", "کار", "ticket", "TKT"),
@@ -724,7 +714,6 @@ def initialize_engine(workspace):
         ("starts_at", "شروع", "datetime", {"required": True}, None, None),
         ("ends_at", "پایان", "datetime", {"required": True}, None, None),
         ("reason", "علت", "long_text", {}, None, None),
-        ("leave_type", "نوع مرخصی", "select", {}, leave_types, None),
     ]
     for code, title, kind, config, lookup, relation in definitions:
         FieldDefinition.objects.get_or_create(
@@ -767,7 +756,6 @@ def initialize_engine(workspace):
             ("starts_at", "starts_at"),
             ("ends_at", "ends_at"),
             ("reason", "reason"),
-            ("leave_type", ""),
         ],
     }
     for code, mapping in maps.items():
@@ -794,4 +782,7 @@ def initialize_engine(workspace):
             )
             form.published = version
             form.save(update_fields=["published", "updated_at"])
+    from .leave_requests import ensure_leave_entity
+
+    types["leave_request"] = ensure_leave_entity(workspace)
     return types

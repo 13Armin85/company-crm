@@ -22,6 +22,8 @@ from .entity import EngineAPIView
 
 
 class WorkflowBase(EngineAPIView):
+    allow_record_sources = True
+
     def base(self, request, slug, code="Workflow.View"):
         workspace = self.workspace(slug)
         self.require(request, workspace, "Workflow.View")
@@ -192,6 +194,14 @@ class WorkflowRecordEndpoint(WorkflowBase):
         self.base(request, slug)
         entity = self.entity(slug, entity_code)
         instance = engine.instance_for(entity, record_id)
+        source = engine.record_source(entity)
+        if source is not None:
+            # Records with their own source decide who may read them; they start their workflow themselves.
+            _, native = engine.record_parts(entity, record_id)
+            if native is None or not source.can_view(request.user, native, request):
+                raise PermissionDenied("اجازهٔ مشاهدهٔ گردش‌کار این رکورد را ندارید.")
+            payload = engine.instance_payload(instance, request.user, request) if instance else None
+            return Response({"instance": payload, "can_start": False})
         if instance is not None:
             if not engine.can_view_instance(request.user, instance, request):
                 from django.http import Http404
@@ -210,6 +220,8 @@ class WorkflowRecordEndpoint(WorkflowBase):
 
     def post(self, request, slug, entity_code, record_id):
         workspace = self.base(request, slug)
+        if engine.record_source(self.entity(slug, entity_code)) is not None:
+            raise ValidationError("گردش‌کار این رکورد از صفحهٔ خود آن (مثلاً ثبت امضا و ارسال) شروع می‌شود.")
         instance = actions.start(workspace, request.user, entity_code, record_id, request.data, request)
         return Response({"instance": self.payload(request, instance)}, status=201)
 
@@ -224,6 +236,7 @@ ACTIONS = {
     "contact-resolve": lambda w, r, i: actions.contact_resolve(w, r.user, i, r.data),
     "to-standard": lambda w, r, i: actions.to_standard(w, r.user, i, r.data, r),
     "migrate": lambda w, r, i: actions.migrate(w, r.user, i, r.data, r),
+    "cancel": lambda w, r, i: actions.cancel(w, r.user, i, r.data, r),
 }
 
 

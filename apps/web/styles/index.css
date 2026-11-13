@@ -9,6 +9,8 @@
 @import "./work-calendar.css";
 @import "./workflow.css";
 @import "./ticket.css";
+@import "./leave.css";
+@import "./portal.css";
 * {
   box-sizing: border-box;
 }

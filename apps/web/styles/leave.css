@@ -1,0 +1,393 @@
+/* Leave requests, Word preview, signature image and template pages (ticket 6). */
+.leave-page {
+  display: grid;
+  /* minmax(0, 1fr): a wide child (table, long file name) must never widen the page on phones. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+.leave-card {
+  min-width: 0;
+  overflow-x: auto;
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.leave-card h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-lg, 1.05rem);
+}
+.leave-form {
+  display: grid;
+  gap: 12px;
+}
+.leave-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+.leave-field,
+.leave-grid > label {
+  display: grid;
+  gap: 4px;
+}
+.leave-field textarea,
+.leave-field select,
+.leave-field input[type="time"],
+.leave-grid input {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
+  background: var(--surface);
+  color: inherit;
+}
+.leave-mode {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  border: 0;
+  padding: 0;
+}
+.leave-mode legend {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.leave-duration {
+  font-weight: 600;
+}
+.leave-error {
+  color: var(--red);
+  font-size: var(--fs-sm);
+}
+.leave-notice {
+  padding: 8px 12px;
+  border-radius: var(--radius-md, 8px);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  font-size: var(--fs-sm);
+}
+.leave-blockers {
+  margin: 0;
+  padding: 8px 24px;
+  border-radius: var(--radius-md, 8px);
+  background: color-mix(in srgb, var(--red) 10%, transparent);
+  color: var(--text-primary);
+  font-size: var(--fs-sm);
+}
+.leave-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.leave-status {
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+.leave-status-neutral {
+  background: color-mix(in srgb, var(--text-secondary) 14%, transparent);
+}
+.leave-status-info {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.leave-status-warning {
+  background: color-mix(in srgb, var(--orange, #f97316) 18%, transparent);
+}
+.leave-status-success {
+  background: color-mix(in srgb, var(--green) 16%, transparent);
+}
+.leave-status-danger {
+  background: color-mix(in srgb, var(--red) 16%, transparent);
+}
+.leave-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+.leave-table th,
+.leave-table td {
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: start;
+  vertical-align: top;
+}
+.leave-summary {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  margin: 0;
+}
+.leave-summary dt {
+  color: var(--text-secondary);
+}
+.leave-summary dd {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.leave-template-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.leave-preview {
+  width: 100%;
+  min-height: 520px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
+  background: #fff;
+}
+.leave-sign {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius-lg);
+}
+.leave-signature {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.leave-signature img,
+.leave-signature-thumb {
+  max-width: 220px;
+  max-height: 110px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
+  background: #fff;
+}
+.leave-signature > div {
+  display: grid;
+  gap: 8px;
+}
+.leave-templates,
+.leave-history {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0 16px;
+}
+
+/* ---------------------------------------------------------------- attachments */
+.leave-attachments-field {
+  display: grid;
+  gap: 10px;
+}
+.leave-attachments-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.leave-attachments-head label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+.leave-attachments-head small {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+.leave-dropzone {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 22px 16px;
+  border: 1.5px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface-soft);
+  color: var(--text-secondary);
+  text-align: center;
+  transition:
+    border-color var(--duration-fast, 120ms) var(--ease-out, ease-out),
+    background-color var(--duration-fast, 120ms) var(--ease-out, ease-out);
+}
+.leave-dropzone svg {
+  color: var(--accent);
+}
+.leave-dropzone strong {
+  color: var(--text-primary);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+.leave-dropzone small {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  direction: rtl;
+}
+/* The real file input covers the zone: click, keyboard and native drop all work on it. */
+.leave-dropzone input[type="file"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.leave-dropzone:hover,
+.leave-dropzone.is-dragging {
+  border-color: var(--accent);
+  background: var(--accent-softer, var(--accent-soft));
+}
+.leave-dropzone:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--focus-ring, var(--form-ring));
+}
+.leave-dropzone.is-full {
+  opacity: 0.6;
+}
+.leave-dropzone.is-full input[type="file"] {
+  cursor: not-allowed;
+}
+.leave-files {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.leave-file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
+  background: var(--surface);
+}
+.leave-file-busy {
+  border-style: dashed;
+}
+.leave-file-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm, 6px);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+}
+.leave-file-icon-pdf {
+  background: var(--danger-soft);
+  color: var(--danger, var(--red));
+}
+.leave-file-icon-image {
+  background: color-mix(in srgb, var(--purple, var(--violet)) 14%, transparent);
+  color: var(--purple, var(--violet));
+}
+.leave-file-icon-sheet {
+  background: var(--success-soft);
+  color: var(--success, var(--green));
+}
+.leave-file-icon-doc {
+  background: var(--info-soft);
+  color: var(--info, var(--blue));
+}
+.leave-file-icon-busy {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.leave-file-icon-busy svg {
+  animation: leave-spin 0.9s linear infinite;
+}
+.leave-file-meta {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.leave-file-name {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+a.leave-file-name:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.leave-file-meta small {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  direction: rtl;
+}
+.leave-file-remove {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm, 6px);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.leave-file-remove:hover {
+  background: var(--danger-soft);
+  color: var(--danger, var(--red));
+}
+.leave-file-remove:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--focus-ring, var(--form-ring));
+}
+.leave-summary dd .leave-files {
+  max-width: 720px;
+}
+@keyframes leave-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .leave-dropzone {
+    transition: none;
+  }
+  .leave-file-icon-busy svg {
+    animation: none;
+  }
+}
+.leave-template {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
+}
+.leave-template-active {
+  border-color: var(--green);
+}
+.leave-template-deprecated {
+  opacity: 0.7;
+}
+
+/* Wide tables scroll inside their own box on phones instead of widening the page. */
+.leave-table-scroll {
+  min-width: 0;
+  overflow-x: auto;
+  border-radius: var(--radius-md, 8px);
+}
+.leave-table-scroll:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--focus-ring, var(--form-ring));
+}

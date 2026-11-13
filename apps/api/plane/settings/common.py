@@ -150,6 +150,15 @@ REST_FRAMEWORK = {
     "SCHEMA_COERCE_PATH_PK": False,
 }
 
+# Ticket 7 — customer portal. Throttle rates per scope (see app/views/portal/base.py for defaults),
+# the portal session cookie and the external notification channels. External delivery stays OFF
+# until a provider, texts and approval exist: an empty tuple means no e-mail / SMS is ever attempted.
+PORTAL_THROTTLE_RATES = {}
+PORTAL_SESSION_COOKIE_NAME = os.environ.get("PORTAL_SESSION_COOKIE_NAME", "portal-session")
+PORTAL_NOTIFY_CHANNELS = tuple(
+    channel for channel in os.environ.get("PORTAL_NOTIFY_CHANNELS", "").split(",") if channel in ("email", "sms")
+)
+
 # API key throttle rate (DRF SimpleRateThrottle format, e.g. "60/minute")
 API_KEY_RATE_LIMIT = os.environ.get("API_KEY_RATE_LIMIT", "60/minute")
 
@@ -190,7 +199,7 @@ else:
     CORS_ALLOW_ALL_ORIGINS = bool(DEBUG)
     secure_origins = False
 
-CORS_ALLOW_HEADERS = [*default_headers, "X-API-Key"]
+CORS_ALLOW_HEADERS = [*default_headers, "X-API-Key", "X-Portal-CSRF"]
 
 # Application Settings
 WSGI_APPLICATION = "plane.wsgi.application"

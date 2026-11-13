@@ -16,6 +16,17 @@ import type { RouteConfig } from "@react-router/dev/routes";
  */
 export default [
   route("login", "./crm/pages/auth.tsx"),
+  // Ticket 7: the customer portal has its own layouts and never mounts the CRM shell.
+  layout("./portal/public-layout.tsx", [
+    route("portal/login", "./portal/pages/login.tsx"),
+    route("portal/setup", "./portal/pages/setup.tsx"),
+  ]),
+  layout("./portal/layout.tsx", [
+    route("portal", "./portal/pages/requests.tsx"),
+    route("portal/new", "./portal/pages/new-request.tsx"),
+    route("portal/requests/:id", "./portal/pages/request.tsx"),
+    route("portal/settings", "./portal/pages/settings.tsx"),
+  ]),
   layout("./crm/layout.tsx", [
     index("./crm/pages/home.tsx"),
     route("projects", "./crm/pages/projects.tsx"),
@@ -33,6 +44,11 @@ export default [
     route("routing", "./crm/pages/routing.tsx"),
     route("help", "./crm/pages/help.tsx"),
     route("absences", "./crm/pages/absences.tsx"),
+    route("leave-requests", "./crm/leave/requests-page.tsx"),
+    route("leave-requests/:id", "./crm/leave/request-page.tsx"),
+    route("leave-templates", "./crm/leave/templates-page.tsx"),
+    route("signatures", "./crm/leave/signatures-page.tsx"),
+    route("portal-settings", "./crm/pages/portal-settings.tsx"),
     route("settings", "./crm/pages/settings.tsx"),
     route("settings/engine", "./crm/engine/settings-page.tsx"),
     route("entities", "./crm/engine/entity-directory.tsx"),

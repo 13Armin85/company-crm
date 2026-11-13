@@ -1110,6 +1110,11 @@ def save_native(
 
 @transaction.atomic
 def save_record(entity, user, payload, request=None, identifier=None):
+    from .quotes import engine_write_refused
+
+    if engine_write_refused(entity):
+        # Ticket 7: quote versions are written only by the quote service (version lock, decisions).
+        raise PermissionDenied("برآورد هزینه فقط از صفحهٔ تیکت ساخته، ویرایش و ارسال می‌شود.")
     Workspace.objects.select_for_update().get(id=entity.workspace_id)
     entity = EntityType.objects.select_for_update().get(id=entity.id)
     creating = identifier is None
@@ -1352,6 +1357,11 @@ def references_to(entity, identifier):
 def delete_record(
     entity, user, identifier, request=None, deactivate=None, confirm=False
 ):
+    from .quotes import engine_write_refused
+
+    if engine_write_refused(entity):
+        # Ticket 7: quote versions are written only by the quote service (version lock, decisions).
+        raise PermissionDenied("برآورد هزینه فقط از صفحهٔ تیکت ساخته، ویرایش و ارسال می‌شود.")
     Workspace.objects.select_for_update().get(id=entity.workspace_id)
     EntityType.objects.select_for_update().get(id=entity.id)
     require_action(
@@ -1444,9 +1454,12 @@ def apply_workflow_status(entity, actor, record_id, status_code, metadata=None):
     ``record.status_changed`` event of a normal save are kept.
     Returns True when the status changed.
     """
-    from .workflow_engine import STATE_GROUPS, status_field
+    from .workflow_engine import STATE_GROUPS, record_source, status_field
 
     metadata = metadata or {}
+    source = record_source(entity)
+    if source is not None:
+        return source.apply_status(entity, actor, record_id, status_code, metadata)
     field = status_field(entity, metadata.get("definition_settings"))
     if entity.adapter == "leave":
         native = UserAbsence.objects.select_for_update().get(

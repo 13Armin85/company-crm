@@ -10,6 +10,9 @@ export const pagePermissions: Record<string, string> = {
   "/routing": "Routing.Queue.View",
   "/projects": "Project.View",
   "/workflow-inbox": "Workflow.View",
+  "/leave-requests": "Workflow.View",
+  "/leave-templates": "LeaveTemplate.Manage",
+  "/signatures": "Signature.Manage",
 };
 
 export function permissionsForPath(pathname: string): string[] {
@@ -31,9 +34,20 @@ export function canAccessPath(pathname: string, can: (code: string) => boolean):
       "View.Official.Manage",
       "Workflow.Design",
     ].some(can);
+  if (pathname.startsWith("/portal-settings"))
+    return can(portalPermissions.manageSettings) || can(portalPermissions.manageAccounts);
   if (/^\/roles\/[^/]+\/permissions\/?$/.test(pathname)) return can("Role.View") || can("Role.Permission.Assign");
   return permissionsForPath(pathname).every(can);
 }
+
+/** Ticket 6: leave requests. Seeing a request is decided per row on the server (own, approver,
+ * manager or ViewAll); these codes only show or hide pages and buttons. */
+export const leavePermissions = {
+  create: "LeaveRequest.Create",
+  viewAll: "LeaveRequest.ViewAll",
+  manageTemplates: "LeaveTemplate.Manage",
+  manageSignatures: "Signature.Manage",
+} as const;
 
 /** Ticket 5 action permissions (the server enforces the same codes). Extension approval has no code:
  * it follows the "direct manager / active delegate" relation only. */
@@ -43,4 +57,14 @@ export const ticketActionPermissions = {
   viewRules: "Routing.View",
   manageQueue: "Routing.Queue.ViewAll",
   route: "Routing.Route",
+} as const;
+
+/** Ticket 7: customer portal. The server enforces the same codes on every internal portal endpoint. */
+export const portalPermissions = {
+  manageAccounts: "Portal.Account.Manage",
+  manageSettings: "Portal.Settings.Manage",
+  triage: "Portal.Request.Triage",
+  reply: "Portal.Reply",
+  manageQuotes: "Quote.Manage",
+  viewFeedback: "Portal.Feedback.View",
 } as const;

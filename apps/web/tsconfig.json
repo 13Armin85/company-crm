@@ -23,6 +23,8 @@
     "app/routes.ts",
     "app/crm/**/*.ts",
     "app/crm/**/*.tsx",
+    "app/portal/**/*.ts",
+    "app/portal/**/*.tsx",
     "vite.config.ts",
     "local-origin.ts",
     "react-router.config.ts",

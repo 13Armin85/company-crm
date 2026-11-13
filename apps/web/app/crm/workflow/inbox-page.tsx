@@ -7,11 +7,12 @@ import { EmptyState, PageHeader, Skeleton } from "../components";
 import { DeadlineBadges } from "./panel";
 import { formatWorkingMinutes } from "./model";
 import { TicketExtensionInbox } from "../ticket/extension-inbox";
+import { recordHref } from "../leave/model";
 
 function Row({ item, extra }: { item: InboxItem; extra?: string }) {
   return (
     <li className="workflow-inbox-row">
-      <Link to={`/entities/${item.entity}/${item.record_id}`}>
+      <Link to={recordHref(item.entity, item.record_id)}>
         <strong>{item.record_title}</strong>
         <small>
           {item.entity_title} · {item.step_title}
@@ -99,7 +100,7 @@ function ErrorInstances() {
       <ul>
         {rows.data.map((row) => (
           <li key={row.id} className="workflow-inbox-row">
-            <Link to={`/entities/${row.entity}/${row.record_id}`}>
+            <Link to={recordHref(row.entity, row.record_id)}>
               <strong>{row.record_title}</strong>
               <small>
                 {row.definition} · {row.current_step}
