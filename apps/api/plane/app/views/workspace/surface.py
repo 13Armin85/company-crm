@@ -20,12 +20,11 @@ from plane.app.services.surface_config import (
     surface_schema,
     validate_definition,
     read_values,
-    extra_fields,
 )
 from plane.app.services.access_control import has_permission
 from plane.app.services.surface_designer import new_field_data, persian_errors
 from plane.app.serializers.entity import FieldDefinitionSerializer
-from plane.app.services.entity_schema import can_field, role_ids, present_schema
+from plane.app.services.entity_schema import present_schema
 from plane.app.services.entity_schema import validate_layout
 from plane.app.services.entity_records import (
     emit_definition,
@@ -57,13 +56,9 @@ class SurfaceEndpoint(EngineAPIView):
             response = super().handle_exception(exc)
         except Exception:
             reference = uuid4().hex[:8]
-            logging.getLogger(__name__).exception(
-                "Surface configuration failed; reference=%s", reference
-            )
+            logging.getLogger(__name__).exception("Surface configuration failed; reference=%s", reference)
             return Response(
-                {
-                    "detail": f"خطای غیرمنتظره رخ داد و عملیات انجام نشد. دوباره تلاش کنید؛ کد پیگیری: {reference}"
-                },
+                {"detail": f"خطای غیرمنتظره رخ داد و عملیات انجام نشد. دوباره تلاش کنید؛ کد پیگیری: {reference}"},
                 status=500,
             )
         if response.status_code >= 400:
@@ -86,38 +81,31 @@ class SurfaceEndpoint(EngineAPIView):
             return Response(
                 {
                     "results": [
-                        surface_schema(workspace, key, request.user) for key in SURFACES if key in DESIGNABLE_SURFACES
+                        surface_schema(workspace, key, request.user, request=request)
+                        for key in SURFACES
+                        if key in DESIGNABLE_SURFACES
                     ]
                 }
             )
         workspace = self.context(request, slug, code)
-        return Response(surface_schema(workspace, code, request.user))
+        return Response(surface_schema(workspace, code, request.user, request=request))
 
     @transaction.atomic
     def put(self, request, slug, code):
         if code not in DESIGNABLE_SURFACES:
-            raise ValidationError("فرم‌ساز فقط برای ایجاد و ویرایش موجودیت‌هاست؛ طراحی صفحه‌های ثابت مجاز نیست.")
+            raise ValidationError("این صفحه در فهرست طراحی فرم‌ها و جدول‌ها نیست.")
         workspace = self.context(request, slug, code)
         allowed(request, workspace, code, manage=True)
         self.require(request, workspace, "FormDesigner.Publish")
         if not isinstance(request.data, dict):
-            raise ValidationError(
-                "اطلاعات تنظیمات باید به‌صورت یک فرم معتبر ارسال شود."
-            )
+            raise ValidationError("اطلاعات تنظیمات باید به‌صورت یک فرم معتبر ارسال شود.")
         Workspace.objects.select_for_update().get(id=workspace.id)
         row, previous = configuration(workspace, code)
         revision = row.revision if row else 0
-        if (
-            type(request.data.get("revision")) is not int
-            or request.data["revision"] != revision
-        ):
-            conflict(
-                "تنظیمات توسط کاربر دیگری تغییر کرده است؛ نسخه جدید را دریافت کنید."
-            )
+        if type(request.data.get("revision")) is not int or request.data["revision"] != revision:
+            conflict("تنظیمات توسط کاربر دیگری تغییر کرده است؛ نسخه جدید را دریافت کنید.")
         if "form" in request.data:
-            if not SURFACES[code].get("engine") or not isinstance(
-                request.data["form"], dict
-            ):
+            if not SURFACES[code].get("engine") or not isinstance(request.data["form"], dict):
                 raise ValidationError("تنظیمات فرم این صفحه معتبر نیست.")
             entity = get_object_or_404(
                 EntityType.objects.select_for_update(),
@@ -127,22 +115,14 @@ class SurfaceEndpoint(EngineAPIView):
             )
             form = FormLayout.objects.select_for_update().filter(entity=entity).first()
             change = request.data["form"]
-            if type(change.get("revision")) is not int or change["revision"] != (
-                form.revision if form else 0
-            ):
+            if type(change.get("revision")) is not int or change["revision"] != (form.revision if form else 0):
                 conflict("فرم توسط مدیر دیگری تغییر کرده است؛ دوباره بارگذاری کنید.")
             layout = validate_layout(entity, change.get("layout"))
             if not form:
                 form = FormLayout.objects.create(entity=entity, draft=layout)
             version = FormVersion.objects.create(
                 layout=form,
-                number=(
-                    form.versions.order_by("-number")
-                    .values_list("number", flat=True)
-                    .first()
-                    or 0
-                )
-                + 1,
+                number=(form.versions.order_by("-number").values_list("number", flat=True).first() or 0) + 1,
                 schema=deepcopy(layout),
                 created_by=request.user,
             )
@@ -161,16 +141,12 @@ class SurfaceEndpoint(EngineAPIView):
                 before,
                 layout,
             )
-        definition = validate_definition(
-            workspace, code, request.data.get("definition")
-        )
+        definition = validate_definition(workspace, code, request.data.get("definition"))
         if row:
             row.definition, row.revision = definition, revision + 1
             row.save(update_fields=["definition", "revision", "updated_at"])
         else:
-            row = SurfaceConfiguration.objects.create(
-                workspace=workspace, code=code, definition=definition
-            )
+            row = SurfaceConfiguration.objects.create(workspace=workspace, code=code, definition=definition)
         emit_definition(
             workspace,
             request.user,
@@ -179,7 +155,7 @@ class SurfaceEndpoint(EngineAPIView):
             previous,
             definition,
         )
-        return Response(surface_schema(workspace, code, request.user))
+        return Response(surface_schema(workspace, code, request.user, request=request))
 
 
 class SurfaceFieldEndpoint(SurfaceEndpoint):
@@ -187,6 +163,8 @@ class SurfaceFieldEndpoint(SurfaceEndpoint):
     def post(self, request, slug, code):
         if code not in DESIGNABLE_SURFACES:
             raise ValidationError("صفحه‌های ثابت سیستم در دامنه فرم‌ساز نیستند.")
+        if SURFACES[code].get("presentation_only"):
+            raise ValidationError("نام و راهنمای ورودی‌های موجود را از تنظیمات فرم ویرایش کنید.")
         workspace = self.context(request, slug, code)
         allowed(request, workspace, code, manage=True)
         self.require(request, workspace, "Field.Create")
@@ -213,9 +191,7 @@ class SurfaceFieldEndpoint(SurfaceEndpoint):
                 ]
             )
             data["lookup"] = str(category.id)
-        serializer = FieldDefinitionSerializer(
-            data=data, context={"workspace": workspace}
-        )
+        serializer = FieldDefinitionSerializer(data=data, context={"workspace": workspace})
         serializer.is_valid(raise_exception=True)
         row = serializer.save(workspace=workspace, created_by=request.user)
         emit_definition(
@@ -249,43 +225,27 @@ class SurfaceOptionsEndpoint(SurfaceEndpoint):
             from plane.app.views.workspace.entity import EngineOptionsEndpoint
 
             return EngineOptionsEndpoint().get(request, slug, code, field_code)
-        schema = surface_schema(workspace, code, request.user)
-        field = next(
-            (f for f in schema["schema"]["fields"] if f["code"] == field_code), None
-        )
+        schema = surface_schema(workspace, code, request.user, request=request)
+        field = next((f for f in schema["schema"]["fields"] if f["code"] == field_code), None)
         if not field:
             raise PermissionDenied()
         config, kind = field["config"], field["kind"]
-        query, (offset, size) = request.query_params.get("search", "")[:200], page(
-            request
-        )
-        selected = [
-            v for v in request.query_params.get("selected", "").split(",") if v
-        ][:100]
+        query, (offset, size) = request.query_params.get("search", "")[:200], page(request)
+        selected = [v for v in request.query_params.get("selected", "").split(",") if v][:100]
         resolving = request.query_params.get("resolve") == "true" and bool(selected)
         if field.get("lookup"):
-            rows = LookupValue.objects.filter(
-                category__workspace=workspace, category__code=field["lookup"]
-            )
+            rows = LookupValue.objects.filter(category__workspace=workspace, category__code=field["lookup"])
             rows = rows.filter(
                 Q(is_active=True, category__is_active=True)
-                | Q(
-                    **{"code__in" if config.get("lookup_codes") else "id__in": selected}
-                )
+                | Q(**{"code__in" if config.get("lookup_codes") else "id__in": selected})
             )
             if resolving:
-                rows = rows.filter(
-                    **{"code__in" if config.get("lookup_codes") else "id__in": selected}
-                )
+                rows = rows.filter(**{"code__in" if config.get("lookup_codes") else "id__in": selected})
             elif config.get("depends_on"):
                 parent = request.query_params.get("parent")
-                parent_field = FieldDefinition.objects.filter(
-                    workspace=workspace, code=config["depends_on"]
-                ).first()
+                parent_field = FieldDefinition.objects.filter(workspace=workspace, code=config["depends_on"]).first()
                 if parent and parent_field and parent_field.config.get("lookup_codes"):
-                    rows = rows.filter(
-                        parent__category_id=parent_field.lookup_id, parent__code=parent
-                    )
+                    rows = rows.filter(parent__category_id=parent_field.lookup_id, parent__code=parent)
                 else:
                     rows = rows.filter(parent_id=parent) if parent else rows.none()
             rows = rows.filter(title__icontains=query).order_by("position", "id")
@@ -314,19 +274,13 @@ class SurfaceOptionsEndpoint(SurfaceEndpoint):
             if resolving:
                 rows = rows.filter(id__in=selected)
             title_field = next(
-                (
-                    f
-                    for f in present_schema(target, request.user)["fields"]
-                    if f["code"] == target.title_field
-                ),
+                (f for f in present_schema(target, request.user)["fields"] if f["code"] == target.title_field),
                 None,
             )
             if not title_field or title_field["config"].get("visible_if"):
                 rows = rows.none()
             title_key = (
-                ("reason" if target.adapter == "leave" else "name")
-                if target.adapter
-                else f"data__{target.title_field}"
+                ("reason" if target.adapter == "leave" else "name") if target.adapter else f"data__{target.title_field}"
             )
             rows = rows.filter(**{f"{title_key}__icontains": query}).order_by("id")
             results = []
@@ -353,10 +307,7 @@ class SurfaceOptionsEndpoint(SurfaceEndpoint):
                         member_workspace__is_active=True,
                         member_workspace__deleted_at__isnull=True,
                     )
-                    .filter(
-                        Q(display_name__icontains=query)
-                        | Q(first_name__icontains=query)
-                    )
+                    .filter(Q(display_name__icontains=query) | Q(first_name__icontains=query))
                     .distinct()
                 )
             else:
@@ -374,7 +325,9 @@ class SurfaceOptionsEndpoint(SurfaceEndpoint):
                     "title": (
                         (r.display_name or r.first_name or r.email)
                         if kind == "user"
-                        else r.name if kind == "role" else r.title
+                        else r.name
+                        if kind == "role"
+                        else r.title
                     ),
                 }
                 for r in rows[offset * size : (offset + 1) * size]
@@ -387,20 +340,15 @@ class SurfaceFileEndpoint(SurfaceEndpoint):
         workspace = self.context(request, slug, code)
         from plane.app.services.surface_config import WRITE_PERMISSIONS
 
-        permissions = {
-            p for codes in WRITE_PERMISSIONS.get(code, {}).values() for p in codes
-        }
+        permissions = {p for codes in WRITE_PERMISSIONS.get(code, {}).values() for p in codes}
         if code in WRITE_PERMISSIONS and not any(
-            has_permission(request.user, workspace, p, request=request)
-            for p in permissions
+            has_permission(request.user, workspace, p, request=request) for p in permissions
         ):
             raise PermissionDenied()
         field = next(
             (
                 f
-                for f in surface_schema(workspace, code, request.user)["schema"][
-                    "fields"
-                ]
+                for f in surface_schema(workspace, code, request.user, request=request)["schema"]["fields"]
                 if f["code"] == field_code and f["kind"] == "file"
             ),
             None,
@@ -425,9 +373,7 @@ class SurfaceFileEndpoint(SurfaceEndpoint):
                 "name": PurePath(upload.name).name,
             },
         )
-        return Response(
-            {"id": str(asset.id), "title": asset.attributes["name"]}, status=201
-        )
+        return Response({"id": str(asset.id), "title": asset.attributes["name"]}, status=201)
 
     def get(self, request, slug, code, field_code, asset_id):
         workspace = self.context(request, slug, code)
@@ -445,16 +391,14 @@ class SurfaceFileEndpoint(SurfaceEndpoint):
                 identifier = UUID(record)
             except ValueError as exc:
                 raise ValidationError("شناسه رکورد معتبر نیست.") from exc
-            permitted = str(asset.id) in read_values(
-                request, workspace, code, [identifier]
-            ).get(record, {}).get(field_code, [])
+            permitted = str(asset.id) in read_values(request, workspace, code, [identifier]).get(record, {}).get(
+                field_code, []
+            )
         else:
             field = next(
                 (
                     f
-                    for f in surface_schema(workspace, code, request.user)["schema"][
-                        "fields"
-                    ]
+                    for f in surface_schema(workspace, code, request.user, request=request)["schema"]["fields"]
                     if f["code"] == field_code
                 ),
                 None,

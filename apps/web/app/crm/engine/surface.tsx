@@ -1,7 +1,8 @@
+import { ScrollableTable } from "@plane/ui";
 import { ErrorNotice } from "../error-state";
-import { Children, cloneElement, isValidElement, useEffect, useState } from "react";
+import { Children, cloneElement, isValidElement, useContext, useEffect, useState } from "react";
 import type { FormEvent, FormHTMLAttributes, ReactElement, ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { QueryClientContext, useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { Settings2, Table2 } from "lucide-react";
 import { SchemaDrivenForm, validateSchemaValues, fieldVisible } from "@plane/ui";
@@ -38,10 +39,15 @@ export interface NativeField {
   locked: boolean;
   lock_reason?: string;
   hidden?: boolean;
+  placeholder?: string;
+  help_text?: string;
   aliases: string[];
 }
 export interface SurfaceDefinition {
-  native: Record<string, { required?: boolean; hidden?: boolean }>;
+  native: Record<
+    string,
+    { required?: boolean; hidden?: boolean; title?: string; placeholder?: string; help_text?: string }
+  >;
   fields: FieldBinding[];
   columns: string[];
   table_tabs?: { id: string; title: string; columns: string[] }[];
@@ -51,6 +57,7 @@ export interface SurfaceSchema {
   title: string;
   path: string;
   engine: string | null;
+  presentation_only?: boolean;
   revision: number;
   definition: SurfaceDefinition;
   native_fields: NativeField[];
@@ -108,15 +115,16 @@ function textOf(node: ReactNode): string {
 
 /** Apply native field settings without replacing the page's business controls. */
 export function configureNativeFields(children: ReactNode, fields: NativeField[]): ReactNode {
-  const controls = (node: ReactNode, required: boolean): ReactNode =>
+  const controls = (node: ReactNode, field: NativeField): ReactNode =>
     Children.map(node, (child) => {
       if (!isValidElement<Record<string, unknown>>(child)) return child;
       const props = child.props;
       if (typeof child.type === "string" && ["input", "textarea", "select"].includes(child.type))
-        return cloneElement(child, { required: props.type === "checkbox" ? undefined : required });
-      return props.children
-        ? cloneElement(child, { children: controls(props.children as ReactNode, required) })
-        : child;
+        return cloneElement(child, {
+          required: props.type === "checkbox" ? undefined : field.required,
+          ...(field.placeholder !== undefined ? { placeholder: field.placeholder } : {}),
+        });
+      return props.children ? cloneElement(child, { children: controls(props.children as ReactNode, field) }) : child;
     });
   return Children.map(children, (child) => {
     if (!isValidElement<Record<string, unknown>>(child)) return child;
@@ -125,17 +133,71 @@ export function configureNativeFields(children: ReactNode, fields: NativeField[]
       typeof props.label === "string"
         ? props.label
         : child.type === "label"
-          ? textOf(Children.toArray(props.children as ReactNode).find((c) => isValidElement(c) && c.type === "span"))
+          ? textOf(
+              Children.toArray(props.children as ReactNode).find(
+                (c) => typeof c === "string" || (isValidElement(c) && c.type === "span")
+              )
+            ).trim()
           : "";
-    const field = fields.find((f) => f.title === label || f.aliases.includes(label));
+    const field = fields.find(
+      (f) => props["data-surface-field"] === f.code || f.title === label || f.aliases.includes(label)
+    );
     if (field) {
       if (field.hidden) return null;
-      return cloneElement(child, { children: controls(props.children as ReactNode, field.required) });
+      if (typeof child.type === "string" && ["input", "textarea", "select"].includes(child.type))
+        return (
+          <label className="surface-native-control">
+            <span>{field.title}</span>
+            {cloneElement(child, {
+              required: props.type === "checkbox" ? undefined : field.required,
+              ...(field.placeholder !== undefined ? { placeholder: field.placeholder } : {}),
+            })}
+            {field.help_text && <small className="surface-field-help">{field.help_text}</small>}
+          </label>
+        );
+      const configured = props["data-surface-field"]
+        ? configureNativeFields(props.children as ReactNode, fields)
+        : (props.children as ReactNode);
+      const content = Children.map(controls(configured, field), (item) => {
+        if (typeof item === "string" && item.trim() === label) return field.title;
+        if (
+          child.type === "label" &&
+          isValidElement<{ children?: ReactNode }>(item) &&
+          item.type === "span" &&
+          textOf(item) === label
+        )
+          return cloneElement(item, { children: field.title });
+        return item;
+      });
+      return cloneElement(child, {
+        ...(typeof props.label === "string"
+          ? { label: field.title, ...(field.help_text !== undefined ? { hint: field.help_text } : {}) }
+          : {}),
+        children:
+          child.type === "label" && field.help_text ? (
+            <>
+              {content}
+              <small className="surface-field-help">{field.help_text}</small>
+            </>
+          ) : (
+            content
+          ),
+      });
     }
     return props.children
       ? cloneElement(child, { children: configureNativeFields(props.children as ReactNode, fields) })
       : child;
   });
+}
+
+export function ConfiguredFields({ code, children }: { code: string; children: ReactNode }) {
+  const client = useContext(QueryClientContext);
+  return client ? <ConnectedFields code={code}>{children}</ConnectedFields> : <>{children}</>;
+}
+
+function ConnectedFields({ code, children }: { code: string; children: ReactNode }) {
+  const config = useSurface(code);
+  return <>{configureNativeFields(children, config.data?.native_fields || [])}</>;
 }
 
 export function useSurfaceTransport(code: string, record = "", engine = false) {
@@ -386,11 +448,20 @@ const surfaceRowId = (row: ReactElement) =>
     .split("$")
     .at(-1) || "";
 
-export function SurfaceTable({
-  code,
-  children,
-  ...props
-}: { code: string; children: ReactNode } & React.TableHTMLAttributes<HTMLTableElement>) {
+type SurfaceTableProps = {
+  code: string;
+  dynamicColumns?: boolean;
+  children: ReactNode;
+} & React.TableHTMLAttributes<HTMLTableElement>;
+
+export function SurfaceTable(props: SurfaceTableProps) {
+  const client = useContext(QueryClientContext);
+  if (client) return <ConnectedTable {...props} />;
+  const { code: _code, dynamicColumns: _dynamicColumns, ...tableProps } = props;
+  return <ScrollableTable {...tableProps} />;
+}
+
+function ConnectedTable({ code, dynamicColumns = false, children, ...props }: SurfaceTableProps) {
   const config = useSurface(code),
     { data: access } = useWorkspaceAccess();
   const engineCode = config.data?.engine || ({ users: "user", units: "unit" } as Record<string, string>)[code];
@@ -424,11 +495,20 @@ export function SurfaceTable({
   const currentTab =
     activeTab && tabView.isVisible(activeTab) ? activeTab : mainVisible ? "" : visibleTabs[0]?.id || "";
   const selectedTab = tabs.find((tab) => tab.id === currentTab);
-  const baseColumns = config.data?.definition.columns || headings.map((h) => `native:${textOf(h) || "عملیات"}`);
+  const providedColumns = headings.map((h) => `native:${textOf(h) || "عملیات"}`);
+  const configuredColumns = config.data?.definition.columns || providedColumns;
+  const baseColumns = dynamicColumns
+    ? [
+        ...configuredColumns.filter((column) => providedColumns.includes(column)),
+        ...providedColumns.filter((column) => !configuredColumns.includes(column)),
+      ]
+    : configuredColumns;
   const availableColumns = selectedTab?.columns || baseColumns;
   const activeColumnKey = selectedTab?.id || MAIN_TABLE_TAB;
   const hiddenColumns = columnChoicesByTab.find((item) => item.tabId === activeColumnKey)?.hidden || [];
-  const columns = availableColumns.filter((column) => !hiddenColumns.includes(column));
+  const columns = availableColumns.filter(
+    (column) => !hiddenColumns.includes(column) && (!dynamicColumns || providedColumns.includes(column))
+  );
   const values = useSurfaceValues(code, columns.some((c) => !c.startsWith("native:")) ? rows.map(surfaceRowId) : []);
   const fields = [...(config.data?.schema.fields || []), ...(config.data?.engine_fields || [])];
   const columnChoices = [
@@ -538,12 +618,19 @@ export function SurfaceTable({
           ستونی برای نمایش انتخاب نشده است؛ از «تب‌های من» ستون‌ها را دوباره فعال کنید.
         </p>
       )}
-      <table {...props}>
+      <ScrollableTable {...props}>
         <thead>
           <tr>
             {columns.map((column) => {
               const native = column.startsWith("native:"),
                 title = column.slice(column.indexOf(":") + 1);
+              const original = headings.find((heading) => `native:${textOf(heading) || "عملیات"}` === column);
+              if (native && isValidElement<{ children?: ReactNode }>(original))
+                return cloneElement(original, {
+                  key: column,
+                  "data-column": column,
+                  children: textOf(original) ? original.props.children : title,
+                } as Record<string, unknown>);
               return (
                 <th key={column} data-column={column}>
                   {native ? title : fields.find((f) => f.code === title)?.title || "فیلد غیرفعال"}
@@ -604,7 +691,7 @@ export function SurfaceTable({
             });
           })}
         </tbody>
-      </table>
+      </ScrollableTable>
     </div>
   );
 }

@@ -1,13 +1,45 @@
+import { ConfiguredFields } from "../engine/surface";
 /** Presentational parts of the daily report (ticket 8). Leave, schedule, events and presence are
  * read-only here: they come live from their own pages and are never written by this form. */
 import { useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 import { Link } from "react-router";
-import { CalendarClock, CalendarOff, Check, History, Lightbulb, Link2, Lock, Pencil, Plus, Trash2, X } from "lucide-react";
-import type { DayEvent, DayLeave, DayPayload, HistoryEvent, ItemKind, ReportItem, Suggestion, WorkOptions } from "../api/reports";
+import {
+  CalendarClock,
+  CalendarOff,
+  Check,
+  History,
+  Lightbulb,
+  Link2,
+  Lock,
+  Pencil,
+  Plus,
+  Trash2,
+  X,
+} from "lucide-react";
+import type {
+  DayEvent,
+  DayLeave,
+  DayAbsence,
+  DayPayload,
+  HistoryEvent,
+  ItemKind,
+  ReportItem,
+  Suggestion,
+  WorkOptions,
+} from "../api/reports";
 import { Button, IconButton } from "../components";
 import { persianDate, toFa } from "../utils";
-import { EFFORT_LABEL, FULL_LEAVE_TEXT, KINDS, PRESENCE_LABEL, emptyItem, minutesText, parseEffort, sourceKindLabel } from "./model";
+import {
+  EFFORT_LABEL,
+  FULL_LEAVE_TEXT,
+  KINDS,
+  PRESENCE_LABEL,
+  emptyItem,
+  minutesText,
+  parseEffort,
+  sourceKindLabel,
+} from "./model";
 
 export type Tone = "success" | "warning" | "danger" | "neutral" | "info";
 
@@ -15,7 +47,8 @@ export function Pill({ tone, children }: { tone: Tone; children: ReactNode }) {
   return <span className={`dr-pill dr-pill-${tone}`}>{children}</span>;
 }
 
-const time = (iso: string) => toFa(new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tehran" }));
+const time = (iso: string) =>
+  toFa(new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tehran" }));
 
 /** Approved leave of the day, read live from the leave request. There is no leave category. */
 export function LeaveBanner({ leaves }: { leaves: DayLeave[] }) {
@@ -27,11 +60,29 @@ export function LeaveBanner({ leaves }: { leaves: DayLeave[] }) {
         {leaves.map((leave) => (
           <p key={leave.id}>
             <strong>مرخصی {leave.mode_label} تأییدشده</strong> — {leave.period_text} ({leave.duration_text})
-            {leave.full_day ? " · کل روز کاری" : " · بخشی از روز"}{" "}
-            <Link to={leave.url}>مشاهدهٔ درخواست</Link>
+            {leave.full_day ? " · کل روز کاری" : " · بخشی از روز"} <Link to={leave.url}>مشاهدهٔ درخواست</Link>
           </p>
         ))}
         <small>این اطلاعات از درخواست مرخصی خوانده می‌شود و در گزارش ذخیره نمی‌شود.</small>
+      </div>
+    </section>
+  );
+}
+
+export function AbsenceBanner({ absences }: { absences: DayAbsence[] }) {
+  if (!absences.length) return null;
+  return (
+    <section className="dr-leave" aria-label="عدم حضور ثبت‌شدهٔ این روز">
+      <CalendarOff size={18} aria-hidden="true" />
+      <div className="dr-leave-body">
+        {absences.map((absence) => (
+          <p key={absence.id}>
+            <strong>عدم حضور ثبت‌شده</strong> — {absence.period_text}
+            {absence.full_day ? " · کل روز کاری" : " · بخشی از روز"}{" "}
+            {absence.url && <Link to={absence.url}>مشاهدهٔ عدم حضور</Link>}
+          </p>
+        ))}
+        <small>این بازه‌ها از بخش عدم حضور خوانده می‌شوند و با تغییر یا لغو آن به‌روز می‌شوند.</small>
       </div>
     </section>
   );
@@ -151,7 +202,7 @@ function LinkPicker({
       )}
       {open && (
         <div className="dr-picker-menu" role="listbox" aria-label="کارهای من">
-          <input autoFocus placeholder="جست‌وجو در کارهای من…" onChange={(event) => onSearch(event.target.value)} />
+          <input placeholder="جست‌وجو در کارهای من…" onChange={(event) => onSearch(event.target.value)} />
           {options?.tickets.map((ticket) => (
             <button
               type="button"
@@ -180,7 +231,9 @@ function LinkPicker({
               <small>پروژه</small> {project.name}
             </button>
           ))}
-          {options && !options.tickets.length && !options.projects.length && <p className="dr-muted">موردی پیدا نشد.</p>}
+          {options && !options.tickets.length && !options.projects.length && (
+            <p className="dr-muted">موردی پیدا نشد.</p>
+          )}
         </div>
       )}
     </div>
@@ -213,75 +266,94 @@ export function ItemSection({
   const update = (index: number, patch: Partial<ReportItem>) =>
     onChange(items.map((item, position) => (position === index ? { ...item, ...patch } : item)));
   return (
-    <section className={`dr-section dr-section-${kind}`} aria-label={meta.title}>
-      <header>
-        <h3>{meta.title}</h3>
-        <small>{meta.hint}</small>
-      </header>
-      <ol className="dr-items">
-        {items.map((item, index) => (
-          <li key={item.id ?? `${item.source_kind}-${item.source_id}-${index}`} className="dr-item">
-            <textarea
-              aria-label={`${meta.title} ${toFa(index + 1)}`}
-              value={item.text}
-              rows={Math.min(4, Math.max(1, Math.ceil(item.text.length / 70)))}
-              disabled={disabled}
-              onChange={(event) => update(index, { text: event.target.value })}
-            />
-            <div className="dr-item-tools">
-              <LinkPicker item={item} options={options} onSearch={onSearch} disabled={disabled} onPick={(link) => update(index, link)} />
-              {kind === "blocker" && (
-                <label className="dr-check">
-                  <input
-                    type="checkbox"
-                    checked={item.needs_help}
-                    disabled={disabled}
-                    onChange={(event) => update(index, { needs_help: event.target.checked })}
-                  />
-                  نیاز به کمک دارم
-                </label>
-              )}
-              <label className="dr-effort" title={EFFORT_LABEL}>
-                <span>{EFFORT_LABEL}</span>
-                <input
-                  inputMode="numeric"
-                  placeholder="دقیقه"
+    <ConfiguredFields code="daily-report-form">
+      <section className={`dr-section dr-section-${kind}`} aria-label={meta.title}>
+        <header>
+          <div className="dr-section-heading">
+            <h3>{meta.title}</h3>
+            <span className="dr-section-count" aria-label="تعداد موارد">
+              {toFa(items.length)}
+            </span>
+          </div>
+          <small>{meta.hint}</small>
+        </header>
+        <ol className="dr-items">
+          {items.map((item, index) => (
+            <li key={item.id ?? item.clientKey} className="dr-item">
+              <textarea
+                data-surface-field="text"
+                aria-label={`${meta.title} ${toFa(index + 1)}`}
+                value={item.text}
+                rows={Math.min(4, Math.max(1, Math.ceil(item.text.length / 70)))}
+                disabled={disabled}
+                maxLength={2000}
+                placeholder={meta.placeholder}
+                onChange={(event) => update(index, { text: event.target.value })}
+              />
+              <div className="dr-item-tools">
+                <LinkPicker
+                  item={item}
+                  options={options}
+                  onSearch={onSearch}
                   disabled={disabled}
-                  value={item.effort_minutes === null ? "" : toFa(item.effort_minutes)}
-                  onChange={(event) => update(index, { effort_minutes: parseEffort(event.target.value) })}
+                  onPick={(link) => update(index, link)}
                 />
-                {item.effort_minutes ? <small>{minutesText(item.effort_minutes)}</small> : null}
-              </label>
-              {item.source_kind && <small className="dr-source">{sourceKindLabel(item.source_kind)}</small>}
-              {!disabled && (
-                <IconButton label="حذف این مورد" onClick={() => onChange(items.filter((_, position) => position !== index))}>
-                  <Trash2 size={15} />
-                </IconButton>
-              )}
-            </div>
-          </li>
-        ))}
-      </ol>
-      {!disabled && (
-        <div className="dr-add">
-          <input
-            aria-label={`افزودن به ${meta.title}`}
-            placeholder={meta.placeholder}
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => {
-              if (event.key === "Enter" && !event.nativeEvent.isComposing) {
-                event.preventDefault();
-                add();
-              }
-            }}
-          />
-          <IconButton label={`افزودن به ${meta.title}`} onClick={add} disabled={!draft.trim()}>
-            <Plus size={16} />
-          </IconButton>
-        </div>
-      )}
-    </section>
+                {kind === "blocker" && (
+                  <label className="dr-check">
+                    <input
+                      type="checkbox"
+                      checked={item.needs_help}
+                      disabled={disabled}
+                      onChange={(event) => update(index, { needs_help: event.target.checked })}
+                    />
+                    نیاز به کمک دارم
+                  </label>
+                )}
+                <label className="dr-effort" title={EFFORT_LABEL}>
+                  <span>{EFFORT_LABEL}</span>
+                  <input
+                    inputMode="numeric"
+                    placeholder="دقیقه"
+                    disabled={disabled}
+                    value={item.effort_minutes === null ? "" : toFa(item.effort_minutes)}
+                    onChange={(event) => update(index, { effort_minutes: parseEffort(event.target.value) })}
+                  />
+                  {item.effort_minutes ? <small>{minutesText(item.effort_minutes)}</small> : null}
+                </label>
+                {item.source_kind && <small className="dr-source">{sourceKindLabel(item.source_kind)}</small>}
+                {!disabled && (
+                  <IconButton
+                    label="حذف این مورد"
+                    onClick={() => onChange(items.filter((_, position) => position !== index))}
+                  >
+                    <Trash2 size={15} />
+                  </IconButton>
+                )}
+              </div>
+            </li>
+          ))}
+        </ol>
+        {!disabled && (
+          <div className="dr-add">
+            <input
+              aria-label={`افزودن به ${meta.title}`}
+              placeholder={meta.placeholder}
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => {
+                if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+                  event.preventDefault();
+                  add();
+                }
+              }}
+            />
+            <IconButton label={`افزودن به ${meta.title}`} onClick={add} disabled={!draft.trim()}>
+              <Plus size={16} />
+            </IconButton>
+          </div>
+        )}
+      </section>
+    </ConfiguredFields>
   );
 }
 

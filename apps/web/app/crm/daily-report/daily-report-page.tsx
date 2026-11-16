@@ -1,7 +1,17 @@
 /** «گزارش روزانه»: one page, four sections, quick entry; leave and calendar are shown read-only. */
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useSearchParams } from "react-router";
-import { BellRing, ChevronLeft, ChevronRight, Copy, FileText, History, Sparkles, Users } from "lucide-react";
+import {
+  BellRing,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  FileBarChart,
+  FileText,
+  History,
+  Sparkles,
+  Users,
+} from "lucide-react";
 import { useWorkspaceAccess } from "../api";
 import {
   useDailyMeta,
@@ -23,6 +33,7 @@ import {
   HistoryList,
   ItemSection,
   LeaveBanner,
+  AbsenceBanner,
   LockNotice,
   Pill,
   SuggestionCard,
@@ -52,14 +63,20 @@ function TemplatesMenu({ onUse, items }: { onUse: (item: ReportItem) => void; it
       </Button>
       {open && (
         <div className="dr-templates-menu" role="menu">
-          {list.length === 0 && <p className="dr-muted">قالبی ندارید؛ یک مورد بنویسید و «ذخیره به‌عنوان قالب» را بزنید.</p>}
+          {list.length === 0 && (
+            <p className="dr-muted">قالبی ندارید؛ یک مورد بنویسید و «ذخیره به‌عنوان قالب» را بزنید.</p>
+          )}
           {list.map((template) => (
             <div key={template.id} className="dr-template-row">
               <button
                 type="button"
                 role="menuitem"
                 onClick={() => {
-                  onUse({ ...emptyItem(template.kind, template.text), source_kind: "template", source_id: template.id });
+                  onUse({
+                    ...emptyItem(template.kind, template.text),
+                    source_kind: "template",
+                    source_id: template.id,
+                  });
                   setOpen(false);
                 }}
               >
@@ -84,7 +101,12 @@ function TemplatesMenu({ onUse, items }: { onUse: (item: ReportItem) => void; it
                 const fresh = items
                   .filter((item) => item.text.trim() && !list.some((row) => row.text === item.text.trim()))
                   .slice(0, Math.max(0, 30 - list.length))
-                  .map((item) => ({ id: crypto.randomUUID(), title: item.text.trim().slice(0, 40), kind: item.kind, text: item.text.trim() }));
+                  .map((item) => ({
+                    id: crypto.randomUUID(),
+                    title: item.text.trim().slice(0, 40),
+                    kind: item.kind,
+                    text: item.text.trim(),
+                  }));
                 save.mutate([...list, ...fresh]);
               }}
             >
@@ -132,10 +154,21 @@ export default function DailyReportPage() {
 
   const pending = useMemo(() => pendingSuggestions(suggestions ?? [], items), [suggestions, items]);
   if (accessLoading || meta.isLoading) return <Skeleton rows={6} />;
-  if (!access?.can("DailyReport.Submit") && !access?.can("DailyReport.Team.View")) return <Navigate to="/" replace />;
+  if (meta.isError)
+    return (
+      <EmptyState
+        title="گزارش روزانه در دسترس نیست"
+        description={errorMessage(meta.error, "خواندن تنظیمات گزارش ممکن نشد.")}
+      />
+    );
+  if (!access?.can("DailyReport.Submit") && !access?.can("DailyReport.Team.View") && !access?.can("Report.ViewAll"))
+    return <Navigate to="/" replace />;
   if (day.isError)
     return (
-      <EmptyState title="گزارش در دسترس نیست" description={errorMessage(day.error, "این گزارش پیدا نشد یا اجازهٔ دیدن آن را ندارید.")} />
+      <EmptyState
+        title="گزارش در دسترس نیست"
+        description={errorMessage(day.error, "این گزارش پیدا نشد یا اجازهٔ دیدن آن را ندارید.")}
+      />
     );
   if (!day.data) return <Skeleton rows={6} />;
   const data = day.data;
@@ -154,7 +187,14 @@ export default function DailyReportPage() {
     save.mutate(savePayload(items, data, final));
   };
   const addEvent = (event: DayEvent) =>
-    setItems((rows) => [...rows, { ...emptyItem("done", `شرکت در ${event.kind_label} «${event.title}»`), source_kind: "event", source_id: event.id }]);
+    setItems((rows) => [
+      ...rows,
+      {
+        ...emptyItem("done", `شرکت در ${event.kind_label} «${event.title}»`),
+        source_kind: "event",
+        source_id: event.id,
+      },
+    ]);
 
   return (
     <div className="dr-page" dir="rtl">
@@ -163,16 +203,21 @@ export default function DailyReportPage() {
         title={data.is_mine ? "گزارش کار روزانهٔ من" : `گزارش روزانهٔ ${data.person.name}`}
         description="کارهای انجام‌شده، در حال انجام، مانع‌ها و گام بعدی را سریع ثبت کنید. مرخصی و برنامهٔ تقویم خودکار نمایش داده می‌شود."
         actions={
-          <div className="dr-header-actions">
+          <>
             {meta.data?.can.team && (
               <Link className="button button-secondary" to="/daily-report/team">
                 <Users size={16} /> گزارش تیم
               </Link>
             )}
+            {data.report?.status === "submitted" && (access.can("Report.View") || access.can("Report.ViewAll")) && (
+              <Link className="button button-secondary" to={`/reports/source/daily_report_items?date=${data.date}`}>
+                <FileBarChart size={16} /> مشاهده در گزارش‌ها
+              </Link>
+            )}
             <Link className="button button-ghost" to="/daily-report/settings">
               <BellRing size={16} /> یادآوری
             </Link>
-          </div>
+          </>
         }
       />
       <div className="dr-daybar">
@@ -180,7 +225,12 @@ export default function DailyReportPage() {
           <ChevronRight size={18} />
         </button>
         <div className="dr-date">
-          <PersianDateInput id="daily-report-date" label="روز گزارش" value={date} onChange={(value) => value && go(value)} />
+          <PersianDateInput
+            id="daily-report-date"
+            label="روز گزارش"
+            value={date}
+            onChange={(value) => value && go(value)}
+          />
         </div>
         <button
           type="button"
@@ -198,6 +248,7 @@ export default function DailyReportPage() {
         {data.report?.is_late && data.report.status === "submitted" && <Pill tone="warning">دیرهنگام</Pill>}
       </div>
       <LeaveBanner leaves={data.leaves} />
+      <AbsenceBanner absences={data.absences ?? []} />
       <LockNotice day={data} />
       {data.requirement === "off" && !data.report && <p className="dr-notice">{data.requirement_text}</p>}
       {data.requirement === "future" && <p className="dr-notice">{data.requirement_text}</p>}
@@ -299,7 +350,12 @@ export default function DailyReportPage() {
           )}
           {data.report && (
             <section className="dr-history-box">
-              <button type="button" className="dr-link-button" onClick={() => setShowHistory(!showHistory)} aria-expanded={showHistory}>
+              <button
+                type="button"
+                className="dr-link-button"
+                onClick={() => setShowHistory(!showHistory)}
+                aria-expanded={showHistory}
+              >
                 <History size={15} aria-hidden="true" /> سابقهٔ اصلاح
               </button>
               {showHistory && (history.data ? <HistoryList events={history.data.events} /> : <Skeleton rows={2} />)}

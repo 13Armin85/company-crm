@@ -21,9 +21,69 @@ import { passwordErrors } from "./pages/setup";
 import { Composer, DEFAULT_ACCESS, InternalThread, QuoteEditor, QuoteList } from "../crm/ticket/portal-tab";
 import type { TicketPortalSummary } from "../crm/api/portal";
 import { settingsProblems } from "../crm/pages/portal-settings";
+import { PortalRequestCards } from "./pages/requests";
+import { CustomerRequestTable } from "../crm/pages/portal-requests";
 import { canAccessPath, portalPermissions } from "../crm/access/permission-map";
 
 const noop = () => undefined;
+
+describe("request inbox redesign", () => {
+  it("shows the customer's request number, real status and unread update with a detail link", () => {
+    const html = withClient(
+      <PortalRequestCards
+        requests={[
+          {
+            id: "request-1",
+            number: "TT25",
+            subject: "چاپ فاکتور",
+            status: { code: "review", title: "در حال بررسی" },
+            unread: true,
+            created_at: null,
+            updated_at: null,
+          },
+        ]}
+      />
+    );
+    expect(html).toContain('href="/portal/requests/request-1"');
+    expect(html).toContain("TT25");
+    expect(html).toContain("چاپ فاکتور");
+    expect(html).toContain("در حال بررسی");
+    expect(html).toContain("به‌روزرسانی جدید");
+    expect(html).toContain("مشاهده و گفت‌وگو");
+  });
+  it("lets staff open the real customer request from a configurable scrollable table", () => {
+    const html = withClient(
+      <CustomerRequestTable
+        data={{
+          count: 1,
+          page: 1,
+          pages: 1,
+          counts: { all: 1 },
+          stages: [],
+          results: [
+            {
+              id: "request-1",
+              number: "TT25",
+              subject: "چاپ فاکتور",
+              customer: { id: "customer-1", title: "شرکت مشتری" },
+              account: { id: "account-1", display_name: "همکار مشتری" },
+              stage: "pending",
+              stage_title: "منتظر بررسی",
+              status: { code: "review", title: "در حال بررسی" },
+              created_at: "2026-11-15T08:00:00Z",
+              updated_at: "2026-11-15T08:00:00Z",
+            },
+          ],
+        }}
+      />
+    );
+    expect(html).toContain('href="/portal-settings/requests/request-1"');
+    expect(html).toContain("شرکت مشتری");
+    expect(html).toContain("همکار مشتری");
+    expect(html).toContain("منتظر بررسی");
+    expect(html).toContain("horizontal-table-scroll");
+  });
+});
 const can = (codes: string[]) => (code: string) => codes.includes(code);
 
 function withClient(node: ReactNode) {

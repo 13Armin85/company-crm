@@ -1,3 +1,4 @@
+import { ScrollableTable } from "@plane/ui";
 import { ErrorNotice, ErrorState } from "../error-state";
 import { useEffect, useMemo, useState } from "react";
 import { Columns3, Filter, ListTree, Plus, Save, SlidersHorizontal } from "lucide-react";
@@ -266,7 +267,7 @@ export function OfficialTableDesigner({ code }: { code: string }) {
         <h4>پیش‌نمایش ستون‌ها</h4>
         <p>از راست به چپ، این ستون‌ها هنگام انتخاب این نمای رسمی دیده می‌شوند.</p>
         <div className="studio-table-preview-scroll">
-          <table>
+          <ScrollableTable>
             <thead>
               <tr>
                 {definition.columns.map((column) => (
@@ -283,7 +284,7 @@ export function OfficialTableDesigner({ code }: { code: string }) {
                 ))}
               </tr>
             </tbody>
-          </table>
+          </ScrollableTable>
         </div>
       </section>
       {notice && <p role="status">{notice}</p>}

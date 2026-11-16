@@ -1,0 +1,211 @@
+.portal-accounts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 22px;
+}
+.portal-accounts .portal-section-heading {
+  margin: 0;
+}
+.portal-accounts .portal-section-heading h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 6px;
+}
+.portal-account-count {
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  white-space: nowrap;
+  font-size: var(--fs-sm);
+}
+.portal-accounts .portal-admin-form {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+.portal-accounts .portal-admin-form label {
+  min-width: 0;
+  gap: 8px;
+}
+.portal-accounts .portal-admin-form :is(input, select) {
+  min-height: 42px;
+  border-radius: 8px;
+}
+.portal-account-form-footer {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.portal-account-form-footer p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+}
+.portal-account-filters {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-soft);
+}
+.portal-account-filters .search-box {
+  flex: 1 1 250px;
+  width: auto;
+  min-width: 0;
+  min-height: 42px;
+  background: var(--surface);
+}
+.portal-account-filters .search-box input {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.portal-account-status-filter {
+  display: grid;
+  flex: 0 1 210px;
+  gap: 6px;
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+}
+.portal-account-status-filter select {
+  min-height: 42px;
+}
+.portal-account-filters .portal-result-count {
+  margin: 0;
+  padding-bottom: 10px;
+  white-space: nowrap;
+}
+.portal-accounts-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.portal-accounts-table :is(th, td) {
+  vertical-align: middle;
+  padding: 16px;
+  max-width: 280px;
+  white-space: normal;
+}
+.portal-accounts-table th {
+  padding-block: 12px;
+  color: var(--text-secondary);
+  background: var(--surface-soft);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
+.portal-accounts-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.portal-accounts-table tbody tr:hover {
+  background: color-mix(in srgb, var(--accent) 4%, var(--surface));
+}
+.portal-account-person {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 200px;
+}
+.portal-account-person > div,
+.portal-account-customer {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  max-width: 230px;
+  overflow-wrap: anywhere;
+}
+.portal-account-person .portal-account-avatar {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+}
+.portal-accounts-table strong {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+.portal-accounts-table small,
+.portal-account-no-login {
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+}
+.portal-account-customer {
+  min-width: 170px;
+}
+.portal-account-username {
+  display: inline-block;
+  min-width: 130px;
+  max-width: 200px;
+  overflow-wrap: anywhere;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.portal-account-status {
+  --account-tone: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  white-space: nowrap;
+  font-size: var(--fs-xs);
+  color: var(--account-tone);
+  background: color-mix(in srgb, var(--account-tone) 10%, var(--surface));
+}
+.portal-account-status.is-active {
+  --account-tone: var(--green);
+}
+.portal-account-status.is-pending {
+  --account-tone: var(--orange);
+}
+.portal-account-status.is-locked {
+  --account-tone: var(--red);
+}
+.portal-account-status i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.portal-account-login {
+  display: block;
+  min-width: 140px;
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+}
+.portal-account-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 180px;
+}
+.portal-account-actions .button {
+  justify-content: flex-start;
+  min-height: 36px;
+  white-space: nowrap;
+  font-size: var(--fs-xs);
+}
+@media (max-width: 600px) {
+  .portal-accounts .portal-admin-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .portal-account-filters {
+    align-items: stretch;
+    gap: 12px;
+    padding: 12px;
+  }
+  .portal-account-status-filter {
+    flex: 1 1 100%;
+  }
+  .portal-account-filters .portal-result-count {
+    padding: 0;
+  }
+}

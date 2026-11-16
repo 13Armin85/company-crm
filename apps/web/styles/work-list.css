@@ -1,0 +1,234 @@
+.work-list-panel {
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+}
+.work-list-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 18px;
+  padding: 22px 24px;
+}
+.work-list-heading h2 {
+  margin: 0 0 6px;
+  font-size: var(--fs-lg);
+}
+.work-list-heading p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  line-height: 1.9;
+}
+.work-list-controls {
+  padding: 0 24px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.work-list-controls > .tab-bar {
+  margin-bottom: 14px;
+}
+.work-list-controls .issues-toolbar {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.work-list-controls .ticket-presets {
+  flex: 1 1 420px;
+  margin: 0;
+}
+.work-list-controls .toolbar-actions {
+  flex: 1 1 300px;
+}
+.work-list-controls .search-box {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+}
+.work-list-panel > .filter-results {
+  margin: 0;
+  padding: 14px 24px;
+  color: var(--text-secondary);
+}
+.work-list-panel > .issue-list-card,
+.work-list-panel > .table-card {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.work-list-panel > .kanban-board {
+  padding: 20px;
+}
+.work-list-panel .surface-table-toolbar {
+  padding-inline: 24px;
+}
+.my-work-content .my-work-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  padding-bottom: 18px;
+}
+.my-work-filters .tab-bar {
+  width: 100%;
+}
+.my-work-filter-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.my-work-filter-tools .ticket-presets {
+  flex: 1 1 460px;
+  margin: 0;
+}
+.my-work-filter-tools .search-box {
+  flex: 1 1 260px;
+  width: auto;
+  margin: 0;
+}
+/* Widths follow column identity, including after designer reordering. */
+.horizontal-table-scroll > .surface-work-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: auto;
+  white-space: normal;
+}
+.horizontal-table-scroll > .surface-work-table :is(th, td) {
+  padding: 16px 18px;
+  max-width: 360px;
+  text-align: start;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--border);
+  overflow: visible;
+  white-space: normal;
+  line-height: 1.8;
+}
+.horizontal-table-scroll > .surface-work-table th {
+  padding-block: 12px;
+  background: var(--surface-soft);
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.horizontal-table-scroll > .surface-work-table [data-column="native:عنوان کار"] {
+  min-width: 300px;
+  max-width: 380px;
+}
+.horizontal-table-scroll > .surface-work-table [data-column="native:شناسه"] {
+  min-width: 110px;
+}
+.horizontal-table-scroll > .surface-work-table [data-column="native:پروژه"] {
+  min-width: 165px;
+  max-width: 200px;
+}
+.horizontal-table-scroll > .surface-work-table [data-column="native:وضعیت"] {
+  min-width: 155px;
+}
+.horizontal-table-scroll > .surface-work-table [data-column="native:اولویت"] {
+  min-width: 110px;
+}
+.horizontal-table-scroll > .surface-work-table [data-column="native:موعد"] {
+  min-width: 130px;
+}
+.horizontal-table-scroll > .surface-work-table [data-column="native:مسئول"] {
+  min-width: 170px;
+  max-width: 220px;
+}
+.horizontal-table-scroll > .surface-work-table [data-column="native:عملیات"] {
+  min-width: 76px;
+  text-align: center;
+  position: sticky;
+  inset-inline-end: 0;
+  z-index: 1;
+  background: var(--surface);
+  box-shadow: 1px 0 0 var(--border);
+}
+.horizontal-table-scroll > .surface-work-table th[data-column="native:عملیات"] {
+  background: var(--surface-soft);
+}
+.surface-work-table .work-list-row:last-child td {
+  border-bottom: 0;
+}
+.work-list-row:hover,
+.work-list-row:focus-within {
+  background: color-mix(in srgb, var(--accent) 4%, var(--surface));
+}
+.surface-work-table .personal-work-title-wrap {
+  min-width: 0;
+  max-width: 340px;
+  align-items: flex-start;
+}
+.surface-work-table .personal-work-title-wrap > div {
+  min-width: 0;
+}
+.surface-work-table .personal-work-marker {
+  margin-top: 4px;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+}
+.state-in-progress .personal-work-marker {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.horizontal-table-scroll > .surface-work-table .surface-work-title {
+  display: block;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  line-height: 1.9;
+}
+.horizontal-table-scroll > .surface-work-table a.surface-work-title:hover {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.horizontal-table-scroll > .surface-work-table .surface-work-sender {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-top: 6px;
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+}
+.surface-work-sender svg {
+  flex-shrink: 0;
+}
+.surface-work-table .surface-work-assignee {
+  align-items: center;
+  gap: 8px;
+}
+.horizontal-table-scroll > .surface-work-table .surface-work-assignee > span {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.surface-work-table .personal-work-project {
+  overflow-wrap: anywhere;
+  align-items: baseline;
+}
+.surface-work-table .issue-status-control {
+  min-width: 122px;
+}
+@media (max-width: 600px) {
+  .work-list-heading {
+    padding: 18px 14px;
+  }
+  .work-list-controls {
+    padding-inline: 14px;
+  }
+  .work-list-panel .surface-table-toolbar,
+  .work-list-panel > .filter-results {
+    padding-inline: 14px;
+  }
+  .work-list-controls .toolbar-actions {
+    width: 100%;
+  }
+}

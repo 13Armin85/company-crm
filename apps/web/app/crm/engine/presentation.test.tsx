@@ -63,4 +63,19 @@ describe("Persian entity presentation", () => {
       expect(markup).not.toContain("record-id");
     }
   );
+  it.each([
+    ["/leave-requests/record-id", "جزئیات درخواست"],
+    ["/projects/record-id", "جزئیات پروژه"],
+    ["/team/record-id", "پروفایل کاربر"],
+    ["/leave-templates", "قالب Word مرخصی"],
+    ["/portal-settings/requests/record-id", "درخواست‌های مشتریان"],
+  ])("shows a readable breadcrumb for %s", (path, title) => {
+    const markup = renderToStaticMarkup(
+      <MemoryRouter initialEntries={[path]}>
+        <Breadcrumb />
+      </MemoryRouter>
+    );
+    expect(markup).toContain(title);
+    expect(markup).not.toContain("record-id");
+  });
 });

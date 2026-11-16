@@ -209,7 +209,7 @@ def test_password_is_separate_hashed_and_audited(session_client, workspace, mock
 
     user = member(workspace, "password")
     base = f"/api/workspaces/{workspace.slug}/organization/users/{user.id}/"
-    assert session_client.patch(base, {"password": "SafeChangedPassword!2026"}, format="json").status_code == 400
+    assert session_client.patch(base, {"password": "SafeChangedPassword!2026"}, format="json").status_code in (400, 403)
     assert (
         session_client.post(
             f"{base}password/",

@@ -130,6 +130,8 @@ export function presentNotification(item: Record<string, unknown>): Notification
   const login = sender === "crm:login" && crmEvent.kind === "login";
   const queued = sender === "crm:routing:queued" && crmEvent.kind === "queued";
   const claimed = sender === "crm:routing:claimed" && crmEvent.kind === "claimed";
+  const dailyReminder = sender === "crm:daily_report:reminder" && crmEvent.kind === "daily_report_reminder";
+  const dailyLink = text(crmEvent.link);
   const rawTitle = text(item.title);
   const field = name(activity.field) || (isGeneratedEnglish(rawTitle) ? inferField(rawTitle) : "");
   const verb =
@@ -179,6 +181,9 @@ export function presentNotification(item: Record<string, unknown>): Notification
       browser && device && persianLetters.test(browser) && persianLetters.test(device)
         ? `ورود موفق به حساب شما با ${browser} در ${device} ثبت شد.`
         : "ورود موفق به حساب شما ثبت شد.";
+  } else if (dailyReminder) {
+    eventLabel = "یادآوری گزارش روزانه";
+    description = text(item.message_stripped) || "گزارش کار امروز هنوز ثبت نشده است.";
   } else if (queued) {
     eventLabel = "کار جدید در صف نقش شما";
     description = `${subject} در صف نقش شما آمادهٔ پذیرش است.`;
@@ -238,6 +243,7 @@ export function presentNotification(item: Record<string, unknown>): Notification
   const rawMessage = text(item.message_text) || text(item.message_stripped) || text(item.message);
   const structured =
     login ||
+    dailyReminder ||
     queued ||
     claimed ||
     Object.keys(activity).length > 0 ||
@@ -273,17 +279,23 @@ export function presentNotification(item: Record<string, unknown>): Notification
     changes: changes.length ? changes : undefined,
     actionHref: login
       ? "/settings?section=profile"
-      : queued
-        ? "/routing"
-        : item.entity_name === "workspace_task"
-          ? "/my-work"
-          : undefined,
+      : dailyReminder
+        ? /^\/daily-report\?date=\d{4}-\d{2}-\d{2}$/.test(dailyLink)
+          ? dailyLink
+          : "/daily-report"
+        : queued
+          ? "/routing"
+          : item.entity_name === "workspace_task"
+            ? "/my-work"
+            : undefined,
     actionLabel: login
       ? "مشاهده حساب کاربری"
-      : queued
-        ? "مشاهده صف کارها"
-        : item.entity_name === "workspace_task"
-          ? "مشاهده کارهای من"
-          : undefined,
+      : dailyReminder
+        ? "ثبت گزارش روزانه"
+        : queued
+          ? "مشاهده صف کارها"
+          : item.entity_name === "workspace_task"
+            ? "مشاهده کارهای من"
+            : undefined,
   };
 }

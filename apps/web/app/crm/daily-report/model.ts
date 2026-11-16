@@ -17,7 +17,7 @@ export const KINDS: { code: ItemKind; title: string; hint: string; placeholder: 
 
 export const PRESENCE_LABEL = "خوداظهاری — حضور تأییدشده نیست";
 export const EFFORT_LABEL = "تخمین تلاش (نه ساعت کاری)";
-export const FULL_LEAVE_TEXT = "روز تمام‌مرخصی — گزارش لازم نیست";
+export const FULL_LEAVE_TEXT = "مرخصی یا عدم حضور تمام‌روز — گزارش لازم نیست";
 
 export const DAY_STATUS_TONES: Record<DayStatus, "success" | "warning" | "danger" | "neutral" | "info"> = {
   submitted: "success",
@@ -30,8 +30,11 @@ export const DAY_STATUS_TONES: Record<DayStatus, "success" | "warning" | "danger
 };
 
 export const MAX_TEXT = 2000;
+let nextItemKey = 0;
+const newItemKey = () => `draft-item-${++nextItemKey}`;
 
 export const emptyItem = (kind: ItemKind, text = ""): ReportItem => ({
+  clientKey: newItemKey(),
   kind,
   text,
   needs_help: false,
@@ -49,7 +52,9 @@ export const itemsOf = (items: ReportItem[], kind: ItemKind) => items.filter((it
 export function itemFromSuggestion(suggestion: Suggestion, text = suggestion.text): ReportItem {
   return {
     ...emptyItem(suggestion.kind, text),
-    issue: suggestion.issue ? { id: suggestion.issue.id, title: suggestion.issue.title, number: suggestion.issue.number } : null,
+    issue: suggestion.issue
+      ? { id: suggestion.issue.id, title: suggestion.issue.title, number: suggestion.issue.number }
+      : null,
     source_kind: suggestion.source_kind,
     source_id: suggestion.source_id,
   };
@@ -59,13 +64,15 @@ export function itemFromSuggestion(suggestion: Suggestion, text = suggestion.tex
 export function itemsFromPrevious(items: ReportItem[]): ReportItem[] {
   return items
     .filter((item) => item.kind !== "done")
-    .map((item) => ({
-      ...item,
-      id: undefined,
-      kind: item.kind === "next_step" ? "in_progress" : item.kind,
-      issue: item.issue?.hidden ? null : item.issue,
-      source_kind: "previous",
-    }));
+    .map((item) =>
+      Object.assign({}, item, {
+        id: undefined,
+        clientKey: newItemKey(),
+        kind: item.kind === "next_step" ? ("in_progress" as const) : item.kind,
+        issue: item.issue?.hidden ? null : item.issue,
+        source_kind: "previous",
+      })
+    );
 }
 
 /** Suggestions not yet kept in the form (matched by their source). */
@@ -125,7 +132,10 @@ export const sourceKindLabel = (kind: string) =>
   })[kind] ?? "";
 
 /** Is today's report still expected? Used for the header badge. */
-export function dayBadge(day: DayPayload): { label: string; tone: "success" | "warning" | "danger" | "neutral" | "info" } {
+export function dayBadge(day: DayPayload): {
+  label: string;
+  tone: "success" | "warning" | "danger" | "neutral" | "info";
+} {
   if (day.report?.status === "submitted")
     return day.report.is_late ? { label: "ثبت‌شده (دیرهنگام)", tone: "warning" } : { label: "ثبت‌شده", tone: "success" };
   if (day.requirement === "not_required") return { label: FULL_LEAVE_TEXT, tone: "neutral" };

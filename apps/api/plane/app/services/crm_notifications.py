@@ -143,6 +143,8 @@ def notify_routed_issue(issue, assignee_id, actor_id):
 
 def notify_role_queue(entry, actor_id):
     from .access_control import has_permission
+    from .project_visibility import visible_projects
+    from plane.db.models import Project
 
     members = WorkspaceMember.objects.filter(
         workspace_id=entry.issue.workspace_id,
@@ -157,7 +159,15 @@ def notify_role_queue(entry, actor_id):
         ).values("user_id"),
     ).select_related("member")
     receivers = [
-        row.member_id for row in members if has_permission(row.member, entry.issue.workspace_id, "Routing.Queue.View")
+        row.member_id for row in members
+        if has_permission(row.member, entry.issue.workspace_id, "Routing.Queue.View")
+        and (
+            not entry.issue.project_id
+            or visible_projects(
+                Project.objects.filter(id=entry.issue.project_id, workspace_id=entry.issue.workspace_id),
+                row.member, entry.issue.workspace.slug,
+            ).exists()
+        )
     ]
     notify_members(
         entry.issue.workspace_id,

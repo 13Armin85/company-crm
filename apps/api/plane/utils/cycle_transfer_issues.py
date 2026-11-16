@@ -168,6 +168,7 @@ def transfer_cycle_issues(
                 workspace__slug=slug,
                 project_id=project_id,
             )
+            .values("id")
             .annotate(display_name=F("assignees__display_name"))
             .annotate(assignee_id=F("assignees__id"))
             .annotate(
@@ -290,6 +291,7 @@ def transfer_cycle_issues(
             workspace__slug=slug,
             project_id=project_id,
         )
+        .values("id")
         .annotate(display_name=F("assignees__display_name"))
         .annotate(assignee_id=F("assignees__id"))
         .annotate(

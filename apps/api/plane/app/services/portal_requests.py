@@ -23,7 +23,7 @@ Every step writes an append-only ``EntityEvent`` on the ticket (``portal.*``).
 from datetime import timedelta
 
 from django.db import IntegrityError, transaction
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.utils import timezone
 from rest_framework.exceptions import APIException, PermissionDenied, ValidationError
 
@@ -145,6 +145,83 @@ def _subject(value):
 
 
 # ------------------------------------------------------------------ customer side
+
+
+def internal_list(workspace, user, params, request=None):
+    """The staff inbox uses exactly the same ticket visibility as its detail endpoint."""
+    from .task_visibility import visible_issues
+
+    visible = visible_issues(
+        Issue.objects.filter(workspace=workspace, portal_account__isnull=False),
+        user,
+        workspace.slug,
+        request=request,
+    )
+    counts = {
+        row["portal_stage"]: row["total"]
+        for row in visible.order_by().values("portal_stage").annotate(total=Count("id", distinct=True))
+    }
+    stage = params.get("stage", "")
+    if stage and stage not in STAGE_TITLES:
+        raise ValidationError({"stage": "وضعیت درخواست معتبر نیست."})
+    try:
+        page = max(1, int(params.get("page", 1)))
+    except (ValueError, TypeError):
+        raise ValidationError({"page": "شمارهٔ صفحه باید عدد باشد."})
+    rows = visible
+    if stage:
+        rows = rows.filter(portal_stage=stage)
+    search = str(params.get("q", "")).strip()[:100]
+    if search:
+        numbers = EntityRecord.objects.filter(workspace=workspace, number__icontains=search).values("source_id")
+        rows = rows.filter(
+            Q(name__icontains=search)
+            | Q(id__in=numbers)
+            | Q(portal_account__display_name__icontains=search)
+            | Q(portal_account__customer_record__number__icontains=search)
+        )
+    total = rows.count()
+    pages = max(1, -(-total // PAGE_SIZE))
+    page = min(page, pages)
+    rows = rows.select_related("workspace", "state", "portal_account__customer_record__entity").order_by(
+        "-created_at", "-id"
+    )
+    batch = list(rows[(page - 1) * PAGE_SIZE : page * PAGE_SIZE])
+    numbers = dict(
+        EntityRecord.objects.filter(workspace=workspace, source_id__in=[row.id for row in batch]).values_list(
+            "source_id", "number"
+        )
+    )
+    config = portal_settings.load(workspace)
+    results = []
+    for issue in batch:
+        account = issue.portal_account
+        customer = account.customer_record
+        results.append(
+            {
+                "id": str(issue.id),
+                "number": numbers.get(issue.id) or issue.work_number,
+                "subject": issue.name,
+                "customer": {
+                    "id": str(customer.id),
+                    "title": str(customer.data.get(customer.entity.title_field) or customer.number),
+                },
+                "account": {"id": str(account.id), "display_name": account.display_name},
+                "stage": issue.portal_stage,
+                "stage_title": STAGE_TITLES.get(issue.portal_stage, "ثبت‌شده"),
+                "status": portal_settings.customer_status(issue, config),
+                "created_at": ticket_core.iso(issue.created_at, workspace),
+                "updated_at": ticket_core.iso(issue.updated_at, workspace),
+            }
+        )
+    return {
+        "results": results,
+        "count": total,
+        "page": page,
+        "pages": pages,
+        "counts": {"all": sum(counts.values()), **counts},
+        "stages": [{"code": code, "title": title} for code, title in STAGE_TITLES.items()],
+    }
 
 
 def create_request(account, data, uploads):
@@ -443,6 +520,12 @@ def internal_summary(workspace, user, issue_id, request=None):
     account = issue.portal_account if portal else None
     return {
         "is_portal": portal,
+        "request": {
+            "id": str(issue.id),
+            "number": ticket_number(issue),
+            "subject": issue.name,
+            "created_at": ticket_core.iso(issue.created_at, workspace),
+        },
         "stage": issue.portal_stage,
         "stage_title": STAGE_TITLES.get(issue.portal_stage, ""),
         "customer_status": portal_settings.customer_status(issue, config) if portal else None,

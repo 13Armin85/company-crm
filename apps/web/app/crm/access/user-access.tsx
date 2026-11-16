@@ -1,3 +1,4 @@
+import { ScrollableTable } from "@plane/ui";
 import { useUserExceptionsTable } from "../table-hooks";
 import { useDebouncedValue, useTablePaging } from "../table-query";
 import { TablePagination } from "../table-pagination";
@@ -120,7 +121,7 @@ export function UserAccessPanel({ userId }: { userId: string }) {
             <p role="status">مجوزی از نقش‌های فعال برای این جستجو وجود ندارد.</p>
           ) : (
             <div className="table-card">
-              <table>
+              <ScrollableTable>
                 <thead>
                   <tr>
                     <th>دسته / مجوز</th>
@@ -150,7 +151,7 @@ export function UserAccessPanel({ userId }: { userId: string }) {
                       );
                     })}
                 </tbody>
-              </table>
+              </ScrollableTable>
             </div>
           )}
         </section>

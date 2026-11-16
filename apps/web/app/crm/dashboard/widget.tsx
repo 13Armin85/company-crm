@@ -1,3 +1,4 @@
+import { ScrollableTable } from "@plane/ui";
 import { ErrorState } from "../error-state";
 import { Link, useNavigate } from "react-router";
 import {
@@ -97,7 +98,7 @@ function DataWidget({ widget }: { widget: DashboardWidget }) {
     const headers = Array.isArray(data.headers) ? (data.headers as { field: string; title: string }[]) : [];
     return rows.length ? (
       <div className="dashboard-mini-table">
-        <table>
+        <ScrollableTable>
           <thead>
             <tr>
               {headers.map((header) => (
@@ -125,7 +126,7 @@ function DataWidget({ widget }: { widget: DashboardWidget }) {
               </tr>
             ))}
           </tbody>
-        </table>
+        </ScrollableTable>
       </div>
     ) : (
       <div className="dashboard-empty-small">رکوردی برای نمایش وجود ندارد.</div>

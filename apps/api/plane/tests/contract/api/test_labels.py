@@ -130,7 +130,7 @@ class TestLabelListCreateAPIEndpoint:
         response = api_key_client.post(url, label_data, format="json")
 
         assert response.status_code == status.HTTP_409_CONFLICT
-        assert "same external id" in response.data["error"]
+        assert "با همین شناسه و منبع خارجی" in response.data["error"]
 
     @pytest.mark.django_db
     def test_list_labels_success(self, api_key_client, workspace, project, create_label):

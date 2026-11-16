@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 from rest_framework import status
 
-from plane.db.models import Issue, Project, ProjectMember, State, User
+from plane.db.models import Issue, Project, ProjectMember, State, User, WorkspaceMember
 
 
 @pytest.fixture
@@ -116,6 +116,7 @@ class TestIssueNotificationContract:
     @pytest.mark.django_db
     def test_assign_issue_triggers_notification(self, api_key_client, workspace, project, create_issue, assignee_user):
         """Assigning a work item via the external API dispatches a notifying activity."""
+        WorkspaceMember.objects.create(workspace=workspace, member=assignee_user, role=15, is_active=True)
         ProjectMember.objects.create(
             project=project,
             member=assignee_user,

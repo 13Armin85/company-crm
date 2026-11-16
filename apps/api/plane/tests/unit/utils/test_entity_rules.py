@@ -6,6 +6,21 @@ from plane.app.services.entity_rules import normalize, compute, condition, valid
 pytestmark = pytest.mark.unit
 
 
+def test_email_accepts_pasted_whitespace_and_explains_invalid_addresses():
+    field = {"kind": "email", "config": {}}
+    assert normalize(field, "  User@example.com \n") == "User@example.com"
+    with pytest.raises(ValidationError, match="ایمیل معتبر وارد کنید"):
+        normalize(field, "not an address")
+
+
+def test_project_work_without_a_state_does_not_expose_a_standalone_status():
+    from types import SimpleNamespace
+    from plane.app.services.unified_work import work_status
+
+    assert work_status(SimpleNamespace(project_id="project", state_id=None, status="todo")) is None
+    assert work_status(SimpleNamespace(project_id=None, state_id=None, status="todo")) == "todo"
+
+
 @pytest.mark.parametrize(
     "kind,value",
     [

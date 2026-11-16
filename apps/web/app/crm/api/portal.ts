@@ -40,6 +40,7 @@ export interface InternalQuote {
 }
 
 export interface TicketPortalSummary {
+  request?: { id: string; number: string; subject: string; created_at: string };
   is_portal: boolean;
   stage: "" | "pending" | "accepted" | "awaiting_customer" | "rejected";
   stage_title: string;
@@ -51,6 +52,36 @@ export interface TicketPortalSummary {
   can: { note: boolean; reply: boolean; triage: boolean; quote: boolean; feedback: boolean };
   staff_name: "team" | "display_name";
   team_name: string;
+}
+
+export interface CustomerRequestRow {
+  id: string;
+  number: string;
+  subject: string;
+  customer: { id: string; title: string };
+  account: { id: string; display_name: string };
+  stage: string;
+  stage_title: string;
+  status: { code: string; title: string };
+  created_at: string;
+  updated_at: string;
+}
+export interface CustomerRequestList {
+  results: CustomerRequestRow[];
+  count: number;
+  page: number;
+  pages: number;
+  counts: Record<string, number>;
+  stages: { code: string; title: string }[];
+}
+export function useCustomerRequests(params: { page: number; stage: string; q: string }, enabled = true) {
+  const slug = useSlug();
+  return useQuery({
+    queryKey: ["portal-requests", slug, params],
+    enabled: Boolean(slug && enabled),
+    queryFn: async ({ signal }) =>
+      (await api.get<CustomerRequestList>(`/api/workspaces/${slug}/portal/requests/`, { params, signal })).data,
+  });
 }
 
 export interface PortalLabel {
@@ -128,6 +159,7 @@ function usePortalMutation<Body>(
       void client.invalidateQueries({ queryKey: ["ticket-portal", slug, id] });
       void client.invalidateQueries({ queryKey: ["ticket-core", slug, id] });
       void client.invalidateQueries({ queryKey: ["ticket-history", slug, id] });
+      void client.invalidateQueries({ queryKey: ["portal-requests", slug] });
     },
     onError: (error) => toastError(error, messages.error),
   });

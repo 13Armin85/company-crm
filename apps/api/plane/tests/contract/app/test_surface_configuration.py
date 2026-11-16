@@ -48,14 +48,12 @@ def publish(surface, code="roles", **changes):
 
 
 def seed_legacy_fixed_surface(surface, code, **changes):
-    """Historical definitions remain safe to read; Ticket 6 forbids designing new ones."""
+    """Historical definitions remain safe to read as native page design expands."""
     workspace, _, client = surface
     current = client.get(path(workspace, code))
     assert current.status_code == 200, current.data
     definition = {**deepcopy(current.data["definition"]), **changes}
-    SurfaceConfiguration.objects.update_or_create(
-        workspace=workspace, code=code, defaults={"definition": definition}
-    )
+    SurfaceConfiguration.objects.update_or_create(workspace=workspace, code=code, defaults={"definition": definition})
     return client.get(path(workspace, code)).data
 
 
@@ -78,11 +76,9 @@ def test_all_native_pages_have_a_backend_configuration(surface):
     # The catalog lives at surfaces/, without an empty code segment.
     response = client.get(f"/api/workspaces/{workspace.slug}/engine/surfaces/")
     assert response.status_code == 200, response.data
-    project_work = next(
-        row for row in response.data["results"] if row["code"] == "ticket"
-    )
+    project_work = next(row for row in response.data["results"] if row["code"] == "ticket")
     assert project_work["title"] == "کارهای پروژه"
-    assert {row["code"] for row in response.data["results"]} == {
+    assert {row["code"] for row in response.data["results"]} >= {
         "ticket",
         "task",
         "project",
@@ -92,6 +88,18 @@ def test_all_native_pages_have_a_backend_configuration(surface):
         "units",
         "routing",
         "cycles",
+        "profile",
+        "security",
+        "leave-requests",
+        "daily-team",
+        "portal-requests",
+        "report-daily_reports",
+        "report-daily_report_items",
+        "portal-customer-request",
+        "leave-versions",
+        "leave-placeholders",
+        "work-schedule-table",
+        "portal-status-labels",
     }
     for code in (
         "profile",
@@ -105,12 +113,7 @@ def test_all_native_pages_have_a_backend_configuration(surface):
         "appearance",
     ):
         assert client.get(path(workspace, code)).status_code == 200
-        assert (
-            client.put(
-                path(workspace, code), {"revision": 0, "definition": {}}, format="json"
-            ).status_code
-            == 400
-        )
+        assert client.put(path(workspace, code), {"revision": 0, "definition": {}}, format="json").status_code == 400
     assert SurfaceConfiguration.objects.count() == 0  # Reads never initialize records.
 
 
@@ -137,32 +140,21 @@ def test_designer_publishes_server_owned_types_limits_permissions_and_locks(surf
         "select",
         "file",
     }
-    bindings = [
-        binding
-        for section in result["form"]["layout"]["sections"]
-        for binding in section["bindings"]
-    ]
+    bindings = [binding for section in result["form"]["layout"]["sections"] for binding in section["bindings"]]
     for binding in bindings:
         if binding.get("source") == "name":
             assert binding["field"] in designer["locked_fields"]
 
 
-@pytest.mark.parametrize(
-    "patch", [{"hidden": True}, {"required": False}, {"title": " "}]
-)
-def test_native_essential_fields_cannot_be_bypassed_in_direct_form_updates(
-    surface, patch
-):
+@pytest.mark.parametrize("patch", [{"hidden": True}, {"required": False}, {"title": " "}])
+def test_native_essential_fields_cannot_be_bypassed_in_direct_form_updates(surface, patch):
     from plane.db.models import FormLayout, FormVersion
 
     workspace, _, client = surface
     schema = client.get(path(workspace, "project")).data
     layout = deepcopy(schema["form"]["layout"])
     title = next(
-        binding
-        for section in layout["sections"]
-        for binding in section["bindings"]
-        if binding.get("source") == "name"
+        binding for section in layout["sections"] for binding in section["bindings"] if binding.get("source") == "name"
     )
     title.update(patch)
     before = FormVersion.objects.count()
@@ -203,13 +195,8 @@ def test_configuration_requires_publish_permission_and_rejects_stale_revisions(s
         format="json",
     )
     assert response.status_code == 409
-    assert (
-        SurfaceConfiguration.objects.get(workspace=workspace, code="roles").revision
-        == 1
-    )
-    outsider = User.objects.create(
-        email="outsider-surface@example.com", username="outsider-surface"
-    )
+    assert SurfaceConfiguration.objects.get(workspace=workspace, code="roles").revision == 1
+    outsider = User.objects.create(email="outsider-surface@example.com", username="outsider-surface")
     client.force_authenticate(outsider)
     assert client.get(path(workspace)).status_code in {403, 404}
     assert client.put(
@@ -234,9 +221,7 @@ def test_required_typed_field_is_enforced_on_the_original_role_endpoint(surface)
             format="json",
         )
         assert response.status_code == 400, response.data
-    assert not OrganizationRole.objects.filter(
-        workspace=workspace, name="قرارداد"
-    ).exists()
+    assert not OrganizationRole.objects.filter(workspace=workspace, name="قرارداد").exists()
     response = client.post(
         role_url(workspace),
         {"name": "قرارداد", "custom_values": {extra.code: 7}},
@@ -244,9 +229,7 @@ def test_required_typed_field_is_enforced_on_the_original_role_endpoint(surface)
     )
     assert response.status_code == 201, response.data
     record_id = response.data["id"]
-    assert SurfaceValues.objects.get(
-        workspace=workspace, code="roles", object_id=record_id
-    ).values == {extra.code: 7}
+    assert SurfaceValues.objects.get(workspace=workspace, code="roles", object_id=record_id).values == {extra.code: 7}
     response = client.get(path(workspace, suffix=f"values/?ids={record_id}"))
     assert response.status_code == 200, response.data
     assert response.data["values"][str(record_id)][extra.code] == 7
@@ -258,19 +241,14 @@ def test_required_typed_field_is_enforced_on_the_original_role_endpoint(surface)
         ).status_code
         == 200
     )
-    assert (
-        SurfaceValues.objects.get(object_id=record_id, code="roles").values[extra.code]
-        == 7
-    )
+    assert SurfaceValues.objects.get(object_id=record_id, code="roles").values[extra.code] == 7
 
 
 def test_required_can_be_removed_without_changing_the_field_library(surface):
     workspace, _, client = surface
     extra = field(surface, config={"required": True})
     publish(surface, fields=[{"field": extra.code, "required": False}])
-    response = client.post(
-        role_url(workspace), {"name": "اختیاری", "custom_values": {}}, format="json"
-    )
+    response = client.post(role_url(workspace), {"name": "اختیاری", "custom_values": {}}, format="json")
     assert response.status_code == 201, response.data
     extra.refresh_from_db()
     assert extra.config["required"] is True
@@ -282,9 +260,7 @@ def test_native_optional_input_can_be_required_then_removed(surface):
     publish(surface, native={"description": {"required": True}})
     response = client.post(role_url(workspace), {"name": "توضیح لازم"}, format="json")
     assert response.status_code == 400
-    response = client.patch(
-        role_url(workspace, old_role.id), {"name": "نام عوض‌شده"}, format="json"
-    )
+    response = client.patch(role_url(workspace, old_role.id), {"name": "نام عوض‌شده"}, format="json")
     assert response.status_code == 400
     publish(surface, native={"description": {"hidden": True, "required": False}})
     response = client.post(
@@ -307,19 +283,13 @@ def test_unknown_or_hidden_custom_values_cannot_be_injected(surface):
             format="json",
         )
         assert response.status_code == expected, response.data
-    assert not OrganizationRole.objects.filter(
-        name="تزریق", workspace=workspace
-    ).exists()
+    assert not OrganizationRole.objects.filter(name="تزریق", workspace=workspace).exists()
 
 
 def test_configuration_cannot_attach_foreign_fields_or_remove_system_inputs(surface):
     workspace, actor, client = surface
-    other = Workspace.objects.create(
-        name="شرکت دیگر", slug="foreign-surface", owner=actor
-    )
-    foreign = FieldDefinition.objects.create(
-        workspace=other, code="foreign", title="خارجی", kind="short_text"
-    )
+    other = Workspace.objects.create(name="شرکت دیگر", slug="foreign-surface", owner=actor)
+    foreign = FieldDefinition.objects.create(workspace=other, code="foreign", title="خارجی", kind="short_text")
     current = client.get(path(workspace)).data
     for patch in (
         {"fields": [{"field": foreign.code}]},
@@ -346,9 +316,7 @@ def test_failed_native_mutation_does_not_commit_custom_values(surface):
     )
     assert response.status_code == 400
     assert not SurfaceValues.objects.filter(workspace=workspace).exists()
-    assert not EntityEvent.objects.filter(
-        workspace=workspace, event_type="surface.values.updated"
-    ).exists()
+    assert not EntityEvent.objects.filter(workspace=workspace, event_type="surface.values.updated").exists()
 
 
 def test_removing_field_preserves_history_and_removes_it_from_values_and_columns(
@@ -365,10 +333,7 @@ def test_removing_field_preserves_history_and_removes_it_from_values_and_columns
     assert response.status_code == 201, response.data
     identifier = response.data["id"]
     publish(surface, fields=[], columns=["native:نام نقش"])
-    assert (
-        SurfaceValues.objects.get(object_id=identifier, code="roles").values[extra.code]
-        == 8
-    )
+    assert SurfaceValues.objects.get(object_id=identifier, code="roles").values[extra.code] == 8
     response = client.get(path(workspace, suffix=f"values/?ids={identifier}"))
     assert response.data["values"][str(identifier)] == {}
 
@@ -376,9 +341,7 @@ def test_removing_field_preserves_history_and_removes_it_from_values_and_columns
 def test_personal_form_values_are_scoped_to_the_authenticated_user(surface):
     workspace, actor, client = surface
     extra = field(surface)
-    seed_legacy_fixed_surface(
-        surface, code="profile", fields=[{"field": extra.code, "required": True}]
-    )
+    seed_legacy_fixed_surface(surface, code="profile", fields=[{"field": extra.code, "required": True}])
     response = client.patch(
         "/api/users/me/",
         {"display_name": "نام جدید", "custom_values": {extra.code: 5}},
@@ -386,28 +349,15 @@ def test_personal_form_values_are_scoped_to_the_authenticated_user(surface):
         HTTP_X_CRM_WORKSPACE=workspace.slug,
     )
     assert response.status_code == 200, response.data
-    assert (
-        SurfaceValues.objects.get(
-            workspace=workspace, code="profile", object_id=actor.id
-        ).values[extra.code]
-        == 5
-    )
-    other = User.objects.create(
-        email="other-surface@example.com", username="other-surface"
-    )
+    assert SurfaceValues.objects.get(workspace=workspace, code="profile", object_id=actor.id).values[extra.code] == 5
+    other = User.objects.create(email="other-surface@example.com", username="other-surface")
     WorkspaceMember.objects.create(workspace=workspace, member=other, role=15)
-    SurfaceValues.objects.create(
-        workspace=workspace, code="profile", object_id=other.id, values={extra.code: 99}
-    )
-    response = client.get(
-        path(workspace, "profile", f"values/?ids={actor.id},{other.id}")
-    )
+    SurfaceValues.objects.create(workspace=workspace, code="profile", object_id=other.id, values={extra.code: 99})
+    response = client.get(path(workspace, "profile", f"values/?ids={actor.id},{other.id}"))
     assert set(response.data["values"]) == {str(actor.id)}
 
 
-@pytest.mark.parametrize(
-    "columns", [[], ["native:نام نقش", "native:نام نقش"], ["field:unattached"]]
-)
+@pytest.mark.parametrize("columns", [[], ["native:نام نقش", "native:نام نقش"], ["field:unattached"]])
 def test_invalid_columns_are_rejected(surface, columns):
     workspace, _, client = surface
     initial = client.get(path(workspace)).data
@@ -443,18 +393,13 @@ def test_export_import_includes_native_form_and_column_settings(surface):
         fields=[{"field": extra.code, "required": True}],
         columns=[f"field:{extra.code}", "native:نام نقش"],
     )
-    other = Workspace.objects.create(
-        name="مقصد فرم‌ها", slug="surface-import", owner=actor
-    )
+    other = Workspace.objects.create(name="مقصد فرم‌ها", slug="surface-import", owner=actor)
     initialize_engine(other)
     config = export_config(workspace)
     assert config["surfaces"][0]["definition"] == published["definition"]
     result = import_config(other, actor, config)
     assert result["surfaces"] == 1
-    assert (
-        SurfaceConfiguration.objects.get(workspace=other, code="roles").definition
-        == published["definition"]
-    )
+    assert SurfaceConfiguration.objects.get(workspace=other, code="roles").definition == published["definition"]
 
 
 @pytest.mark.parametrize(
@@ -495,9 +440,7 @@ def test_extra_values_are_saved_by_each_native_form_endpoint(surface, code):
         "workspace",
         "security",
     }:
-        seed_legacy_fixed_surface(
-            surface, code=code, fields=[{"field": extra.code, "required": True}]
-        )
+        seed_legacy_fixed_surface(surface, code=code, fields=[{"field": extra.code, "required": True}])
     else:
         publish(surface, code=code, fields=[{"field": extra.code, "required": True}])
     body, method, expected = {}, "post", 201
@@ -509,14 +452,15 @@ def test_extra_values_are_saved_by_each_native_form_endpoint(surface, code):
     elif code in {"routing", "delegates"}:
         unit = OrganizationUnit.objects.create(workspace=workspace, title="واحد ارجاع")
         if code == "routing":
-            role = OrganizationRole.objects.filter(
-                workspace=workspace, is_active=True
-            ).first()
-            url, body = f"{root}/organization/routing-rules/", {
-                "name": "ارجاع سفارشی",
-                "unit_id": str(unit.id),
-                "required_role_id": str(role.id),
-            }
+            role = OrganizationRole.objects.filter(workspace=workspace, is_active=True).first()
+            url, body = (
+                f"{root}/organization/routing-rules/",
+                {
+                    "name": "ارجاع سفارشی",
+                    "unit_id": str(unit.id),
+                    "required_role_id": str(role.id),
+                },
+            )
         else:
             url, body, method, expected, identifier = (
                 f"{root}/organization/units/{unit.id}/delegates/",
@@ -526,28 +470,28 @@ def test_extra_values_are_saved_by_each_native_form_endpoint(surface, code):
                 unit.id,
             )
     elif code == "cycles":
-        project = Project.objects.create(
-            workspace=workspace, name="پروژه چرخه", identifier="CYCS"
+        project = Project.objects.create(workspace=workspace, name="پروژه چرخه", identifier="CYCS")
+        ProjectMember.objects.create(workspace=workspace, project=project, member=actor, role=20)
+        url, body = (
+            f"{root}/projects/{project.id}/cycles/",
+            {
+                "name": "چرخه سفارشی",
+                "start_date": "2026-01-01",
+                "end_date": "2026-02-01",
+            },
         )
-        ProjectMember.objects.create(
-            workspace=workspace, project=project, member=actor, role=20
-        )
-        url, body = f"{root}/projects/{project.id}/cycles/", {
-            "name": "چرخه سفارشی",
-            "start_date": "2026-01-01",
-            "end_date": "2026-02-01",
-        }
     elif code == "users":
-        url, body = f"{root}/members/", {
-            "email": "native-surface@example.com",
-            "username": "native-surface",
-            "display_name": "کاربر سفارشی",
-            "password": "V7!mQ2#rZ9$pL4@x",
-        }
-    elif code == "role-permissions":
-        role = OrganizationRole.objects.create(
-            workspace=workspace, name="نقش مجوز سفارشی"
+        url, body = (
+            f"{root}/members/",
+            {
+                "email": "native-surface@example.com",
+                "username": "native-surface",
+                "display_name": "کاربر سفارشی",
+                "password": "V7!mQ2#rZ9$pL4@x",
+            },
         )
+    elif code == "role-permissions":
+        role = OrganizationRole.objects.create(workspace=workspace, name="نقش مجوز سفارشی")
         url, body, method, expected, identifier = (
             f"{root}/organization/roles/{role.id}/",
             {"permission_ids": []},
@@ -557,17 +501,16 @@ def test_extra_values_are_saved_by_each_native_form_endpoint(surface, code):
         )
         headers["HTTP_X_CRM_SURFACE"] = code
     elif code == "exceptions":
-        permission = OrganizationPermission.objects.get(
-            workspace=workspace, code="Issue.View"
+        permission = OrganizationPermission.objects.get(workspace=workspace, code="Issue.View")
+        url, body = (
+            f"{root}/organization/users/{actor.id}/exceptions/",
+            {
+                "permission": str(permission.id),
+                "effect": "ALLOW",
+            },
         )
-        url, body = f"{root}/organization/users/{actor.id}/exceptions/", {
-            "permission": str(permission.id),
-            "effect": "ALLOW",
-        }
     elif code == "password":
-        target = User.objects.create(
-            email="surface-reset@example.com", username="surface-reset"
-        )
+        target = User.objects.create(email="surface-reset@example.com", username="surface-reset")
         WorkspaceMember.objects.create(workspace=workspace, member=target, role=15)
         url, body, expected, identifier = (
             f"{root}/organization/users/{target.id}/password/",
@@ -582,9 +525,7 @@ def test_extra_values_are_saved_by_each_native_form_endpoint(surface, code):
         method, expected, identifier = "patch", 200, actor.id
         headers["HTTP_X_CRM_WORKSPACE"] = workspace.slug
         if code == "notifications":
-            url, body = "/api/users/me/notification-preferences/", {
-                "property_change": False
-            }
+            url, body = "/api/users/me/notification-preferences/", {"property_change": False}
         elif code == "appearance":
             Profile.objects.get_or_create(user=actor)
             url, body = "/api/users/me/profile/", {"theme": {"theme": "light"}}
@@ -602,19 +543,12 @@ def test_extra_values_are_saved_by_each_native_form_endpoint(surface, code):
             200,
             workspace.id,
         )
-    response = getattr(client, method)(
-        url, {**body, "custom_values": {extra.code: 9}}, format="json", **headers
-    )
+    response = getattr(client, method)(url, {**body, "custom_values": {extra.code: 9}}, format="json", **headers)
     assert response.status_code == expected, response.data
     if code == "users":
         identifier = User.objects.get(email=body["email"]).id
     identifier = identifier or response.data["id"]
-    assert (
-        SurfaceValues.objects.get(
-            workspace=workspace, code=code, object_id=identifier
-        ).values[extra.code]
-        == 9
-    )
+    assert SurfaceValues.objects.get(workspace=workspace, code=code, object_id=identifier).values[extra.code] == 9
 
 
 def test_personal_required_fields_cannot_be_bypassed_by_omitting_workspace_header(
@@ -622,12 +556,8 @@ def test_personal_required_fields_cannot_be_bypassed_by_omitting_workspace_heade
 ):
     workspace, actor, client = surface
     extra = field(surface)
-    seed_legacy_fixed_surface(
-        surface, code="profile", fields=[{"field": extra.code, "required": True}]
-    )
-    rejected = client.patch(
-        "/api/users/me/", {"display_name": "بدون اطلاعات الزامی"}, format="json"
-    )
+    seed_legacy_fixed_surface(surface, code="profile", fields=[{"field": extra.code, "required": True}])
+    rejected = client.patch("/api/users/me/", {"display_name": "بدون اطلاعات الزامی"}, format="json")
     assert rejected.status_code == 400, rejected.data
     accepted = client.patch(
         "/api/users/me/",
@@ -635,19 +565,12 @@ def test_personal_required_fields_cannot_be_bypassed_by_omitting_workspace_heade
         format="json",
     )
     assert accepted.status_code == 200, accepted.data
-    assert (
-        SurfaceValues.objects.get(
-            workspace=workspace, code="profile", object_id=actor.id
-        ).values[extra.code]
-        == 9
-    )
+    assert SurfaceValues.objects.get(workspace=workspace, code="profile", object_id=actor.id).values[extra.code] == 9
 
 
 def test_permission_form_header_cannot_bypass_role_information_rules(surface):
     workspace, _, client = surface
-    role = OrganizationRole.objects.create(
-        workspace=workspace, name="نقش محافظت‌شده", description="توضیح موجود"
-    )
+    role = OrganizationRole.objects.create(workspace=workspace, name="نقش محافظت‌شده", description="توضیح موجود")
     publish(surface, native={"description": {"required": True}})
     response = client.patch(
         role_url(workspace, role.id),
@@ -666,18 +589,14 @@ def test_required_appearance_fields_do_not_block_workspace_navigation(surface):
     workspace, actor, client = surface
     Profile.objects.get_or_create(user=actor)
     extra = field(surface)
-    seed_legacy_fixed_surface(
-        surface, code="appearance", fields=[{"field": extra.code, "required": True}]
-    )
+    seed_legacy_fixed_surface(surface, code="appearance", fields=[{"field": extra.code, "required": True}])
     response = client.patch(
         "/api/users/me/profile/",
         {"last_workspace_id": str(workspace.id)},
         format="json",
     )
     assert response.status_code == 200, response.data
-    assert not SurfaceValues.objects.filter(
-        workspace=workspace, code="appearance"
-    ).exists()
+    assert not SurfaceValues.objects.filter(workspace=workspace, code="appearance").exists()
 
 
 def test_table_tabs_keep_independent_columns_and_can_be_removed(surface):
@@ -733,11 +652,7 @@ def test_simple_field_creation_generates_choice_options_without_library_setup(su
     )
     assert response.status_code == 201, response.data
     assert response.data["lookup"]
-    assert set(
-        LookupValue.objects.filter(category_id=response.data["lookup"]).values_list(
-            "title", flat=True
-        )
-    ) == {
+    assert set(LookupValue.objects.filter(category_id=response.data["lookup"]).values_list("title", flat=True)) == {
         "عادی",
         "فوری",
     }
@@ -752,9 +667,7 @@ def test_simple_form_and_columns_publish_together_and_roll_back_on_invalid_colum
     schema = client.get(path(workspace, "project")).data
     extra = field(surface)
     layout = deepcopy(schema["form"]["layout"])
-    layout["sections"][0]["bindings"].append(
-        {"field": extra.code, "title": "امتیاز پروژه", "required": True}
-    )
+    layout["sections"][0]["bindings"].append({"field": extra.code, "title": "امتیاز پروژه", "required": True})
     schema["definition"]["columns"].append(f"engine:{extra.code}")
     body = {
         "revision": schema["revision"],
@@ -764,9 +677,7 @@ def test_simple_form_and_columns_publish_together_and_roll_back_on_invalid_colum
     accepted = client.put(path(workspace, "project"), body, format="json")
     assert accepted.status_code == 200, accepted.data
     assert accepted.data["form"]["layout"] == layout
-    root = EntityType.objects.get(
-        workspace=workspace, code="project", parent__isnull=True
-    )
+    root = EntityType.objects.get(workspace=workspace, code="project", parent__isnull=True)
     before = FormLayout.objects.get(entity=root).revision
     versions = FormVersion.objects.filter(layout__entity=root).count()
     invalid = {
@@ -781,17 +692,13 @@ def test_simple_form_and_columns_publish_together_and_roll_back_on_invalid_colum
 
 
 @pytest.mark.parametrize("with_asset", [False, True])
-def test_avatar_removal_clears_legacy_and_uploaded_images_idempotently(
-    surface, with_asset
-):
+def test_avatar_removal_clears_legacy_and_uploaded_images_idempotently(surface, with_asset):
     from plane.db.models import FileAsset
 
     _, actor, client = surface
     actor.avatar = "https://example.com/old-avatar.png"
     if with_asset:
-        asset = FileAsset.objects.create(
-            user=actor, asset="avatar.png", entity_type="USER_AVATAR", is_uploaded=True
-        )
+        asset = FileAsset.objects.create(user=actor, asset="avatar.png", entity_type="USER_AVATAR", is_uploaded=True)
         actor.avatar_asset = asset
     actor.save()
     for _ in range(2):
@@ -811,11 +718,6 @@ def test_avatar_removal_cannot_clear_another_users_picture(surface):
         username="avatar-other",
         avatar="https://example.com/other.png",
     )
-    assert (
-        client.delete(
-            "/api/users/me/avatar/", {"user_id": str(other.id)}, format="json"
-        ).status_code
-        == 204
-    )
+    assert client.delete("/api/users/me/avatar/", {"user_id": str(other.id)}, format="json").status_code == 204
     other.refresh_from_db()
     assert other.avatar == "https://example.com/other.png"

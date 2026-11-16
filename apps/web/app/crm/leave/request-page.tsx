@@ -1,6 +1,6 @@
 /** One leave request: edit (unsigned version only), preview, explicit signing, versions, route and history. */
 import { useEffect, useState } from "react";
-import { useParams } from "react-router";
+import { Link, useParams } from "react-router";
 import { errorMessage } from "../api";
 import { useSlug } from "../api/client";
 import {
@@ -42,9 +42,9 @@ export function LeaveSummary({ detail }: { detail: LeaveRequestDetail }) {
           <dt>مدت محاسبه‌شده</dt>
           <dd>{current.duration_text}</dd>
           <dt>دلیل</dt>
-          <dd>{current.reason || "—"}</dd>
+          <dd>{current.reason || "دلیلی ثبت نشده است"}</dd>
           <dt>جانشین</dt>
-          <dd>{current.substitute?.name ?? "—"}</dd>
+          <dd>{current.substitute?.name ?? "جانشین پیشنهاد نشده است"}</dd>
           <dt>پیوست‌ها</dt>
           <dd>
             <AttachmentList items={current.attachments} hrefFor={(id) => attachmentUrl(slug, detail.id, id)} />
@@ -67,7 +67,7 @@ export function LeaveSummary({ detail }: { detail: LeaveRequestDetail }) {
   );
 }
 
-function Editor({ detail }: { detail: LeaveRequestDetail }) {
+function Editor({ detail, onDirtyChange }: { detail: LeaveRequestDetail; onDirtyChange: (dirty: boolean) => void }) {
   const meta = useLeaveMeta();
   const update = useUpdateLeave(detail.id);
   const slug = useSlug();
@@ -82,21 +82,45 @@ function Editor({ detail }: { detail: LeaveRequestDetail }) {
   const [touched, setTouched] = useState(false);
   const duration = useDurationText(values, true);
   const shownVersion = detail.current;
+  const dirty = JSON.stringify(formPayload(values)) !== JSON.stringify(formPayload(formFromVersion(detail.current!)));
+  useEffect(() => onDirtyChange(dirty), [dirty, onDirtyChange]);
   useEffect(() => {
     if (!shownVersion) return;
     setValues(formFromVersion(shownVersion));
     setFiles(shownVersion.attachments);
-  }, [shownVersion]);
+    setTouched(false);
+    // A metadata refetch (for example signature consent) must not discard unsaved text.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detail.id, detail.revision, shownVersion?.id]);
   const errors = touched ? formErrors(values) : {};
   return (
-    <section className="leave-card" aria-label="ویرایش درخواست">
+    <form
+      className="leave-card"
+      aria-label="ویرایش درخواست"
+      noValidate
+      onSubmit={(event) => {
+        event.preventDefault();
+        setTouched(true);
+        if (
+          hasErrors(formErrors(values)) ||
+          update.isPending ||
+          uploads.pending.length ||
+          duration.pending ||
+          duration.error
+        )
+          return;
+        update.mutate({ ...(formPayload(values) as LeaveFormValues), revision: detail.revision });
+      }}
+    >
       <h2>ویرایش نسخهٔ {detail.current!.number.toLocaleString("fa-IR")}</h2>
       <LeaveForm
         values={values}
         errors={errors}
         members={meta.data?.members ?? []}
-        durationText={duration.text || detail.current!.duration_text}
+        durationText={duration.text}
         durationError={duration.error}
+        calculating={duration.pending}
+        disabled={update.isPending}
         attachments={files}
         pending={uploads.pending}
         attachmentConfig={meta.data?.attachment}
@@ -105,16 +129,18 @@ function Editor({ detail }: { detail: LeaveRequestDetail }) {
         onAddFiles={uploads.add}
       />
       <Button
-        disabled={update.isPending || uploads.pending.length > 0}
-        onClick={() => {
-          setTouched(true);
-          if (hasErrors(formErrors(values))) return;
-          update.mutate({ ...(formPayload(values) as LeaveFormValues), revision: detail.revision });
-        }}
+        type="submit"
+        disabled={update.isPending || uploads.pending.length > 0 || duration.pending || Boolean(duration.error)}
       >
         ذخیره و ساخت دوبارهٔ پیش‌نمایش
       </Button>
-    </section>
+      {update.isError && <ErrorNotice message={errorMessage(update.error, "ذخیرهٔ تغییرات ممکن نشد.")} />}
+      {dirty && (
+        <p className="leave-notice" role="status">
+          تغییرات هنوز ذخیره نشده‌اند. برای به‌روز شدن سند و امکان امضا، تغییرات را ذخیره کنید.
+        </p>
+      )}
+    </form>
   );
 }
 
@@ -128,6 +154,7 @@ export default function LeaveRequestPage() {
   const history = useLeaveHistory(id);
   const action = useLeaveAction(id ?? "");
   const [cancelReason, setCancelReason] = useState("");
+  const [dirty, setDirty] = useState(false);
   if (query.isLoading) return <Skeleton rows={6} />;
   if (query.error || !detail)
     return <ErrorNotice message={errorMessage(query.error, "این درخواست پیدا نشد یا اجازهٔ دیدن آن را ندارید")} />;
@@ -139,8 +166,11 @@ export default function LeaveRequestPage() {
         title={`درخواست مرخصی ${detail.number}`}
         description="سند Word فقط از حساب شما و داده‌های همین درخواست ساخته می‌شود؛ برای اصلاح، خود درخواست را ویرایش کنید."
       />
+      <Link className="leave-back" to="/leave-requests">
+        بازگشت به درخواست‌های مرخصی
+      </Link>
       <LeaveSummary detail={detail} />
-      {actions.can_edit && <Editor detail={detail} />}
+      {actions.can_edit && <Editor key={detail.current?.id} detail={detail} onDirtyChange={setDirty} />}
       {actions.can_new_version && (
         <section className="leave-card">
           <p>
@@ -164,6 +194,11 @@ export default function LeaveRequestPage() {
             </Button>
           )}
         </h2>
+        {dirty && (
+          <p className="leave-notice">
+            این پیش‌نمایش مربوط به آخرین اطلاعات ذخیره‌شده است. ابتدا تغییرات فرم را ذخیره کنید.
+          </p>
+        )}
         {preview.isLoading ? (
           <Skeleton rows={4} />
         ) : preview.error ? (
@@ -176,10 +211,18 @@ export default function LeaveRequestPage() {
         <>
           <MySignatureSection />
           <SignPanel
-            canSign={actions.can_sign}
-            blockers={actions.sign_blockers}
+            canSign={actions.can_sign && !dirty}
+            blockers={
+              dirty ? [...actions.sign_blockers, "پیش از امضا، تغییرات فرم را ذخیره کنید."] : actions.sign_blockers
+            }
             pending={action.isPending}
-            hasPreview={Boolean(preview.data && !preview.data.signed && preview.data.fingerprint)}
+            hasPreview={Boolean(
+              preview.data &&
+              !preview.isFetching &&
+              !preview.data.signed &&
+              preview.data.fingerprint &&
+              preview.data.version === detail.current?.number
+            )}
             onSign={() =>
               preview.data &&
               action.mutate({
@@ -202,7 +245,13 @@ export default function LeaveRequestPage() {
       {actions.can_cancel && (
         <section className="leave-card" aria-label="لغو درخواست">
           <label htmlFor="leave-cancel-reason">دلیل لغو (اختیاری)</label>
-          <input id="leave-cancel-reason" value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} />
+          <input
+            id="leave-cancel-reason"
+            value={cancelReason}
+            maxLength={2000}
+            placeholder="مثلاً: برنامه تغییر کرده و دیگر به این مرخصی نیاز ندارم."
+            onChange={(e) => setCancelReason(e.target.value)}
+          />
           <Button
             variant="danger"
             disabled={action.isPending}
@@ -219,6 +268,8 @@ export default function LeaveRequestPage() {
       )}
       <section className="leave-card" aria-label="سابقه">
         <h2>سابقهٔ تغییرها</h2>
+        {history.isError && <ErrorNotice message={errorMessage(history.error, "خواندن سابقه ممکن نشد.")} />}
+        {history.isLoading && <Skeleton rows={2} />}
         <ol className="leave-history">
           {(history.data?.events ?? []).map((event) => (
             <li key={event.id}>

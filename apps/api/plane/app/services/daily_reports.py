@@ -19,8 +19,9 @@ Reuse, not parallel machinery (decisions 8.1–8.5):
 attendance, lateness or overtime anywhere.
 """
 
-from copy import deepcopy
+from copy import copy, deepcopy
 from datetime import date, datetime, time, timedelta
+from math import ceil
 from uuid import UUID
 
 from django.db import IntegrityError, transaction
@@ -46,6 +47,8 @@ from .access_control import has_permission
 from .work_calendar import bulk_resolvers, calendar_zone, local_today
 from .work_calendar_actions import fa_date
 from .workflow_engine import Conflict
+from . import report_absences
+from .table_page import DEFAULT_PAGE_SIZE, normalize, page_params
 
 CODE = "daily-report"
 UNIT_CODE = "daily-report-unit"
@@ -65,9 +68,17 @@ DAY_STATUS_TITLES = {
     "late": "ثبت‌شده (دیرهنگام)",
     "draft": "ثبت‌نشده (پیش‌نویس)",
     "missing": "ثبت‌نشده",
-    "not_required": "لازم نیست (مرخصی تمام‌روز)",
+    "not_required": "لازم نیست (مرخصی یا عدم حضور تمام‌روز)",
     "off": "روز غیرکاری",
     "future": "هنوز نرسیده",
+}
+TEAM_STATUS_ORDER = ("missing", "draft", "late", "submitted", "not_required", "off", "future")
+TEAM_FILTERS = {
+    "all": TEAM_STATUS_ORDER,
+    "missing": ("missing", "draft"),
+    "late": ("late",),
+    "submitted": ("submitted", "late"),
+    "not_required": ("not_required", "off"),
 }
 
 DEFAULTS = {
@@ -233,6 +244,7 @@ def approved_leaves(workspace, user_ids, date_from, date_to):
         LeaveRequest.objects.filter(
             workspace=workspace, requester_id__in=list(user_ids), status=LeaveRequest.Status.APPROVED
         )
+        .select_related("absence")
         .prefetch_related("versions")
         .order_by("created_at")
     )
@@ -242,16 +254,34 @@ def approved_leaves(workspace, user_ids, date_from, date_to):
         if not versions:
             continue
         version = versions[-1]
-        if version.start_date <= date_to and version.end_date >= date_from:
+        if row.absence_id:
+            period = report_absences.effective_period(row.absence)
+            if period is None:
+                continue
+            start, end = max(version.starts_at, period[0]), min(version.ends_at, period[1])
+            if start >= end:
+                continue
+            version = copy(version)
+            version._effective_period = (start, end)
+        start, end = leave_interval(version)
+        zone = calendar_zone(workspace)
+        if (
+            start.astimezone(zone).date() <= date_to
+            and (end - timedelta(microseconds=1)).astimezone(zone).date() >= date_from
+        ):
             result.setdefault(row.requester_id, []).append((row, version))
     return result
 
 
-def _covers_working_day(schedule, leaves, zone):
+def leave_interval(version):
+    return getattr(version, "_effective_period", (version.starts_at, version.ends_at))
+
+
+def _covers_working_day(schedule, leaves, zone, absence_periods=()):
     intervals = schedule.intervals(zone)
     if not schedule.working or not intervals:
         return False
-    spans = sorted((version.starts_at, version.ends_at) for _, version in leaves)
+    spans = sorted([leave_interval(version) for _, version in leaves] + list(absence_periods))
     for start, end in intervals:
         cursor = start
         for leave_start, leave_end in spans:
@@ -271,8 +301,16 @@ def leave_payload(row, version, workspace, schedule):
         "number": row.number,
         "mode": version.mode,
         "mode_label": "روزانه" if version.mode == "daily" else "ساعتی",
-        "period_text": period_text(version, workspace),
-        "duration_text": duration_text(version.mode, version.duration_days, version.duration_minutes),
+        "period_text": (
+            report_absences.period_text(*leave_interval(version), zone)
+            if leave_interval(version) != (version.starts_at, version.ends_at)
+            else period_text(version, workspace)
+        ),
+        "duration_text": (
+            "طبق بازهٔ به‌روزشدهٔ عدم حضور"
+            if leave_interval(version) != (version.starts_at, version.ends_at)
+            else duration_text(version.mode, version.duration_days, version.duration_minutes)
+        ),
         "full_day": _covers_working_day(schedule, [(row, version)], zone),
         "url": f"/leave-requests/{row.id}",
     }
@@ -281,7 +319,21 @@ def leave_payload(row, version, workspace, schedule):
 def day_leaves(workspace, leaves, day, schedule):
     zone = calendar_zone(workspace)
     start, end = _day_bounds(day, zone)
-    return [(row, version) for row, version in leaves if version.starts_at < end and version.ends_at > start]
+    return [
+        (row, version)
+        for row, version in leaves
+        if leave_interval(version)[0] < end and leave_interval(version)[1] > start
+    ]
+
+
+def absence_payload(row, period, workspace, schedule, can_open=False):
+    zone = calendar_zone(workspace)
+    return {
+        "id": str(row.id),
+        "period_text": report_absences.period_text(*period, zone),
+        "full_day": _covers_working_day(schedule, [], zone, [period]),
+        "url": "/absences" if can_open else None,
+    }
 
 
 def editable_until(workspace, user, work_date, settings=None, resolver=None):
@@ -295,7 +347,9 @@ def editable_until(workspace, user, work_date, settings=None, resolver=None):
     else:
         needed, last = window["days"], work_date
         if needed:
-            resolver = resolver or bulk_resolvers(workspace, [user], work_date, work_date + timedelta(days=60))[user.id]
+            resolver = (
+                resolver or bulk_resolvers(workspace, [user], work_date, work_date + timedelta(days=60))[user.id]
+            )
             found, day = 0, work_date
             for _ in range(60):
                 day += timedelta(days=1)
@@ -432,19 +486,19 @@ def parse_day(value, workspace):
         raise ValidationError({"date": "تاریخ معتبر نیست."})
 
 
-def requirement(schedule, leaves, day, today, zone):
+def requirement(schedule, leaves, day, today, zone, absence_periods=()):
     if day > today:
         return "future"
     if not schedule.working:
         return "off"
-    if _covers_working_day(schedule, leaves, zone):
+    if _covers_working_day(schedule, leaves, zone, absence_periods):
         return "not_required"
     return "required"
 
 
 REQUIREMENT_TEXT = {
     "required": "گزارش این روز لازم است.",
-    "not_required": "روز تمام‌مرخصی — گزارش لازم نیست؛ در صورت تمایل می‌توانید ثبت کنید.",
+    "not_required": "مرخصی یا عدم حضور تمام‌روز — گزارش لازم نیست؛ در صورت تمایل می‌توانید ثبت کنید.",
     "off": "روز غیرکاری یا تعطیل است — گزارش لازم نیست.",
     "future": "این روز هنوز نرسیده است؛ برای روز آینده گزارش ثبت نمی‌شود.",
 }
@@ -458,6 +512,8 @@ def day_payload(workspace, viewer, target, day, request=None, now=None):
     resolver = bulk_resolvers(workspace, [target], day, day + timedelta(days=60))[target.id]
     schedule = resolver.day(day)
     leaves = day_leaves(workspace, approved_leaves(workspace, [target.id], day, day).get(target.id, []), day, schedule)
+    absences = report_absences.standalone_periods(workspace, [target.id], day, day).get(target.id, [])
+    can_open_absence = has_permission(viewer, workspace, "Absence.View", request=request)
     start, end = _day_bounds(day, zone)
     events = list(
         WorkEvent.objects.filter(
@@ -485,7 +541,7 @@ def day_payload(workspace, viewer, target, day, request=None, now=None):
     labels = _ticket_labels(viewer, workspace, [i.issue_id for i in items], request)
     until = editable_until(workspace, target, day, settings, resolver)
     mine = target.id == viewer.id
-    need = requirement(schedule, leaves, day, today, zone)
+    need = requirement(schedule, leaves, day, today, zone, [period for _, period in absences])
     locked = now >= until
     can_submit = has_permission(viewer, workspace, "DailyReport.Submit", request=request)
     return {
@@ -500,6 +556,7 @@ def day_payload(workspace, viewer, target, day, request=None, now=None):
             "label": "روز کاری" if schedule.working else "روز غیرکاری",
         },
         "leaves": [leave_payload(row, version, workspace, schedule) for row, version in leaves],
+        "absences": [absence_payload(row, period, workspace, schedule, can_open_absence) for row, period in absences],
         "requirement": need,
         "requirement_text": REQUIREMENT_TEXT[need],
         "events": [
@@ -755,8 +812,10 @@ def history(workspace, viewer, target, day, request=None):
     if report is None:
         return []
     zone = calendar_zone(workspace)
-    rows = EntityEvent.objects.filter(workspace=workspace, record_id=report.id, event_type__in=EVENT_TITLES).order_by(
-        "created_at", "id"
+    # Revision first: two saves within the same instant still read in the order they were made.
+    rows = sorted(
+        EntityEvent.objects.filter(workspace=workspace, record_id=report.id, event_type__in=EVENT_TITLES),
+        key=lambda row: ((row.metadata or {}).get("revision") or 0, row.created_at),
     )
     actors = {u.id: u for u in User.objects.filter(id__in={r.created_by_id for r in rows if r.created_by_id})}
     result = []
@@ -887,7 +946,7 @@ def save_templates(workspace, actor, raw, request=None):
 # ---------------------------------------------------------------- team / range statuses (single source)
 
 
-def day_statuses(workspace, user_ids, date_from, date_to, now=None):
+def day_statuses(workspace, user_ids, date_from, date_to, now=None, *, include_items=True):
     """Per person and day: status (submitted/late/draft/missing/not_required/off/future).
 
     The only implementation of "who has (not) reported": used by the manager's team view,
@@ -900,27 +959,29 @@ def day_statuses(workspace, user_ids, date_from, date_to, now=None):
     users = list(User.objects.filter(id__in=list(user_ids)).order_by("display_name", "id"))
     resolvers = bulk_resolvers(workspace, users, date_from, date_to)
     leaves = approved_leaves(workspace, [u.id for u in users], date_from, date_to)
-    reports = {
-        (row.user_id, row.work_date): row
-        for row in DailyReport.objects.filter(
-            workspace=workspace, user_id__in=[u.id for u in users], work_date__gte=date_from, work_date__lte=date_to
-        ).prefetch_related("items")
-    }
+    absences = report_absences.standalone_periods(workspace, [u.id for u in users], date_from, date_to)
+    report_query = DailyReport.objects.filter(
+        workspace=workspace, user_id__in=[u.id for u in users], work_date__gte=date_from, work_date__lte=date_to
+    )
+    if include_items:
+        report_query = report_query.prefetch_related("items")
+    reports = {(row.user_id, row.work_date): row for row in report_query}
     rows = []
     for user in users:
         day = date_from
         while day <= date_to:
             schedule = resolvers[user.id].day(day)
             day_leave = day_leaves(workspace, leaves.get(user.id, []), day, schedule)
+            day_absences = report_absences.day_periods(absences.get(user.id, []), day, zone)
             report = reports.get((user.id, day))
-            need = requirement(schedule, day_leave, day, today, zone)
+            need = requirement(schedule, day_leave, day, today, zone, [period for _, period in day_absences])
             if report and report.status == DailyReport.Status.SUBMITTED:
                 status = "late" if report.is_late else "submitted"
             elif need in ("off", "not_required", "future"):
                 status = need
             else:
                 status = "draft" if report else "missing"
-            items = [i for i in report.items.all() if i.deleted_at is None] if report else []
+            items = [i for i in report.items.all() if i.deleted_at is None] if report and include_items else []
             rows.append(
                 {
                     "user": user,
@@ -930,6 +991,7 @@ def day_statuses(workspace, user_ids, date_from, date_to, now=None):
                     "report": report,
                     "items": items,
                     "leaves": day_leave,
+                    "absences": day_absences,
                     "schedule": schedule,
                 }
             )
@@ -945,14 +1007,39 @@ def team_day(workspace, viewer, day, request=None, now=None):
     ):
         raise PermissionDenied("مجوز مشاهدهٔ گزارش روزانهٔ تیم را ندارید.")
     scope = people_scope(viewer, workspace, source="daily_reports", request=request)
+    group = request.query_params.get("filter", "all") if request else "all"
+    if group not in TEAM_FILTERS:
+        raise ValidationError({"filter": "فیلتر وضعیت گزارش معتبر نیست."})
+    page, size = page_params(request) if request else (1, DEFAULT_PAGE_SIZE)
     zone = calendar_zone(workspace)
-    rows = day_statuses(workspace, [uid for uid in scope.user_ids if uid != viewer.id], day, day, now)
-    issue_ids = [i.issue_id for row in rows for i in row["items"]]
-    labels = _ticket_labels(viewer, workspace, issue_ids, request)
-    people = []
+    rows = day_statuses(
+        workspace, [uid for uid in scope.user_ids if uid != viewer.id], day, day, now, include_items=False
+    )
     summary = {key: 0 for key in DAY_STATUS_TITLES}
     for row in rows:
         summary[row["status"]] += 1
+    team_empty = not rows
+    rows = [row for row in rows if row["status"] in TEAM_FILTERS[group]]
+    rows.sort(
+        key=lambda row: (
+            TEAM_STATUS_ORDER.index(row["status"]),
+            normalize(person(row["user"])["name"]),
+            str(row["user"].id),
+        )
+    )
+    count = len(rows)
+    pages = max(1, ceil(count / size))
+    page = min(page, pages)
+    rows = rows[(page - 1) * size : page * size]
+    # Only the current page needs item text, ticket labels and detailed serialization.
+    page_reports = {row["report"].id: row for row in rows if row["report"]}
+    for item in DailyReportItem.objects.filter(report_id__in=page_reports, deleted_at__isnull=True):
+        page_reports[item.report_id]["items"].append(item)
+    issue_ids = [i.issue_id for row in rows for i in row["items"]]
+    labels = _ticket_labels(viewer, workspace, issue_ids, request)
+    people = []
+    can_open_absence = has_permission(viewer, workspace, "Absence.View", request=request)
+    for row in rows:
         report = row["report"]
         blockers = [i for i in row["items"] if i.kind == DailyReportItem.Kind.BLOCKER]
         people.append(
@@ -960,10 +1047,13 @@ def team_day(workspace, viewer, day, request=None, now=None):
                 "person": person(row["user"]),
                 "status": row["status"],
                 "status_label": DAY_STATUS_TITLES[row["status"]],
-                "submitted_at": report.submitted_at.astimezone(zone).isoformat()
-                if report and report.submitted_at
-                else None,
+                "submitted_at": (
+                    report.submitted_at.astimezone(zone).isoformat() if report and report.submitted_at else None
+                ),
                 "leaves": [leave_payload(r, v, workspace, row["schedule"]) for r, v in row["leaves"]],
+                "absences": [
+                    absence_payload(r, p, workspace, row["schedule"], can_open_absence) for r, p in row["absences"]
+                ],
                 "blockers": [item_payload(i, labels) for i in blockers if not i.needs_help],
                 "help": [item_payload(i, labels) for i in blockers if i.needs_help],
                 "counts": {kind: sum(1 for i in row["items"] if i.kind == kind) for kind in KIND_TITLES},
@@ -975,5 +1065,9 @@ def team_day(workspace, viewer, day, request=None, now=None):
         "summary": summary,
         "titles": DAY_STATUS_TITLES,
         "people": people,
-        "empty": "زیرمجموعه‌ای در دامنهٔ شما پیدا نشد." if not people else None,
+        "count": count,
+        "page": page,
+        "page_size": size,
+        "pages": pages,
+        "empty": "زیرمجموعه‌ای در دامنهٔ شما پیدا نشد." if team_empty else None,
     }

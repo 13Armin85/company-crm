@@ -39,6 +39,14 @@
 .page-header::after {
   display: none;
 }
+/* Compact content has 20px gutters (including on mobile). Keep the full-width
+   masthead aligned with those gutters instead of extending 8px past the viewport. */
+:root[data-density="compact"] .page-header,
+:root[data-density="compact"] .dashboard-hero {
+  margin-top: -16px;
+  margin-inline: -20px;
+  padding-inline: 20px;
+}
 .page-header-main {
   display: flex;
   align-items: center;
@@ -578,6 +586,7 @@
   :root .dashboard-hero {
     margin: -16px -14px 18px;
     padding: 16px 14px;
+    flex-wrap: nowrap;
   }
   .page-header-main {
     flex-basis: 100%;
@@ -824,23 +833,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* Narrower sheets drop the least-used columns instead of scrolling. */
-@media (max-width: 1280px) {
-  .app-shell:not(.is-panel-collapsed) .surface-work-table:not(.personal-work-table) [data-column="native:شناسه"] {
-    display: none;
-  }
-}
-@media (max-width: 1100px) {
-  .surface-work-table:not(.personal-work-table) :is([data-column="native:شناسه"], [data-column="native:پروژه"]) {
-    display: none;
-  }
-}
-@media (max-width: 760px) {
-  .surface-work-table:not(.personal-work-table) :is([data-column="native:اولویت"], [data-column="native:موعد"]) {
-    display: none;
-  }
-}
-
 /* "تب‌های من" on tables opens as a band under the toolbar: the table moves down, so nothing
    ever sits underneath the picker while columns are switched on or off. */
 .surface-table-toolbar:has(.table-tab-picker.is-inline) {

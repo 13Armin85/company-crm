@@ -503,23 +503,23 @@ def test_native_member_can_change_own_status_without_obtaining_general_edit_perm
         email="view-receiver@example.com", username="view-receiver", password="SafePassword!2026"
     )
     WorkspaceMember.objects.create(workspace=workspace, member=receiver, role=15)
-    entity = workspace.entity_types.get(code="task")
+    entity = workspace.entity_types.get(code="ticket")
     task = create_record(
-        engine, entity, {"title": "assigned", "assignee": str(receiver.id), "task_status": "todo", "priority": "medium"}
+        engine, entity, {"title": "assigned", "ticket_assignees": [str(receiver.id)], "ticket_state": "todo", "priority": "medium"}
     )
     client.force_authenticate(user=receiver)
     base = endpoint(workspace, "entities/task/")
     schema = client.get(base + f"schema/?record={task['id']}").data
     fields = {f["code"]: f for f in schema["fields"]}
     assert fields["title"]["config"]["readonly"] is True
-    assert fields["task_status"]["config"]["readonly"] is False
-    listed = query(engine, entity, spec("title", "task_status"))
+    assert fields["ticket_state"]["config"]["readonly"] is False
+    listed = query(engine, entity, spec("title", "ticket_state"))
     assert listed.status_code == 200, listed.data
     assert listed.data["results"][0]["can_edit"] is True
     assert "title" not in listed.data["results"][0]["editable_fields"]
     changed = client.patch(
         base + f"records/{task['id']}/",
-        {"revision": task["revision"], "values": {"task_status": "in_progress"}},
+        {"revision": task["revision"], "values": {"ticket_state": "in_progress"}},
         format="json",
     )
     assert changed.status_code == 200, changed.data

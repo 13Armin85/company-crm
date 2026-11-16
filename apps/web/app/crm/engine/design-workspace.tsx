@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link } from "react-router";
+import { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router";
 import { CloseOutline, SearchOutline } from "@makeplane/propel/icons";
 import { GitBranch, LayoutTemplate, Plus, SearchX, Table2 } from "lucide-react";
 import { NewPageDialog } from "./sidebar-pages";
@@ -29,7 +29,6 @@ const tabs: { id: DesignTab; label: string; hint: string }[] = [
   { id: "relations", label: "ارتباط‌ها", hint: "اتصال به بخش‌های دیگر" },
   { id: "workflow", label: "گردش‌کار", hint: "مرحله‌ها، تأییدها و مهلت‌های فرایند" },
 ];
-const surfaceCodes = new Set(["ticket", "project", "leave", "users", "units", "roles", "routing", "cycles"]);
 const nativePaths: Record<string, string> = {
   ticket: "/issues",
   project: "/projects",
@@ -39,12 +38,17 @@ const nativePaths: Record<string, string> = {
 };
 
 export function DesignWorkspace() {
+  const [params, setParams] = useSearchParams();
   const catalog = useEngineCatalog();
   const fields = useEngineDefinitions<FieldDefinition>("fields");
   const surfaces = useEngineQuery<{ results: Surface[] }>("surfaces", "surfaces/");
   const { data: access } = useWorkspaceAccess();
-  const [code, setCode] = useState("");
-  const [tab, setTab] = useState<DesignTab>("layout");
+  const [code, setCode] = useState(params.get("page") || "");
+  const [tab, setTab] = useState<DesignTab>(params.get("mode") === "columns" ? "table" : "layout");
+  useEffect(() => {
+    setCode(params.get("page") || "");
+    setTab(params.get("mode") === "columns" ? "table" : "layout");
+  }, [params]);
   const [search, setSearch] = useState("");
   const [general, setGeneral] = useState(false);
   const [creatingPage, setCreatingPage] = useState(false);
@@ -52,7 +56,10 @@ export function DesignWorkspace() {
   const entities = (catalog.data?.entities || []).filter((item) => item.is_active && item.code !== "task");
   const entity = entities.find((item) => item.code === code);
   const surfaceCode = code === "user" ? "users" : code === "unit" ? "units" : code;
-  const surface = surfaces.data?.results.find((item) => item.code === surfaceCode && surfaceCodes.has(item.code));
+  const surface = surfaces.data?.results.find((item) => item.code === surfaceCode);
+  const pages = (surfaces.data?.results || []).filter(
+    (item) => item.code !== "task" && !entities.some((candidate) => candidate.code === item.code)
+  );
   const codes = form.data?.draft.sections.flatMap((section) => section.bindings.map((binding) => binding.field)) || [];
   const choose = (next: string) => {
     if (next === code) return;
@@ -62,6 +69,7 @@ export function DesignWorkspace() {
     )
       return;
     setCode(next);
+    setParams({ page: next }, { replace: true });
     setTab("layout");
   };
   const selectTab = (next: DesignTab) => {
@@ -105,7 +113,7 @@ export function DesignWorkspace() {
       <aside className="engine-workspace-sidebar" aria-label="فرم‌ها و جدول‌ها">
         <header>
           <strong>فرم‌ها و جدول‌ها</strong>
-          <small>{entities.length.toLocaleString("fa-IR")} بخش قابل تنظیم</small>
+          <small>{(entities.length + pages.length).toLocaleString("fa-IR")} بخش قابل تنظیم</small>
         </header>
         <div className="engine-entity-search">
           <label htmlFor="engine-entity-search-input">جستجوی بخش</label>
@@ -138,29 +146,46 @@ export function DesignWorkspace() {
               <small>{item.parent ? "نوع فرعی" : item.adapter ? "بخش اصلی سامانه" : "بخش سفارشی"}</small>
             </button>
           ))}
+          {pages
+            .filter((item) => normalizePersianSearch(item.title + item.code).includes(normalizePersianSearch(search)))
+            .map((item) => (
+              <button
+                type="button"
+                key={item.code}
+                className={code === item.code ? "active" : ""}
+                aria-current={code === item.code ? "page" : undefined}
+                onClick={() => choose(item.code)}
+              >
+                <strong>{item.title}</strong>
+                <small>فرم و جدول صفحه</small>
+              </button>
+            ))}
         </nav>
-        {!list.length && (
-          <div className="engine-search-empty" role="status">
-            <span className="engine-search-empty-icon" aria-hidden="true">
-              <SearchX size={22} />
-            </span>
-            <strong>{search.trim() ? `بخشی با «${search.trim()}» پیدا نشد` : "هنوز بخشی وجود ندارد"}</strong>
-            <p>املای نام را بررسی کنید یا با کد انگلیسی بخش جستجو کنید.</p>
-            <div className="engine-search-empty-actions">
-              {search && (
-                <Button variant="secondary" onClick={() => setSearch("")}>
-                  پاک کردن جستجو
-                </Button>
-              )}
-              {access?.can("EntityType.Create") && access?.can("FormDesigner.Publish") && (
-                <Button onClick={() => setCreatingPage(true)}>
-                  <Plus size={15} aria-hidden="true" />
-                  {search.trim() ? `ساخت صفحهٔ «${search.trim()}»` : "ساخت صفحهٔ جدید"}
-                </Button>
-              )}
+        {!list.length &&
+          !pages.some((item) =>
+            normalizePersianSearch(item.title + item.code).includes(normalizePersianSearch(search))
+          ) && (
+            <div className="engine-search-empty" role="status">
+              <span className="engine-search-empty-icon" aria-hidden="true">
+                <SearchX size={22} />
+              </span>
+              <strong>{search.trim() ? `بخشی با «${search.trim()}» پیدا نشد` : "هنوز بخشی وجود ندارد"}</strong>
+              <p>املای نام را بررسی کنید یا با کد انگلیسی بخش جستجو کنید.</p>
+              <div className="engine-search-empty-actions">
+                {search && (
+                  <Button variant="secondary" onClick={() => setSearch("")}>
+                    پاک کردن جستجو
+                  </Button>
+                )}
+                {access?.can("EntityType.Create") && access?.can("FormDesigner.Publish") && (
+                  <Button onClick={() => setCreatingPage(true)}>
+                    <Plus size={15} aria-hidden="true" />
+                    {search.trim() ? `ساخت صفحهٔ «${search.trim()}»` : "ساخت صفحهٔ جدید"}
+                  </Button>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
         {creatingPage && <NewPageDialog initialTitle={search.trim()} onClose={() => setCreatingPage(false)} />}
         {access?.can("View.Official.Manage") && (
           <Button variant="ghost" onClick={() => setGeneral(true)}>
@@ -308,6 +333,20 @@ export function DesignWorkspace() {
               {tab === "relations" && <RelationSettings key={code} entityCode={code} />}
               {tab === "workflow" && <WorkflowDesigner key={code} entity={code} />}
             </section>
+          </>
+        ) : surface ? (
+          <>
+            <header className="engine-workspace-heading">
+              <div>
+                <small>فرم و جدول صفحه</small>
+                <h2>{surface.title}</h2>
+                <p>تنظیمات ذخیره‌شده روی صفحهٔ اصلی برای کاربران اعمال می‌شود.</p>
+              </div>
+              <Link className="button button-secondary" to={surface.path}>
+                مشاهده صفحه
+              </Link>
+            </header>
+            <PageEditor key={surfaceCode} code={surfaceCode} embedded />
           </>
         ) : (
           <section className="engine-workspace-start">

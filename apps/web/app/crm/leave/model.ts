@@ -79,6 +79,13 @@ export function formPayload(values: LeaveFormValues) {
   return values.mode === "hourly" ? { ...base, start_time: values.start_time, end_time: values.end_time } : base;
 }
 
+/** Only the period changes the calendar calculation; typing a reason must not recalculate it. */
+export function durationPayload(values: LeaveFormValues) {
+  const { mode, start_date, start_time, end_time } = values;
+  const end_date = values.end_date || start_date;
+  return mode === "hourly" ? { mode, start_date, end_date, start_time, end_time } : { mode, start_date, end_date };
+}
+
 /** Same rules as the server: dates present, end not before start, hourly needs both times and end after start. */
 export function formErrors(values: LeaveFormValues): Partial<Record<keyof LeaveFormValues, string>> {
   const errors: Partial<Record<keyof LeaveFormValues, string>> = {};

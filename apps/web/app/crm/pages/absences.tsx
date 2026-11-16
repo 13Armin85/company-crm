@@ -1,7 +1,7 @@
 import { ErrorNotice } from "../error-state";
 import { EngineRecordForm } from "../engine/record-form";
 import { useState } from "react";
-import { Navigate } from "react-router";
+import { Link, Navigate } from "react-router";
 import { useCurrentUser, useWorkspaceAccess, errorMessage } from "../api";
 import { useAccessMutation } from "../access/api";
 import { AccessModal } from "../access/components";
@@ -46,9 +46,18 @@ export default function AbsencesPage() {
         title="مدیریت عدم حضور"
         description="عدم حضور توسط مدیر بالادستی یا مدیر دارای مجوز ثبت می‌شود. بازه‌های هم‌پوشان پذیرفته نمی‌شوند."
         actions={
-          access.can("Absence.Create") && (
-            <Button onClick={() => setEditing({ user: "", startsAt: "", endsAt: "", reason: "" })}>ثبت عدم حضور</Button>
-          )
+          <>
+            {(access.can("Report.View") || access.can("Report.ViewAll")) && (
+              <Link className="button button-secondary" to="/reports/source/leave">
+                گزارش مرخصی و عدم حضور
+              </Link>
+            )}
+            {access.can("Absence.Create") && (
+              <Button onClick={() => setEditing({ user: "", startsAt: "", endsAt: "", reason: "" })}>
+                ثبت عدم حضور
+              </Button>
+            )}
+          </>
         }
       />
       <ErrorNotice message={error && errorMessage(error, "دریافت فهرست عدم حضورها انجام نشد")} />

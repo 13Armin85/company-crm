@@ -46,10 +46,10 @@ describe("simplified forms and profile", () => {
     state.avatar = "";
     state.removing = false;
   });
-  it("offers entity forms and data rules while excluding fixed personal pages", () => {
+  it("offers both entity forms and native page forms in the same designer", () => {
     const html = renderPage(<EngineSettingsPage />);
     expect(html).toContain("کارها");
-    expect(html).not.toContain("پروفایل من");
+    expect(html).toContain("پروفایل من");
     expect(html).toContain("فرم و جدول کدام بخش را تنظیم می‌کنید؟");
     expect(html).toContain("جستجوی بخش");
     expect(html).not.toContain("بخش‌های طراحی");

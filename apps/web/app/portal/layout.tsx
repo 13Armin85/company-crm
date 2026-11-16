@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { NavLink, Navigate, Outlet, useLocation, useNavigate } from "react-router";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
-import { FilePlus2, ListChecks, LogOut, Settings } from "lucide-react";
+import { FilePlus2, Headphones, ListChecks, LogOut, Settings } from "lucide-react";
 import { onSessionExpired } from "./api/client";
 import { usePortalLogout, usePortalSession } from "./api/portal";
 
@@ -58,8 +58,13 @@ function PortalShell() {
     <div className="portal-page" dir="rtl">
       <header className="portal-header">
         <div className="portal-brand">
-          <strong>درگاه مشتریان</strong>
-          <span>{account.customer}</span>
+          <span className="portal-brand-mark">
+            <Headphones size={25} aria-hidden />
+          </span>
+          <div>
+            <strong>درگاه پشتیبانی مشتریان</strong>
+            <span>{account.customer}</span>
+          </div>
         </div>
         <nav aria-label="بخش‌های درگاه">
           <NavLink to="/portal" end className="portal-nav">
@@ -73,6 +78,9 @@ function PortalShell() {
           </NavLink>
         </nav>
         <div className="portal-user">
+          <span className="portal-account-avatar" aria-hidden>
+            {account.display_name.slice(0, 1)}
+          </span>
           <span>{account.display_name}</span>
           <button
             type="button"

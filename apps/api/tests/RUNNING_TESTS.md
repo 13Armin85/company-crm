@@ -51,6 +51,19 @@ docker compose -f docker-compose-test.yml run --rm api-tests \
 
 The available markers (`unit`, `contract`, `smoke`, `slow`) are declared in `apps/api/pytest.ini`.
 
+### Migration contracts
+
+The default suite uses `--nomigrations`. The two historical migration contracts skip in that mode; run them explicitly with real migrations enabled:
+
+```bash
+docker compose -f docker-compose-test.yml run --rm api-tests \
+  pytest -n 2 --migrations --create-db \
+  plane/tests/contract/app/test_crm_access_migration.py \
+  plane/tests/contract/test_entity_engine_migration.py
+```
+
+Each contract creates and removes its own temporary PostgreSQL database. It applies the historical schema, seeds records, and migrates forward, without reversing the later irreversible data migrations or changing the normal test database.
+
 ### Teardown
 
 ```bash

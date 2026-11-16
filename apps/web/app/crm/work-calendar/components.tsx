@@ -1,3 +1,4 @@
+import { ConfiguredFields, SurfaceTable } from "../engine/surface";
 /** Presentational pieces of the work calendar. Data and permissions come from the server via props. */
 import { useState } from "react";
 import type { FormEvent } from "react";
@@ -232,151 +233,155 @@ export function WeeklyScheduleEditor({
     onSubmit({ effective_from: effectiveFrom, effective_to: effectiveTo || undefined, reason: reason.trim(), days });
   };
   return (
-    <form className="work-schedule-editor" aria-label="ویرایش برنامهٔ هفتگی" onSubmit={submit}>
-      <p className="work-muted">
-        هر ذخیره یک نسخهٔ تاریخ‌دار جدید می‌سازد و نسخهٔ قبلی بسته می‌شود ولی حذف نمی‌شود. تغییر برنامه هیچ مرخصی، غیبت یا
-        تخلفی ثبت نمی‌کند.
-      </p>
-      <table>
-        <thead>
-          <tr>
-            <th>روز</th>
-            <th>روز کاری</th>
-            <th>شروع</th>
-            <th>پایان</th>
-            <th>استراحت‌ها</th>
-            <th>شیوهٔ کار</th>
-          </tr>
-        </thead>
-        <tbody>
-          {WEEK_ORDER.map(({ weekday, label }) => {
-            const day = days.find((item) => item.weekday === weekday)!;
-            return (
-              <tr key={weekday} data-weekday={weekday} data-working={day.is_working}>
-                <th scope="row">{label}</th>
-                <td>
-                  <label className="work-check">
-                    <input
-                      type="checkbox"
-                      aria-label={`${label} روز کاری است`}
-                      checked={day.is_working}
-                      onChange={(event) => update(weekday, { is_working: event.target.checked })}
+    <ConfiguredFields code="work-schedule-form">
+      <form className="work-schedule-editor" aria-label="ویرایش برنامهٔ هفتگی" onSubmit={submit}>
+        <p className="work-muted">
+          هر ذخیره یک نسخهٔ تاریخ‌دار جدید می‌سازد و نسخهٔ قبلی بسته می‌شود ولی حذف نمی‌شود. تغییر برنامه هیچ مرخصی، غیبت یا
+          تخلفی ثبت نمی‌کند.
+        </p>
+        <SurfaceTable code="work-schedule-table">
+          <thead>
+            <tr>
+              <th>روز</th>
+              <th>روز کاری</th>
+              <th>شروع</th>
+              <th>پایان</th>
+              <th>استراحت‌ها</th>
+              <th>شیوهٔ کار</th>
+            </tr>
+          </thead>
+          <tbody>
+            {WEEK_ORDER.map(({ weekday, label }) => {
+              const day = days.find((item) => item.weekday === weekday)!;
+              return (
+                <tr key={weekday} data-weekday={weekday} data-working={day.is_working}>
+                  <th scope="row">{label}</th>
+                  <td>
+                    <label className="work-check">
+                      <input
+                        type="checkbox"
+                        aria-label={`${label} روز کاری است`}
+                        checked={day.is_working}
+                        onChange={(event) => update(weekday, { is_working: event.target.checked })}
+                      />
+                      <span>{day.is_working ? "کاری" : "غیرکاری"}</span>
+                    </label>
+                  </td>
+                  <td>
+                    <PersianTimePicker
+                      label={`شروع ${label}`}
+                      value={day.start}
+                      disabled={!day.is_working}
+                      onChange={(start) => update(weekday, { start })}
                     />
-                    <span>{day.is_working ? "کاری" : "غیرکاری"}</span>
-                  </label>
-                </td>
-                <td>
-                  <PersianTimePicker
-                    label={`شروع ${label}`}
-                    value={day.start}
-                    disabled={!day.is_working}
-                    onChange={(start) => update(weekday, { start })}
-                  />
-                </td>
-                <td>
-                  <PersianTimePicker
-                    label={`پایان ${label}`}
-                    value={day.end}
-                    disabled={!day.is_working}
-                    onChange={(end) => update(weekday, { end })}
-                  />
-                </td>
-                <td>
-                  {day.breaks.map((item, index) => (
-                    // Breaks have no identity of their own; their position is the identity.
-                    // oxlint-disable-next-line react/no-array-index-key
-                    <div className="work-break" key={index}>
-                      <PersianTimePicker
-                        label={`شروع استراحت ${label}`}
-                        value={item.start}
-                        disabled={!day.is_working}
-                        onChange={(start) =>
-                          update(weekday, {
-                            breaks: day.breaks.map((row, i) => (i === index ? { ...row, start } : row)),
-                          })
-                        }
-                      />
-                      <PersianTimePicker
-                        label={`پایان استراحت ${label}`}
-                        value={item.end}
-                        disabled={!day.is_working}
-                        onChange={(end) =>
-                          update(weekday, { breaks: day.breaks.map((row, i) => (i === index ? { ...row, end } : row)) })
-                        }
-                      />
+                  </td>
+                  <td>
+                    <PersianTimePicker
+                      label={`پایان ${label}`}
+                      value={day.end}
+                      disabled={!day.is_working}
+                      onChange={(end) => update(weekday, { end })}
+                    />
+                  </td>
+                  <td>
+                    {day.breaks.map((item, index) => (
+                      // Breaks have no identity of their own; their position is the identity.
+                      // oxlint-disable-next-line react/no-array-index-key
+                      <div className="work-break" key={index}>
+                        <PersianTimePicker
+                          label={`شروع استراحت ${label}`}
+                          value={item.start}
+                          disabled={!day.is_working}
+                          onChange={(start) =>
+                            update(weekday, {
+                              breaks: day.breaks.map((row, i) => (i === index ? { ...row, start } : row)),
+                            })
+                          }
+                        />
+                        <PersianTimePicker
+                          label={`پایان استراحت ${label}`}
+                          value={item.end}
+                          disabled={!day.is_working}
+                          onChange={(end) =>
+                            update(weekday, {
+                              breaks: day.breaks.map((row, i) => (i === index ? { ...row, end } : row)),
+                            })
+                          }
+                        />
+                        <button
+                          type="button"
+                          className="work-icon-button"
+                          aria-label={`حذف استراحت ${label}`}
+                          onClick={() => update(weekday, { breaks: day.breaks.filter((_, i) => i !== index) })}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                    {day.is_working && (
                       <button
                         type="button"
-                        className="work-icon-button"
-                        aria-label={`حذف استراحت ${label}`}
-                        onClick={() => update(weekday, { breaks: day.breaks.filter((_, i) => i !== index) })}
+                        className="work-link-button"
+                        onClick={() => update(weekday, { breaks: [...day.breaks, { start: "12:00", end: "12:30" }] })}
                       >
-                        <Trash2 size={14} />
+                        <Plus size={14} /> افزودن استراحت
                       </button>
-                    </div>
-                  ))}
-                  {day.is_working && (
-                    <button
-                      type="button"
-                      className="work-link-button"
-                      onClick={() => update(weekday, { breaks: [...day.breaks, { start: "12:00", end: "12:30" }] })}
-                    >
-                      <Plus size={14} /> افزودن استراحت
-                    </button>
-                  )}
-                </td>
-                <td>
-                  <SearchableSelect
-                    label={`شیوهٔ کار ${label}`}
-                    value={day.work_mode || "none"}
-                    disabled={!day.is_working}
-                    onChange={(mode) => update(weekday, { work_mode: (mode === "none" ? "" : mode) as WorkMode })}
-                    options={modeOptions}
-                  />
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      <div className="work-form-row">
-        <PersianDatePicker
-          label="معتبر از تاریخ"
-          required
-          value={effectiveFrom}
-          min={minDate}
-          timeZone={timeZone}
-          onChange={setEffectiveFrom}
-        />
-        <PersianDatePicker
-          label="معتبر تا تاریخ (اختیاری)"
-          value={effectiveTo}
-          min={effectiveFrom || minDate}
-          timeZone={timeZone}
-          onChange={setEffectiveTo}
-        />
-      </div>
-      <label className="work-field">
-        <span>دلیل یا توضیح تغییر</span>
-        <textarea value={reason} onChange={(event) => setReason(event.target.value)} required />
-      </label>
-      {submitted && errors.length > 0 && (
-        <ul className="work-errors" role="alert">
-          {errors.map((error) => (
-            <li key={error}>{error}</li>
-          ))}
-        </ul>
-      )}
-      <div className="work-form-actions">
-        <Button type="submit" disabled={saving}>
-          ثبت نسخهٔ جدید برنامه
-        </Button>
-        {onCancel && (
-          <Button variant="ghost" onClick={onCancel}>
-            انصراف
-          </Button>
+                    )}
+                  </td>
+                  <td>
+                    <SearchableSelect
+                      label={`شیوهٔ کار ${label}`}
+                      value={day.work_mode || "none"}
+                      disabled={!day.is_working}
+                      onChange={(mode) => update(weekday, { work_mode: (mode === "none" ? "" : mode) as WorkMode })}
+                      options={modeOptions}
+                    />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </SurfaceTable>
+        <div className="work-form-row">
+          <PersianDatePicker
+            label="معتبر از تاریخ"
+            required
+            value={effectiveFrom}
+            min={minDate}
+            timeZone={timeZone}
+            onChange={setEffectiveFrom}
+          />
+          <PersianDatePicker
+            label="معتبر تا تاریخ (اختیاری)"
+            value={effectiveTo}
+            min={effectiveFrom || minDate}
+            timeZone={timeZone}
+            onChange={setEffectiveTo}
+          />
+        </div>
+        <label className="work-field">
+          <span>دلیل یا توضیح تغییر</span>
+          <textarea value={reason} onChange={(event) => setReason(event.target.value)} required />
+        </label>
+        {submitted && errors.length > 0 && (
+          <ul className="work-errors" role="alert">
+            {errors.map((error) => (
+              <li key={error}>{error}</li>
+            ))}
+          </ul>
         )}
-      </div>
-    </form>
+        <div className="work-form-actions">
+          <Button type="submit" disabled={saving}>
+            ثبت نسخهٔ جدید برنامه
+          </Button>
+          {onCancel && (
+            <Button variant="ghost" onClick={onCancel}>
+              انصراف
+            </Button>
+          )}
+        </div>
+      </form>
+    </ConfiguredFields>
   );
 }
 
@@ -413,72 +418,74 @@ export function ExceptionForm({
     ...(isWorking && end <= start ? ["ساعت پایان باید بعد از ساعت شروع باشد."] : []),
   ];
   return (
-    <form
-      className="work-exception-form"
-      aria-label="استثنای تاریخ‌دار"
-      onSubmit={(event) => {
-        event.preventDefault();
-        setSubmitted(true);
-        if (errors.length) return;
-        onSubmit({
-          date_from: dateFrom,
-          date_to: dateTo || dateFrom,
-          is_working: isWorking,
-          ...(isWorking ? { start, end } : {}),
-          reason: reason.trim(),
-        });
-      }}
-    >
-      <p className="work-muted">استثنا فقط همان تاریخ‌ها را تغییر می‌دهد و برنامهٔ هفتگی دست نمی‌خورد.</p>
-      <div className="work-form-row">
-        <PersianDatePicker
-          label="از تاریخ"
-          required
-          value={dateFrom}
-          min={minDate}
-          timeZone={timeZone}
-          onChange={setDateFrom}
-        />
-        <PersianDatePicker
-          label="تا تاریخ (اختیاری)"
-          value={dateTo}
-          min={dateFrom || minDate}
-          timeZone={timeZone}
-          onChange={setDateTo}
-        />
-      </div>
-      <label className="work-check">
-        <input type="checkbox" checked={isWorking} onChange={(event) => setIsWorking(event.target.checked)} />
-        <span>در این تاریخ‌ها کار می‌کند</span>
-      </label>
-      {isWorking && (
+    <ConfiguredFields code="work-exception-form">
+      <form
+        className="work-exception-form"
+        aria-label="استثنای تاریخ‌دار"
+        onSubmit={(event) => {
+          event.preventDefault();
+          setSubmitted(true);
+          if (errors.length) return;
+          onSubmit({
+            date_from: dateFrom,
+            date_to: dateTo || dateFrom,
+            is_working: isWorking,
+            ...(isWorking ? { start, end } : {}),
+            reason: reason.trim(),
+          });
+        }}
+      >
+        <p className="work-muted">استثنا فقط همان تاریخ‌ها را تغییر می‌دهد و برنامهٔ هفتگی دست نمی‌خورد.</p>
         <div className="work-form-row">
-          <PersianTimePicker label="شروع" value={start} onChange={setStart} />
-          <PersianTimePicker label="پایان" value={end} onChange={setEnd} />
+          <PersianDatePicker
+            label="از تاریخ"
+            required
+            value={dateFrom}
+            min={minDate}
+            timeZone={timeZone}
+            onChange={setDateFrom}
+          />
+          <PersianDatePicker
+            label="تا تاریخ (اختیاری)"
+            value={dateTo}
+            min={dateFrom || minDate}
+            timeZone={timeZone}
+            onChange={setDateTo}
+          />
         </div>
-      )}
-      <label className="work-field">
-        <span>دلیل یا توضیح</span>
-        <textarea value={reason} onChange={(event) => setReason(event.target.value)} required />
-      </label>
-      {submitted && errors.length > 0 && (
-        <ul className="work-errors" role="alert">
-          {errors.map((error) => (
-            <li key={error}>{error}</li>
-          ))}
-        </ul>
-      )}
-      <div className="work-form-actions">
-        <Button type="submit" disabled={saving}>
-          ثبت استثنا
-        </Button>
-        {onCancel && (
-          <Button variant="ghost" onClick={onCancel}>
-            انصراف
-          </Button>
+        <label className="work-check">
+          <input type="checkbox" checked={isWorking} onChange={(event) => setIsWorking(event.target.checked)} />
+          <span>در این تاریخ‌ها کار می‌کند</span>
+        </label>
+        {isWorking && (
+          <div className="work-form-row">
+            <PersianTimePicker label="شروع" value={start} onChange={setStart} />
+            <PersianTimePicker label="پایان" value={end} onChange={setEnd} />
+          </div>
         )}
-      </div>
-    </form>
+        <label className="work-field">
+          <span>دلیل یا توضیح</span>
+          <textarea value={reason} onChange={(event) => setReason(event.target.value)} required />
+        </label>
+        {submitted && errors.length > 0 && (
+          <ul className="work-errors" role="alert">
+            {errors.map((error) => (
+              <li key={error}>{error}</li>
+            ))}
+          </ul>
+        )}
+        <div className="work-form-actions">
+          <Button type="submit" disabled={saving}>
+            ثبت استثنا
+          </Button>
+          {onCancel && (
+            <Button variant="ghost" onClick={onCancel}>
+              انصراف
+            </Button>
+          )}
+        </div>
+      </form>
+    </ConfiguredFields>
   );
 }
 
@@ -529,75 +536,77 @@ export function WorkEventForm({
     ...(participants.length ? [] : ["دست‌کم یک فرد مرتبط انتخاب کنید."]),
   ];
   return (
-    <form
-      className="work-event-form"
-      aria-label="رویداد کاری جدید"
-      onSubmit={(event) => {
-        event.preventDefault();
-        setSubmitted(true);
-        if (errors.length) return;
-        onSubmit({
-          kind,
-          title: title.trim(),
-          description,
-          private_note: privateNote,
-          starts_at: startsAt,
-          ends_at: endsAt,
-          all_day: false,
-          participant_ids: participants,
-        });
-      }}
-    >
-      <div className="work-form-row">
-        <SearchableSelect
-          label="نوع"
-          value={kind}
-          onChange={(value) => setKind(value as WorkEventKind)}
-          options={kindOptions}
+    <ConfiguredFields code="work-event-form">
+      <form
+        className="work-event-form"
+        aria-label="رویداد کاری جدید"
+        onSubmit={(event) => {
+          event.preventDefault();
+          setSubmitted(true);
+          if (errors.length) return;
+          onSubmit({
+            kind,
+            title: title.trim(),
+            description,
+            private_note: privateNote,
+            starts_at: startsAt,
+            ends_at: endsAt,
+            all_day: false,
+            participant_ids: participants,
+          });
+        }}
+      >
+        <div className="work-form-row">
+          <SearchableSelect
+            label="نوع"
+            value={kind}
+            onChange={(value) => setKind(value as WorkEventKind)}
+            options={kindOptions}
+          />
+          <label className="work-field">
+            <span>عنوان</span>
+            <input value={title} onChange={(event) => setTitle(event.target.value)} required />
+          </label>
+        </div>
+        <div className="work-form-row">
+          <PersianDateTimePicker label="شروع" value={startsAt} timeZone={timeZone} onChange={setStartsAt} />
+          <PersianDateTimePicker label="پایان" value={endsAt} timeZone={timeZone} onChange={setEndsAt} />
+        </div>
+        <CompactMultiSelector
+          label="افراد مرتبط"
+          options={people
+            .filter((person) => person.can_schedule)
+            .map((person) => ({ id: person.id, title: person.name }))}
+          selected={participants}
+          onChange={setParticipants}
         />
         <label className="work-field">
-          <span>عنوان</span>
-          <input value={title} onChange={(event) => setTitle(event.target.value)} required />
+          <span>توضیح (فقط برای افراد مرتبط و مدیران مجاز)</span>
+          <textarea value={description} onChange={(event) => setDescription(event.target.value)} />
         </label>
-      </div>
-      <div className="work-form-row">
-        <PersianDateTimePicker label="شروع" value={startsAt} timeZone={timeZone} onChange={setStartsAt} />
-        <PersianDateTimePicker label="پایان" value={endsAt} timeZone={timeZone} onChange={setEndsAt} />
-      </div>
-      <CompactMultiSelector
-        label="افراد مرتبط"
-        options={people
-          .filter((person) => person.can_schedule)
-          .map((person) => ({ id: person.id, title: person.name }))}
-        selected={participants}
-        onChange={setParticipants}
-      />
-      <label className="work-field">
-        <span>توضیح (فقط برای افراد مرتبط و مدیران مجاز)</span>
-        <textarea value={description} onChange={(event) => setDescription(event.target.value)} />
-      </label>
-      <label className="work-field">
-        <span>یادداشت محرمانه</span>
-        <textarea value={privateNote} onChange={(event) => setPrivateNote(event.target.value)} />
-      </label>
-      <p className="work-muted">همکاران دیگر فقط بازهٔ زمانی را با عنوان «در دسترس نیست» می‌بینند.</p>
-      {submitted && errors.length > 0 && (
-        <ul className="work-errors" role="alert">
-          {errors.map((error) => (
-            <li key={error}>{error}</li>
-          ))}
-        </ul>
-      )}
-      <div className="work-form-actions">
-        <Button type="submit" disabled={saving}>
-          ثبت رویداد
-        </Button>
-        {onCancel && (
-          <Button variant="ghost" onClick={onCancel}>
-            انصراف
-          </Button>
+        <label className="work-field">
+          <span>یادداشت محرمانه</span>
+          <textarea value={privateNote} onChange={(event) => setPrivateNote(event.target.value)} />
+        </label>
+        <p className="work-muted">همکاران دیگر فقط بازهٔ زمانی را با عنوان «در دسترس نیست» می‌بینند.</p>
+        {submitted && errors.length > 0 && (
+          <ul className="work-errors" role="alert">
+            {errors.map((error) => (
+              <li key={error}>{error}</li>
+            ))}
+          </ul>
         )}
-      </div>
-    </form>
+        <div className="work-form-actions">
+          <Button type="submit" disabled={saving}>
+            ثبت رویداد
+          </Button>
+          {onCancel && (
+            <Button variant="ghost" onClick={onCancel}>
+              انصراف
+            </Button>
+          )}
+        </div>
+      </form>
+    </ConfiguredFields>
   );
 }

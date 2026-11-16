@@ -11,6 +11,7 @@ import {
   MySignatureCard,
   PlaceholderTable,
   PreviewFrame,
+  ReadyTemplateCard,
   SignPanel,
   TemplateVersionRow,
   VersionList,
@@ -23,6 +24,7 @@ import {
   attachmentKind,
   checkAttachments,
   emptyForm,
+  durationPayload,
   formErrors,
   formFromVersion,
   formPayload,
@@ -68,6 +70,47 @@ const version: LeaveVersion = {
 };
 
 describe("leave form rules (mirrors the server)", () => {
+  it("explains template activation and blocks repeated creation while the ready form is being added", () => {
+    const html = render(<ReadyTemplateCard pending sampleHref="/sample.docx" onCreate={noop} />);
+    expect(html).toContain("پس از بررسی");
+    expect(html).toContain("در حال افزودن قالب");
+    expect(html).toMatch(/<button[^>]*disabled/);
+    const failed = render(
+      <ReadyTemplateCard pending={false} sampleHref="/sample.docx" onCreate={noop} error="دریافت قالب ممکن نشد" />
+    );
+    expect(failed).toContain('role="alert"');
+    expect(failed).toContain("دریافت قالب ممکن نشد");
+    expect(failed).toContain('href="/sample.docx"');
+  });
+  it("calculates duration only from dates and times, independently of optional text and files", () => {
+    const values = emptyForm("2027-01-09");
+    expect(durationPayload(values)).toEqual({ mode: "daily", start_date: "2027-01-09", end_date: "2027-01-09" });
+    expect(durationPayload({ ...values, reason: "متن جدید", attachments: ["a1"], substitute: "u2" })).toEqual(
+      durationPayload(values)
+    );
+    expect(durationPayload({ ...values, mode: "hourly", start_time: "10:00", end_time: "12:00" })).toMatchObject({
+      start_time: "10:00",
+      end_time: "12:00",
+    });
+  });
+
+  it("provides examples, input limits and accessible guidance for the optional fields", () => {
+    const html = render(
+      <LeaveForm
+        values={emptyForm("2027-01-09")}
+        errors={{}}
+        members={[]}
+        durationText=""
+        attachments={[]}
+        onChange={noop}
+      />
+    );
+    expect(html).toContain("مثلاً: مراجعه به پزشک");
+    expect(html).toContain('maxLength="2000"');
+    expect(html).toContain('aria-describedby="leave-reason-hint"');
+    expect(html).toContain("پس از انتخاب بازه");
+    expect(html).toContain("انتخاب همکار جانشین");
+  });
   it("only offers daily or hourly and never sends a category", () => {
     const html = render(
       <LeaveForm

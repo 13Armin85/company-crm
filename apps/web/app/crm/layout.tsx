@@ -2,7 +2,8 @@ import { ErrorState } from "./error-state";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BusinessChoicesProvider } from "./engine/choice-provider";
 import { ModalVisibilityContext } from "@plane/ui";
-import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
+import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
+import { createCrmQueryClient } from "./report-cache";
 import { Navigate, NavLink, Outlet, useBlocker, useLocation, useNavigate } from "react-router";
 import { Bell, Menu, Moon, Plus, Search, Sun } from "lucide-react";
 import {
@@ -35,7 +36,6 @@ import {
   subscribeToSessionEnd,
 } from "./access/session-events";
 import { ShellNavigation } from "./app-shell";
-
 
 function AppLayout() {
   const location = useLocation();
@@ -307,11 +307,7 @@ function AppLayout() {
 }
 
 export default function CrmRootLayout() {
-  const client = useMemo(
-    () =>
-      new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: false } } }),
-    []
-  );
+  const client = useMemo(createCrmQueryClient, []);
   return (
     <QueryClientProvider client={client}>
       <AuthenticationBoundary />

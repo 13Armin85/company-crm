@@ -113,7 +113,7 @@ class TestCycleListCreateAPIEndpoint:
 
         response = api_key_client.post(url, invalid_data, format="json")
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "Both start date and end date are either required or are to be null" in response.data["error"]
+        assert "تاریخ شروع و پایان باید هر دو وارد شوند یا هر دو خالی باشند." in response.data["error"]
 
     @pytest.mark.django_db
     def test_create_cycle_with_external_id(self, api_key_client, workspace, project):
@@ -160,7 +160,7 @@ class TestCycleListCreateAPIEndpoint:
         response = api_key_client.post(url, cycle_data, format="json")
 
         assert response.status_code == status.HTTP_409_CONFLICT
-        assert "same external id" in response.data["error"]
+        assert "با همین شناسه و منبع خارجی" in response.data["error"]
 
     @pytest.mark.django_db
     def test_list_cycles_success(self, api_key_client, workspace, project, create_cycle, create_user):
@@ -346,7 +346,7 @@ class TestCycleDetailAPIEndpoint:
         response = api_key_client.patch(url, update_data, format="json")
 
         assert response.status_code == status.HTTP_409_CONFLICT
-        assert "same external id" in response.data["error"]
+        assert "با همین شناسه و منبع خارجی" in response.data["error"]
 
     @pytest.mark.django_db
     def test_delete_cycle_success(self, api_key_client, workspace, project, create_cycle):

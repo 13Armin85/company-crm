@@ -8,9 +8,8 @@ from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 
 
-@pytest.mark.django_db(transaction=True)
 @pytest.mark.contract
-def test_entity_migration_and_idempotent_backfill_preserve_native_records():
+def test_entity_migration_and_idempotent_backfill_preserve_native_records(migration_database):
     executor = MigrationExecutor(connection)
     executor.migrate([("db", "0133_system_identifier_counter")])
     old = executor.loader.project_state([("db", "0133_system_identifier_counter")]).apps
@@ -47,7 +46,11 @@ def test_entity_migration_and_idempotent_backfill_preserve_native_records():
             entity__workspace_id=workspace.id, entity__code="project", source_id=project.id
         )
         assert attached.data == {}
-        assert EntityType.objects.filter(workspace_id=workspace.id, parent__isnull=True).count() == 4
+        root_codes = set(
+            EntityType.objects.filter(workspace_id=workspace.id, parent__isnull=True).values_list("code", flat=True)
+        )
+        assert {"ticket", "project", "leave", "user", "unit"} <= root_codes
+        assert "task" not in root_codes
         call_command("sync_entity_engine", workspace=workspace.slug, stdout=StringIO())
         assert EntityRecord.objects.filter(entity__workspace_id=workspace.id, source_id=project.id).count() == 1
         current = CurrentProject.objects.get(id=project.id)

@@ -14,9 +14,9 @@ CREATABLE_KINDS = {key: title for key, title in FIELD_KINDS.items() if key not i
 LOCK_REASON = "این ورودی برای ثبت اطلاعات ضروری است؛ نمی‌توان آن را حذف، پنهان یا اختیاری کرد."
 
 
-def designer_schema(workspace, code, user, engine_fields):
-    publish = has_permission(user, workspace, "FormDesigner.Publish")
-    create = has_permission(user, workspace, "Field.Create")
+def designer_schema(workspace, code, user, engine_fields, request=None):
+    publish = has_permission(user, workspace, "FormDesigner.Publish", request=request)
+    create = has_permission(user, workspace, "Field.Create", request=request)
     return {
         "can_publish": publish,
         "can_create_field": publish and create,
@@ -108,13 +108,17 @@ def persian_errors(data, status):
         else:
             message = str(value)
             if not any("\u0600" <= char <= "\u06ff" for char in message):
-                message = {
-                    "required": "این ورودی را تکمیل کنید.",
-                    "blank": "این ورودی نمی‌تواند خالی باشد.",
-                    "null": "برای این ورودی مقدار وارد کنید.",
-                    "max_length": "طول مقدار واردشده بیش از حد مجاز است.",
-                    "invalid": "مقدار این ورودی معتبر نیست.",
-                }.get(getattr(value, "code", "")) or translate_message(value) or defaults.get(status, FALLBACK)
+                message = (
+                    {
+                        "required": "این ورودی را تکمیل کنید.",
+                        "blank": "این ورودی نمی‌تواند خالی باشد.",
+                        "null": "برای این ورودی مقدار وارد کنید.",
+                        "max_length": "طول مقدار واردشده بیش از حد مجاز است.",
+                        "invalid": "مقدار این ورودی معتبر نیست.",
+                    }.get(getattr(value, "code", ""))
+                    or translate_message(value)
+                    or defaults.get(status, FALLBACK)
+                )
             # The most specific known segment names the input, e.g. "form.sections.0.title" -> title.
             parts = [part for part in path.split(".") if part and not part.isdigit()]
             label = next((labels[part] for part in reversed(parts) if part in labels), DEFAULT_LABEL)

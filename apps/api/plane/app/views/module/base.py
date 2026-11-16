@@ -434,6 +434,7 @@ class ModuleViewSet(BaseViewSet):
                     workspace__slug=slug,
                     project_id=project_id,
                 )
+                .values("id")
                 .annotate(first_name=F("assignees__first_name"))
                 .annotate(last_name=F("assignees__last_name"))
                 .annotate(assignee_id=F("assignees__id"))
@@ -542,6 +543,7 @@ class ModuleViewSet(BaseViewSet):
                 workspace__slug=slug,
                 project_id=project_id,
             )
+            .values("id")
             .annotate(first_name=F("assignees__first_name"))
             .annotate(last_name=F("assignees__last_name"))
             .annotate(assignee_id=F("assignees__id"))

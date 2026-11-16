@@ -1,3 +1,4 @@
+import { SurfaceTable } from "../engine/surface";
 /** «درخواست‌های مرخصی»: my requests, requests waiting for me and (when allowed) everyone's. */
 import { useEffect, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router";
@@ -15,14 +16,15 @@ import {
 import { useAttachmentUploads } from "./attachments";
 import type { LeaveAttachment, LeaveFormValues, LeaveRequestSummary } from "../api/leave";
 import { Button, EmptyState, PageHeader, Skeleton, TabBar } from "../components";
+import { ErrorNotice } from "../error-state";
 import { LeaveForm, LeaveStatusBadge, MySignatureCard } from "./components";
-import { emptyForm, formErrors, formPayload, hasErrors, holderText } from "./model";
+import { durationPayload, emptyForm, formErrors, formPayload, hasErrors, holderText } from "./model";
 
 export function LeaveRequestList({ rows }: { rows: LeaveRequestSummary[] }) {
   if (!rows.length) return <EmptyState title="درخواستی نیست" description="در این فهرست درخواست مرخصی‌ای وجود ندارد." />;
   return (
     <div className="leave-table-scroll" role="region" aria-label="فهرست درخواست‌ها" tabIndex={0}>
-      <table className="leave-table">
+      <SurfaceTable code="leave-requests" className="leave-table">
         <thead>
           <tr>
             <th>شماره</th>
@@ -51,31 +53,28 @@ export function LeaveRequestList({ rows }: { rows: LeaveRequestSummary[] }) {
             </tr>
           ))}
         </tbody>
-      </table>
+      </SurfaceTable>
     </div>
   );
 }
 
 /** Live, read-only duration from the server's calendar calculation. */
 export function useDurationText(values: LeaveFormValues, enabled: boolean) {
-  const duration = useLeaveDuration();
-  const [state, setState] = useState<{ text: string; error: string }>({ text: "", error: "" });
-  const key = JSON.stringify(formPayload(values));
+  const period = durationPayload(values);
+  const key = JSON.stringify(period);
+  const [settledKey, setSettledKey] = useState("");
+  const valid = !hasErrors(formErrors({ ...values, reason: "" }));
   useEffect(() => {
-    if (!enabled || hasErrors(formErrors(values))) {
-      setState({ text: "", error: "" });
-      return;
-    }
-    const timer = setTimeout(() => {
-      duration.mutate(formPayload(values) as Partial<LeaveFormValues>, {
-        onSuccess: (data) => setState({ text: data.duration_text, error: "" }),
-        onError: (error) => setState({ text: "", error: errorMessage(error, "محاسبهٔ مدت ممکن نشد") }),
-      });
-    }, 400);
+    const timer = setTimeout(() => setSettledKey(key), 350);
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, enabled]);
-  return state;
+  }, [key]);
+  const ready = enabled && valid && key === settledKey;
+  const duration = useLeaveDuration(period, ready);
+  return {
+    text: ready ? (duration.data?.duration_text ?? "") : "",
+    error: ready && duration.error ? errorMessage(duration.error, "محاسبهٔ مدت ممکن نشد") : "",
+    pending: enabled && valid && (!ready || duration.isFetching),
+  };
 }
 
 function NewRequest({ onDone }: { onDone: () => void }) {
@@ -97,16 +96,54 @@ function NewRequest({ onDone }: { onDone: () => void }) {
     if (today)
       setValues((current) => (current.start_date ? current : { ...current, start_date: today, end_date: today }));
   }, [today]);
+  if (meta.isError)
+    return (
+      <EmptyState
+        title="فرم مرخصی در دسترس نیست"
+        description={errorMessage(meta.error, "خواندن اطلاعات فرم ممکن نشد.")}
+      />
+    );
   if (!meta.data) return <Skeleton rows={3} />;
   return (
-    <section className="leave-card" aria-label="درخواست مرخصی تازه">
+    <form
+      className="leave-card"
+      aria-label="درخواست مرخصی تازه"
+      noValidate
+      onSubmit={(event) => {
+        event.preventDefault();
+        setTouched(true);
+        if (
+          hasErrors(formErrors(values)) ||
+          create.isPending ||
+          uploads.pending.length ||
+          duration.pending ||
+          duration.error
+        )
+          return;
+        create.mutate(formPayload(values) as LeaveFormValues, {
+          onSuccess: (row) => {
+            onDone();
+            navigate(`/leave-requests/${row.id}`);
+          },
+        });
+      }}
+    >
       <h2>درخواست مرخصی تازه</h2>
+      <p className="leave-form-intro">۱. بازه را مشخص کنید · ۲. پیش‌نمایش را بررسی کنید · ۳. امضا و ارسال برای تأیید</p>
+      {!meta.data.has_workflow && (
+        <p className="leave-notice" role="status">
+          مسیر تأیید مرخصی هنوز آماده نیست. می‌توانید پیش‌نویس را ذخیره کنید؛ ارسال برای تأیید پس از تنظیم مسیر توسط مدیر
+          سامانه ممکن می‌شود.
+        </p>
+      )}
       <LeaveForm
         values={values}
         errors={errors}
         members={meta.data.members}
         durationText={duration.text}
         durationError={duration.error}
+        calculating={duration.pending}
+        disabled={create.isPending}
         attachments={files}
         pending={uploads.pending}
         attachmentConfig={meta.data.attachment}
@@ -115,17 +152,8 @@ function NewRequest({ onDone }: { onDone: () => void }) {
       />
       <div className="leave-actions">
         <Button
-          disabled={create.isPending || uploads.pending.length > 0}
-          onClick={() => {
-            setTouched(true);
-            if (hasErrors(formErrors(values))) return;
-            create.mutate(formPayload(values) as LeaveFormValues, {
-              onSuccess: (row) => {
-                onDone();
-                navigate(`/leave-requests/${row.id}`);
-              },
-            });
-          }}
+          type="submit"
+          disabled={create.isPending || uploads.pending.length > 0 || duration.pending || Boolean(duration.error)}
         >
           ذخیرهٔ پیش‌نویس و رفتن به پیش‌نمایش
         </Button>
@@ -133,7 +161,8 @@ function NewRequest({ onDone }: { onDone: () => void }) {
           انصراف
         </Button>
       </div>
-    </section>
+      {create.isError && <ErrorNotice message={errorMessage(create.error, "ذخیرهٔ درخواست ممکن نشد.")} />}
+    </form>
   );
 }
 
@@ -173,12 +202,31 @@ export default function LeaveRequestsPage() {
         eyebrow="مرخصی"
         title="درخواست‌های مرخصی"
         description="درخواست روزانه یا ساعتی ثبت کنید؛ مدت با تقویم کاری شما محاسبه می‌شود و پس از امضا در مسیر تأیید قرار می‌گیرد."
-        actions={canCreate && !creating && <Button onClick={() => setCreating(true)}>درخواست تازه</Button>}
+        actions={
+          <>
+            {(access?.can("Report.View") || access?.can("Report.ViewAll")) && (
+              <Link className="button button-secondary" to="/reports/source/leave">
+                گزارش مرخصی و عدم حضور
+              </Link>
+            )}
+            {canCreate && !creating && <Button onClick={() => setCreating(true)}>درخواست تازه</Button>}
+          </>
+        }
       />
       {creating && <NewRequest onDone={() => setCreating(false)} />}
       {canCreate && <MySignatureSection />}
       <TabBar items={tabs} active={scope} onChange={setScope} />
-      {rows.isLoading ? <Skeleton rows={5} /> : <LeaveRequestList rows={rows.data ?? []} />}
+      {rows.isLoading ? (
+        <Skeleton rows={5} />
+      ) : rows.isError ? (
+        <EmptyState
+          title="دریافت درخواست‌ها ممکن نشد"
+          description={errorMessage(rows.error, "دوباره تلاش کنید.")}
+          action={<Button onClick={() => rows.refetch()}>تلاش دوباره</Button>}
+        />
+      ) : (
+        <LeaveRequestList rows={rows.data ?? []} />
+      )}
     </div>
   );
 }

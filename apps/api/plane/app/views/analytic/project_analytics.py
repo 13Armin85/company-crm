@@ -131,7 +131,7 @@ class ProjectAdvanceAnalyticsStatsEndpoint(ProjectAdvanceAnalyticsBaseView):
         else:
             base_queryset = Issue.issue_objects.filter(**self.filters["base_filters"], project_id=project_id)
         return (
-            base_queryset.annotate(display_name=F("assignees__display_name"))
+            base_queryset.values("id").annotate(display_name=F("assignees__display_name"))
             .annotate(assignee_id=F("assignees__id"))
             .annotate(avatar=F("assignees__avatar"))
             .annotate(

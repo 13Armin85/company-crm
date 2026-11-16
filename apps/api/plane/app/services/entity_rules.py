@@ -272,6 +272,9 @@ def normalize(field, value):
             return value
         if not isinstance(value, str) or len(value) > (100000 if kind in {"long_text", "rich_text"} else 4096):
             raise ValueError()
+        if kind == "email":
+            value = value.strip()
+            error = "ایمیل معتبر وارد کنید."
         if len(value) < config.get("min_length", 0) or len(value) > config.get("max_length", 100000):
             raise ValueError()
         if config.get("regex"):

@@ -1,3 +1,4 @@
+import { ScrollableTable } from "@plane/ui";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { Dialog, DialogPanel, DialogTitle } from "@headlessui/react";
@@ -374,7 +375,9 @@ export function PageEditor({
       /* Retain unsaved edits after validation or revision conflict. */
     }
   };
-  const currentMode = (tableOnly || mode === "columns") && surface.native_columns.length ? "columns" : "form";
+  const hasForm = Boolean(surface.native_fields.length || bindingList.length || form);
+  const currentMode =
+    (tableOnly || mode === "columns" || !hasForm) && surface.native_columns.length ? "columns" : "form";
   const reloadLatest = async () => {
     const result = await query.refetch();
     if (!result.data || result.error) return;
@@ -403,17 +406,19 @@ export function PageEditor({
       )}
       {!tableOnly && (
         <div className="page-studio-tabs" role="tablist" aria-label="بخش طراحی">
-          <button
-            type="button"
-            role="tab"
-            id={`studio-form-${code}`}
-            aria-controls={`studio-panel-${code}`}
-            aria-selected={currentMode === "form"}
-            onClick={() => setMode("form")}
-          >
-            <FilePenLine size={17} />
-            فیلدهای فرم
-          </button>
+          {hasForm && (
+            <button
+              type="button"
+              role="tab"
+              id={`studio-form-${code}`}
+              aria-controls={`studio-panel-${code}`}
+              aria-selected={currentMode === "form"}
+              onClick={() => setMode("form")}
+            >
+              <FilePenLine size={17} />
+              فیلدهای فرم
+            </button>
+          )}
           {!!surface.native_columns.length && (
             <button
               type="button"
@@ -489,7 +494,55 @@ export function PageEditor({
                     return (
                       <div className="studio-field-row" key={field.code}>
                         <div>
-                          <strong>{field.title}</strong>
+                          <input
+                            aria-label={`عنوان ${field.aliases[0] || field.title}`}
+                            value={config.title ?? field.title}
+                            maxLength={255}
+                            onChange={(event) =>
+                              setDraft({
+                                ...draft,
+                                native: {
+                                  ...draft.native,
+                                  [field.code]: { ...draft.native[field.code], title: event.target.value },
+                                },
+                              })
+                            }
+                          />
+                          <details className="studio-native-help">
+                            <summary>متن نمونه و راهنمای ورودی</summary>
+                            <label>
+                              متن نمونه
+                              <input
+                                value={config.placeholder || ""}
+                                maxLength={255}
+                                onChange={(event) =>
+                                  setDraft({
+                                    ...draft,
+                                    native: {
+                                      ...draft.native,
+                                      [field.code]: { ...draft.native[field.code], placeholder: event.target.value },
+                                    },
+                                  })
+                                }
+                              />
+                            </label>
+                            <label>
+                              راهنما
+                              <textarea
+                                value={config.help_text || ""}
+                                maxLength={2000}
+                                onChange={(event) =>
+                                  setDraft({
+                                    ...draft,
+                                    native: {
+                                      ...draft.native,
+                                      [field.code]: { ...draft.native[field.code], help_text: event.target.value },
+                                    },
+                                  })
+                                }
+                              />
+                            </label>
+                          </details>
                           <small>
                             {designer.field_types.find((type) => type.id === field.kind)?.title || "ورودی اصلی"}
                           </small>
@@ -510,7 +563,7 @@ export function PageEditor({
                         <StudioSwitch
                           title={`الزامی بودن ${field.title}`}
                           checked={config.required}
-                          disabled={field.locked || Boolean(config.hidden)}
+                          disabled={surface.presentation_only || field.locked || Boolean(config.hidden)}
                           reason={
                             field.lock_reason ||
                             (config.hidden ? "فیلد پنهان در فرم از کاربر دریافت نمی‌شود." : undefined)
@@ -761,7 +814,7 @@ export function PageEditor({
           <h3>پیش‌نمایش ستون‌ها</h3>
           <p>از راست به چپ، همین ستون‌ها پس از ذخیره برای کاربران این صفحه نمایش داده می‌شوند.</p>
           <div className="studio-table-preview-scroll">
-            <table>
+            <ScrollableTable>
               <thead>
                 <tr>
                   {columns.map((column) => (
@@ -776,7 +829,7 @@ export function PageEditor({
                   ))}
                 </tr>
               </tbody>
-            </table>
+            </ScrollableTable>
           </div>
         </section>
       )}

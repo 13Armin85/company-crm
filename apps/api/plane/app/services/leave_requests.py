@@ -739,16 +739,16 @@ def document_values(row, version, now=None):
     full_name = " ".join(part for part in (user.first_name, user.last_name) if part).strip()
     return {
         "employee_name": user.display_name or full_name or user.username,
-        "employee_id": record.number if record else user.username,
-        "unit": "، ".join(sorted(unit.title for unit in units)) or "—",
+        "employee_id": (record.number if record else None) or user.username or str(user.id),
+        "unit": "، ".join(sorted(unit.title for unit in units)) or "واحد سازمانی در حساب کاربر ثبت نشده است",
         "start": fa_date(version.start_date),
         "end": fa_date(version.end_date),
         "mode": MODE_TITLES[version.mode],
-        "start_time": fa(start.strftime("%H:%M")) if hourly else "",
-        "end_time": fa(end.strftime("%H:%M")) if hourly else "",
+        "start_time": fa(start.strftime("%H:%M")) if hourly else "روز کامل؛ ساعت لازم نیست",
+        "end_time": fa(end.strftime("%H:%M")) if hourly else "روز کامل؛ ساعت لازم نیست",
         "duration": duration_text(version.mode, version.duration_days, version.duration_minutes),
-        "reason": version.reason or "—",
-        "substitute": engine.user_name(version.substitute) if version.substitute_id else "—",
+        "reason": version.reason or "دلیلی توسط درخواست‌دهنده ثبت نشده است",
+        "substitute": engine.user_name(version.substitute) if version.substitute_id else "جانشین پیشنهاد نشده است",
         "submitted_at": f"{fa_date(submitted.date())} ساعت {fa(submitted.strftime('%H:%M'))}",
         "request_number": row.number,
     }

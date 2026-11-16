@@ -11,6 +11,7 @@
 @import "./ticket.css";
 @import "./leave.css";
 @import "./portal.css";
+@import "./reports.css";
 * {
   box-sizing: border-box;
 }

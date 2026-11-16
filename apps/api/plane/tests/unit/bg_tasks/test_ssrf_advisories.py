@@ -118,7 +118,7 @@ class TestWebhookPatchContextGuard:
         ser = self._serializer_with_request("myplane.example.com")
         with patch("plane.utils.ip_address.socket.getaddrinfo") as dns:
             dns.return_value = [_addr("93.184.216.34")]  # public, so only the host guard can block
-            with pytest.raises(Exception, match="not allowed"):
+            with pytest.raises(Exception, match="ممنوع"):
                 ser._validate_webhook_url("https://myplane.example.com/hook")
 
     def test_unrelated_public_host_passes_with_context(self):

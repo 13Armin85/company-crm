@@ -5,6 +5,8 @@ import {
   CalendarOff,
   CheckSquare2,
   CircleHelp,
+  ClipboardList,
+  FileBarChart,
   Database,
   FileText,
   FolderKanban,
@@ -38,6 +40,7 @@ export const shellGroups: ShellGroup[] = [
       { to: "/", label: "داشبورد", icon: Home, end: true },
       { to: "/inbox", label: "صندوق ورودی", icon: Inbox },
       { to: "/my-work", label: "کارهای من", icon: ListTodo },
+      { to: "/daily-report", label: "گزارش روزانه", icon: ClipboardList, end: true },
       { to: "/workflow-inbox", label: "منتظر اقدام من", icon: Workflow },
       { to: "/leave-requests", label: "درخواست مرخصی", icon: CalendarOff },
       { to: "/calendar", label: "تقویم", icon: CalendarDays },
@@ -51,6 +54,16 @@ export const shellGroups: ShellGroup[] = [
     items: [
       { to: "/issues", label: "همه کارها", icon: CheckSquare2 },
       { to: "/projects", label: "پروژه‌ها", icon: FolderKanban },
+    ],
+  },
+  {
+    id: "reports",
+    label: "گزارش‌ها",
+    title: "گزارش‌ها",
+    icon: FileBarChart,
+    items: [
+      { to: "/reports", label: "گزارش‌ها", icon: FileBarChart },
+      { to: "/daily-report/team", label: "گزارش روزانهٔ تیم", icon: Users },
     ],
   },
   {
@@ -95,8 +108,15 @@ const matches = (item: ShellItem, pathname: string) =>
 /** Picks the group that owns a path; project pages belong to "work", record pages to "data". */
 export function groupForPath(pathname: string): string {
   if (pathname.startsWith("/entities")) return "data";
-  const owner = shellGroups.find((group) => group.items.some((item) => item.to !== "/" && matches(item, pathname)));
+  // The most specific item wins (e.g. "/daily-report/team" belongs to reports, "/daily-report" to home).
+  const owner = shellGroups
+    .flatMap((group) =>
+      group.items.filter((item) => item.to !== "/" && matches(item, pathname)).map((item) => ({ group, item }))
+    )
+    // eslint-disable-next-line unicorn/no-array-sort -- ES2022 has no toSorted; flatMap produces a new array.
+    .sort((a, b) => b.item.to.length - a.item.to.length)[0]?.group;
   if (owner) return owner.id;
+  if (pathname.startsWith("/daily-report")) return "home";
   if (pathname.startsWith("/edit") || pathname.startsWith("/projects")) return "work";
   return "home";
 }
@@ -106,6 +126,7 @@ export function iconForPath(pathname: string): LucideIcon {
   const items = shellGroups.flatMap((group) => group.items);
   const best = items
     .filter((item) => item.to !== "/" && matches(item, pathname))
+    // eslint-disable-next-line unicorn/no-array-sort -- ES2022 has no toSorted; filter produces a new array.
     .sort((a, b) => b.to.length - a.to.length)[0];
   if (best) return best.icon;
   if (pathname === "/") return Home;

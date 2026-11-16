@@ -325,6 +325,21 @@ def test_overlapping_active_request_is_rejected_but_rejected_or_cancelled_is_not
 # ------------------------------------------------------------------ 4/5. templates and document data
 
 
+def test_word_form_explains_missing_optional_values_without_fabricating_information(org):
+    employee, workspace = org["other"], org["workspace"]
+    created = client_for(employee).post(base(workspace, "requests/"), daily(reason=""), format="json")
+    assert created.status_code == 201, created.data
+    row = LeaveRequest.objects.get(id=created.data["id"])
+    values = leave.document_values(row, leave.current_version(row), NOW)
+    assert values["unit"] == "واحد سازمانی در حساب کاربر ثبت نشده است"
+    assert values["reason"] == "دلیلی توسط درخواست‌دهنده ثبت نشده است"
+    assert values["substitute"] == "جانشین پیشنهاد نشده است"
+    assert values["start_time"] == values["end_time"] == "روز کامل؛ ساعت لازم نیست"
+    html = documents.to_html(documents.render(documents.build_sample_template(), values))
+    assert all(values[key] in html for key in ("unit", "reason", "substitute", "start_time"))
+    assert "{{" not in html
+
+
 def test_template_validation_blocks_incomplete_invalid_corrupt_expired_and_deprecated(org):
     admin, workspace = org["admin"], org["workspace"]
     assert upload_template(org["employee"], workspace).status_code == 403

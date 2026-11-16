@@ -1,3 +1,4 @@
+import { ScrollableTable } from "@plane/ui";
 /** Workflow designer of one record type: ordered steps and transitions, check, dry run and publish. */
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
@@ -111,7 +112,7 @@ export function PathPreview({
 
 export function SimulationResult({ path }: { path: SimulatedStep[] }) {
   return (
-    <table className="workflow-simulation" aria-label="نتیجهٔ آزمایش">
+    <ScrollableTable className="workflow-simulation" aria-label="نتیجهٔ آزمایش">
       <thead>
         <tr>
           <th>مرحله</th>
@@ -137,7 +138,7 @@ export function SimulationResult({ path }: { path: SimulatedStep[] }) {
           </tr>
         ))}
       </tbody>
-    </table>
+    </ScrollableTable>
   );
 }
 
@@ -704,6 +705,7 @@ function DefinitionEditor({
     setGraph(version.graph);
     setIssues(null);
     setPath(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Only switching version identity should reset the local graph; a refetch of this version must preserve edits.
   }, [version.id]);
   const readOnly = !version.is_editable || !canDesign;
   const conditionFields = useMemo(
@@ -1012,6 +1014,7 @@ export function WorkflowDesigner({ entity }: { entity: string }) {
   if (!meta.data || !access?.can("Workflow.View"))
     return <p role="status">برای مشاهدهٔ گردش‌کارها از مدیر سامانه دسترسی بگیرید.</p>;
   // Active first, then the standard path before the fast path, so the default selection is predictable.
+  // eslint-disable-next-line unicorn/no-array-sort -- The web app targets ES2022; sorting a copy preserves the cached definitions.
   const rows = [...(definitions.data || [])].sort(
     (a, b) => Number(b.is_active) - Number(a.is_active) || Number(a.kind !== "standard") - Number(b.kind !== "standard")
   );

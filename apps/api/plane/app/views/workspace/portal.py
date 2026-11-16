@@ -62,6 +62,20 @@ class PortalSettingsEndpoint(TicketAPIView):
         return Response({"settings": portal_settings.save(workspace, request.user, request.data)})
 
 
+class PortalRequestListEndpoint(TicketAPIView):
+    @require_any_permission(
+        "Portal.Request.Triage",
+        "Portal.Reply",
+        "Portal.Account.Manage",
+        "Portal.Settings.Manage",
+        "Portal.Feedback.View",
+        "Quote.Manage",
+    )
+    def get(self, request, slug):
+        workspace = self.workspace(slug)
+        return Response(portal_requests.internal_list(workspace, request.user, request.query_params, request))
+
+
 class PortalAccountListEndpoint(TicketAPIView):
     @require_permission("Portal.Account.Manage")
     def get(self, request, slug):

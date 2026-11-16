@@ -64,8 +64,22 @@ def ensure_directory_record(entity, native, subtype=None):
 
     with transaction.atomic():
         Workspace.objects.select_for_update().get(id=entity.workspace_id)
-        row = EntityRecord.objects.filter(entity=entity, source_id=native.id).first()
+        # Source identity is unique even after soft deletion. Rejoining an active
+        # account reuses its directory record; revoked roles and memberships are
+        # maintained by their own tables and are never restored here.
+        row = EntityRecord.all_objects.filter(entity=entity, source_id=native.id).first()
         if row:
+            if (
+                entity.adapter == "user" and (row.deleted_at is not None or not row.is_active)
+                and WorkspaceMember.objects.filter(
+                    workspace_id=entity.workspace_id, member_id=native.id,
+                    is_active=True, member__is_active=True,
+                ).exists()
+            ):
+                row.deleted_at = None
+                row.is_active = True
+                row.revision += 1
+                row.save(update_fields=["deleted_at", "is_active", "revision", "updated_at"])
             return row
         counter = SystemIdentifierCounter.locked(f"entity:{entity.id}", "default")
         form = FormLayout.objects.filter(entity=entity).first()

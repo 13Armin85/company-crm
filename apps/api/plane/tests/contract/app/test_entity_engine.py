@@ -667,10 +667,10 @@ def test_unused_category_and_entity_can_be_deleted_without_losing_audit(engine):
     assert EntityEvent.objects.filter(event_type="definition.entities.deleted").exists()
 
 
-def test_native_ticket_task_leave_and_dynamic_business_choices(engine):
+def test_native_project_work_standalone_work_leave_and_dynamic_business_choices(engine):
     from django.utils import timezone
     from datetime import timedelta
-    from plane.db.models import Issue, WorkspaceTask, UserAbsence
+    from plane.db.models import Issue, UserAbsence
 
     workspace, actor, client = engine
     project = create_record(
@@ -689,10 +689,11 @@ def test_native_ticket_task_leave_and_dynamic_business_choices(engine):
     LookupValue.objects.create(category=statuses, code="custom_status", title="وضعیت تازه")
     task = create_record(
         engine,
-        EntityType.objects.get(workspace=workspace, code="task"),
-        {"title": "وظیفه واقعی", "assignee": str(actor.id), "task_status": "custom_status"},
+        EntityType.objects.get(workspace=workspace, code="ticket"),
+        {"title": "کار مستقل واقعی", "ticket_assignees": [str(actor.id)], "ticket_state": "custom_status"},
     )
-    assert WorkspaceTask.objects.get(id=task["id"]).status == "custom_status"
+    assert Issue.objects.get(id=task["id"]).status == "custom_status"
+    assert Issue.objects.get(id=task["id"]).project_id is None
     leave = create_record(
         engine,
         EntityType.objects.get(workspace=workspace, code="leave"),

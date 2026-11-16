@@ -17,6 +17,44 @@ def django_db_setup(django_db_setup):  # noqa: F811
 
 
 @pytest.fixture
+def migration_database(django_db_blocker, django_db_use_migrations):
+    """Start migration contracts on an empty database, without reversing later data migrations.
+
+    These tests deliberately do not request ``db`` or ``django_db``: pytest's
+    normal database setup would apply every migration before the test can seed
+    its historical schema. Every invocation owns and removes only its uniquely
+    named scratch database; the normal test database remains available to the
+    rest of the suite.
+    """
+    from uuid import uuid4
+    from django.db import connection
+
+    if not django_db_use_migrations:
+        pytest.skip("Run migration contracts with --migrations --create-db.")
+    if connection.vendor != "postgresql":
+        pytest.skip("Migration contracts require the isolated PostgreSQL test stack.")
+
+    original_name = connection.settings_dict["NAME"]
+    scratch_name = f"test_plane_migration_{uuid4().hex}"
+    quoted_name = connection.ops.quote_name(scratch_name)
+    created = False
+    with django_db_blocker.unblock():
+        connection.close()
+        try:
+            with connection._nodb_cursor() as cursor:
+                cursor.execute(f"CREATE DATABASE {quoted_name}")
+            created = True
+            connection.settings_dict["NAME"] = scratch_name
+            yield
+        finally:
+            connection.close()
+            connection.settings_dict["NAME"] = original_name
+            if created:
+                with connection._nodb_cursor() as cursor:
+                    cursor.execute(f"DROP DATABASE {quoted_name}")
+
+
+@pytest.fixture
 def api_client():
     """Return an unauthenticated API client"""
     return APIClient()

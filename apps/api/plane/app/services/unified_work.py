@@ -17,9 +17,9 @@ def canonical_entity(entity):
 
 
 def work_status(native):
-    return (
-        str(native.state_id) if native.project_id and native.state_id else native.status
-    )
+    if native.project_id:
+        return str(native.state_id) if native.state_id else None
+    return native.status
 
 
 def work_status_expression():

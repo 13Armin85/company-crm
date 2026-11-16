@@ -1,3 +1,4 @@
+import { ScrollableTable } from "@plane/ui";
 import { useEffect } from "react";
 import { AccessModal } from "../access/components";
 import { errorMessage } from "../api";
@@ -36,7 +37,7 @@ export function DeletePreviewContent({ preview }: { preview: DeletePreview }) {
   return (
     <div className="engine-delete-preview">
       {preview.impacts.length ? (
-        <table>
+        <ScrollableTable>
           <thead>
             <tr>
               <th>ارتباط</th>
@@ -58,7 +59,7 @@ export function DeletePreviewContent({ preview }: { preview: DeletePreview }) {
               </tr>
             ))}
           </tbody>
-        </table>
+        </ScrollableTable>
       ) : (
         <p>این رکورد پیوند فعالی ندارد.</p>
       )}

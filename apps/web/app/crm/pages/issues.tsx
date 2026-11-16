@@ -22,6 +22,7 @@ import { toFa } from "../utils";
 import { useTasksTable } from "../table-hooks";
 import { useDebouncedValue, useTablePaging } from "../table-query";
 import { TablePagination } from "../table-pagination";
+import { ErrorState } from "../error-state";
 
 export default function IssuesPage() {
   const [view, setView] = useState<"list" | "board">("list");
@@ -84,7 +85,7 @@ export default function IssuesPage() {
   if (accessLoading) return <Skeleton rows={7} />;
   if (!access?.can("Issue.View")) return <Navigate to="/my-work" replace />;
   return (
-    <div>
+    <div className="issues-page">
       <PageHeader
         eyebrow="مرکز کارها"
         title="همه کارها"
@@ -97,95 +98,117 @@ export default function IssuesPage() {
           ) : undefined
         }
       />
-      {!isAdmin && (
-        <TabBar
-          chooserKey="issues-status"
-          active={tab}
-          onChange={setTab}
-          items={[
-            { id: "received", label: "دریافتی‌های فعلی", count: counts.received },
-            { id: "history", label: "تاریخچهٔ من (همهٔ زمان‌ها)", count: counts.history },
-            { id: "sent", label: "ارسالی‌های من", count: counts.sent },
-          ]}
-        />
-      )}
-      <TicketPresetBar value={preset} counts={table.data?.preset_counts} onChange={setPreset} />
-      <div className="content-toolbar issues-toolbar">
-        <div className="view-switcher">
-          <button className={view === "list" ? "active" : ""} onClick={() => setView("list")}>
-            <List size={17} /> لیست
-          </button>
-          <button className={view === "board" ? "active" : ""} onClick={() => setView("board")}>
-            <LayoutDashboard size={17} /> برد کانبان
-          </button>
+      <section className="panel work-list-panel" aria-label="فهرست همهٔ کارها">
+        <div className="work-list-heading">
+          <div>
+            <h2>فهرست کارها</h2>
+            <p>عنوان کار را برای ویرایش انتخاب کنید؛ سایر اقدامها در منوی عملیات هر ردیف قرار دارند.</p>
+          </div>
+          <div className="view-switcher" aria-label="نمای کارها">
+            <button
+              type="button"
+              aria-pressed={view === "list"}
+              className={view === "list" ? "active" : ""}
+              onClick={() => setView("list")}
+            >
+              <List size={17} /> لیست
+            </button>
+            <button
+              type="button"
+              aria-pressed={view === "board"}
+              className={view === "board" ? "active" : ""}
+              onClick={() => setView("board")}
+            >
+              <LayoutDashboard size={17} /> برد کانبان
+            </button>
+          </div>
         </div>
-        <div className="toolbar-actions">
-          <SearchBox value={query} onChange={setQuery} placeholder="جستجو در کارها..." />
-          <DataFilterButton
-            count={issueFilterCount(filters)}
-            open={filterOpen}
-            onClick={() => {
-              setDraft(filters);
-              setFilterOpen(true);
+        <div className="work-list-controls">
+          {!isAdmin && (
+            <TabBar
+              chooserKey="issues-status"
+              active={tab}
+              onChange={setTab}
+              items={[
+                { id: "received", label: "دریافتی‌های فعلی", count: counts.received },
+                { id: "history", label: "تاریخچهٔ من (همهٔ زمان‌ها)", count: counts.history },
+                { id: "sent", label: "ارسالی‌های من", count: counts.sent },
+              ]}
+            />
+          )}
+          <div className="content-toolbar issues-toolbar">
+            <TicketPresetBar value={preset} counts={table.data?.preset_counts} onChange={setPreset} />
+            <div className="toolbar-actions">
+              <SearchBox value={query} onChange={setQuery} placeholder="جستجوی عنوان، شناسه یا فرستنده…" />
+              <DataFilterButton
+                count={issueFilterCount(filters)}
+                open={filterOpen}
+                onClick={() => {
+                  setDraft(filters);
+                  setFilterOpen(true);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+        {!loading && (
+          <p className="filter-results" role="status">
+            {toFa(table.data?.count ?? 0)} از {toFa(counts[activeTab] ?? 0)} کار
+          </p>
+        )}
+        {filterOpen && (
+          <IssueFilterDialog
+            filters={filters}
+            issues={filtered}
+            projects={projects}
+            members={members}
+            query={query}
+            today={today}
+            timeZone={currentUser?.timeZone}
+            loading={preview.isFetching || membersLoading}
+            serverCount={preview.data?.count ?? 0}
+            onDraftChange={setDraft}
+            onClose={() => setFilterOpen(false)}
+            onApply={(next) => {
+              setFilters(next);
+              setFilterOpen(false);
             }}
           />
-        </div>
-      </div>
-      {!loading && (
-        <p className="filter-results" role="status">
-          {toFa(table.data?.count ?? 0)} از {toFa(counts[activeTab] ?? 0)} کار
-        </p>
-      )}
-      {filterOpen && (
-        <IssueFilterDialog
-          filters={filters}
-          issues={filtered}
-          projects={projects}
-          members={members}
-          query={query}
-          today={today}
-          timeZone={currentUser?.timeZone}
-          loading={preview.isFetching || membersLoading}
-          serverCount={preview.data?.count ?? 0}
-          onDraftChange={setDraft}
-          onClose={() => setFilterOpen(false)}
-          onApply={(next) => {
-            setFilters(next);
-            setFilterOpen(false);
-          }}
-        />
-      )}
-      {loading ? (
-        <Skeleton rows={7} />
-      ) : !filtered.length ? (
-        <EmptyState
-          title="کاری پیدا نشد"
-          description="جستجو یا انتخاب‌های دکمهٔ فیلتر را تغییر دهید، یا یک کار تازه بسازید."
-          action={
-            canCreate ? (
-              <Button icon={Plus} onClick={() => setCreate(true, "issue")}>
-                کار جدید
-              </Button>
-            ) : undefined
-          }
-        />
-      ) : view === "list" ? (
-        <div className="table-card issue-list-card">
-          <WorkTable issues={filtered} readOnly={!isAdmin && tab === "history"} />
-          {pager}
-        </div>
-      ) : (
-        <IssueKanbanBoard
-          issues={filtered}
-          onStatusChange={(issue, nextStatus) => updateStatus.mutate({ issue, status: nextStatus })}
-          readOnly={!isAdmin && tab === "history"}
-          onCreate={canCreate ? () => setCreate(true, "issue") : undefined}
-          transferMembers={members}
-          transferDisabled={reassign.isPending}
-          onAssigneeChange={(issue, assigneeId) => reassign.mutate({ issue, assigneeId })}
-        />
-      )}
-      {view === "board" && !loading && filtered.length > 0 && <div className="table-card">{pager}</div>}
+        )}
+        {loading ? (
+          <Skeleton rows={7} />
+        ) : table.error ? (
+          <ErrorState message="دریافت کارها انجام نشد." onRetry={() => void table.refetch()} />
+        ) : !filtered.length ? (
+          <EmptyState
+            title="کاری پیدا نشد"
+            description="جستجو یا انتخاب‌های دکمهٔ فیلتر را تغییر دهید، یا یک کار تازه بسازید."
+            action={
+              canCreate ? (
+                <Button icon={Plus} onClick={() => setCreate(true, "issue")}>
+                  کار جدید
+                </Button>
+              ) : undefined
+            }
+          />
+        ) : view === "list" ? (
+          <div className="table-card issue-list-card">
+            <WorkTable issues={filtered} readOnly={!isAdmin && tab === "history"} />
+            {pager}
+          </div>
+        ) : (
+          <IssueKanbanBoard
+            issues={filtered}
+            onStatusChange={(issue, nextStatus) => updateStatus.mutate({ issue, status: nextStatus })}
+            readOnly={!isAdmin && tab === "history"}
+            onCreate={canCreate ? () => setCreate(true, "issue") : undefined}
+            transferMembers={members}
+            transferDisabled={reassign.isPending}
+            onAssigneeChange={(issue, assigneeId) => reassign.mutate({ issue, assigneeId })}
+          />
+        )}
+        {view === "board" && !loading && filtered.length > 0 && <div className="table-card">{pager}</div>}
+      </section>
     </div>
   );
 }

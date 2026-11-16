@@ -48,12 +48,20 @@ def test_removing_workspace_membership_preserves_global_identity(session_client,
     assert session_client.delete(f"/api/workspaces/{workspace.slug}/members/{membership_id}/").status_code == 204
 
     user = User.objects.get(email="first-owner@example.com")
-    assert user.username == "reusable.username"
-    assert user.is_active
+    assert user.username.startswith("deleted-")
+    assert not user.is_active
     assert not WorkspaceMember.objects.filter(id=membership_id).exists()
     deleted = WorkspaceMember.all_objects.get(id=membership_id)
     assert not deleted.is_active
     assert deleted.deleted_at is not None
+    assert deleted.member_id == user.id
+    replacement = session_client.post(
+        f"/api/workspaces/{workspace.slug}/members/",
+        {"email": "replacement@example.com", "username": "reusable.username", "password": "StrongPassword!2026"},
+        format="json",
+    )
+    assert replacement.status_code == 201, replacement.data
+    assert User.objects.get(email="replacement@example.com").id != user.id
 
 
 @pytest.mark.django_db

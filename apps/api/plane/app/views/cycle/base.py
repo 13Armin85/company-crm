@@ -848,6 +848,7 @@ class CycleAnalyticsEndpoint(BaseAPIView):
                     workspace__slug=slug,
                     project_id=project_id,
                 )
+                .values("id")
                 .annotate(display_name=F("assignees__display_name"))
                 .annotate(assignee_id=F("assignees__id"))
                 .annotate(
@@ -945,6 +946,7 @@ class CycleAnalyticsEndpoint(BaseAPIView):
                     project_id=project_id,
                     workspace__slug=slug,
                 )
+                .values("id")
                 .annotate(display_name=F("assignees__display_name"))
                 .annotate(assignee_id=F("assignees__id"))
                 .annotate(

@@ -1,3 +1,4 @@
+import { ConfiguredFields, SurfaceTable } from "../engine/surface";
 /** Presentational parts of the leave request pages. They render server-provided flags only;
  * the server decides who may edit, sign or see anything. */
 import type { ReactNode } from "react";
@@ -30,23 +31,65 @@ export function LeaveStatusBadge({ status, label }: { status: LeaveStatus; label
   return <span className={`leave-status leave-status-${STATUS_TONES[status]}`}>{label || STATUS_LABELS[status]}</span>;
 }
 
+export function ReadyTemplateCard({
+  pending,
+  disabled,
+  error,
+  sampleHref,
+  onCreate,
+}: {
+  pending: boolean;
+  disabled?: boolean;
+  error?: string;
+  sampleHref: string;
+  onCreate: () => void;
+}) {
+  return (
+    <section className="leave-card" aria-label="قالب آمادهٔ مرخصی">
+      <h2>شروع با قالب آماده</h2>
+      <p className="workflow-muted">
+        قالب فارسی آماده، همهٔ جایگاه‌های لازم و محل امضا را دارد. آن را اضافه کنید و پس از بررسی، از فهرست نسخه‌ها فعال
+        کنید. برای استفاده از سربرگ شرکت، فایل دلخواه را در بخش بعد بارگذاری کنید.
+      </p>
+      <div className="leave-actions">
+        <Button variant="secondary" disabled={pending || disabled} onClick={onCreate}>
+          {pending ? "در حال افزودن قالب…" : "افزودن قالب آمادهٔ فارسی"}
+        </Button>
+        <a href={sampleHref}>دریافت فایل نمونه برای ویرایش</a>
+      </div>
+      {error && (
+        <p className="leave-error" role="alert">
+          {error}
+        </p>
+      )}
+    </section>
+  );
+}
+
 function Field({
   label,
   error,
   children,
   htmlFor,
+  hint,
 }: {
   label: string;
   error?: string;
   children: ReactNode;
   htmlFor?: string;
+  hint?: string;
 }) {
   return (
     <div className="leave-field">
       <label htmlFor={htmlFor}>{label}</label>
       {children}
+      {hint && (
+        <small id={htmlFor ? `${htmlFor}-hint` : undefined} className="leave-hint">
+          {hint}
+        </small>
+      )}
       {error && (
-        <small className="leave-error" role="alert">
+        <small id={htmlFor ? `${htmlFor}-error` : undefined} className="leave-error" role="alert">
           {error}
         </small>
       )}
@@ -60,6 +103,7 @@ export function LeaveForm({
   members,
   durationText,
   durationError,
+  calculating,
   attachments,
   pending,
   attachmentConfig,
@@ -73,6 +117,7 @@ export function LeaveForm({
   members: Person[];
   durationText: string;
   durationError?: string;
+  calculating?: boolean;
   /** Metadata of every file uploaded for this form; only those in ``values.attachments`` are shown. */
   attachments: LeaveAttachment[];
   pending?: PendingUpload[];
@@ -86,109 +131,145 @@ export function LeaveForm({
     onChange({ ...values, [key]: value });
   const hourly = values.mode === "hourly";
   return (
-    <div className="leave-form" dir="rtl">
-      <fieldset className="leave-mode" disabled={disabled}>
-        <legend>شیوهٔ مدت</legend>
-        {(Object.keys(MODE_LABELS) as LeaveFormValues["mode"][]).map((mode) => (
-          <label key={mode}>
-            <input
-              type="radio"
-              name="leave-mode"
-              value={mode}
-              checked={values.mode === mode}
-              onChange={() => set("mode", mode)}
-            />
-            {MODE_LABELS[mode]}
-          </label>
-        ))}
-        <small className="workflow-muted">این انتخاب فقط شیوهٔ ورود بازه را مشخص می‌کند.</small>
-      </fieldset>
-      <div className="leave-grid">
-        <Field label="تاریخ شروع" error={errors.start_date} htmlFor="leave-start-date">
-          <PersianDateInput
-            id="leave-start-date"
-            value={values.start_date}
-            disabled={disabled}
-            onChange={(value) =>
-              onChange({ ...values, start_date: value, end_date: values.end_date < value ? value : values.end_date })
-            }
-          />
-        </Field>
-        {hourly && (
-          <Field label="ساعت شروع" error={errors.start_time} htmlFor="leave-start-time">
-            <input
-              id="leave-start-time"
-              type="time"
-              value={values.start_time}
-              disabled={disabled}
-              onChange={(event) => set("start_time", event.target.value)}
-            />
-          </Field>
-        )}
-        <Field label="تاریخ پایان" error={errors.end_date} htmlFor="leave-end-date">
-          <PersianDateInput
-            id="leave-end-date"
-            value={values.end_date}
-            disabled={disabled}
-            onChange={(value) => set("end_date", value)}
-          />
-        </Field>
-        {hourly && (
-          <Field label="ساعت پایان" error={errors.end_time} htmlFor="leave-end-time">
-            <input
-              id="leave-end-time"
-              type="time"
-              value={values.end_time}
-              disabled={disabled}
-              onChange={(event) => set("end_time", event.target.value)}
-            />
-          </Field>
-        )}
-      </div>
-      <Field label="مدت محاسبه‌شده (طبق تقویم کاری شما)" error={durationError}>
-        <output className="leave-duration" aria-live="polite">
-          {durationText || "—"}
-        </output>
-      </Field>
-      <Field label="دلیل" error={errors.reason} htmlFor="leave-reason">
-        <textarea
-          id="leave-reason"
-          rows={3}
-          value={values.reason}
-          disabled={disabled}
-          onChange={(event) => set("reason", event.target.value)}
-        />
-      </Field>
-      <Field label="جانشین پیشنهادی" htmlFor="leave-substitute">
-        <select
-          id="leave-substitute"
-          value={values.substitute}
-          disabled={disabled}
-          onChange={(event) => set("substitute", event.target.value)}
-        >
-          <option value="">بدون جانشین</option>
-          {members.map((member) => (
-            <option key={member.id} value={member.id}>
-              {member.name}
-            </option>
+    <ConfiguredFields code="leave-requests">
+      <div className="leave-form" dir="rtl">
+        <fieldset className="leave-mode" disabled={disabled}>
+          <legend>بازهٔ مرخصی را چطور وارد می‌کنید؟</legend>
+          {(Object.keys(MODE_LABELS) as LeaveFormValues["mode"][]).map((mode) => (
+            <label key={mode}>
+              <input
+                type="radio"
+                name="leave-mode"
+                value={mode}
+                checked={values.mode === mode}
+                onChange={() => set("mode", mode)}
+              />
+              {MODE_LABELS[mode]}
+            </label>
           ))}
-        </select>
-      </Field>
-      <LeaveAttachments
-        items={attachments.filter((item) => values.attachments.includes(item.id))}
-        pending={pending}
-        config={attachmentConfig}
-        disabled={disabled}
-        hrefFor={attachmentHref}
-        onAdd={onAddFiles}
-        onRemove={(id) =>
-          set(
-            "attachments",
-            values.attachments.filter((item) => item !== id)
-          )
-        }
-      />
-    </div>
+          <small className="leave-hint">
+            برای یک یا چند روز کامل «روزانه» و برای بخشی از روز «ساعتی» را انتخاب کنید.
+          </small>
+        </fieldset>
+        <div className="leave-grid">
+          <Field
+            label="تاریخ شروع"
+            error={errors.start_date}
+            htmlFor="leave-start-date"
+            hint="روز آغاز مرخصی را از تقویم انتخاب کنید."
+          >
+            <PersianDateInput
+              id="leave-start-date"
+              label="تاریخ شروع مرخصی"
+              value={values.start_date}
+              disabled={disabled}
+              onChange={(value) =>
+                onChange({ ...values, start_date: value, end_date: values.end_date < value ? value : values.end_date })
+              }
+            />
+          </Field>
+          {hourly && (
+            <Field label="ساعت شروع" error={errors.start_time} htmlFor="leave-start-time">
+              <input
+                id="leave-start-time"
+                type="time"
+                value={values.start_time}
+                disabled={disabled}
+                aria-invalid={Boolean(errors.start_time)}
+                aria-describedby={errors.start_time ? "leave-start-time-error" : undefined}
+                onChange={(event) => set("start_time", event.target.value)}
+              />
+            </Field>
+          )}
+          <Field
+            label="تاریخ پایان"
+            error={errors.end_date}
+            htmlFor="leave-end-date"
+            hint="برای مرخصی یک‌روزه، تاریخ شروع و پایان یکسان است."
+          >
+            <PersianDateInput
+              id="leave-end-date"
+              label="تاریخ پایان مرخصی"
+              value={values.end_date}
+              disabled={disabled}
+              onChange={(value) => set("end_date", value)}
+            />
+          </Field>
+          {hourly && (
+            <Field label="ساعت پایان" error={errors.end_time} htmlFor="leave-end-time">
+              <input
+                id="leave-end-time"
+                type="time"
+                value={values.end_time}
+                disabled={disabled}
+                aria-invalid={Boolean(errors.end_time)}
+                aria-describedby={errors.end_time ? "leave-end-time-error" : undefined}
+                onChange={(event) => set("end_time", event.target.value)}
+              />
+            </Field>
+          )}
+        </div>
+        <Field label="مدت محاسبه‌شده (طبق تقویم کاری شما)" error={durationError}>
+          <output className="leave-duration" aria-live="polite">
+            {calculating
+              ? "در حال محاسبهٔ مدت…"
+              : durationText || "پس از انتخاب بازه، مدت مرخصی اینجا نمایش داده می‌شود."}
+          </output>
+        </Field>
+        <Field
+          label="دلیل مرخصی (اختیاری)"
+          error={errors.reason}
+          htmlFor="leave-reason"
+          hint="توضیح کوتاهی بنویسید تا مسئول تأیید درخواست را بهتر بررسی کند؛ حداکثر ۲۰۰۰ نویسه."
+        >
+          <textarea
+            id="leave-reason"
+            rows={3}
+            value={values.reason}
+            disabled={disabled}
+            placeholder="مثلاً: مراجعه به پزشک؛ کارهای فوری را پیش از شروع مرخصی تحویل می‌دهم."
+            maxLength={2000}
+            aria-invalid={Boolean(errors.reason)}
+            aria-describedby={`leave-reason-hint${errors.reason ? " leave-reason-error" : ""}`}
+            onChange={(event) => set("reason", event.target.value)}
+          />
+        </Field>
+        <Field
+          label="جانشین پیشنهادی (اختیاری)"
+          htmlFor="leave-substitute"
+          hint="اگر همکاری در زمان نبودن شما کارها را پیگیری می‌کند، او را انتخاب کنید."
+        >
+          <select
+            id="leave-substitute"
+            value={values.substitute}
+            disabled={disabled}
+            aria-describedby="leave-substitute-hint"
+            onChange={(event) => set("substitute", event.target.value)}
+          >
+            <option value="">انتخاب همکار جانشین؛ در صورت نیاز</option>
+            {members.map((member) => (
+              <option key={member.id} value={member.id}>
+                {member.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <LeaveAttachments
+          items={attachments.filter((item) => values.attachments.includes(item.id))}
+          pending={pending}
+          config={attachmentConfig}
+          disabled={disabled}
+          hrefFor={attachmentHref}
+          onAdd={onAddFiles}
+          onRemove={(id) =>
+            set(
+              "attachments",
+              values.attachments.filter((item) => item !== id)
+            )
+          }
+        />
+      </div>
+    </ConfiguredFields>
   );
 }
 
@@ -243,49 +324,53 @@ export function VersionList({
   onShow?: (version: LeaveVersion) => void;
 }) {
   return (
-    <table className="leave-table">
-      <thead>
-        <tr>
-          <th>نسخه</th>
-          <th>بازه</th>
-          <th>مدت</th>
-          <th>امضا</th>
-          <th>قالب</th>
-          <th>سند</th>
-        </tr>
-      </thead>
-      <tbody>
-        {versions.map((version) => (
-          <tr key={version.id}>
-            <td>
-              {version.number.toLocaleString("fa-IR")} {version.is_locked ? "(قفل)" : "(در حال ویرایش)"}
-            </td>
-            <td>{version.period_text}</td>
-            <td>{version.duration_text}</td>
-            <td>
-              {version.signed_at
-                ? `${version.signed_by?.name ?? ""} — ${new Date(version.signed_at).toLocaleString("fa-IR")}`
-                : "امضا نشده"}
-            </td>
-            <td>{version.template ? `نسخهٔ ${version.template.number.toLocaleString("fa-IR")}` : "—"}</td>
-            <td>
-              {version.has_document ? (
-                <span className="leave-actions">
-                  <a href={documentHref(version)}>دریافت Word</a>
-                  {onShow && (
-                    <Button variant="ghost" onClick={() => onShow(version)}>
-                      نمایش
-                    </Button>
-                  )}
-                </span>
-              ) : (
-                "—"
-              )}
-            </td>
+    <div className="leave-table-scroll" role="region" aria-label="نسخه‌ها و اسناد مرخصی" tabIndex={0}>
+      <SurfaceTable code="leave-versions" className="leave-table">
+        <thead>
+          <tr>
+            <th>نسخه</th>
+            <th>بازه</th>
+            <th>مدت</th>
+            <th>امضا</th>
+            <th>قالب</th>
+            <th>سند</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {versions.map((version) => (
+            <tr key={version.id}>
+              <td>
+                {version.number.toLocaleString("fa-IR")} {version.is_locked ? "(قفل)" : "(در حال ویرایش)"}
+              </td>
+              <td>{version.period_text}</td>
+              <td>{version.duration_text}</td>
+              <td>
+                {version.signed_at
+                  ? `${version.signed_by?.name ?? ""} — ${new Date(version.signed_at).toLocaleString("fa-IR")}`
+                  : "امضا نشده"}
+              </td>
+              <td>
+                {version.template ? `نسخهٔ ${version.template.number.toLocaleString("fa-IR")}` : "هنگام امضا ثبت می‌شود"}
+              </td>
+              <td>
+                {version.has_document ? (
+                  <span className="leave-actions">
+                    <a href={documentHref(version)}>دریافت Word</a>
+                    {onShow && (
+                      <Button variant="ghost" onClick={() => onShow(version)}>
+                        نمایش
+                      </Button>
+                    )}
+                  </span>
+                ) : (
+                  "فایل پس از امضا آماده می‌شود"
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </SurfaceTable>
+    </div>
   );
 }
 
@@ -345,26 +430,28 @@ export function MySignatureCard({
 
 export function PlaceholderTable({ placeholders }: { placeholders: TemplateOverview["placeholders"] }) {
   return (
-    <table className="leave-table">
-      <thead>
-        <tr>
-          <th>جایگاه</th>
-          <th>معنا</th>
-          <th>الزامی</th>
-        </tr>
-      </thead>
-      <tbody>
-        {placeholders.map((row) => (
-          <tr key={row.key}>
-            <td dir="ltr">
-              <code>{`{{${row.key}}}`}</code>
-            </td>
-            <td>{row.title}</td>
-            <td>{row.required ? "بله" : "خیر"}</td>
+    <div className="leave-table-scroll" role="region" aria-label="راهنمای جایگاه‌های Word" tabIndex={0}>
+      <SurfaceTable code="leave-placeholders" className="leave-table">
+        <thead>
+          <tr>
+            <th>جایگاه</th>
+            <th>معنا</th>
+            <th>الزامی</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {placeholders.map((row) => (
+            <tr key={row.key}>
+              <td dir="ltr">
+                <code>{`{{${row.key}}}`}</code>
+              </td>
+              <td>{row.title}</td>
+              <td>{row.required ? "بله" : "خیر"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </SurfaceTable>
+    </div>
   );
 }
 

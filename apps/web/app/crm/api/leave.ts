@@ -171,7 +171,21 @@ export const templateFileUrl = (slug: string | undefined, templateId: string) =>
   `${leavePath(slug)}templates/${templateId}/file/`;
 export const templateSampleUrl = (slug: string | undefined) => `${leavePath(slug)}templates/sample/`;
 
-const KEYS = ["leave-requests", "leave-request", "leave-preview", "leave-history", "workflow-record", "workflow-inbox"];
+const KEYS = [
+  "leave-requests",
+  "leave-request",
+  "leave-preview",
+  "leave-history",
+  "workflow-record",
+  "workflow-inbox",
+  "daily-day",
+  "daily-team",
+  "report-run",
+  "absences",
+  "work-calendar",
+  "dashboard-widget",
+  "dashboard-team",
+];
 
 function useLeaveMutation<T, R = unknown>(
   request: (slug: string, payload: T) => Promise<{ data: R }>,
@@ -246,13 +260,16 @@ export const useLeaveHistory = (id?: string) => {
   });
 };
 
-export const useLeaveDuration = () => {
+export const useLeaveDuration = (values: Partial<LeaveFormValues>, enabled = true) => {
   const slug = useSlug();
-  return useMutation({
-    mutationFn: async (
-      values: Partial<LeaveFormValues>
-    ): Promise<{ duration_days: number | null; duration_minutes: number | null; duration_text: string }> =>
-      (await api.post(`${leavePath(slug)}duration/`, values)).data,
+  return useQuery({
+    queryKey: ["leave-duration", slug, values],
+    enabled: Boolean(slug) && enabled,
+    retry: false,
+    queryFn: async ({
+      signal,
+    }): Promise<{ duration_days: number | null; duration_minutes: number | null; duration_text: string }> =>
+      (await api.post(`${leavePath(slug)}duration/`, values, { signal })).data,
   });
 };
 
@@ -311,6 +328,20 @@ export const useUploadTemplate = () =>
     },
     "نسخهٔ تازهٔ قالب بارگذاری شد؛ گزارش بررسی را ببینید.",
     "بارگذاری قالب انجام نشد",
+    ["leave-templates"]
+  );
+
+export const useCreateSampleTemplate = () =>
+  useLeaveMutation<void, LeaveTemplate>(
+    async (slug) => {
+      const sample = await api.get<Blob>(templateSampleUrl(slug), { responseType: "blob" });
+      const data = new FormData();
+      data.append("file", sample.data, "leave-form.docx");
+      data.append("title", "فرم آمادهٔ فارسی درخواست مرخصی");
+      return api.post(`${leavePath(slug)}templates/`, data);
+    },
+    "قالب آماده افزوده شد؛ نسخه را بررسی و سپس فعال کنید.",
+    "افزودن قالب آماده انجام نشد",
     ["leave-templates"]
   );
 

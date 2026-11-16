@@ -52,7 +52,6 @@ from .entity_records import (
     validate_reference,
     native_queryset,
     record_payload,
-    emit_definition,
 )
 
 
@@ -237,9 +236,7 @@ SURFACES = {
         "columns": [],
         "native": [
             native("new_password", "رمز عبور جدید", required=True, locked=True),
-            native(
-                "confirm_password", "تأیید رمز عبور جدید", required=True, locked=True
-            ),
+            native("confirm_password", "تأیید رمز عبور جدید", required=True, locked=True),
         ],
     },
     "exceptions": {
@@ -275,7 +272,10 @@ SURFACES = {
     },
 }
 
-DESIGNABLE_SURFACES = {"ticket", "project", "task", "leave", "users", "roles", "units", "routing", "cycles"}
+from .page_surfaces import page_surfaces
+
+SURFACES.update(page_surfaces(native))
+DESIGNABLE_SURFACES = set(SURFACES) - {"appearance"}
 
 WRITE_PERMISSIONS = {
     "users": {"POST": ("User.Create",), "PATCH": ("User.Edit",)},
@@ -311,30 +311,27 @@ def allowed(request, workspace, code, manage=False, records=False):
     spec = SURFACES[code]
     if spec["permission"] == "self" and not manage:
         return
-    permissions = ["FormDesigner.Publish"] if manage else [spec["permission"]]
+    permissions = ["FormDesigner.Publish"] if manage else [spec["permission"], *spec.get("read_permissions", [])]
     if not manage and not records:
         permissions += [
             "FormDesigner.Publish",
+            "FormDesigner.View",
             *{p for grants in WRITE_PERMISSIONS.get(code, {}).values() for p in grants},
         ]
     if code == "exceptions" and not manage:
         permissions.append("Access.UserException.View")
-    if not any(
-        has_permission(request.user, workspace, p, request=request) for p in permissions
-    ):
+    if not any(has_permission(request.user, workspace, p, request=request) for p in permissions):
         raise PermissionDenied("مجوز مشاهده یا تنظیم این صفحه را ندارید.")
 
 
 def configuration(workspace, code):
     # Both work pages share the same table tabs and fields after unification.
-    row = SurfaceConfiguration.objects.filter(
-        workspace=workspace, code="ticket" if code == "task" else code
-    ).first()
+    row = SurfaceConfiguration.objects.filter(workspace=workspace, code="ticket" if code == "task" else code).first()
     definition = deepcopy(row.definition) if row else {}
     definition.setdefault("native", {})
     definition.setdefault("fields", [])
     definition.setdefault(
-        "columns", [f"native:{title}" for title in SURFACES[code]["columns"]]
+        "columns", [f"native:{title}" for title in SURFACES[code].get("default_columns", SURFACES[code]["columns"])]
     )
     definition.setdefault("table_tabs", [])
     return row, definition
@@ -355,24 +352,18 @@ def extra_fields(workspace, definition):
         field["binding"] = binding
         if binding.get("title"):
             field["title"] = binding["title"]
-        field["config"].update(
-            {
-                key: binding[key]
-                for key in ("required", "hidden", "readonly")
-                if key in binding
-            }
-        )
+        field["config"].update({key: binding[key] for key in ("required", "hidden", "readonly") if key in binding})
         if "required" in binding:
             field["config"].pop("required_if", None)
         result[field["code"]] = field
     return result
 
 
-def surface_schema(workspace, code, user):
+def surface_schema(workspace, code, user, request=None):
     row, definition = configuration(workspace, code)
     spec = SURFACES[code]
     fields = extra_fields(workspace, definition)
-    roles = role_ids(user, workspace)
+    roles = role_ids(user, workspace) if fields else []
     fields = {
         key: field
         for key, field in fields.items()
@@ -381,47 +372,46 @@ def surface_schema(workspace, code, user):
     engine_fields = []
     form_definition = None
     if spec.get("engine"):
-        entity = EntityType.objects.filter(
-            workspace=workspace, code=spec["engine"], parent__isnull=True
-        ).first()
+        entity = EntityType.objects.filter(workspace=workspace, code=spec["engine"], parent__isnull=True).first()
         if entity:
-            if has_permission(user, workspace, "FormDesigner.Publish"):
-                form = (
-                    FormLayout.objects.filter(entity=entity)
-                    .select_related("published")
-                    .first()
-                )
+            if has_permission(user, workspace, "FormDesigner.Publish", request=request):
+                form = FormLayout.objects.filter(entity=entity).select_related("published").first()
                 form_definition = {
                     "revision": form.revision if form else 0,
                     "layout": deepcopy(
                         form.published.schema
                         if form and form.published_id
-                        else form.draft if form else {"tabs": [], "sections": []}
+                        else form.draft
+                        if form
+                        else {"tabs": [], "sections": []}
                     ),
                 }
-            engine_fields = [
-                {**f, "options_surface": entity.code}
-                for f in present_schema(entity, user)["fields"]
-            ]
+            engine_fields = [{**f, "options_surface": entity.code} for f in present_schema(entity, user)["fields"]]
     defaults = {}
     user._engine_workspace = workspace
     for field in fields.values():
-        field["config"]["readonly"] = field["config"].get(
-            "readonly", False
-        ) or not can_field(field, roles, edit=True)
+        field["config"]["readonly"] = field["config"].get("readonly", False) or not can_field(field, roles, edit=True)
         if field["is_active"] and field["kind"] != "computed":
             defaults[field["code"]] = default_value(field, user)
+    designer = designer_schema(workspace, spec.get("engine") or code, user, engine_fields, request=request)
+    if spec.get("presentation_only"):
+        designer["can_create_field"] = False
+        designer["create_field_reason"] = (
+            "عنوان، راهنما و نمایش ورودی‌های این فرم قابل تنظیم است؛ داده‌های آن از فرم اصلی ثبت می‌شوند."
+        )
     return {
         "code": code,
         "title": spec["title"],
         "path": spec["path"],
         "engine": spec.get("engine"),
+        "presentation_only": spec.get("presentation_only", False),
         "form": form_definition,
         "revision": row.revision if row else 0,
         "definition": definition,
         "native_fields": [
             {
                 **f,
+                "aliases": list(dict.fromkeys([*f["aliases"], f["title"]])),
                 **definition["native"].get(f["code"], {}),
                 "lock_reason": LOCK_REASON if f["locked"] else "",
             }
@@ -429,7 +419,7 @@ def surface_schema(workspace, code, user):
         ],
         "native_columns": spec["columns"],
         "engine_fields": engine_fields,
-        "designer": designer_schema(workspace, spec.get("engine") or code, user, engine_fields),
+        "designer": designer,
         "schema": {
             "entity": code,
             "time_zone": timezone.get_current_timezone_name(),
@@ -460,9 +450,7 @@ def validate_definition(workspace, code, definition):
         "table_tabs",
     }:
         raise ValidationError("ساختار تنظیمات صفحه معتبر نیست.")
-    if not isinstance(definition.get("native", {}), dict) or not isinstance(
-        definition.get("fields", []), list
-    ):
+    if not isinstance(definition.get("native", {}), dict) or not isinstance(definition.get("fields", []), list):
         raise ValidationError("فهرست فیلدهای فرم معتبر نیست.")
     definition = deepcopy(definition)
     definition.setdefault("native", {})
@@ -472,17 +460,30 @@ def validate_definition(workspace, code, definition):
         if (
             key not in native_map
             or not isinstance(patch, dict)
-            or set(patch) - {"required", "hidden"}
+            or set(patch) - {"required", "hidden", "title", "placeholder", "help_text"}
         ):
             raise ValidationError("فیلد اصلی یا تنظیم آن معتبر نیست.")
-        if any(not isinstance(v, bool) for v in patch.values()):
+        if any(not isinstance(v, bool) for k, v in patch.items() if k in {"required", "hidden"}):
             raise ValidationError("الزام و نمایش فیلد باید بله یا خیر باشد.")
-        if native_map[key]["locked"] and (
-            patch.get("hidden") or patch.get("required") is False
+        for option, limit in (("title", 255), ("placeholder", 255), ("help_text", 2000)):
+            if option in patch and (
+                not isinstance(patch[option], str)
+                or len(patch[option]) > limit
+                or (option == "title" and not patch[option].strip())
+            ):
+                raise ValidationError({key: "عنوان یا راهنمای ورودی معتبر نیست."})
+        if (
+            SURFACES[code].get("presentation_only")
+            and "required" in patch
+            and patch["required"] != native_map[key]["required"]
         ):
+            raise ValidationError({key: "الزام این ورودی از قواعد ثبت فرم اصلی پیروی می‌کند."})
+        if native_map[key]["locked"] and (patch.get("hidden") or patch.get("required") is False):
             raise ValidationError({key: "این ورودی برای عملیات اصلی سیستم ضروری است."})
     if len(definition["fields"]) > 200:
         raise ValidationError("حداکثر دویست فیلد در هر فرم مجاز است.")
+    if SURFACES[code].get("presentation_only") and definition["fields"]:
+        raise ValidationError("برای این فرم از تنظیمات ورودی‌های موجود استفاده کنید.")
     seen = set()
     for binding in definition["fields"]:
         if not isinstance(binding, dict) or set(binding) - {
@@ -497,16 +498,10 @@ def validate_definition(workspace, code, definition):
         if not isinstance(field, str) or field in seen or field in native_map:
             raise ValidationError("فیلد تکراری یا با ورودی اصلی هم‌نام است.")
         if "title" in binding and (
-            not isinstance(binding["title"], str)
-            or not binding["title"].strip()
-            or len(binding["title"]) > 255
+            not isinstance(binding["title"], str) or not binding["title"].strip() or len(binding["title"]) > 255
         ):
             raise ValidationError("عنوان فیلد باید بین یک تا ۲۵۵ نویسه باشد.")
-        if any(
-            not isinstance(v, bool)
-            for k, v in binding.items()
-            if k not in {"field", "title"}
-        ):
+        if any(not isinstance(v, bool) for k, v in binding.items() if k not in {"field", "title"}):
             raise ValidationError("تنظیم فیلد باید بله یا خیر باشد.")
         seen.add(field)
     fields = extra_fields(workspace, definition)
@@ -515,10 +510,7 @@ def validate_definition(workspace, code, definition):
     for field in fields.values():
         for key in ("required_if", "visible_if"):
             validate_condition(field["config"].get(key), fields)
-        if (
-            field["config"].get("depends_on")
-            and field["config"]["depends_on"] not in fields
-        ):
+        if field["config"].get("depends_on") and field["config"]["depends_on"] not in fields:
             raise ValidationError("فیلد والد باید در همین فرم موجود باشد.")
     compute(fields, {}, strict=False)
     engine_codes = set()
@@ -543,9 +535,7 @@ def validate_definition(workspace, code, definition):
         )
         for root in roots:
             for subtype in EntityType.objects.filter(parent=root, is_active=True):
-                choices |= {
-                    f"engine:{field}" for field in schema_fields(root, subtype)[1]
-                }
+                choices |= {f"engine:{field}" for field in schema_fields(root, subtype)[1]}
     columns = definition.get("columns")
     if (
         not isinstance(columns, list)
@@ -566,25 +556,13 @@ def validate_definition(workspace, code, definition):
         if not isinstance(tab, dict):
             raise ValidationError({error_key: "اطلاعات تب جدول معتبر نیست."})
         if not isinstance(tab.get("title"), str) or not tab["title"].strip():
-            raise ValidationError(
-                {
-                    f"{error_key}.title": "نام تب را وارد کنید؛ نام تب نمی‌تواند خالی باشد."
-                }
-            )
+            raise ValidationError({f"{error_key}.title": "نام تب را وارد کنید؛ نام تب نمی‌تواند خالی باشد."})
         if len(tab["title"]) > MAX_TAB_TITLE:
             raise ValidationError({f"{error_key}.title": "نام تب حداکثر ۸۰ نویسه است."})
         if tab["title"].strip().casefold() in titles:
-            raise ValidationError(
-                {
-                    f"{error_key}.title": "نام تب تکراری است؛ برای هر تب نام متفاوتی انتخاب کنید."
-                }
-            )
+            raise ValidationError({f"{error_key}.title": "نام تب تکراری است؛ برای هر تب نام متفاوتی انتخاب کنید."})
         if not tab.get("columns"):
-            raise ValidationError(
-                {
-                    f"{error_key}.columns": f"برای تب «{tab['title']}» حداقل یک ستون انتخاب کنید."
-                }
-            )
+            raise ValidationError({f"{error_key}.columns": f"برای تب «{tab['title']}» حداقل یک ستون انتخاب کنید."})
         if (
             not isinstance(tab, dict)
             or set(tab) != {"id", "title", "columns"}
@@ -619,11 +597,7 @@ def surface_route(path, request=None):
         slug = request.headers.get("X-CRM-Workspace")
         actor = getattr(request, "user", None)
         if not slug and actor and actor.is_authenticated:
-            preferred = (
-                Profile.objects.filter(user=actor)
-                .values_list("last_workspace_id", flat=True)
-                .first()
-            )
+            preferred = Profile.objects.filter(user=actor).values_list("last_workspace_id", flat=True).first()
             memberships = Workspace.objects.filter(
                 workspace_member__member=actor,
                 workspace_member__is_active=True,
@@ -657,11 +631,7 @@ def surface_route(path, request=None):
     ):
         found = re.fullmatch(pattern, suffix)
         if found:
-            if (
-                code == "roles"
-                and request
-                and request.headers.get("X-CRM-Surface") == "role-permissions"
-            ):
+            if code == "roles" and request and request.headers.get("X-CRM-Surface") == "role-permissions":
                 code = "role-permissions"
             return slug, code, found[1]
     return None
@@ -670,9 +640,7 @@ def surface_route(path, request=None):
 def prepare_surface_request(request):
     if request.method not in {"POST", "PUT", "PATCH"}:
         return
-    if request.path == "/api/users/me/profile/" and set(request.data) == {
-        "last_workspace_id"
-    }:
+    if request.path == "/api/users/me/profile/" and set(request.data) == {"last_workspace_id"}:
         return  # Navigation state is separate from the appearance form.
     route = surface_route(request.path, request)
     if not route:
@@ -682,9 +650,7 @@ def prepare_surface_request(request):
         "permission_ids",
         "custom_values",
     }:
-        raise ValidationError(
-            "در فرم مجوزهای نقش فقط مجوزها و اطلاعات تکمیلی همان فرم قابل تغییر است."
-        )
+        raise ValidationError("در فرم مجوزهای نقش فقط مجوزها و اطلاعات تکمیلی همان فرم قابل تغییر است.")
     request._full_data = request.data.copy()
     workspace = member_workspace(request, slug)
     if code == "security":
@@ -707,49 +673,26 @@ def prepare_surface_request(request):
             request.data.pop(key)
             continue
         current_value = request.data.get(key)
-        if (
-            not creating
-            and key not in request.data
-            and object_id
-            and definition["native"].get(key, {}).get("required")
-        ):
-            original = (
-                original
-                or scoped_objects(workspace, code, request.user, request)
-                .filter(id=object_id)
-                .first()
-            )
+        if not creating and key not in request.data and object_id and definition["native"].get(key, {}).get("required"):
+            original = original or scoped_objects(workspace, code, request.user, request).filter(id=object_id).first()
             if original is None or not hasattr(original, key):
                 continue
             current_value = getattr(original, key)
-        if (
-            definition["native"].get(key, {}).get("required")
-            and not config.get("hidden")
-            and empty(current_value)
-        ):
+        if definition["native"].get(key, {}).get("required") and not config.get("hidden") and empty(current_value):
             raise ValidationError({key: f"تکمیل «{field['title']}» الزامی است."})
     fields = extra_fields(workspace, definition)
     submitted = request.data.get("custom_values", {})
     if not isinstance(submitted, dict) or set(submitted) - set(fields):
-        raise ValidationError(
-            {"custom_values": "فیلد ناشناخته یا ساختار مقادیر نامعتبر است."}
-        )
+        raise ValidationError({"custom_values": "فیلد ناشناخته یا ساختار مقادیر نامعتبر است."})
     request.data.pop("custom_values", None)
     if not creating and not submitted and not fields:
         return
     if submitted and code in WRITE_PERMISSIONS:
         permissions = WRITE_PERMISSIONS[code].get(request.method, ())
-        if not any(
-            has_permission(request.user, workspace, p, request=request)
-            for p in permissions
-        ):
+        if not any(has_permission(request.user, workspace, p, request=request) for p in permissions):
             raise PermissionDenied("مجوز ویرایش اطلاعات تکمیلی این فرم را ندارید.")
     old = (
-        SurfaceValues.objects.filter(
-            workspace=workspace, code=code, object_id=object_id
-        ).first()
-        if object_id
-        else None
+        SurfaceValues.objects.filter(workspace=workspace, code=code, object_id=object_id).first() if object_id else None
     )
     values = deepcopy(old.values) if old else {}
     roles = role_ids(request.user, workspace)
@@ -771,11 +714,7 @@ def prepare_surface_request(request):
             raise PermissionDenied({key: "ویرایش این فیلد مجاز نیست."})
         if not field["is_active"] and raw != values.get(key):
             raise ValidationError({key: "فیلد غیرفعال قابل تغییر نیست."})
-        if (
-            not creating
-            and field["config"].get("editable_after_create") is False
-            and raw != values.get(key)
-        ):
+        if not creating and field["config"].get("editable_after_create") is False and raw != values.get(key):
             raise PermissionDenied({key: "این فیلد پس از ثبت قابل تغییر نیست."})
         try:
             values[key] = normalize(field, raw)
@@ -790,16 +729,10 @@ def prepare_surface_request(request):
             or not can_field(field, roles)
             or not condition(config.get("visible_if"), values, fields)
         )
-        if (
-            key in submitted
-            and hidden
-            and value != (old.values.get(key) if old else None)
-        ):
+        if key in submitted and hidden and value != (old.values.get(key) if old else None):
             raise PermissionDenied({key: "فیلد در این فرم قابل تغییر نیست."})
         required = (
-            config.get("required")
-            or config.get("required_if")
-            and condition(config["required_if"], values, fields)
+            config.get("required") or config.get("required_if") and condition(config["required_if"], values, fields)
         )
         if field["is_active"] and required and not hidden and empty(value):
             raise ValidationError({key: f"تکمیل «{field['title']}» الزامی است."})
@@ -817,9 +750,7 @@ def prepare_surface_request(request):
             except (ValueError, TypeError) as exc:
                 raise ValidationError({key: "مقدار انتخابی معتبر نیست."}) from exc
         if config.get("unique") and not empty(value):
-            matches = SurfaceValues.objects.filter(
-                workspace=workspace, code=code, **{f"values__{key}": value}
-            )
+            matches = SurfaceValues.objects.filter(workspace=workspace, code=code, **{f"values__{key}": value})
             if object_id:
                 matches = matches.exclude(object_id=object_id)
             if matches.exists():
@@ -856,9 +787,7 @@ def finish_surface_request(request, response):
     SurfaceValues.objects.update_or_create(
         workspace=workspace, code=code, object_id=object_id, defaults={"values": values}
     )
-    for key, field in extra_fields(
-        workspace, configuration(workspace, code)[1]
-    ).items():
+    for key, field in extra_fields(workspace, configuration(workspace, code)[1]).items():
         if field["kind"] == "file":
             FileAsset.objects.filter(
                 workspace=workspace,
@@ -869,9 +798,9 @@ def finish_surface_request(request, response):
                 attributes__entity=code,
                 attributes__field=key,
             ).update(entity_identifier=str(object_id))
-    FieldDefinition.objects.filter(
-        workspace=workspace, code__in=values, used_at__isnull=True
-    ).update(used_at=timezone.now())
+    FieldDefinition.objects.filter(workspace=workspace, code__in=values, used_at__isnull=True).update(
+        used_at=timezone.now()
+    )
     if values != before:
         EntityEvent.objects.create(
             workspace=workspace,
@@ -922,9 +851,7 @@ def scoped_objects(workspace, code, user, request):
     if code == "role-permissions":
         return OrganizationRole.objects.filter(workspace=workspace)
     if SURFACES[code].get("engine"):
-        entity = get_object_or_404(
-            EntityType, workspace=workspace, code=code, parent__isnull=True
-        )
+        entity = get_object_or_404(EntityType, workspace=workspace, code=code, parent__isnull=True)
         return native_queryset(entity, user, request)
     if code == "users":
         return User.objects.filter(
@@ -937,9 +864,7 @@ def scoped_objects(workspace, code, user, request):
 
         return Cycle.objects.filter(
             workspace=workspace,
-            project__in=visible_projects(
-                Project.objects.filter(workspace=workspace), user, workspace.slug
-            ),
+            project__in=visible_projects(Project.objects.filter(workspace=workspace), user, workspace.slug),
         )
     return {
         "roles": OrganizationRole,
@@ -952,44 +877,25 @@ def read_values(request, workspace, code, identifiers):
     allowed(request, workspace, code, records=True)
     if code in {"task", "ticket"}:
         result = {}
-        for entity in EntityType.objects.filter(
-            workspace=workspace, code="ticket", parent__isnull=True
-        ):
-            rows = list(
-                native_queryset(entity, request.user, request).filter(
-                    id__in=identifiers
-                )
-            )
+        for entity in EntityType.objects.filter(workspace=workspace, code="ticket", parent__isnull=True):
+            rows = list(native_queryset(entity, request.user, request).filter(id__in=identifiers))
             sidecars = {
                 str(r.source_id): r
-                for r in EntityRecord.objects.filter(
-                    entity=entity, source_id__in=[r.id for r in rows]
-                )
+                for r in EntityRecord.objects.filter(entity=entity, source_id__in=[r.id for r in rows])
             }
             for row in rows:
-                result[str(row.id)] = record_payload(
-                    entity, request.user, sidecars.get(str(row.id)), row, request
-                )["values"]
+                result[str(row.id)] = record_payload(entity, request.user, sidecars.get(str(row.id)), row, request)[
+                    "values"
+                ]
         return result
-    rows = list(
-        scoped_objects(workspace, code, request.user, request).filter(
-            id__in=identifiers
-        )
-    )
+    rows = list(scoped_objects(workspace, code, request.user, request).filter(id__in=identifiers))
     if SURFACES[code].get("engine"):
-        entity = EntityType.objects.get(
-            workspace=workspace, code=code, parent__isnull=True
-        )
+        entity = EntityType.objects.get(workspace=workspace, code=code, parent__isnull=True)
         sidecars = {
-            str(r.source_id): r
-            for r in EntityRecord.objects.filter(
-                entity=entity, source_id__in=[r.id for r in rows]
-            )
+            str(r.source_id): r for r in EntityRecord.objects.filter(entity=entity, source_id__in=[r.id for r in rows])
         }
         return {
-            str(row.id): record_payload(
-                entity, request.user, sidecars.get(str(row.id)), row, request
-            )["values"]
+            str(row.id): record_payload(entity, request.user, sidecars.get(str(row.id)), row, request)["values"]
             for row in rows
         }
     _, definition = configuration(workspace, code)
@@ -997,9 +903,7 @@ def read_values(request, workspace, code, identifiers):
     roles = role_ids(request.user, workspace)
     stored = {
         str(r.object_id): r.values
-        for r in SurfaceValues.objects.filter(
-            workspace=workspace, code=code, object_id__in=[r.id for r in rows]
-        )
+        for r in SurfaceValues.objects.filter(workspace=workspace, code=code, object_id__in=[r.id for r in rows])
     }
     return {
         str(row.id): {

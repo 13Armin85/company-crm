@@ -172,6 +172,9 @@ def test_role_queue_notifies_eligible_role_members_once(session_client, workspac
     rule = routing_rule(workspace)
     for user in (eligible, denied):
         UserOrganizationRole.objects.create(workspace=workspace, user=user, role=rule.required_role)
+    outsider = member(workspace, "event-queue-no-project")
+    UserOrganizationRole.objects.create(workspace=workspace, user=outsider, role=rule.required_role)
+    ProjectMember.objects.create(project=issue.project, member=eligible, workspace=workspace, role=15)
     exception(workspace, denied, "Routing.Queue.View", "DENY")
     TicketRoutingService.route(issue, rule, actor_id=create_user.id)
     TicketRoutingService.route(issue, rule, actor_id=create_user.id)

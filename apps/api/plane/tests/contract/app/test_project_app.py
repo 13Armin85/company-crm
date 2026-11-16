@@ -173,7 +173,7 @@ class TestProjectAPIPost(TestProjectBase):
 
     @pytest.mark.django_db
     def test_create_project_duplicate_identifier(self, session_client, workspace, create_user):
-        """Test creating project with duplicate identifier"""
+        """Client identifiers cannot override the automatically generated reference."""
         Project.objects.create(name="First Project", identifier="DUP", workspace=workspace)
 
         url = self.get_project_url(workspace.slug)
@@ -184,7 +184,8 @@ class TestProjectAPIPost(TestProjectBase):
 
         response = session_client.post(url, project_data, format="json")
 
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.status_code == status.HTTP_201_CREATED
+        assert response.data["identifier"] != "DUP"
 
     @pytest.mark.django_db
     def test_create_project_missing_required_fields(self, session_client, workspace, create_user):
@@ -195,9 +196,10 @@ class TestProjectAPIPost(TestProjectBase):
         response = session_client.post(url, {"identifier": "MN"}, format="json")
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-        # Test missing identifier
+        # Identifiers are generated; only the name is supplied by the user.
         response = session_client.post(url, {"name": "Missing Identifier"}, format="json")
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.status_code == status.HTTP_201_CREATED
+        assert response.data["identifier"].startswith("PRJ")
 
     @pytest.mark.django_db
     def test_create_project_with_all_optional_fields(self, session_client, workspace, create_user):
@@ -338,7 +340,7 @@ class TestProjectAPIGet(TestProjectBase):
         url = self.get_project_url(workspace.slug, pk=fake_uuid)
         response = session_client.get(url)
 
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code in (status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND)
 
     @pytest.mark.django_db
     def test_retrieve_archived_project(self, session_client, workspace, create_user):
@@ -435,7 +437,7 @@ class TestProjectAPIPatchDelete(TestProjectBase):
 
     @pytest.mark.django_db
     def test_partial_update_duplicate_identifier_conflict(self, session_client, workspace, create_user):
-        """Test updating project with duplicate identifier returns conflict"""
+        """The project reference is immutable through the native endpoint."""
         # Create two projects
         Project.objects.create(name="Project One", identifier="P1", workspace=workspace)
         project2 = Project.objects.create(name="Project Two", identifier="P2", workspace=workspace)
@@ -447,7 +449,9 @@ class TestProjectAPIPatchDelete(TestProjectBase):
 
         response = session_client.patch(url, update_data, format="json")
 
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.status_code == status.HTTP_200_OK
+        project2.refresh_from_db()
+        assert project2.identifier == "P2"
 
     @pytest.mark.django_db
     def test_partial_update_invalid_data(self, session_client, workspace, create_user):

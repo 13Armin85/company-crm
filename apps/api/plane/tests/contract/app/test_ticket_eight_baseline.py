@@ -62,7 +62,10 @@ def org(workspace, create_user):
     initialize_engine(workspace)
     sync_permission_catalog(workspace)
     leave.ensure_leave_entity(workspace)
-    people = {name: person(workspace, name, ["LeaveRequest.Create"]) for name in ("manager", "employee", "other_manager", "outsider")}
+    people = {
+        name: person(workspace, name, ["LeaveRequest.Create"])
+        for name in ("manager", "employee", "other_manager", "outsider")
+    }
     team = OrganizationUnit.objects.create(workspace=workspace, title="تیم الف", manager=people["manager"])
     other = OrganizationUnit.objects.create(workspace=workspace, title="تیم ب", manager=people["other_manager"])
     OrganizationUnitMember.objects.create(unit=team, user=people["employee"])

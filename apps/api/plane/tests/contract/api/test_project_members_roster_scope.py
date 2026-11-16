@@ -18,7 +18,21 @@ from uuid import uuid4
 import pytest
 from rest_framework import status
 
-from plane.db.models import Project, ProjectMember, User
+from plane.db.models import (
+    OrganizationPermission, OrganizationRole, Project, ProjectMember, RolePermission,
+    User, UserOrganizationRole, WorkspaceMember,
+)
+
+
+@pytest.fixture(autouse=True)
+def ordinary_workspace_member(workspace, create_user):
+    """Exercise project isolation with an ordinary user; CRM administrators may see every project."""
+    WorkspaceMember.objects.filter(workspace=workspace, member=create_user).update(role=15)
+    UserOrganizationRole.objects.filter(workspace=workspace, user=create_user).delete()
+    role = OrganizationRole.objects.create(workspace=workspace, name="Roster reader")
+    permission = OrganizationPermission.objects.get(workspace=workspace, code="Project.View")
+    RolePermission.objects.create(role=role, permission=permission)
+    UserOrganizationRole.objects.create(workspace=workspace, user=create_user, role=role)
 
 
 def members_url(slug, project_id):

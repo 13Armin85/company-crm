@@ -8,7 +8,7 @@ from rest_framework.response import Response
 
 from plane.app.services import portal_access, portal_files, portal_requests, portal_settings, quotes
 from plane.app.services.portal_access import record_title
-from plane.db.models import PORTAL_ATTACHMENT, FileAsset
+from plane.db.models import PORTAL_ATTACHMENT, FileAsset, SurfaceConfiguration
 
 from .base import (
     COOKIE,
@@ -29,6 +29,13 @@ COOKIE_PATH = "/api/portal/"
 def profile(account):
     config = portal_settings.load(account.workspace)
     server = set(getattr(settings, "PORTAL_NOTIFY_CHANNELS", ()) or ())
+    layout = (
+        SurfaceConfiguration.objects.filter(workspace=account.workspace, code="portal-customer-request")
+        .values_list("definition", flat=True)
+        .first()
+        or {}
+    )
+    native = layout.get("native", {})
     return {
         "display_name": account.display_name,
         "username": account.username,
@@ -38,6 +45,14 @@ def profile(account):
             channel: channel in server and bool(config["notify_channels"].get(channel)) for channel in ("email", "sms")
         },
         "idle_minutes": config["session"]["idle_minutes"],
+        "request_form": {
+            key: {
+                option: value
+                for option, value in native.get(key, {}).items()
+                if option in {"title", "placeholder", "help_text"}
+            }
+            for key in ("subject", "description")
+        },
     }
 
 

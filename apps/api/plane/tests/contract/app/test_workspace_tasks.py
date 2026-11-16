@@ -144,7 +144,7 @@ def test_normal_member_can_see_all_team_members_for_task_transfer(session_client
 
 
 @pytest.mark.django_db
-def test_normal_member_can_transfer_own_project_issue_to_any_team_member(session_client, workspace):
+def test_normal_member_can_transfer_own_project_issue_to_active_project_member(session_client, workspace):
     first_assignee = add_member(workspace, "project-first@example.com")
     next_assignee = add_member(workspace, "project-next@example.com")
     project = Project.objects.create(workspace=workspace, name="Transfer Project", identifier="TRN")
@@ -167,7 +167,17 @@ def test_normal_member_can_transfer_own_project_issue_to_any_team_member(session
         format="json",
     )
 
-    assert response.status_code == 204
+    assert response.status_code == 400, response.data
+    assert not ProjectMember.objects.filter(project=project, member=next_assignee).exists()
+    assert IssueAssignee.objects.filter(issue=issue, assignee=first_assignee).exists()
+
+    ProjectMember.objects.create(project=project, member=next_assignee, role=15)
+    response = session_client.patch(
+        f"/api/workspaces/{workspace.slug}/projects/{project.id}/issues/{issue.id}/",
+        {"assignee_ids": [str(next_assignee.id)]},
+        format="json",
+    )
+    assert response.status_code == 204, response.data
     assert ProjectMember.objects.filter(
         project=project,
         member=next_assignee,

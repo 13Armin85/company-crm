@@ -24,13 +24,15 @@ from rest_framework.exceptions import APIException
 try:
     from docx import Document
     from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.oxml import OxmlElement
     from docx.oxml.ns import qn
-    from docx.shared import Cm
+    from docx.shared import Cm, Pt
     from docx.text.paragraph import Paragraph
+    from docx.text.run import Run
 
     DOCX_AVAILABLE = True
 except ImportError:  # pragma: no cover - exercised by test_missing_docx_library_does_not_break_the_api
-    Document = WD_ALIGN_PARAGRAPH = qn = Cm = Paragraph = None
+    Document = WD_ALIGN_PARAGRAPH = OxmlElement = qn = Cm = Pt = Paragraph = Run = None
     DOCX_AVAILABLE = False
 
 MAX_TEMPLATE_BYTES = 5 * 1024 * 1024
@@ -151,7 +153,17 @@ def _paragraphs(document):
 
 
 def _paragraph_text(paragraph):
-    return "".join(node.text or "" for node in paragraph._p.iter(qn("w:t")))
+    return "".join(run.text for run in _runs(paragraph))
+
+
+def _runs(paragraph):
+    """Include hyperlink/content-control runs, but leave nested text-box paragraphs to their own pass."""
+    for element in paragraph._p.iter(qn("w:r")):
+        parent = element.getparent()
+        while parent is not None and parent.tag != qn("w:p"):
+            parent = parent.getparent()
+        if parent is paragraph._p:
+            yield Run(element, paragraph)
 
 
 # ---------------------------------------------------------------- validation
@@ -216,7 +228,7 @@ def _replace_text(text, values):
 
 
 def _fill_paragraph(paragraph, values, signature):
-    runs = paragraph.runs
+    runs = list(_runs(paragraph))
     text = "".join(run.text for run in runs)
     if "{{" not in text:
         return
@@ -311,7 +323,7 @@ def _run_html(run, part):
 
 
 def _paragraph_html(paragraph, part):
-    body = "".join(_run_html(run, part) for run in paragraph.runs) or "&nbsp;"
+    body = "".join(_run_html(run, part) for run in _runs(paragraph)) or "&nbsp;"
     align = ALIGN.get(paragraph.alignment)
     style = f' style="text-align:{align}"' if align else ""
     return f'<p dir="auto"{style}>{body}</p>'
@@ -343,11 +355,12 @@ def _container_html(element, parent):
 
 
 PREVIEW_STYLE = (
-    "body{font-family:Vazirmatn,Tahoma,sans-serif;margin:0;padding:24px;background:#fff;color:#111;line-height:1.8}"
+    "body{font-family:Vazirmatn,Tahoma,sans-serif;margin:0;padding:24px;background:#fff;color:#111;line-height:1.8;overflow-wrap:anywhere}"
     "main{max-width:21cm;margin:0 auto}table{border-collapse:collapse;width:100%;margin:8px 0}"
     "td{border:1px solid #999;padding:4px 8px;vertical-align:top}p{margin:4px 0}"
     "header,footer{color:#444;font-size:90%;border-bottom:1px dashed #ccc;margin-bottom:12px}"
     "footer{border-bottom:0;border-top:1px dashed #ccc;margin-top:12px}"
+    "@media(max-width:480px){body{padding:12px;font-size:13px}td{padding:5px}h1{font-size:20px}}"
 )
 
 
@@ -373,8 +386,19 @@ def build_sample_template(keys=None, extra_text=""):
     require_docx()
     keys = list(PLACEHOLDERS) if keys is None else keys
     document = Document()
-    document.add_heading("فرم درخواست مرخصی", level=1)
+    section = document.sections[0]
+    section.page_width, section.page_height = Cm(21), Cm(29.7)
+    section.top_margin = section.bottom_margin = Cm(1.8)
+    section.left_margin = section.right_margin = Cm(1.8)
+    normal = document.styles["Normal"]
+    normal.font.name, normal.font.size = "Tahoma", Pt(11)
+    normal.paragraph_format.space_after = Pt(7)
+    heading = document.add_heading("فرم درخواست مرخصی", level=1)
+    heading.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    document.add_paragraph("اطلاعات این فرم از حساب کاربری و درخواست مرخصی تکمیل می‌شود. پیش از امضا، نام، بازه و مدت مرخصی را بررسی کنید.")
     table = document.add_table(rows=0, cols=2)
+    table.style = "Light Shading Accent 1"
+    table._tbl.tblPr.append(OxmlElement("w:bidiVisual"))
     for key in keys:
         if key == SIGNATURE_KEY:
             continue
@@ -386,6 +410,18 @@ def build_sample_template(keys=None, extra_text=""):
     if SIGNATURE_KEY in keys:
         document.add_paragraph("امضای درخواست‌دهنده:")
         document.add_paragraph(f"{{{{{SIGNATURE_KEY}}}}}")
+    for paragraph in _paragraphs(document):
+        if paragraph._p is not heading._p:
+            paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        paragraph._p.get_or_add_pPr().append(OxmlElement("w:bidi"))
+        for run in _runs(paragraph):
+            properties = run._r.get_or_add_rPr()
+            properties.append(OxmlElement("w:rtl"))
+            fonts = properties.find(qn("w:rFonts"))
+            if fonts is None:
+                fonts = OxmlElement("w:rFonts")
+                properties.insert(0, fonts)
+            fonts.set(qn("w:cs"), "Tahoma")
     output = BytesIO()
     document.save(output)
     return output.getvalue()

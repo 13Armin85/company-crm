@@ -65,6 +65,13 @@ def _definition(job):
     return source, definition
 
 
+def _reference_time(job):
+    from datetime import datetime
+
+    value = job.definition.get("now")
+    return datetime.fromisoformat(value) if value else job.created_at
+
+
 def file_cell(value):
     return safe_text(value) if isinstance(value, str) else value
 
@@ -88,7 +95,14 @@ def request_export(workspace, user, data, request=None):
     source = sources.get_source(saved.source if saved else data.get("source"))
     raw = dict(saved.definition) if saved else data.get("definition")
     if saved and isinstance(data.get("definition"), dict):
-        raw.update({k: v for k, v in data["definition"].items() if k in ("filters", "range", "sort")})
+        # Same overrides as the page (saved_reports.run_saved): the file always matches what is on screen.
+        raw.update(
+            {
+                k: v
+                for k, v in data["definition"].items()
+                if k in ("filters", "range", "sort", "columns", "group_by", "aggregates")
+            }
+        )
     definition = sources.validate(
         source, raw, saved=saved is not None, schema_version=getattr(saved, "schema_version", None)
     )
@@ -100,7 +114,14 @@ def request_export(workspace, user, data, request=None):
         entity=None,
         report_source=source.code,
         user=user,
-        definition={"source": source.code, "definition": definition, "saved_id": str(saved.id) if saved else None},
+        # The reference time is frozen with the job: time-dependent cells (delay, near-due) must not
+        # make a legitimate download fail verification; scope and permissions are still rechecked live.
+        definition={
+            "source": source.code,
+            "definition": definition,
+            "saved_id": str(saved.id) if saved else None,
+            "now": timezone.now().isoformat(),
+        },
         format=fmt,
         expires_at=timezone.now() + timedelta(hours=24),
     )
@@ -125,7 +146,9 @@ def build_report_export(identifier):
         request = SimpleNamespace(user=job.user)
         _require(job.user, job.workspace, request)
         source, definition = _definition(job)
-        columns, rows = sources.all_rows(job.workspace, job.user, source, definition, request, limit=BACKGROUND_LIMIT)
+        columns, rows = sources.all_rows(
+            job.workspace, job.user, source, definition, request, now=_reference_time(job), limit=BACKGROUND_LIMIT
+        )
         _progress(job, 60)
         with SpooledTemporaryFile(max_size=8 * 1024 * 1024, mode="w+b") as output:
             if job.format == "xlsx":
@@ -186,7 +209,9 @@ def verify_report_export(job, request=None):
     request = request or SimpleNamespace(user=job.user)
     _require(job.user, job.workspace, request)
     source, definition = _definition(job)
-    _, rows = sources.all_rows(job.workspace, job.user, source, definition, request, limit=BACKGROUND_LIMIT)
+    _, rows = sources.all_rows(
+        job.workspace, job.user, source, definition, request, now=_reference_time(job), limit=BACKGROUND_LIMIT
+    )
     if _digest(rows) != job.fingerprint or len(rows) != job.row_count:
         raise PermissionDenied("داده یا دسترسی از زمان ساخت فایل تغییر کرده است؛ خروجی تازه درخواست کنید.")
 

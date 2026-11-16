@@ -14,6 +14,8 @@ export interface Person {
 
 export interface ReportItem {
   id?: string;
+  /** Stable identity of an unsaved editor row; excluded from savePayload. */
+  clientKey?: string;
   kind: ItemKind;
   kind_label?: string;
   text: string;
@@ -35,6 +37,13 @@ export interface DayLeave {
   duration_text: string;
   full_day: boolean;
   url: string;
+}
+
+export interface DayAbsence {
+  id: string;
+  period_text: string;
+  full_day: boolean;
+  url: string | null;
 }
 
 export interface DayEvent {
@@ -66,6 +75,7 @@ export interface DayPayload {
     label: string;
   };
   leaves: DayLeave[];
+  absences?: DayAbsence[];
   requirement: Requirement;
   requirement_text: string;
   events: DayEvent[];
@@ -126,7 +136,13 @@ export interface DailyMeta {
 }
 
 export interface WorkOptions {
-  tickets: { id: string; number: string; title: string; status: string; project: { id: string; name: string } | null }[];
+  tickets: {
+    id: string;
+    number: string;
+    title: string;
+    status: string;
+    project: { id: string; name: string } | null;
+  }[];
   projects: { id: string; name: string }[];
 }
 
@@ -142,12 +158,17 @@ export interface TeamDay {
   date_text: string;
   summary: Record<DayStatus, number>;
   titles: Record<DayStatus, string>;
+  count: number;
+  page: number;
+  page_size: number;
+  pages: number;
   people: {
     person: Person;
     status: DayStatus;
     status_label: string;
     submitted_at: string | null;
     leaves: DayLeave[];
+    absences?: DayAbsence[];
     blockers: ReportItem[];
     help: ReportItem[];
     counts: Record<ItemKind, number>;
@@ -223,6 +244,7 @@ export interface ReportSource {
   team: boolean;
   default: ReportDefinition;
   fields: SourceField[];
+  connections?: { title: string; path: string }[];
 }
 
 export interface ReportCatalog {
@@ -332,7 +354,11 @@ export const useSaveDay = (date: string) => {
       (await api.put(`${daily(slug)}day/${date}/`, body)).data,
     onSuccess: async (data, body) => {
       client.setQueryData(["daily-day", slug, date, ""], data);
-      await client.invalidateQueries({ queryKey: ["daily-history", slug, date] });
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ["daily-history", slug, date] }),
+        client.invalidateQueries({ queryKey: ["daily-team", slug] }),
+        client.invalidateQueries({ queryKey: ["report-run", slug] }),
+      ]);
       toastSuccess(body.submit ? "گزارش روزانه ثبت شد." : "تغییرات گزارش ذخیره شد.");
     },
     onError: (error) => toastError(error, "ذخیرهٔ گزارش روزانه ممکن نشد"),
@@ -392,14 +418,20 @@ export const useSaveTemplates = () => {
   });
 };
 
-export const useTeamDay = (date: string, enabled = true) => {
+export type TeamDayFilter = "all" | "missing" | "late" | "submitted" | "not_required";
+
+export const useTeamDay = (
+  date: string,
+  enabled: boolean,
+  { page, pageSize, filter }: { page: number; pageSize: number; filter: TeamDayFilter }
+) => {
   const slug = useSlug();
   return useQuery({
-    queryKey: ["daily-team", slug, date],
+    queryKey: ["daily-team", slug, date, { page, pageSize, filter }],
     enabled: Boolean(slug && date) && enabled,
     retry: false,
     queryFn: async ({ signal }): Promise<TeamDay> =>
-      (await api.get(`${daily(slug)}team/`, { params: { date }, signal })).data,
+      (await api.get(`${daily(slug)}team/`, { params: { date, page, page_size: pageSize, filter }, signal })).data,
   });
 };
 
@@ -408,7 +440,8 @@ export const useReminderSettings = () => {
   return useQuery({
     queryKey: ["daily-reminder", slug],
     enabled: Boolean(slug),
-    queryFn: async ({ signal }): Promise<ReminderSettings> => (await api.get(`${daily(slug)}reminder/`, { signal })).data,
+    queryFn: async ({ signal }): Promise<ReminderSettings> =>
+      (await api.get(`${daily(slug)}reminder/`, { signal })).data,
   });
 };
 
@@ -422,7 +455,8 @@ export const useSaveReminder = () => {
         | { level: "unit"; unit: string; reminder: ReminderValue | null; allow_personal: boolean | null }
         | { level: "workspace"; data: Record<string, unknown> }
     ): Promise<ReminderSettings> => {
-      if (payload.level === "personal") return (await api.put(`${daily(slug)}reminder/`, { reminder: payload.reminder })).data;
+      if (payload.level === "personal")
+        return (await api.put(`${daily(slug)}reminder/`, { reminder: payload.reminder })).data;
       if (payload.level === "unit")
         return (
           await api.put(`${daily(slug)}reminder/units/${payload.unit}/`, {
@@ -469,7 +503,8 @@ export const useSavedReport = (id?: string) => {
     queryKey: ["saved-report", slug, id],
     enabled: Boolean(slug && id),
     retry: false,
-    queryFn: async ({ signal }): Promise<SavedReport> => (await api.get(`${reports(slug)}saved/${id}/`, { signal })).data,
+    queryFn: async ({ signal }): Promise<SavedReport> =>
+      (await api.get(`${reports(slug)}saved/${id}/`, { signal })).data,
   });
 };
 
@@ -484,6 +519,8 @@ export const useRunReport = (
     enabled: Boolean(slug) && enabled,
     retry: false,
     staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchInterval: 60_000,
     queryFn: async ({ signal }): Promise<ReportResult> =>
       args.savedId
         ? (
@@ -503,14 +540,20 @@ export const useRunReport = (
   });
 };
 
-function useReportMutation<T, R>(request: (slug: string, payload: T) => Promise<{ data: R }>, success: string, failure: string) {
+function useReportMutation<T, R>(
+  request: (slug: string, payload: T) => Promise<{ data: R }>,
+  success: string,
+  failure: string
+) {
   const slug = useSlug();
   const client = useQueryClient();
   return useMutation({
     mutationFn: async (payload: T) => (await request(slug ?? "", payload)).data,
     onSuccess: async () => {
       await Promise.all(
-        ["saved-reports", "saved-report", "report-run"].map((key) => client.invalidateQueries({ queryKey: [key, slug] }))
+        ["saved-reports", "saved-report", "report-run"].map((key) =>
+          client.invalidateQueries({ queryKey: [key, slug] })
+        )
       );
       if (success) toastSuccess(success);
     },
@@ -562,7 +605,9 @@ export const useShareOptions = (enabled: boolean) => {
   return useQuery({
     queryKey: ["report-share-options", slug],
     enabled: Boolean(slug) && enabled,
-    queryFn: async ({ signal }): Promise<{ roles: { id: string; name: string }[]; units: { id: string; name: string }[] }> =>
+    queryFn: async ({
+      signal,
+    }): Promise<{ roles: { id: string; name: string }[]; units: { id: string; name: string }[] }> =>
       (await api.get(`${reports(slug)}share-options/`, { signal })).data,
   });
 };
@@ -582,10 +627,11 @@ export const useRequestExport = () => {
 
 export const useExportJob = (id: string | null) => {
   const slug = useSlug();
-  return useQuery({
+  return useQuery<ExportJob>({
     queryKey: ["report-export", slug, id],
     enabled: Boolean(slug && id),
     refetchInterval: (query) => (["ready", "failed"].includes(query.state.data?.status ?? "") ? false : 1500),
-    queryFn: async ({ signal }): Promise<ExportJob> => (await api.get(`${reports(slug)}exports/${id}/`, { signal })).data,
+    queryFn: async ({ signal }): Promise<ExportJob> =>
+      (await api.get(`${reports(slug)}exports/${id}/`, { signal })).data,
   });
 };

@@ -21,12 +21,13 @@ daily report is not exposed as working time anywhere.
 """
 
 from collections import defaultdict
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from django.db import connection, transaction
-from django.db.models import Q
+from django.db.models import OuterRef, Q, Subquery
 from django.utils import timezone
 from rest_framework.exceptions import APIException, PermissionDenied, ValidationError
 
@@ -40,9 +41,11 @@ from plane.db.models import (
     IssueAssignee,
     IssueComment,
     LeaveRequest,
+    LeaveRequestVersion,
     LookupValue,
     OrganizationUnitMember,
     PresenceDeclaration,
+    Project,
     User,
     WorkEvent,
     WorkflowDecision,
@@ -50,6 +53,7 @@ from plane.db.models import (
     WorkflowExtension,
 )
 from . import daily_reports as reports
+from . import report_absences
 from .access_control import has_permission
 from .entity_view_export import jalali
 from .report_scope import Scope, people_scope, ticket_rows
@@ -93,9 +97,13 @@ class Incompatible(APIException):
 class TooLarge(APIException):
     status_code = 400
     default_code = "too_large"
-    default_detail = (
-        "نتیجهٔ این گزارش بزرگ‌تر از حد اجرای هم‌زمان است؛ بازه یا فیلتر را محدود کنید یا خروجی پس‌زمینه بگیرید."
+    message = (
+        "نتیجهٔ این گزارش بزرگ‌تر از حد اجرای هم‌زمان است؛ بازه یا فیلتر را محدود کنید "
+        "یا خروجی پس‌زمینه (CSV/Excel) بگیرید."
     )
+
+    def __init__(self):
+        super().__init__({"error": self.message, "code": "too_large"})
 
 
 @dataclass
@@ -226,15 +234,11 @@ def _units(workspace, user_ids):
 
 
 def _visible_records(entity, viewer, ids, request):
-    from .entity_records import permission, record_queryset
+    from .report_connected import visible_titles
 
-    if entity is None or not ids or not permission(entity, viewer, "view", request):
+    if entity is None or not ids:
         return {}
-    title = entity.title_field
-    return {
-        str(row.id): (row.data or {}).get(title) or row.number or entity.title
-        for row in record_queryset(entity, viewer, request).filter(id__in=list(ids))
-    }
+    return visible_titles(entity, viewer, ids, request)
 
 
 def _related(workspace, viewer, issue_ids, codes, request):
@@ -393,6 +397,13 @@ MY_WORK = Source(
 # ---------------------------------------------------------------- 2. daily_reports
 
 
+def _daily_link(ctx, user_id, day, can_open_team_day):
+    """The day page contains additional calendar context and has a separate team permission."""
+    if user_id == ctx.viewer.id or can_open_team_day:
+        return f"/daily-report?date={day.isoformat()}&user={user_id}"
+    return None
+
+
 def build_daily_reports(ctx):
     people = ctx.requested_people("person")
     user_ids = people if people is not None else ctx.scope.user_ids
@@ -401,11 +412,17 @@ def build_daily_reports(ctx):
         raise TooLarge()
     statuses = reports.day_statuses(ctx.workspace, user_ids, ctx.date_from, ctx.date_to, ctx.now)
     units = _units(ctx.workspace, user_ids)
+    can_open_team_day = has_permission(
+        ctx.viewer, ctx.workspace, "DailyReport.Team.View", request=ctx.request
+    ) or has_permission(ctx.viewer, ctx.workspace, "Report.ViewAll", request=ctx.request)
     rows = []
     for row in statuses:
         items, report = row["items"], row["report"]
         blockers = [i for i in items if i.kind == DailyReportItem.Kind.BLOCKER and not i.needs_help]
         help_ = [i for i in items if i.kind == DailyReportItem.Kind.BLOCKER and i.needs_help]
+        done = [i.text for i in items if i.kind == DailyReportItem.Kind.DONE]
+        in_progress = [i.text for i in items if i.kind == DailyReportItem.Kind.IN_PROGRESS]
+        next_steps = [i.text for i in items if i.kind == DailyReportItem.Kind.NEXT_STEP]
         rows.append(
             {
                 "date": row["date"],
@@ -415,17 +432,22 @@ def build_daily_reports(ctx):
                 "status": row["status"],
                 "submitted_at": report.submitted_at if report and report.status == "submitted" else None,
                 "is_late": bool(report and report.is_late),
-                "done_count": sum(1 for i in items if i.kind == "done"),
-                "in_progress_count": sum(1 for i in items if i.kind == "in_progress"),
+                "done_count": len(done),
+                "in_progress_count": len(in_progress),
+                "next_step_count": len(next_steps),
                 "blocker_count": len(blockers),
                 "help_count": len(help_),
+                "done": " | ".join(done),
+                "in_progress": " | ".join(in_progress),
+                "next_steps": " | ".join(next_steps),
                 "blockers": " | ".join(i.text for i in blockers),
                 "help": " | ".join(i.text for i in help_),
                 "leave": " | ".join(
                     f"مرخصی {'روزانه' if v.mode == 'daily' else 'ساعتی'}: {_period(v, ctx.workspace)}"
                     for _, v in row["leaves"]
                 ),
-                "_link": f"/daily-report?date={row['date'].isoformat()}&user={row['user'].id}",
+                "absence": " | ".join(report_absences.period_text(*period, ctx.zone) for _, period in row["absences"]),
+                "_link": _daily_link(ctx, row["user"].id, row["date"], can_open_team_day),
             }
         )
     return rows
@@ -434,6 +456,9 @@ def build_daily_reports(ctx):
 def _period(version, workspace):
     from .leave_requests import period_text
 
+    interval = reports.leave_interval(version)
+    if interval != (version.starts_at, version.ends_at):
+        return report_absences.period_text(*interval, calendar_zone(workspace))
     return period_text(version, workspace)
 
 
@@ -461,11 +486,21 @@ DAILY_REPORTS = Source(
         Field("is_late", "دیرهنگام", "bool", group=True, method="نخستین ثبت پس از مهلت تنظیم‌شدهٔ همان روز"),
         Field("done_count", "تعداد انجام‌شده", "number", agg=True),
         Field("in_progress_count", "تعداد در حال انجام", "number", agg=True),
+        Field("next_step_count", "تعداد گام بعدی", "number", agg=True),
         Field("blocker_count", "تعداد مانع", "number", agg=True),
         Field("help_count", "تعداد نیاز به کمک", "number", agg=True),
+        Field("done", "کارهای انجام‌شده", "text"),
+        Field("in_progress", "کارهای در حال انجام", "text"),
+        Field("next_steps", "گام‌های بعدی", "text"),
         Field("blockers", "مانع‌ها", "text"),
         Field("help", "نیاز به کمک", "text"),
         Field("leave", "مرخصی (فقط‌خواندنی)", "text", method="خواندن زندهٔ درخواست مرخصی تأییدشده؛ بدون دستهٔ مرخصی"),
+        Field(
+            "absence",
+            "عدم حضور ثبت‌شده",
+            "text",
+            method="خواندن زندهٔ عدم حضور مستقیم؛ درخواست‌های مرخصی دوباره شمرده نمی‌شوند",
+        ),
     ],
     build=build_daily_reports,
     default={
@@ -474,11 +509,15 @@ DAILY_REPORTS = Source(
             "person",
             "status",
             "submitted_at",
+            "done",
+            "in_progress",
             "blocker_count",
             "help_count",
             "blockers",
             "help",
+            "next_steps",
             "leave",
+            "absence",
         ],
         "filters": [{"field": "status", "op": "not_in", "value": ["off", "future"]}],
         "range": {"type": "relative", "days": 7},
@@ -493,6 +532,107 @@ DAILY_REPORTS = Source(
 )
 
 
+def build_daily_report_items(ctx):
+    """One report row per saved line, with ticket titles limited to the viewer's visibility."""
+    people = ctx.requested_people("person")
+    user_ids = people if people is not None else ctx.scope.user_ids
+    days = (ctx.date_to - ctx.date_from).days + 1
+    if len(user_ids) * days > ctx.limit:
+        raise TooLarge()
+    statuses = reports.day_statuses(ctx.workspace, user_ids, ctx.date_from, ctx.date_to, ctx.now)
+    items = [item for day in statuses for item in day["items"]]
+    if len(items) > ctx.limit:
+        raise TooLarge()
+    issue_ids = {item.issue_id for item in items if item.issue_id}
+    ticket_labels = reports._ticket_labels(ctx.viewer, ctx.workspace, issue_ids, ctx.request)
+    project_ids = {item.project_id for item in items if item.project_id}
+    projects = dict(Project.objects.filter(workspace=ctx.workspace, id__in=project_ids).values_list("id", "name"))
+    units = _units(ctx.workspace, user_ids)
+    can_open_team_day = has_permission(
+        ctx.viewer, ctx.workspace, "DailyReport.Team.View", request=ctx.request
+    ) or has_permission(ctx.viewer, ctx.workspace, "Report.ViewAll", request=ctx.request)
+    rows = []
+    for day in statuses:
+        report = day["report"]
+        for item in day["items"]:
+            ticket = ticket_labels.get(item.issue_id)
+            rows.append(
+                {
+                    "date": day["date"],
+                    "person": _person(day["user"]),
+                    "unit": units.get(day["user"].id, ""),
+                    "status": day["status"],
+                    "submitted_at": report.submitted_at if report and report.status == "submitted" else None,
+                    "kind": item.kind,
+                    "text": item.text,
+                    "needs_help": item.needs_help,
+                    "ticket": ticket["number"] if ticket else "",
+                    "ticket_title": ticket["title"] if ticket else "",
+                    "project": projects.get(item.project_id, ""),
+                    "estimated_minutes": item.effort_minutes,
+                    "position": item.position + 1,
+                    "_link": _daily_link(ctx, day["user"].id, day["date"], can_open_team_day),
+                }
+            )
+    return rows
+
+
+DAILY_REPORT_ITEMS = Source(
+    code="daily_report_items",
+    title="جزئیات گزارش‌های روزانه",
+    description="هر مورد ثبت‌شدهٔ گزارش در یک ردیف؛ متن کامل، نوع، ارتباط با تیکت و پروژه، و وضعیت ثبت.",
+    fields=[
+        Field("date", "تاریخ گزارش", "date", group=True),
+        Field("person", "فرد", "person", group=True),
+        Field("unit", "واحد", "text", group=True),
+        Field("status", "وضعیت گزارش", "choice", group=True, choices=reports.DAY_STATUS_TITLES),
+        Field("submitted_at", "زمان ثبت", "datetime"),
+        Field("kind", "نوع مورد", "choice", group=True, choices=reports.KIND_TITLES),
+        Field("text", "شرح کامل", "text"),
+        Field("needs_help", "نیاز به کمک", "bool", group=True),
+        Field("ticket", "شمارهٔ تیکت", "text"),
+        Field("ticket_title", "عنوان تیکت", "text"),
+        Field("project", "پروژه", "text", group=True),
+        Field(
+            "estimated_minutes",
+            "تخمین تلاش (دقیقه؛ نه ساعت کاری)",
+            "number",
+            method="مقدار اختیاریِ اعلام‌شده توسط ثبت‌کننده؛ ساعت حضور محسوب نمی‌شود",
+        ),
+        Field("position", "ترتیب در بخش", "number"),
+    ],
+    build=build_daily_report_items,
+    default={
+        "columns": [
+            "date",
+            "person",
+            "status",
+            "kind",
+            "text",
+            "needs_help",
+            "ticket",
+            "project",
+            "estimated_minutes",
+        ],
+        "filters": [{"field": "status", "op": "in", "value": ["submitted", "late"]}],
+        "range": {"type": "relative", "days": 7},
+        "sort": [
+            {"field": "date", "dir": "desc"},
+            {"field": "person", "dir": "asc"},
+            {"field": "kind", "dir": "asc"},
+            {"field": "position", "dir": "asc"},
+        ],
+        "group_by": [],
+        "aggregates": [{"fn": "count"}],
+    },
+    date_field="date",
+    date_label="روز گزارش",
+    range_required=True,
+    team_source="daily_reports",
+    note="نمای پیش‌فرض فقط موارد گزارش‌های ثبت‌شده را نشان می‌دهد. پیش‌نویس‌ها با تغییر فیلتر وضعیت قابل مشاهده‌اند.",
+)
+
+
 # ---------------------------------------------------------------- 3. leave
 
 
@@ -501,11 +641,15 @@ def build_leave(ctx):
 
     people = ctx.requested_people("person")
     user_ids = list(people if people is not None else ctx.scope.user_ids)
+    latest = LeaveRequestVersion.objects.filter(request_id=OuterRef("pk")).order_by("-number")
     rows_qs = (
         visible_queryset(ctx.viewer, ctx.workspace, ctx.request)
         .filter(requester_id__in=user_ids)
-        .filter(versions__start_date__lte=ctx.date_to, versions__end_date__gte=ctx.date_from)
-        .select_related("requester")
+        .annotate(
+            report_start=Subquery(latest.values("start_date")[:1]), report_end=Subquery(latest.values("end_date")[:1])
+        )
+        .filter(report_start__lte=ctx.date_to, report_end__gte=ctx.date_from)
+        .select_related("requester", "absence")
         .prefetch_related("versions")
         .distinct()
         .order_by("-created_at")
@@ -525,6 +669,7 @@ def build_leave(ctx):
     ):
         approvers[decision.instance.record_id] = decision.actor
     result = []
+    linked_absences = set()
     for row in requests:
         versions = sorted(row.versions.all(), key=lambda v: v.number)
         if not versions:
@@ -532,6 +677,8 @@ def build_leave(ctx):
         version = versions[-1]
         if not (version.start_date <= ctx.date_to and version.end_date >= ctx.date_from):
             continue
+        if row.absence_id:
+            linked_absences.add(row.absence_id)
         result.append(
             {
                 "number": row.number,
@@ -546,35 +693,131 @@ def build_leave(ctx):
                 "duration_minutes": version.duration_minutes,
                 "approver": _person(approvers.get(row.id)) if row.status == LeaveRequest.Status.APPROVED else None,
                 "created_at": row.created_at,
+                "origin": "leave_request",
+                "reason": version.reason,
+                "starts_at": version.starts_at,
+                "ends_at": version.ends_at,
+                "absence_status": row.absence.status if row.absence_id else "",
+                "elapsed_minutes": (version.ends_at - version.starts_at).total_seconds() / 60,
                 "_link": f"/leave-requests/{row.id}",
             }
         )
+    start, end = ctx.moment_range()
+    absences = ctx.cap(
+        report_absences.visible_absences(ctx.viewer, ctx.workspace, user_ids, ctx.request)
+        .filter(starts_at__lt=end, ends_at__gt=start)
+        .exclude(id__in=linked_absences)
+        .select_related("user")
+        .order_by("-starts_at", "id")
+    )
+    numbers = dict(
+        EntityRecord.objects.filter(
+            workspace=ctx.workspace, entity__adapter="leave", source_id__in=[a.id for a in absences]
+        ).values_list("source_id", "number")
+    )
+    for row in absences:
+        minutes = (row.ends_at - row.starts_at).total_seconds() / 60
+        result.append(
+            {
+                "number": numbers.get(row.id) or f"ABS-{row.id}",
+                "person": _person(row.user),
+                "mode": "recorded",
+                "period": report_absences.period_text(row.starts_at, row.ends_at, ctx.zone),
+                "start_date": row.starts_at.astimezone(ctx.zone).date(),
+                "end_date": (row.ends_at - timedelta(microseconds=1)).astimezone(ctx.zone).date(),
+                "status": row.status,
+                "duration": f"{reports.fa(round(minutes, 2))} دقیقهٔ تقویمی",
+                "duration_days": None,
+                "duration_minutes": None,
+                "approver": None,
+                "created_at": row.created_at,
+                "origin": "absence",
+                "reason": row.reason,
+                "starts_at": row.starts_at,
+                "ends_at": row.ends_at,
+                "absence_status": row.status,
+                "elapsed_minutes": minutes,
+                "_link": f"/edit/leave/{row.id}",
+            }
+        )
+    if len(result) > ctx.limit:
+        raise TooLarge()
     return result
 
 
 LEAVE = Source(
     code="leave",
-    title="مرخصی",
-    description="درخواست‌های مرخصی روزانه و ساعتی با بازه، وضعیت، مدت و تأییدکننده (بدون دستهٔ مرخصی).",
+    title="مرخصی و عدم حضور",
+    description="درخواست‌های مرخصی و عدم حضورهای ثبت‌شده در یک گزارش؛ رکورد متصل به درخواست فقط یک‌بار شمرده می‌شود.",
     fields=[
         Field("number", "شماره", "text"),
         Field("person", "درخواست‌دهنده", "person", group=True),
-        Field("mode", "شیوه", "choice", group=True, choices={"daily": "روزانه", "hourly": "ساعتی"}),
+        Field(
+            "mode",
+            "شیوه",
+            "choice",
+            group=True,
+            choices={"daily": "روزانه", "hourly": "ساعتی", "recorded": "بازهٔ عدم حضور"},
+        ),
+        Field(
+            "origin",
+            "منبع ثبت",
+            "choice",
+            group=True,
+            choices={"leave_request": "درخواست مرخصی", "absence": "عدم حضور مستقیم"},
+        ),
         Field("period", "بازه", "text"),
         Field("start_date", "از تاریخ", "date"),
         Field("end_date", "تا تاریخ", "date"),
-        Field("status", "وضعیت", "choice", group=True, choices=dict(LeaveRequest.Status.choices)),
+        Field(
+            "status",
+            "وضعیت",
+            "choice",
+            group=True,
+            choices={**dict(LeaveRequest.Status.choices), **report_absences.STATUS_TITLES},
+        ),
+        Field(
+            "absence_status",
+            "وضعیت عدم حضور",
+            "choice",
+            group=True,
+            choices={"": "عدم حضور ثبت نشده", **report_absences.STATUS_TITLES},
+        ),
+        Field("reason", "علت", "text"),
+        Field("starts_at", "شروع بازه", "datetime"),
+        Field("ends_at", "پایان بازه", "datetime"),
+        Field(
+            "elapsed_minutes",
+            "طول بازه (دقیقهٔ تقویمی)",
+            "number",
+            agg=True,
+            method="فاصلهٔ ابتدا و انتهای بازه؛ معادل دقیقهٔ کاری نیست",
+        ),
         Field("duration", "مدت", "text", filter=False),
         Field("duration_days", "مدت (روز کاری)", "number", agg=True, method="روزهای کاری تقویم فرد هنگام ثبت درخواست"),
         Field(
-            "duration_minutes", "مدت (دقیقهٔ کاری)", "number", agg=True, method="دقیقه‌های کاری تقویم فرد (مرخصی ساعتی)"
+            "duration_minutes",
+            "مدت (دقیقهٔ کاری)",
+            "number",
+            agg=True,
+            method="دقیقه‌های کاری تقویم فرد (مرخصی ساعتی)",
         ),
         Field("approver", "تأییدکننده", "person", group=True, method="آخرین تصمیم‌گیر گردش‌کار درخواست تأییدشده"),
         Field("created_at", "زمان ثبت", "datetime"),
     ],
     build=build_leave,
     default={
-        "columns": ["number", "person", "mode", "period", "duration", "status", "approver"],
+        "columns": [
+            "number",
+            "person",
+            "origin",
+            "mode",
+            "period",
+            "duration",
+            "status",
+            "absence_status",
+            "approver",
+        ],
         "filters": [],
         "range": {"type": "relative", "days": 30},
         "sort": [{"field": "start_date", "dir": "desc"}],
@@ -865,6 +1108,7 @@ WORK_MODES = {"": "نامشخص", "onsite": "حضوری", "remote": "دورکا�
 
 
 def build_team_schedule(ctx):
+    can_open_calendar = has_permission(ctx.viewer, ctx.workspace, "WorkCalendar.View", request=ctx.request)
     people = ctx.requested_people("person")
     user_ids = list(people if people is not None else ctx.scope.user_ids)
     days = (ctx.date_to - ctx.date_from).days + 1
@@ -873,6 +1117,7 @@ def build_team_schedule(ctx):
     users = list(User.objects.filter(id__in=user_ids).order_by("display_name", "id"))
     resolvers = bulk_resolvers(ctx.workspace, users, ctx.date_from, ctx.date_to)
     leaves = reports.approved_leaves(ctx.workspace, user_ids, ctx.date_from, ctx.date_to)
+    absences = report_absences.standalone_periods(ctx.workspace, user_ids, ctx.date_from, ctx.date_to)
     start, end = ctx.moment_range()
     events = defaultdict(list)
     for event in (
@@ -911,6 +1156,7 @@ def build_team_schedule(ctx):
             schedule = resolvers[user.id].day(day)
             day_events = events.get((user.id, day), [])
             day_leaves = reports.day_leaves(ctx.workspace, leaves.get(user.id, []), day, schedule)
+            day_absences = report_absences.day_periods(absences.get(user.id, []), day, ctx.zone)
             declared = (user.id, day) in presence
             rows.append(
                 {
@@ -919,9 +1165,11 @@ def build_team_schedule(ctx):
                     "date": day,
                     "weekday": reports.WEEKDAY_TITLES[day.weekday()],
                     "is_working": schedule.working,
-                    "hours": f"{schedule.start.strftime('%H:%M')}–{schedule.end.strftime('%H:%M')}"
-                    if schedule.working and schedule.start and schedule.end
-                    else "",
+                    "hours": (
+                        f"{schedule.start.strftime('%H:%M')}–{schedule.end.strftime('%H:%M')}"
+                        if schedule.working and schedule.start and schedule.end
+                        else ""
+                    ),
                     "work_mode": schedule.work_mode or "",
                     "schedule_source": schedule.source,
                     "meetings": sum(1 for e in day_events if e.kind == "meeting"),
@@ -929,7 +1177,10 @@ def build_team_schedule(ctx):
                     "events": " | ".join(f"{e.get_kind_display()}: {e.title}" for e in day_events),
                     "presence_type": "self_reported" if declared else "none",
                     "leave": " | ".join(_period(v, ctx.workspace) for _, v in day_leaves),
-                    "_link": None,
+                    "absence": " | ".join(
+                        report_absences.period_text(*period, ctx.zone) for _, period in day_absences
+                    ),
+                    "_link": "/calendar" if can_open_calendar else None,
                 }
             )
             day += timedelta(days=1)
@@ -947,7 +1198,11 @@ TEAM_SCHEDULE = Source(
         Field("date", "تاریخ", "date", group=True),
         Field("weekday", "روز هفته", "text", group=True),
         Field(
-            "is_working", "روز کاری", "bool", group=True, method="برنامهٔ کاری حل‌شدهٔ فرد (استثنا > فرد > واحد > شرکت)"
+            "is_working",
+            "روز کاری",
+            "bool",
+            group=True,
+            method="برنامهٔ کاری حل‌شدهٔ فرد (استثنا > فرد > واحد > شرکت)",
         ),
         Field("hours", "ساعت برنامه", "text"),
         Field("work_mode", "شیوهٔ کار", "choice", group=True, choices=WORK_MODES),
@@ -964,6 +1219,7 @@ TEAM_SCHEDULE = Source(
             method="فقط اعلام خود فرد؛ حضور تأییدشده نیست",
         ),
         Field("leave", "مرخصی", "text"),
+        Field("absence", "عدم حضور ثبت‌شده", "text"),
     ],
     build=build_team_schedule,
     default={
@@ -978,6 +1234,7 @@ TEAM_SCHEDULE = Source(
             "missions",
             "presence_type",
             "leave",
+            "absence",
         ],
         "filters": [],
         "range": {"type": "relative", "days": 7},
@@ -1325,11 +1582,14 @@ EXTENSIONS = Source(
 )
 
 
+from .report_connected import connected_sources
+
 SOURCES = {
     source.code: source
     for source in (
         MY_WORK,
         DAILY_REPORTS,
+        DAILY_REPORT_ITEMS,
         LEAVE,
         RELATIONS,
         ACTIVITY,
@@ -1337,6 +1597,7 @@ SOURCES = {
         STATUS_TREND,
         TICKET_DEADLINES,
         EXTENSIONS,
+        *connected_sources(Source, Field),
     )
 }
 # Words that must never appear as a report column (decision: attendance is out of scope).
@@ -1761,11 +2022,79 @@ def all_rows(workspace, viewer, source, definition, request=None, now=None, limi
     return columns, [[cell(item, row.get(item.key), ctx.zone) for item in columns] for row in rows]
 
 
+SOURCE_CONNECTIONS = {
+    "my_work": [("فهرست کارها", "/issues", ("Issue.View",)), ("پروژه‌ها", "/projects", ("Project.View",))],
+    "daily_reports": [
+        ("گزارش روزانه", "/daily-report", ("DailyReport.Submit",)),
+        ("گزارش تیم", "/daily-report/team", ("DailyReport.Team.View", "Report.ViewAll")),
+        ("عدم حضور", "/absences", ("Absence.View",)),
+    ],
+    "daily_report_items": [
+        ("گزارش روزانه", "/daily-report", ("DailyReport.Submit",)),
+        ("فهرست کارها", "/issues", ("Issue.View",)),
+    ],
+    "leave": [
+        ("عدم حضور", "/absences", ("Absence.View",)),
+        ("درخواست‌های مرخصی", "/leave-requests", ("LeaveRequest.Create", "LeaveRequest.ViewAll")),
+        ("تقویم کاری", "/calendar", ("WorkCalendar.View",)),
+    ],
+    "relations": [("داده‌ها و ارتباط‌ها", "/entities", ())],
+    "activity": [
+        ("فهرست کارها", "/issues", ("Issue.View",)),
+        ("تقویم کاری", "/calendar", ("WorkCalendar.View",)),
+        ("درخواست‌های مرخصی", "/leave-requests", ("LeaveRequest.Create", "LeaveRequest.ViewAll")),
+    ],
+    "team_schedule": [
+        ("تقویم کاری", "/calendar", ("WorkCalendar.View",)),
+        ("عدم حضور", "/absences", ("Absence.View",)),
+    ],
+    "status_trend": [("فهرست کارها", "/issues", ("Issue.View",))],
+    "ticket_deadlines": [("فهرست کارها", "/issues", ("Issue.View",))],
+    "extensions": [("فهرست کارها", "/issues", ("Issue.View",))],
+    "records": [("داده‌ها و فرم‌ها", "/entities", ())],
+    "projects": [("پروژه‌ها", "/projects", ("Project.View",))],
+    "portal_requests": [
+        (
+            "درخواست‌های مشتریان",
+            "/portal-settings",
+            (
+                "Portal.Request.Triage",
+                "Portal.Reply",
+                "Portal.Account.Manage",
+                "Portal.Settings.Manage",
+                "Portal.Feedback.View",
+                "Quote.Manage",
+            ),
+        )
+    ],
+}
+
+
 def catalog(viewer, workspace, request=None):
+    from plane.db.models import SurfaceConfiguration
+
+    layouts = dict(
+        SurfaceConfiguration.objects.filter(
+            workspace=workspace,
+            code__in=[f"report-{key}" for key in SOURCES],
+        ).values_list("code", "definition")
+    )
+
+    def default_definition(source):
+        definition = deepcopy(source.default)
+        layout = layouts.get(f"report-{source.code}", {})
+        by_title = {f"native:{field.label}": field.key for field in source.fields}
+        columns = [by_title[column] for column in layout.get("columns", []) if column in by_title]
+        if columns:
+            definition["columns"] = columns
+        return definition
+
     team = {
         code: people_scope(viewer, workspace, source=src.team_source, request=request).team
         for code, src in SOURCES.items()
     }
+    connection_codes = {code for links in SOURCE_CONNECTIONS.values() for _, _, codes in links for code in codes}
+    granted = {code: has_permission(viewer, workspace, code, request=request) for code in connection_codes}
     return [
         {
             "code": source.code,
@@ -1777,7 +2106,12 @@ def catalog(viewer, workspace, request=None):
             "date_label": source.date_label,
             "range_required": source.range_required,
             "team": team[source.code],
-            "default": source.default,
+            "connections": [
+                {"title": title, "path": path}
+                for title, path, codes in SOURCE_CONNECTIONS.get(source.code, [])
+                if not codes or any(granted[code] for code in codes)
+            ],
+            "default": default_definition(source),
             "fields": [
                 {
                     "key": f.key,

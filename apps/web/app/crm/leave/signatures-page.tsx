@@ -1,10 +1,12 @@
+import { SurfaceTable } from "../engine/surface";
 /** Admin page: upload or replace users' signature images (Signature.Manage) and see each access. */
 import { useState } from "react";
 import { Navigate } from "react-router";
 import { useWorkspaceAccess } from "../api";
 import { useSlug } from "../api/client";
 import { signatureImageUrl, useSignatureHistory, useSignatures, useUploadSignature } from "../api/leave";
-import { Button, PageHeader, Skeleton } from "../components";
+import { Button, EmptyState, PageHeader, Skeleton } from "../components";
+import { errorMessage } from "../api/client";
 import { SignatureHistoryList } from "./components";
 import { SIGNATURE_NOTICE } from "./model";
 
@@ -19,6 +21,14 @@ export default function SignaturesPage() {
   const history = useSignatureHistory(selected);
   if (isLoading) return <Skeleton rows={5} />;
   if (!allowed) return <Navigate to="/leave-requests" replace />;
+  if (rows.isError)
+    return (
+      <EmptyState
+        title="تصویرهای امضا در دسترس نیست"
+        description={errorMessage(rows.error, "دریافت فهرست امضاها ممکن نشد.")}
+        action={<Button onClick={() => rows.refetch()}>تلاش دوباره</Button>}
+      />
+    );
   return (
     <div className="leave-page" dir="rtl">
       <PageHeader
@@ -30,65 +40,74 @@ export default function SignaturesPage() {
       {!rows.data ? (
         <Skeleton rows={5} />
       ) : (
-        <table className="leave-table">
-          <thead>
-            <tr>
-              <th>کاربر</th>
-              <th>وضعیت تصویر</th>
-              <th>اجازهٔ کاربر</th>
-              <th>اقدام</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.data.results.map(({ user, signature }) => (
-              <tr key={user.id}>
-                <td>{user.name}</td>
-                <td>
-                  {signature
-                    ? `بارگذاری‌شده در ${new Date(signature.uploaded_at).toLocaleDateString("fa-IR")}`
-                    : "ندارد"}
-                </td>
-                <td>{signature ? (signature.has_consent ? "داده است" : "نداده است") : "—"}</td>
-                <td className="leave-actions">
-                  <label className="button button-secondary">
-                    {signature ? "جایگزینی" : "بارگذاری"}
-                    <input
-                      hidden
-                      type="file"
-                      accept="image/png,image/jpeg"
-                      disabled={upload.isPending}
-                      onChange={(event) => {
-                        const file = event.target.files?.[0];
-                        if (file) upload.mutate({ userId: user.id, file });
-                        event.target.value = "";
-                      }}
-                    />
-                  </label>
-                  {signature && (
-                    <Button variant="ghost" onClick={() => setShown(shown === user.id ? undefined : user.id)}>
-                      {shown === user.id ? "بستن تصویر" : "دیدن تصویر"}
-                    </Button>
-                  )}
-                  <Button variant="ghost" onClick={() => setSelected(user.id)}>
-                    سابقه
-                  </Button>
-                  {shown === user.id && (
-                    <img
-                      className="leave-signature-thumb"
-                      src={signatureImageUrl(slug, user.id)}
-                      alt={`امضای ${user.name}`}
-                    />
-                  )}
-                </td>
+        <div className="leave-table-scroll" role="region" aria-label="تصویر امضای کاربران" tabIndex={0}>
+          <SurfaceTable code="signatures" className="leave-table">
+            <thead>
+              <tr>
+                <th>کاربر</th>
+                <th>وضعیت تصویر</th>
+                <th>اجازهٔ کاربر</th>
+                <th>اقدام</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.data.results.map(({ user, signature }) => (
+                <tr key={user.id}>
+                  <td>{user.name}</td>
+                  <td>
+                    {signature
+                      ? `بارگذاری‌شده در ${new Date(signature.uploaded_at).toLocaleDateString("fa-IR")}`
+                      : "ندارد"}
+                  </td>
+                  <td>{signature ? (signature.has_consent ? "داده است" : "نداده است") : "—"}</td>
+                  <td className="leave-actions">
+                    <label className="button button-secondary leave-upload-control">
+                      {signature ? "جایگزینی" : "بارگذاری"}
+                      <input
+                        className="leave-file-input"
+                        type="file"
+                        aria-label={`${signature ? "جایگزینی" : "بارگذاری"} تصویر امضای ${user.name}`}
+                        accept="image/png,image/jpeg"
+                        disabled={upload.isPending}
+                        onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          if (file) upload.mutate({ userId: user.id, file });
+                          event.target.value = "";
+                        }}
+                      />
+                    </label>
+                    {signature && (
+                      <Button variant="ghost" onClick={() => setShown(shown === user.id ? undefined : user.id)}>
+                        {shown === user.id ? "بستن تصویر" : "دیدن تصویر"}
+                      </Button>
+                    )}
+                    <Button variant="ghost" onClick={() => setSelected(user.id)}>
+                      سابقه
+                    </Button>
+                    {shown === user.id && (
+                      <img
+                        className="leave-signature-thumb"
+                        src={signatureImageUrl(slug, user.id)}
+                        alt={`امضای ${user.name}`}
+                      />
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </SurfaceTable>
+        </div>
       )}
       {selected && (
         <section className="leave-card" aria-label="سابقهٔ امضا">
           <h2>سابقهٔ تصویر امضا</h2>
-          {history.data ? <SignatureHistoryList events={history.data} /> : <Skeleton rows={3} />}
+          {history.isError ? (
+            <p role="alert">{errorMessage(history.error, "خواندن سابقهٔ امضا ممکن نشد.")}</p>
+          ) : history.data ? (
+            <SignatureHistoryList events={history.data} />
+          ) : (
+            <Skeleton rows={3} />
+          )}
         </section>
       )}
     </div>

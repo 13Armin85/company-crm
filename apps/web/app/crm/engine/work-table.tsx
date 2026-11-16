@@ -100,34 +100,34 @@ export function WorkTable({
   personal?: boolean;
 }) {
   return (
-    <SurfaceTable code={code} className={`surface-work-table${personal ? " personal-work-table" : ""}`}>
+    <SurfaceTable
+      code={code}
+      className={`surface-work-table${personal ? " personal-work-table" : ""}`}
+      aria-label="فهرست کارها"
+    >
       <thead>
         <tr>
-          <th>عنوان کار</th>
-          <th>شناسه</th>
-          <th>پروژه</th>
-          <th>وضعیت</th>
-          <th>اولویت</th>
-          <th>موعد</th>
-          <th>مسئول</th>
-          <th>عملیات</th>
+          <th scope="col">عنوان کار</th>
+          <th scope="col">شناسه</th>
+          <th scope="col">پروژه</th>
+          <th scope="col">وضعیت</th>
+          <th scope="col">اولویت</th>
+          <th scope="col">موعد</th>
+          <th scope="col">مسئول</th>
+          <th scope="col">عملیات</th>
         </tr>
       </thead>
       <tbody>
         {issues.map((issue) => (
           <tr
             key={issue.id}
-            className={
-              personal ? `personal-work-row state-${issue.status.replaceAll(" ", "-").toLowerCase()}` : undefined
-            }
+            className={`${personal ? "personal-work-row " : ""}work-list-row state-${issue.status.replaceAll(" ", "-").toLowerCase()}`}
           >
             <td className={personal ? "personal-work-name" : undefined}>
-              <div className={personal ? "personal-work-title-wrap" : undefined}>
-                {personal && (
-                  <span className="personal-work-marker" aria-hidden="true">
-                    {issue.status === "Done" ? <Check size={17} /> : <Circle size={17} />}
-                  </span>
-                )}
+              <div className="personal-work-title-wrap">
+                <span className="personal-work-marker" aria-hidden="true">
+                  {issue.status === "Done" ? <Check size={17} /> : <Circle size={17} />}
+                </span>
                 <div>
                   {readOnly ? (
                     <strong className="surface-work-title">{issue.name}</strong>
@@ -141,8 +141,7 @@ export function WorkTable({
                   )}
                   <TicketDeadlineBadge badge={issue.deadline ?? undefined} />
                   <small className="surface-work-sender">
-                    {personal && <UserRound size={12} aria-hidden="true" />} فرستنده:{" "}
-                    {issue.sender?.displayName || "نامشخص"}
+                    <UserRound size={12} aria-hidden="true" /> فرستنده: {issue.sender?.displayName || "نامشخص"}
                   </small>
                 </div>
               </div>
@@ -151,8 +150,8 @@ export function WorkTable({
               <IdentifierBadge value={issueReference(issue)} label="شناسه کار" />
             </td>
             <td>
-              <span className={personal ? "personal-work-project" : undefined}>
-                {personal && <Folder size={14} aria-hidden="true" />}
+              <span className="personal-work-project">
+                <Folder size={14} aria-hidden="true" />
                 {issue.scope === "workspace" ? "خارج از پروژه" : issue.projectName || issue.projectIdentifier}
               </span>
             </td>
@@ -165,8 +164,8 @@ export function WorkTable({
               )}
             </td>
             <td>
-              <span className={personal ? `personal-work-due${!issue.dueDate ? " no-date" : ""}` : undefined}>
-                {personal && <CalendarDays size={14} aria-hidden="true" />}
+              <span className={`personal-work-due${!issue.dueDate ? " no-date" : ""}`}>
+                <CalendarDays size={14} aria-hidden="true" />
                 {persianDate(issue.dueDate)}
               </span>
             </td>

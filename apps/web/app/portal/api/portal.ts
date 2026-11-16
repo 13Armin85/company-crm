@@ -8,6 +8,7 @@ export interface PortalStatus {
 }
 
 export interface PortalProfile {
+  request_form?: Record<string, { title?: string; placeholder?: string; help_text?: string }>;
   display_name: string;
   username: string;
   customer: string;

@@ -16,6 +16,44 @@ const native: NativeField = {
 };
 
 describe("native form customization", () => {
+  it("shows a configured label and help for an explicitly bound standalone input", () => {
+    const html = renderToStaticMarkup(
+      <>
+        {configureNativeFields(<textarea data-surface-field="description" defaultValue="شرح ثبت‌شده" />, [
+          { ...native, title: "شرح فعالیت", help_text: "نتیجهٔ کار را بنویسید" },
+        ])}
+      </>
+    );
+    expect(html).toContain("شرح فعالیت");
+    expect(html).toContain("نتیجهٔ کار را بنویسید");
+    expect(html).toContain("شرح ثبت‌شده");
+  });
+  it("uses saved titles and placeholders without losing the original input value or identity", () => {
+    const html = renderToStaticMarkup(
+      <>
+        {configureNativeFields(
+          <label>
+            <span>توضیح</span>
+            <textarea name="description" defaultValue="متن قبلی" />
+          </label>,
+          [
+            {
+              ...native,
+              title: "جزئیات درخواست",
+              aliases: ["توضیح"],
+              placeholder: "مشکل را توضیح دهید",
+              help_text: "شمارهٔ خطا را هم وارد کنید",
+            },
+          ]
+        )}
+      </>
+    );
+    expect(html).toContain("جزئیات درخواست");
+    expect(html).toContain('placeholder="مشکل را توضیح دهید"');
+    expect(html).toContain('name="description"');
+    expect(html).toContain("متن قبلی");
+    expect(html).toContain("شمارهٔ خطا را هم وارد کنید");
+  });
   it("creates distinct valid table tab identifiers on plain HTTP without randomUUID", () => {
     vi.stubGlobal("crypto", { getRandomValues: globalThis.crypto.getRandomValues.bind(globalThis.crypto) });
     try {

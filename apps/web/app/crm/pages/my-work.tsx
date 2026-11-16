@@ -140,8 +140,10 @@ export default function MyWorkPage() {
         </div>
         <div className="my-work-filters">
           <TabBar chooserKey="my-work-status" items={items} active={tab} onChange={setTab} />
-          <TicketPresetBar value={preset} counts={table.data?.preset_counts} onChange={setPreset} />
-          <SearchBox value={query} onChange={setQuery} placeholder="جستجوی عنوان، شناسه یا فرستنده…" />
+          <div className="my-work-filter-tools">
+            <TicketPresetBar value={preset} counts={table.data?.preset_counts} onChange={setPreset} />
+            <SearchBox value={query} onChange={setQuery} placeholder="جستجوی عنوان، شناسه یا فرستنده…" />
+          </div>
         </div>
         <div className="my-work-results" role="status">
           {isLoading || userLoading

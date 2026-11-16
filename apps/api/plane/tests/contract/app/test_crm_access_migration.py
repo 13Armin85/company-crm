@@ -1,12 +1,10 @@
 import importlib
 
-import pytest
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 
 
-@pytest.mark.django_db(transaction=True)
-def test_access_migration_preserves_data_and_is_idempotent():
+def test_access_migration_preserves_data_and_is_idempotent(migration_database):
     """Exercise an existing database, not just schema creation with --nomigrations."""
     executor = MigrationExecutor(connection)
     executor.migrate([("db", "0127_enterprise_organization")])

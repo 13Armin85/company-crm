@@ -114,8 +114,9 @@ def visible_ticket_ids(viewer, workspace, request=None):
 
 def ticket_rows(viewer, workspace, scope, request=None):
     """Tickets visible to the viewer and owned by a person in scope (never wider than either)."""
-    return (
-        Issue.objects.filter(workspace=workspace, is_draft=False, id__in=visible_ticket_ids(viewer, workspace, request))
-        .filter(owner_q(list(scope.user_ids)))
-        .distinct()
+    rows = Issue.objects.filter(
+        workspace=workspace, is_draft=False, id__in=visible_ticket_ids(viewer, workspace, request)
     )
+    # Portal submissions may have neither a staff creator nor an assignee yet. Report.ViewAll
+    # includes that queue, while ticket visibility still limits the result.
+    return (rows if scope.all_people else rows.filter(owner_q(list(scope.user_ids)))).distinct()

@@ -1,3 +1,4 @@
+import { ScrollableTable } from "@plane/ui";
 import { ErrorNotice } from "../error-state";
 import { useState } from "react";
 import { Link } from "react-router";
@@ -91,7 +92,7 @@ export function RelatedSection({
             <p className="engine-related-empty">در حال دریافت…</p>
           ) : count ? (
             <div className="engine-related-table-wrap">
-              <table className="engine-related-table">
+              <ScrollableTable className="engine-related-table">
                 <thead>
                   <tr>
                     <th>عنوان</th>
@@ -150,7 +151,7 @@ export function RelatedSection({
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </ScrollableTable>
             </div>
           ) : (
             <p className="engine-related-empty">رکورد مرتبطی وجود ندارد.</p>

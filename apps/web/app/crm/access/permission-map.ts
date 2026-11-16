@@ -34,8 +34,13 @@ export function canAccessPath(pathname: string, can: (code: string) => boolean):
       "View.Official.Manage",
       "Workflow.Design",
     ].some(can);
-  if (pathname.startsWith("/portal-settings"))
-    return can(portalPermissions.manageSettings) || can(portalPermissions.manageAccounts);
+  if (pathname.startsWith("/daily-report/team"))
+    return can(reportPermissions.teamDaily) || can(reportPermissions.viewAll);
+  if (pathname.startsWith("/daily-report/settings"))
+    return can(reportPermissions.submit) || can(reportPermissions.manageReminders);
+  if (pathname.startsWith("/daily-report")) return can(reportPermissions.submit) || can(reportPermissions.teamDaily);
+  if (pathname.startsWith("/reports")) return can(reportPermissions.view) || can(reportPermissions.viewAll);
+  if (pathname.startsWith("/portal-settings")) return Object.values(portalPermissions).some(can);
   if (/^\/roles\/[^/]+\/permissions\/?$/.test(pathname)) return can("Role.View") || can("Role.Permission.Assign");
   return permissionsForPath(pathname).every(can);
 }
@@ -67,4 +72,18 @@ export const portalPermissions = {
   reply: "Portal.Reply",
   manageQuotes: "Quote.Manage",
   viewFeedback: "Portal.Feedback.View",
+} as const;
+
+/** Ticket 8: daily reports and reports. A "team" code never widens data by itself: the server
+ * computes each viewer's scope (self + organization + active delegation) on every run. */
+export const reportPermissions = {
+  submit: "DailyReport.Submit",
+  teamDaily: "DailyReport.Team.View",
+  manageReminders: "DailyReport.Reminder.Manage",
+  view: "Report.View",
+  team: "Report.Team.View",
+  viewAll: "Report.ViewAll",
+  build: "Report.Build",
+  share: "Report.Share",
+  export: "Report.Export",
 } as const;

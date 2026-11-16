@@ -131,15 +131,21 @@ class TestIssueListGuestScope:
 
     @pytest.mark.django_db
     def test_guest_with_view_all_reads_all_requested_issues(
-        self, guest_client, workspace, project, own_issue, foreign_issue
+        self, guest_client, guest, workspace, project, own_issue, foreign_issue
     ):
-        """When guest_view_all_features is enabled, the guest sees all requested issues."""
+        """The legacy feature flag cannot grant the CRM permission to see other people's work."""
         project.guest_view_all_features = True
         project.save(update_fields=["guest_view_all_features"])
 
         url = LIST_URL.format(slug=workspace.slug, project_id=project.id)
         response = guest_client.get(url, {"issues": f"{own_issue.id},{foreign_issue.id}"})
 
+        assert response.status_code == status.HTTP_200_OK
+        returned_ids = {str(row["id"]) for row in response.data}
+        assert str(foreign_issue.id) not in returned_ids
+        from .test_crm_access_control import grant_role
+        grant_role(workspace, guest, ["Issue.ViewAll"], "Guest with explicit read-all grant")
+        response = guest_client.get(url, {"issues": f"{own_issue.id},{foreign_issue.id}"})
         assert response.status_code == status.HTTP_200_OK
         returned_ids = {str(row["id"]) for row in response.data}
         assert {str(own_issue.id), str(foreign_issue.id)} <= returned_ids

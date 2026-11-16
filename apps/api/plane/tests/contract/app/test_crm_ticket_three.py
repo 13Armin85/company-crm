@@ -9,6 +9,7 @@ from rest_framework.test import APIClient
 
 from plane.app.services.access_control import get_effective_permissions
 from plane.db.models import (
+    EntityRecord,
     OrganizationPermission,
     OrganizationRole,
     OrganizationUnit,
@@ -48,6 +49,7 @@ def test_role_provenance_survives_direct_allow_and_deny(workspace):
 @pytest.mark.parametrize("endpoint", ["membership", "members"])
 def test_deleted_members_are_hidden_and_readd_cannot_restore_grants(session_client, workspace, endpoint):
     user = member(workspace, f"ticket-three-{endpoint}")
+    directory = EntityRecord.objects.get(entity__workspace=workspace, entity__adapter="user", source_id=user.id)
     grant_role(workspace, user, ["Role.Delete"], "removed custom role")
     exception(workspace, user, "User.Create", "ALLOW")
     unit = OrganizationUnit.objects.create(workspace=workspace, title="removed unit")
@@ -67,8 +69,21 @@ def test_deleted_members_are_hidden_and_readd_cannot_restore_grants(session_clie
         str(row["member"]["id"]) for row in session_client.get(f"/api/workspaces/{workspace.slug}/members/").data
     ]
     response = session_client.post(f"/api/workspaces/{workspace.slug}/members/", {"email": user.email}, format="json")
-    assert response.status_code == 201
+    # Removing the final company membership disables the global account. Joining
+    # a company must not silently reactivate it; an explicit account restoration
+    # must happen before membership can be recreated.
+    assert response.status_code == 400, response.data
+    user.refresh_from_db()
+    assert not user.is_active
+    user.is_active = True
+    user.username = f"restored-{endpoint}"
+    user.save(update_fields=["is_active", "username"])
+    response = session_client.post(f"/api/workspaces/{workspace.slug}/members/", {"email": user.email}, format="json")
+    assert response.status_code == 201, response.data
     assert str(response.data["id"]) != str(membership.id)
+    directory.refresh_from_db()
+    assert directory.deleted_at is None and directory.is_active
+    assert EntityRecord.all_objects.filter(entity=directory.entity, source_id=user.id).count() == 1
     assert not OrganizationUnitMember.objects.filter(user=user, unit=unit).exists()
     assert "Role.Delete" not in get_effective_permissions(user, workspace)["permissions"]
     assert "User.Create" not in get_effective_permissions(user, workspace)["permissions"]
@@ -183,8 +198,14 @@ def test_unit_toggle_preserves_structure_and_members(session_client, workspace):
     OrganizationUnitMember.objects.create(unit=unit, user=user)
     path = f"/api/workspaces/{workspace.slug}/organization/units/{unit.id}/"
     for active in (False, True):
+        if active:
+            # An inactive parent must be enabled before its child can be enabled.
+            blocked = session_client.patch(path, {"is_active": True}, format="json")
+            assert blocked.status_code == 400
+            parent.is_active = True
+            parent.save(update_fields=["is_active"])
         response = session_client.patch(path, {"is_active": active}, format="json")
-        assert response.status_code == 200
+        assert response.status_code == 200, response.data
         assert response.data["parent_id"] == parent.id
         assert response.data["manager_id"] == user.id
         assert response.data["member_ids"] == [user.id]

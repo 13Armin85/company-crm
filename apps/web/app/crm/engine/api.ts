@@ -182,6 +182,9 @@ export function useEngineMutation(successMessage = "تغییرات ذخیره ش
         "task-history",
         "workspace-access",
         "organization-permissions",
+        "report-catalog",
+        "report-run",
+        "portal-requests",
       ]) {
         void client.invalidateQueries({ queryKey: [key, slug] }).catch(() => {});
       }

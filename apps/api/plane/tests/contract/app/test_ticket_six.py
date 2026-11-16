@@ -521,18 +521,17 @@ def test_lookup_uses_live_related_values_and_aggregations(engine):
     assert float(result.data["results"][0]["values"][total["field"]]) == 50
 
 
-def test_form_designer_excludes_fixed_pages_and_core_field_is_locked(engine):
+def test_form_designer_includes_page_forms_and_core_field_is_locked(engine):
     workspace, _, client = engine
     result = client.get(endpoint(workspace, "surfaces/"))
     assert result.status_code == 200, result.data
-    assert not {
+    assert {
         "profile",
         "security",
         "notifications",
         "workspace",
         "password",
-        "appearance",
-    }.intersection(row["code"] for row in result.data["results"])
+    } <= {row["code"] for row in result.data["results"]}
     response = client.put(
         endpoint(workspace, "surfaces/profile/"),
         {"revision": 0, "definition": {}},

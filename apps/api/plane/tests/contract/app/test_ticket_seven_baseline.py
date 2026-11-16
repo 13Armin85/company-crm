@@ -130,7 +130,8 @@ def test_portal_permission_codes_are_registered():
 def test_entity_events_are_plain_append_rows():
     names = {c.name for c in EntityEvent._meta.constraints}
     # HEAD had no constraint at all; ticket 7 adds only the two partial unique ones.
-    assert names == {"crm_quote_one_decision", "crm_portal_one_feedback"}  # after ticket 7 (HEAD: none)
+    # Ticket 8 adds one more partial unique constraint (one daily-report reminder per person and day).
+    assert names == {"crm_quote_one_decision", "crm_portal_one_feedback", "crm_daily_report_one_reminder"}
 
 
 def test_intake_is_project_bound():
