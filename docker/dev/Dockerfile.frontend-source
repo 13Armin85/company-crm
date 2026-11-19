@@ -4,9 +4,8 @@
 ARG FRONTEND_BASE_IMAGE=company-crm-local-frontend:installed-deps
 FROM ${FRONTEND_BASE_IMAGE}
 WORKDIR /app
+# Reuse the dependency installation from the base image during this source-only build.
+ENV PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN=false
 COPY apps/web/ ./apps/web/
-COPY packages/ui/src/ ./packages/ui/src/
-COPY packages/ui/styles/ ./packages/ui/styles/
-COPY packages/ui/package.json packages/ui/tsdown.config.ts ./packages/ui/
-COPY packages/tailwind-config/crm-theme.css ./packages/tailwind-config/crm-theme.css
-RUN --network=none pnpm --filter @plane/ui build && pnpm --filter web build
+COPY packages/ ./packages/
+RUN --network=none pnpm exec turbo run build --filter=web --env-mode=loose --concurrency=2
