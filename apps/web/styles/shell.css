@@ -398,15 +398,6 @@
 .shell-header .breadcrumb a:hover {
   color: var(--text-primary);
 }
-.shell-header .breadcrumb span {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.shell-header .breadcrumb b {
-  color: var(--text-primary);
-  font-weight: 600;
-}
 .shell-search {
   display: flex;
   align-items: center;

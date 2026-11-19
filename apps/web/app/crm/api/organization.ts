@@ -36,7 +36,14 @@ export const useOrganizationRole = (roleId: string, enabled = true) => {
     queryKey: ["organization-role", slug, roleId],
     enabled: Boolean(slug && roleId) && enabled,
     queryFn: async ({ signal }) =>
-      mapOrganizationRole((await api.get(`/api/workspaces/${slug}/organization/roles/${roleId}/`, { signal })).data),
+      mapOrganizationRole(
+        (
+          await api.get(
+            `/api/workspaces/${encodeURIComponent(slug ?? "")}/organization/roles/${encodeURIComponent(roleId)}/`,
+            { signal }
+          )
+        ).data
+      ),
   });
 };
 

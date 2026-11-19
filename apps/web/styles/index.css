@@ -126,13 +126,59 @@ h4 {
   font-size: var(--fs-sm);
   white-space: nowrap;
 }
-.breadcrumb span {
+.breadcrumb ol {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
-.breadcrumb b {
-  color: var(--text-secondary);
+.breadcrumb li,
+.breadcrumb a,
+.breadcrumb-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.breadcrumb a,
+.breadcrumb-label {
+  padding: 5px 8px;
+  border-radius: 8px;
+}
+.breadcrumb a {
+  text-decoration: none;
+  transition:
+    background-color 150ms,
+    color 150ms;
+}
+.breadcrumb a:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+.breadcrumb a:focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: 2px;
+}
+.breadcrumb [aria-current="page"] {
+  background: var(--surface-soft);
+  color: var(--text-primary);
   font-weight: 600;
+}
+.breadcrumb-label > span,
+.breadcrumb a > span {
+  display: block;
+  max-width: 24ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.breadcrumb-separator {
+  flex-shrink: 0;
+  opacity: 0.5;
 }
 .command-input kbd {
   padding: 1px 6px;
