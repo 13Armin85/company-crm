@@ -1,0 +1,105 @@
+/* Match the disclosure markup instead of the former inline width/pin controls. */
+.engine-column-editor .engine-column-row,
+.engine-column-editor .engine-column-row:has(> .searchable-select:first-of-type:not(:last-of-type)) {
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  grid-template-areas: "drag name actions" ". relation relation" ". options options";
+  align-items: center;
+}
+.engine-column-editor .engine-column-row > .searchable-select,
+.engine-column-editor .engine-column-row > .searchable-select:first-of-type:last-of-type {
+  grid-area: relation;
+  width: 100%;
+}
+.engine-column-editor .engine-column-options {
+  grid-area: options;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+}
+.engine-column-options > summary {
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+}
+.engine-column-options .engine-suffixed-input {
+  direction: ltr;
+}
+.engine-column-options .engine-suffixed-input input {
+  text-align: left;
+}
+.engine-column-paths > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.engine-column-options[open] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+.engine-column-options[open] > summary {
+  grid-column: 1 / -1;
+}
+.engine-column-options > :is(label, .searchable-select) {
+  min-width: 0;
+  width: 100%;
+  margin-top: 10px;
+}
+.engine-column-editor .engine-column-actions {
+  align-items: center;
+  padding: 0;
+}
+.engine-column-editor .engine-column-actions button {
+  width: 34px;
+  height: 34px;
+  flex: none;
+}
+.engine-column-intro {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+.engine-column-intro p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+}
+.engine-column-sort-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 36px;
+  gap: 10px;
+  align-items: end;
+  margin-block: 12px;
+}
+.engine-column-sort-row > * {
+  min-width: 0;
+}
+.engine-column-sort-row > button {
+  height: 40px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+}
+@container engine-column-editor (max-width: 470px) {
+  .engine-column-tools,
+  .engine-column-options[open],
+  .engine-view-simple-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .engine-column-editor .engine-column-row,
+  .engine-column-editor .engine-column-row:has(> .searchable-select:first-of-type:not(:last-of-type)) {
+    grid-template-columns: 18px minmax(0, 1fr);
+    grid-template-areas: "drag name" ". actions" "relation relation" "options options";
+  }
+  .engine-column-editor .engine-column-actions {
+    justify-content: flex-end;
+  }
+  .engine-column-sort-row {
+    grid-template-columns: minmax(0, 1fr) 36px;
+  }
+  .engine-column-sort-row > .searchable-select:first-child {
+    grid-column: 1 / -1;
+  }
+}

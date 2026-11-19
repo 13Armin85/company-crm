@@ -23,6 +23,9 @@ type ShellProps = {
   onCloseMobile: () => void;
 };
 
+// On tablets the panel floats over the workspace, so the rail opens it on demand.
+const panelFloats = () => typeof window !== "undefined" && window.matchMedia("(max-width: 980px)").matches;
+
 export function ShellNavigation({
   can,
   collapsed,
@@ -44,15 +47,15 @@ export function ShellNavigation({
 
   const groups = useMemo(
     () =>
-      shellGroups
-        .map((group) => ({ ...group, items: group.items.filter((item) => canAccessPath(item.to, can)) }))
-        .filter((group) => group.items.length || group.id === "data"),
+      shellGroups.reduce<ShellGroup[]>((visible, group) => {
+        const items = group.items.filter((item) => canAccessPath(item.to, can));
+        if (items.length || group.id === "data") visible.push({ ...group, items });
+        return visible;
+      }, []),
     [can]
   );
   const current = groups.find((group) => group.id === selected) ?? groups[0];
 
-  // On tablets the panel floats over the workspace, so the rail opens it on demand.
-  const panelFloats = () => typeof window !== "undefined" && window.matchMedia("(max-width: 980px)").matches;
   const chooseGroup = (group: ShellGroup) => {
     setSelected(group.id);
     if (panelFloats()) {
@@ -113,7 +116,11 @@ export function ShellNavigation({
           onClick={togglePanel}
         >
           <span className="shell-rail-icon">
-            {collapsed ? <PanelRightOpen size={19} strokeWidth={1.8} /> : <PanelRightClose size={19} strokeWidth={1.8} />}
+            {collapsed ? (
+              <PanelRightOpen size={19} strokeWidth={1.8} />
+            ) : (
+              <PanelRightClose size={19} strokeWidth={1.8} />
+            )}
           </span>
         </button>
       </aside>
@@ -165,7 +172,12 @@ export function ShellNavigation({
               </h3>
               {projects.length ? (
                 projects.slice(0, 6).map((project) => (
-                  <NavLink key={project.id} to={`/projects/${project.id}`} className="shell-link" onClick={onCloseMobile}>
+                  <NavLink
+                    key={project.id}
+                    to={`/projects/${project.id}`}
+                    className="shell-link"
+                    onClick={onCloseMobile}
+                  >
                     <i className="shell-swatch" style={{ background: project.color }} aria-hidden="true" />
                     <span>{project.name}</span>
                   </NavLink>
@@ -176,7 +188,7 @@ export function ShellNavigation({
             </section>
           )}
           {current?.id === "data" && (
-            <section className="shell-section">
+            <section className="shell-section shell-section-pages">
               <SidebarPages collapsed={false} canCreate={canCreatePage} onNavigate={onCloseMobile} />
             </section>
           )}

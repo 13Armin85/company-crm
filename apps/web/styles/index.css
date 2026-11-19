@@ -12,6 +12,8 @@
 @import "./leave.css";
 @import "./portal.css";
 @import "./reports.css";
+@import "./advanced-filter.css";
+@import "./column-editor.css";
 * {
   box-sizing: border-box;
 }

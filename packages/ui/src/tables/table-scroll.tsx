@@ -13,6 +13,7 @@ export function ScrollableTable(props: TableHTMLAttributes<HTMLTableElement>) {
 export function TableScroll({ children, className = "", ...props }: HTMLAttributes<HTMLDivElement>) {
   const root = useRef<HTMLDivElement>(null);
   const drag = useRef<{ x: number; left: number; moved: boolean } | null>(null);
+  const suppressClick = useRef(false);
   const [wide, setWide] = useState(false);
   useEffect(() => {
     const element = root.current;
@@ -25,10 +26,11 @@ export function TableScroll({ children, className = "", ...props }: HTMLAttribut
     return () => observer.disconnect();
   }, [children]);
   const finish = (event: PointerEvent<HTMLDivElement>) => {
+    if (drag.current) suppressClick.current = drag.current.moved;
+    drag.current = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId))
       event.currentTarget.releasePointerCapture(event.pointerId);
     event.currentTarget.classList.remove("is-dragging");
-    if (drag.current && !drag.current.moved) drag.current = null;
   };
   return (
     <div className="horizontal-table-shell" style={{ minWidth: 0, maxWidth: "100%" }}>
@@ -53,10 +55,12 @@ export function TableScroll({ children, className = "", ...props }: HTMLAttribut
           event.currentTarget.scrollBy({ left: event.key === "ArrowLeft" ? -120 : 120 });
         }}
         onPointerDown={(event) => {
+          suppressClick.current = false;
           if (
             !wide ||
             event.pointerType !== "mouse" ||
             event.button !== 0 ||
+            event.target === event.currentTarget ||
             (event.target as HTMLElement).closest("a,button,input,select,textarea,[role='button']")
           )
             return;
@@ -75,13 +79,14 @@ export function TableScroll({ children, className = "", ...props }: HTMLAttribut
         onPointerUp={finish}
         onPointerCancel={(event) => {
           finish(event);
-          drag.current = null;
+          suppressClick.current = false;
         }}
+        onLostPointerCapture={finish}
         onClickCapture={(event) => {
-          if (!drag.current?.moved) return;
+          if (!suppressClick.current) return;
           event.preventDefault();
           event.stopPropagation();
-          drag.current = null;
+          suppressClick.current = false;
         }}
       >
         {children}

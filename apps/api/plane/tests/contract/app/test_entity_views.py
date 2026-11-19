@@ -67,6 +67,19 @@ def query(engine, entity, definition, **data):
     )
 
 
+def test_user_recipients_show_and_search_full_names_instead_of_generated_labels(engine):
+    workspace, user, client = engine
+    user.first_name, user.last_name, user.display_name = "علی", "رضایی", "1287491"
+    user.save(update_fields=["first_name", "last_name", "display_name"])
+    entity = EntityType.objects.get(workspace=workspace, adapter="user", parent__isnull=True)
+    response = client.get(
+        endpoint(workspace, f"entities/{entity.code}/view-schema/"),
+        {"recipients": "users", "search": "علی رضایی"},
+    )
+    assert response.status_code == 200
+    assert {"id": str(user.id), "title": "علی رضایی"} in response.data["results"]
+
+
 def test_server_nested_filter_sort_pagination_and_global_aggregates(engine):
     entity, _ = make_entity(
         engine,

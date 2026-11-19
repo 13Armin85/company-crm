@@ -62,3 +62,13 @@ def test_preview_escapes_user_text_and_keeps_unsigned_signature_location():
     assert "<br>توضیح تکمیلی" in html
     assert documents.SIGNATURE_PREVIEW_TEXT in html
     assert "{{" not in html
+
+
+def test_empty_time_slot_is_blank_in_rendered_word_and_preview():
+    doc = Document()
+    doc.add_paragraph("پایان: {{end_time}}")
+    filled = documents.render(save(doc), {"end_time": ""})
+    text = " ".join(documents._paragraph_text(p) for p in documents._paragraphs(Document(BytesIO(filled))))
+    assert "{{end_time}}" not in text
+    assert "پایان:" in text
+    assert "{{end_time}}" not in documents.to_html(filled)

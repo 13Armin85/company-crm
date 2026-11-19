@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { ArrowLeft, LockKeyhole } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router";
 import { BrandLogo } from "@plane/ui";
+import { PageHelp } from "../components/page-help";
 
 const authErrors: Record<string, string> = {
   USER_DOES_NOT_EXIST: "حساب کاربری پیدا نشد.",
@@ -55,6 +56,9 @@ export default function AuthPage() {
     );
   return (
     <main className="auth-page">
+      <div className="auth-help-corner">
+        <PageHelp />
+      </div>
       <section className="auth-showcase">
         <BrandLogo variant="full" className="auth-brand-mark" />
         <div>

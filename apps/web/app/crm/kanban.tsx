@@ -5,6 +5,7 @@ import type { WorkCategoryId } from "./ticket/model";
 import { canChangeIssueStatus, canTransferIssue } from "./task-access";
 import { SearchableSelect } from "@plane/ui";
 import { useState } from "react";
+import type { CSSProperties } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -36,7 +37,7 @@ export const statusFromDropTarget = (id: UniqueIdentifier | undefined): Status |
 /** Prefer the column under the pointer; fall back to overlap when the pointer sits between columns. */
 export const kanbanCollision: CollisionDetection = (args) => {
   const hits = pointerWithin(args);
-  return hits.length ? hits : rectIntersection(args);
+  return args.pointerCoordinates ? hits : rectIntersection(args);
 };
 
 const issueTitle = (id: UniqueIdentifier, issues: Issue[]) =>
@@ -218,7 +219,12 @@ function KanbanColumn({
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
   return (
-    <section ref={setNodeRef} className={`kanban-column ${isOver ? "is-over" : ""}`}>
+    <section
+      ref={setNodeRef}
+      className={`kanban-column ${isOver ? "is-over" : ""}`}
+      data-status={id}
+      aria-label={title}
+    >
       <header>
         <span>
           <i style={{ background: color }} />
@@ -298,6 +304,7 @@ export function IssueKanbanBoard({
   return (
     <DndContext
       sensors={sensors}
+      autoScroll={{ threshold: { x: 0, y: 0.15 } }}
       collisionDetection={kanbanCollision}
       accessibility={{
         screenReaderInstructions: {
@@ -318,11 +325,12 @@ export function IssueKanbanBoard({
       onDragEnd={dragEnd}
       onDragCancel={() => setMoving(null)}
     >
-      <div className="kanban-board kanban-board-grouped">
+      <div className="kanban-board kanban-board-grouped" role="region" aria-label="برد کانبان کارها" tabIndex={0}>
         {kanbanGroups(columns).map((group) => (
           <div
             key={group.category}
             className={`kanban-category kanban-category-${group.category}`}
+            style={{ "--kanban-column-count": group.columns.length } as CSSProperties}
             role="group"
             aria-label={group.title}
           >

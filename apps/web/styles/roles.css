@@ -1,0 +1,143 @@
+.roles-table-card {
+  min-width: 0;
+}
+.roles-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.roles-table th,
+.roles-table td {
+  text-align: start;
+  vertical-align: middle;
+}
+.roles-table th:last-child,
+.roles-table td:last-child {
+  min-width: 260px;
+}
+.roles-description {
+  max-width: 320px;
+  overflow-wrap: anywhere;
+  color: var(--text-secondary);
+}
+.roles-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.roles-status::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.roles-status.is-active {
+  color: var(--green);
+  background: color-mix(in srgb, var(--green) 10%, var(--surface));
+}
+.roles-status.is-inactive {
+  color: var(--text-muted);
+  background: var(--surface-soft);
+}
+.roles-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.roles-actions .button {
+  min-height: 32px;
+  padding: 5px 9px;
+  white-space: nowrap;
+}
+@media (max-width: 800px) {
+  .roles-table-card {
+    overflow: visible;
+    border: 0;
+    background: transparent;
+  }
+  .roles-table-card .horizontal-table-scroll {
+    overflow: visible;
+  }
+  .roles-table-card .horizontal-table-shell {
+    overflow: visible;
+  }
+  .roles-table {
+    display: block;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+  .roles-table thead {
+    display: none;
+  }
+  .roles-table tbody {
+    display: grid;
+    gap: 12px;
+  }
+  .roles-table tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 16px;
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+  }
+  .roles-table td {
+    display: grid;
+    align-content: start;
+    gap: 4px;
+    min-width: 0;
+    height: auto;
+    padding: 0;
+    border: 0;
+    overflow-wrap: anywhere;
+  }
+  .roles-table td::before {
+    content: attr(data-label);
+    color: var(--text-muted);
+    font-size: var(--fs-xs);
+    font-weight: 600;
+  }
+  .roles-table td:first-child {
+    grid-column: 1 / -1;
+  }
+  .roles-table td:first-child::before {
+    display: none;
+  }
+  .roles-table td:last-child {
+    grid-column: 1 / -1;
+    min-width: 0;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+  }
+  .roles-table td:last-child .button {
+    width: auto;
+  }
+  .roles-name-cell {
+    font-weight: 700;
+  }
+}
+@media (max-width: 480px) {
+  .roles-table tr {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .roles-table td,
+  .roles-table td:first-child,
+  .roles-table td:last-child {
+    grid-column: 1;
+  }
+  .roles-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .roles-actions .button {
+    justify-content: center;
+    white-space: normal;
+    text-align: center;
+  }
+}

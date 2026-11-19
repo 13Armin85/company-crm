@@ -10,6 +10,7 @@ import { useRolesTable } from "../table-hooks";
 import { useDebouncedValue, useTablePaging } from "../table-query";
 import { TablePagination } from "../table-pagination";
 import { SurfaceForm, SurfaceTable } from "../engine/surface";
+import "../../../styles/roles.css";
 
 export default function RolesPage() {
   const slug = useUIStore((state) => state.workspaceSlug) ?? "";
@@ -54,8 +55,8 @@ export default function RolesPage() {
       {isLoading ? (
         <Skeleton rows={5} />
       ) : (
-        <div className="table-card">
-          <SurfaceTable code="roles">
+        <div className="table-card roles-table-card">
+          <SurfaceTable code="roles" className="roles-table">
             <thead>
               <tr>
                 <th>نام نقش</th>
@@ -69,17 +70,23 @@ export default function RolesPage() {
             <tbody>
               {roles.map((role) => (
                 <tr key={role.id}>
-                  <td>
+                  <td data-label="نام نقش">
                     <div className="role-name-cell">
                       <span>{role.name}</span>
                       {role.systemKey && <small>سیستمی؛ قابل حذف نیست</small>}
                     </div>
                   </td>
-                  <td>{role.description}</td>
-                  <td>{role.isActive ? "فعال" : "غیرفعال"}</td>
-                  <td>{role.permissionIds.length.toLocaleString("fa-IR")}</td>
-                  <td>{(role.userCount ?? 0).toLocaleString("fa-IR")}</td>
-                  <td className="row-actions">
+                  <td data-label="توضیح" className="roles-description">
+                    {role.description || "—"}
+                  </td>
+                  <td data-label="وضعیت">
+                    <span className={`roles-status ${role.isActive ? "is-active" : "is-inactive"}`}>
+                      {role.isActive ? "فعال" : "غیرفعال"}
+                    </span>
+                  </td>
+                  <td data-label="مجوزها">{role.permissionIds.length.toLocaleString("fa-IR")}</td>
+                  <td data-label="کاربران دارای نقش">{(role.userCount ?? 0).toLocaleString("fa-IR")}</td>
+                  <td data-label="عملیات" className="row-actions roles-actions">
                     {access.can("Role.Edit") && (
                       <Button
                         variant="secondary"

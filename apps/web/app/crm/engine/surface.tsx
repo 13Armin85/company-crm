@@ -19,9 +19,6 @@ import { useUIStore } from "../store";
 import { useEngineQuery, useEngineSlug, enginePath } from "./api";
 import { EngineRichText } from "./record-form";
 import { persianDate, plainText } from "../utils";
-import { Button } from "../components";
-import { EntityViewsPage } from "./view-page";
-import type { SavedViewList } from "./view-types";
 import { RecordSummaryDrawer } from "./record-drawer";
 import {
   MAIN_TABLE_TAB,
@@ -465,12 +462,6 @@ function ConnectedTable({ code, dynamicColumns = false, children, ...props }: Su
   const config = useSurface(code),
     { data: access } = useWorkspaceAccess();
   const engineCode = config.data?.engine || ({ users: "user", units: "unit" } as Record<string, string>)[code];
-  const saved = useEngineQuery<SavedViewList>(
-    "views",
-    `entities/${engineCode}/views/`,
-    Boolean(engineCode && access?.can("View.Personal.Create"))
-  );
-  const [personalMode, setPersonalMode] = useState<boolean | null>(null);
   const [summaryId, setSummaryId] = useState<string | null>(null);
   const elements = Children.toArray(children).filter(isValidElement) as ReactElement<{ children?: ReactNode }>[];
   const head = elements.find((element) => element.type === "thead"),
@@ -524,17 +515,6 @@ function ConnectedTable({ code, dynamicColumns = false, children, ...props }: Su
       ? id.slice("native:".length)
       : fields.find((f) => f.code === id.slice(id.indexOf(":") + 1))?.title || id,
   }));
-  const showPersonal =
-    personalMode ?? Boolean(saved.data?.default_id && saved.data.default_id !== saved.data.official_id);
-  if (showPersonal && engineCode)
-    return (
-      <div className="surface-table-wrap">
-        <Button variant="ghost" onClick={() => setPersonalMode(false)}>
-          بازگشت به جدول رسمی
-        </Button>
-        <EntityViewsPage entityCode={engineCode} />
-      </div>
-    );
   return (
     <div className="surface-table-wrap">
       {engineCode && summaryId && (
@@ -596,10 +576,10 @@ function ConnectedTable({ code, dynamicColumns = false, children, ...props }: Su
             }}
           />
           {engineCode && access?.can("View.Personal.Create") && (
-            <button type="button" className="surface-table-action" onClick={() => setPersonalMode(true)}>
+            <Link className="surface-table-action" to={`/entities/${encodeURIComponent(engineCode)}?layout=table`}>
               <Table2 size={15} aria-hidden="true" />
               جدول من
-            </button>
+            </Link>
           )}
           {access?.can("FormDesigner.Publish") && (
             <Link

@@ -16,6 +16,7 @@ from plane.db.models import EntityViewExport, User, OrganizationRole, Organizati
 from plane.app.services.access_control import has_permission
 from django.db.models import Q
 from plane.app.services.entity_query import EntityQuery, default_definition
+from plane.app.services.user_labels import user_label, user_search_filter
 from plane.app.services.entity_views import (
     SYSTEM_VIEWS,
     visible_views,
@@ -134,7 +135,7 @@ class EngineViewSchemaEndpoint(EngineAPIView):
                 else "title" if kind == "units" else "name"
             )
             rows = (
-                rows.filter(**{f"{name}__icontains": search})
+                rows.filter(user_search_filter(search) if kind == "users" else Q(**{f"{name}__icontains": search}))
                 .distinct()
                 .order_by(name, "id")
             )
@@ -145,7 +146,7 @@ class EngineViewSchemaEndpoint(EngineAPIView):
             return Response(
                 {
                     "results": [
-                        {"id": str(row.id), "title": getattr(row, name)}
+                        {"id": str(row.id), "title": user_label(row) if kind == "users" else getattr(row, name)}
                         for row in rows[offset * size : (offset + 1) * size]
                     ],
                     "count": rows.count(),
@@ -364,7 +365,7 @@ class EngineViewOptionsEndpoint(EngineAPIView):
             ]
             rows = (
                 scopes[field["kind"]]
-                .filter(**{f"{name}__icontains": search})
+                .filter(user_search_filter(search) if field["kind"] == "user" else Q(**{f"{name}__icontains": search}))
                 .distinct()
                 .order_by(name, "id")
             )
@@ -372,7 +373,7 @@ class EngineViewOptionsEndpoint(EngineAPIView):
                 rows = rows.filter(id__in=selected)
             count = rows.count()
             result = [
-                {"id": str(r.id), "title": getattr(r, name)}
+                {"id": str(r.id), "title": user_label(r) if field["kind"] == "user" else getattr(r, name)}
                 for r in rows[offset * size : (offset + 1) * size]
             ]
         return Response({"results": result, "count": count})

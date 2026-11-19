@@ -3,7 +3,7 @@ import { SurfaceTable, ConfiguredFields } from "../engine/surface";
  * status list, mapping and limits (Portal.Settings.Manage). The server validates every value again. */
 import { useEffect, useState } from "react";
 import { Link, Navigate, useSearchParams } from "react-router";
-import { ArrowUpLeft, Globe, Inbox, KeyRound, Settings2, Users, UserRound, Power } from "lucide-react";
+import { ArrowUpLeft, Globe, Inbox, KeyRound, Plus, Power, Settings2, Trash2, Users, UserRound } from "lucide-react";
 import { useWorkspaceAccess } from "../api";
 import {
   useCreatePortalAccount,
@@ -23,6 +23,7 @@ import { ErrorNotice } from "../error-state";
 import { errorMessage } from "../api/client";
 import { accountState, accountStates, filterAccounts } from "./portal-account-model";
 import type { AccountState } from "./portal-account-model";
+import { isPortalLabelUsed, nextPortalLabelCode } from "./portal-status-model";
 
 /** Labels referenced by the mapping must stay in the allowed list (the server refuses otherwise too). */
 export const settingsProblems = (doc: PortalSettingsDoc) => {
@@ -361,99 +362,98 @@ function StatusSettings({ payload }: { payload: PortalSettingsPayload }) {
           if (!problems.length) save.mutate(doc);
         }}
       >
-        <h2>وضعیت‌های قابل‌نمایش برای مشتری</h2>
-        <p className="ticket-muted">
-          مشتری فقط برچسب‌های این فهرست را می‌بیند؛ نام وضعیت‌های داخلی هرگز نمایش داده نمی‌شود. وضعیت نگاشت‌نشده با برچسب
-          پیش‌فرض نشان داده می‌شود.
-        </p>
-        <SurfaceTable code="portal-status-labels" className="leave-table">
-          <thead>
-            <tr>
-              <th>کد</th>
-              <th>عنوان برای مشتری</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {doc.labels.map((item, index) => (
-              // eslint-disable-next-line react/no-array-index-key -- Labels are controlled positional slots and their editable codes can be blank or duplicated while typing.
-              <tr key={index}>
-                <td>
+        <section className="portal-status-section" aria-labelledby="portal-status-heading">
+          <div className="portal-status-heading">
+            <div>
+              <h2 id="portal-status-heading">وضعیت‌های قابل‌نمایش برای مشتری</h2>
+              <p>عنوان‌هایی که مشتری در درگاه می‌بیند را اینجا تعیین کنید.</p>
+            </div>
+          </div>
+          <div className="portal-status-list">
+            {doc.labels.map((item, index) => {
+              const used = isPortalLabelUsed(doc, item.code);
+              return (
+                <div className="portal-status-row" key={item.code}>
+                  <label htmlFor={`portal-status-title-${item.code}`}>وضعیت {toFa(index + 1)}</label>
                   <input
-                    dir="ltr"
+                    id={`portal-status-title-${item.code}`}
                     disabled={readOnly}
-                    value={item.code}
-                    onChange={(event) =>
-                      setDoc({
-                        ...doc,
-                        labels: doc.labels.map((l, i) => (i === index ? { ...l, code: event.target.value } : l)),
-                      })
-                    }
-                  />
-                </td>
-                <td>
-                  <input
-                    disabled={readOnly}
+                    maxLength={60}
+                    placeholder="عنوانی که مشتری می‌بیند"
                     value={item.title}
                     onChange={(event) =>
                       setDoc({
                         ...doc,
-                        labels: doc.labels.map((l, i) => (i === index ? { ...l, title: event.target.value } : l)),
+                        labels: doc.labels.map((label) =>
+                          label.code === item.code ? { ...label, title: event.target.value } : label
+                        ),
                       })
                     }
                   />
-                </td>
-                <td>
-                  {!readOnly && (
-                    <Button
-                      variant="ghost"
-                      onClick={() => setDoc({ ...doc, labels: doc.labels.filter((_, i) => i !== index) })}
+                  {!readOnly && !used && doc.labels.length > 1 && (
+                    <button
+                      type="button"
+                      className="portal-status-remove"
+                      title="حذف وضعیت"
+                      aria-label={`حذف وضعیت ${item.title || toFa(index + 1)}`}
+                      onClick={() => setDoc({ ...doc, labels: doc.labels.filter((label) => label.code !== item.code) })}
                     >
-                      حذف
-                    </Button>
+                      <Trash2 size={16} aria-hidden="true" />
+                    </button>
                   )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </SurfaceTable>
-        {!readOnly && (
-          <Button
-            variant="secondary"
-            onClick={() => setDoc({ ...doc, labels: [...doc.labels, { code: "", title: "" }] })}
-          >
-            افزودن برچسب
-          </Button>
-        )}
-        <h3>نگاشت وضعیت داخلی → برچسب مشتری</h3>
-        <div className="portal-map">
-          {payload.categories.map((row) => (
-            <label key={row.key}>
-              <span>دستهٔ «{row.title}»</span>
-              {labelSelect(doc.status_map[row.key], (code) => setMap(row.key, code), true)}
+                </div>
+              );
+            })}
+          </div>
+          <div className="portal-status-actions">
+            {!readOnly && doc.labels.length < 20 && (
+              <Button
+                variant="secondary"
+                icon={Plus}
+                onClick={() =>
+                  setDoc({ ...doc, labels: [...doc.labels, { code: nextPortalLabelCode(doc.labels), title: "" }] })
+                }
+              >
+                افزودن وضعیت
+              </Button>
+            )}
+            <label className="portal-status-default">
+              <span>وضعیت پیش‌فرض</span>
+              {labelSelect(doc.default_label, (code) => setDoc({ ...doc, default_label: code }))}
             </label>
-          ))}
-          {payload.statuses.map((row) => (
-            <label key={row.key}>
-              <span>وضعیت «{row.title}» (تیکت بدون پروژه)</span>
-              {labelSelect(doc.status_map[row.key], (code) => setMap(row.key, code), true)}
-            </label>
-          ))}
-          {payload.stages
-            .filter((row) => row.code !== "accepted")
-            .map((row) => (
-              <label key={row.code}>
-                <span>مرحلهٔ تریاژ «{row.title}»</span>
-                {labelSelect(doc.stage_labels[row.code], (code) =>
-                  setDoc({ ...doc, stage_labels: { ...doc.stage_labels, [row.code]: code } })
-                )}
-              </label>
-            ))}
-          <label>
-            <span>برچسب پیش‌فرض (وضعیت نگاشت‌نشده)</span>
-            {labelSelect(doc.default_label, (code) => setDoc({ ...doc, default_label: code }))}
-          </label>
-        </div>
+          </div>
+          <details className="portal-status-mapping">
+            <summary>اتصال وضعیت‌های داخلی</summary>
+            <p>
+              در صورت نیاز، عنوان هر وضعیت داخلی را تعیین کنید. برای حذف یک عنوانِ در حال استفاده، ابتدا اتصال آن را
+              تغییر دهید.
+            </p>
+            <div className="portal-map">
+              {payload.categories.map((row) => (
+                <label key={row.key}>
+                  <span>دستهٔ «{row.title}»</span>
+                  {labelSelect(doc.status_map[row.key], (code) => setMap(row.key, code), true)}
+                </label>
+              ))}
+              {payload.statuses.map((row) => (
+                <label key={row.key}>
+                  <span>وضعیت «{row.title}» (تیکت بدون پروژه)</span>
+                  {labelSelect(doc.status_map[row.key], (code) => setMap(row.key, code), true)}
+                </label>
+              ))}
+              {payload.stages
+                .filter((row) => row.code !== "accepted")
+                .map((row) => (
+                  <label key={row.code}>
+                    <span>مرحلهٔ تریاژ «{row.title}»</span>
+                    {labelSelect(doc.stage_labels[row.code], (code) =>
+                      setDoc({ ...doc, stage_labels: { ...doc.stage_labels, [row.code]: code } })
+                    )}
+                  </label>
+                ))}
+            </div>
+          </details>
+        </section>
         <h3>پاسخ‌دهنده و بازخورد</h3>
         <div className="portal-map">
           <label>

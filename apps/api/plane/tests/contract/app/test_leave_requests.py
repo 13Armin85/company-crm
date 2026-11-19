@@ -334,9 +334,10 @@ def test_word_form_explains_missing_optional_values_without_fabricating_informat
     assert values["unit"] == "واحد سازمانی در حساب کاربر ثبت نشده است"
     assert values["reason"] == "دلیلی توسط درخواست‌دهنده ثبت نشده است"
     assert values["substitute"] == "جانشین پیشنهاد نشده است"
-    assert values["start_time"] == values["end_time"] == "روز کامل؛ ساعت لازم نیست"
+    assert values["start_time"] == values["end_time"] == ""
     html = documents.to_html(documents.render(documents.build_sample_template(), values))
-    assert all(values[key] in html for key in ("unit", "reason", "substitute", "start_time"))
+    assert all(values[key] in html for key in ("unit", "reason", "substitute"))
+    assert "روز کامل؛ ساعت لازم نیست" not in html
     assert "{{" not in html
 
 

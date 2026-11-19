@@ -36,6 +36,8 @@ import {
   subscribeToSessionEnd,
 } from "./access/session-events";
 import { ShellNavigation } from "./app-shell";
+import { PageHelp } from "./components/page-help";
+import "../../styles/ui-polish.css";
 
 function AppLayout() {
   const location = useLocation();
@@ -187,6 +189,7 @@ function AppLayout() {
             <Breadcrumb />
           </div>
           <div className="shell-header-actions">
+            <PageHelp />
             <button type="button" className="shell-search" onClick={() => setCommand(true)}>
               <Search size={16} aria-hidden="true" />
               <span>جستجو یا اجرای فرمان…</span>

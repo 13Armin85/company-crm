@@ -752,9 +752,11 @@ export function FormDesigner({
                             className={`engine-binding${selected?.section === section.id && selected.field === binding.field ? " selected" : ""}`}
                             onClick={() => setSelected({ section: section.id, field: binding.field })}
                           >
-                            {binding.title || fields.find((f) => f.code === binding.field)?.title || binding.field}
+                            <span className="engine-binding-label">
+                              {binding.title || fields.find((f) => f.code === binding.field)?.title || binding.field}
+                            </span>
                             {form.data?.locked_fields?.includes(binding.field) && (
-                              <span aria-label="فیلد هسته‌ای قفل است">
+                              <span className="engine-binding-lock" aria-label="فیلد هسته‌ای قفل است">
                                 <LockKeyhole size={14} aria-hidden="true" />
                               </span>
                             )}

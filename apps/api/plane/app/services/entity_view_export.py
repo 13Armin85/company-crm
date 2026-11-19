@@ -30,6 +30,7 @@ from plane.db.models import (
 )
 from .entity_views import make_query, require
 from .entity_records import emit_definition
+from .user_labels import user_label
 
 logger = logging.getLogger(__name__)
 
@@ -152,7 +153,7 @@ def value_labels(query, records):
             ).distinct()
             labels = {
                 str(v.id): {
-                    "title": getattr(v, "display_name", None)
+                    "title": (user_label(v) if field["kind"] == "user" else getattr(v, "display_name", None))
                     or getattr(v, "name", None)
                     or getattr(v, "title", None)
                     or v.email

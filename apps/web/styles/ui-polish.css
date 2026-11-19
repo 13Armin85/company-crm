@@ -1,0 +1,99 @@
+/* A composite input has one frame: the wrapper. Inner text inputs remain borderless. */
+:root
+  :is(.selector-input-row, .schema-tag-input, .engine-entity-search-control)
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="color"]),
+:root
+  :is(.selector-input-row, .schema-tag-input, .engine-entity-search-control)
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="color"]):focus,
+:root
+  :is(.selector-input-row, .schema-tag-input, .engine-entity-search-control)
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="color"]):focus-visible {
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+  background: transparent;
+}
+:root :is(.selector-input-row, .schema-tag-input, .engine-entity-search-control):focus-within {
+  border-color: var(--accent);
+  outline: 0;
+  box-shadow: none;
+}
+:root :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), textarea, select):focus-visible {
+  border-color: var(--accent);
+  outline: 0;
+}
+.leave-template-page {
+  gap: 18px;
+}
+.leave-template-page .leave-card {
+  gap: 14px;
+  box-shadow: none;
+}
+.leave-template-page .leave-card > h2 {
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.leave-template-page .workflow-muted {
+  margin: 0;
+  line-height: 1.9;
+}
+.leave-template-upload .leave-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.leave-template-upload .leave-actions {
+  padding-top: 6px;
+}
+.leave-template-slots .leave-table-scroll {
+  max-height: 420px;
+}
+.leave-template-versions .leave-templates {
+  display: grid;
+  gap: 10px;
+}
+/* Native surfaces and entity forms use the same section cards in the designer. */
+.engine-workspace-surface-panel > .page-studio-editor .page-studio-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+  margin: 0 0 12px;
+  padding: 0;
+  gap: 12px;
+  border: 0;
+  background: transparent;
+}
+.engine-workspace-surface-panel > .page-studio-editor .page-studio-tabs > button {
+  min-width: 0;
+  min-height: 92px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-weight: 700;
+  box-shadow: none;
+}
+.engine-workspace-surface-panel > .page-studio-editor .page-studio-tabs > button[aria-selected="true"] {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  color: var(--text-primary);
+  box-shadow: none;
+}
+@media (max-width: 680px) {
+  .leave-template-upload .leave-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .leave-template-page .leave-card {
+    padding: 16px;
+  }
+  .leave-template-upload .leave-actions .button {
+    width: 100%;
+    justify-content: center;
+  }
+  .engine-workspace-surface-panel > .page-studio-editor .page-studio-tabs {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .engine-workspace-surface-panel > .page-studio-editor .page-studio-tabs > button {
+    min-height: 58px;
+    padding: 13px;
+  }
+}

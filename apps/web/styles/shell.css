@@ -85,7 +85,9 @@
   background: var(--rail-hover);
 }
 .shell-rail-item:focus-visible {
-  box-shadow: 0 0 0 2px var(--rail-bg), 0 0 0 4px var(--accent-ink);
+  box-shadow:
+    0 0 0 2px var(--rail-bg),
+    0 0 0 4px var(--accent-ink);
 }
 .shell-rail-icon {
   position: relative;
@@ -257,6 +259,13 @@
   margin-top: 18px;
   padding-top: 14px;
   border-top: 1px solid var(--border);
+}
+.shell-section-pages {
+  margin-top: 14px;
+  padding-top: 14px;
+}
+.shell-section-pages .sidebar-pages a {
+  min-height: 36px;
 }
 .shell-section h3,
 .shell-section .sidebar-pages > p {

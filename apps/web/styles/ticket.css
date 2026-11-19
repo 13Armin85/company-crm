@@ -349,11 +349,11 @@
   list-style: none;
 }
 .routing-rule-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 10px;
-  flex-wrap: wrap;
-  padding: 10px 12px;
+  padding: 14px;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface);
@@ -366,9 +366,21 @@
 }
 .routing-rule-text {
   display: grid;
-  flex: 1;
-  min-width: 220px;
-  gap: 2px;
+  min-width: 0;
+  gap: 5px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.routing-rule-text strong {
+  font-size: var(--fs-sm);
+}
+.routing-rule-text > span:not(.routing-rule-warning) {
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+}
+.routing-rule-row .row-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 .routing-rule-warning {
   color: var(--orange);
@@ -377,9 +389,82 @@
 .routing-test {
   display: grid;
   gap: 8px;
-  padding: 14px;
-  border: 1px dashed var(--border);
+  margin-top: 14px;
+  padding: 16px;
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.routing-test-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-weight: 700;
+  text-align: start;
+  cursor: pointer;
+}
+.routing-test-chevron {
+  margin-inline-start: auto;
+  font-size: 20px;
+  line-height: 1;
+}
+.routing-test > p {
+  margin: 0;
+  line-height: 1.8;
+}
+.routing-test-content {
+  display: grid;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.routing-test-form .searchable-select {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+.routing-search {
+  display: block;
+  max-width: 440px;
+  margin-bottom: 14px;
+}
+.routing-search input {
+  width: 100%;
+}
+@media (max-width: 760px) {
+  .routing-rule-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .routing-rule-row > svg {
+    display: none;
+  }
+  .routing-rule-text {
+    grid-column: 2 / -1;
+  }
+  .routing-rule-row .state-pill {
+    grid-column: 1 / 2;
+  }
+  .routing-rule-row .row-actions {
+    grid-column: 2 / -1;
+  }
+  .routing-search {
+    max-width: none;
+  }
+}
+@media (max-width: 480px) {
+  .routing-test-form > .button {
+    width: 100%;
+    justify-content: center;
+  }
+  .routing-rule-row {
+    gap: 8px;
+    padding: 12px;
+  }
 }
 .routing-rule-form {
   display: grid;

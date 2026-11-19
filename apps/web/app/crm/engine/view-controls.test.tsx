@@ -37,6 +37,8 @@ describe("ColumnEditor design modes", () => {
     expect(markup).toContain("جستجو در ستون‌ها");
     expect(markup).toContain("عرض ستون");
     expect(markup).toContain("پین ستون");
+    expect(markup).toContain("۱ ستون انتخاب‌شده");
+    expect(markup).toContain('aria-label="انتقال نام مشتری به بالا"');
     expect(markup).not.toContain("مرتب‌سازی چندستونه");
   });
 
@@ -47,5 +49,18 @@ describe("ColumnEditor design modes", () => {
 
     expect(markup).toContain("مرتب‌سازی چندستونه");
     expect(markup).toContain("گروه‌بندی");
+  });
+
+  it("gives each sorting rule a separate row and a labelled remove action", () => {
+    const markup = renderToStaticMarkup(
+      <ColumnEditor
+        value={{ ...definition, sort: [{ field: "title", direction: "desc" }] }}
+        fields={fields}
+        onChange={() => {}}
+        onLoadPath={async () => {}}
+      />
+    );
+    expect(markup).toContain('class="engine-column-sort-row"');
+    expect(markup).toContain('aria-label="حذف مرتب‌سازی 1"');
   });
 });

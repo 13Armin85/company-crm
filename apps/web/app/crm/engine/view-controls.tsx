@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowDown, ArrowUp, GripVertical, Search, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Filter, GitBranch, GripVertical, Plus, Search, Trash2 } from "lucide-react";
 import { SearchableSelect, SchemaDrivenForm } from "@plane/ui";
 import type { Condition, FieldValue, SchemaField, EntityFormSchema } from "@plane/ui";
 import { useSchemaTransport } from "./record-form";
@@ -106,6 +106,22 @@ export function ViewValueInput({
   );
 }
 
+export function filterConditionCount(value?: Condition | null): number {
+  if (!value) return 0;
+  return "rules" in value ? value.rules.reduce((total, rule) => total + filterConditionCount(rule), 0) : 1;
+}
+
+export function newFilterCondition(fields: ViewField[], code?: string): Condition | null {
+  const field = fields.find((item) => item.filterable && item.operators.length && (!code || item.code === code));
+  return field
+    ? {
+        field: field.code,
+        op: (field.operators.includes("eq") ? "eq" : field.operators[0]) as Extract<Condition, { field: string }>["op"],
+        value: "",
+      }
+    : null;
+}
+
 export function ViewFilterEditor({
   value,
   onChange,
@@ -117,67 +133,152 @@ export function ViewFilterEditor({
   fields: ViewField[];
   depth?: number;
 }) {
-  const first = fields.find((f) => f.filterable)?.code || "";
-  if (!value)
-    return (
-      <button
-        type="button"
-        className="button button-secondary"
-        onClick={() => onChange({ field: first, op: "eq", value: "" })}
-      >
-        افزودن شرط
-      </button>
-    );
+  const count = filterConditionCount(value);
+  return (
+    <div className="advanced-filter-editor">
+      <div className="advanced-filter-intro">
+        <span className="advanced-filter-icon">
+          <Filter size={21} aria-hidden="true" />
+        </span>
+        <div>
+          <h3>شرط‌های نمایش رکوردها</h3>
+          <p>فیلد، نحوهٔ مقایسه و مقدار موردنظر را انتخاب کنید. شرط‌ها را برای جستجوی دقیق‌تر ترکیب کنید.</p>
+        </div>
+        <span className="advanced-filter-count">{count.toLocaleString("fa-IR")} شرط</span>
+      </div>
+      {value ? (
+        <FilterNode value={value} onChange={onChange} fields={fields} depth={depth} />
+      ) : (
+        <div className="advanced-filter-empty">
+          <Filter size={28} aria-hidden="true" />
+          <h4>از یک شرط ساده شروع کنید</h4>
+          <p>
+            {newFilterCondition(fields)
+              ? "مثلاً نام شامل یک عبارت باشد یا وضعیت با مقدار دلخواه برابر باشد."
+              : "برای این نما فیلد قابل فیلتر در دسترس نیست."}
+          </p>
+          <button
+            className="button button-primary"
+            type="button"
+            disabled={!newFilterCondition(fields)}
+            onClick={() => onChange(newFilterCondition(fields))}
+          >
+            <Plus size={16} aria-hidden="true" />
+            افزودن اولین شرط
+          </button>
+        </div>
+      )}
+      {count > 0 && (
+        <button type="button" className="advanced-filter-reset" onClick={() => onChange(null)}>
+          <Trash2 size={14} aria-hidden="true" />
+          پاک کردن همهٔ شرط‌ها
+        </button>
+      )}
+    </div>
+  );
+}
+
+function FilterNode({
+  value,
+  onChange,
+  fields,
+  depth = 0,
+}: {
+  value: Condition;
+  onChange: (value: Condition | null) => void;
+  fields: ViewField[];
+  depth?: number;
+}) {
+  const fresh = () => newFilterCondition(fields);
   if ("rules" in value)
     return (
-      <fieldset className="engine-rule-group">
-        <legend>گروه شرط‌ها</legend>
-        <SearchableSelect
-          showLabel
-          label="ترکیب"
-          value={value.op}
-          options={[
-            { id: "and", title: "همه شرط‌ها (و)" },
-            { id: "or", title: "حداقل یکی (یا)" },
-          ]}
-          onChange={(op) => onChange({ ...value, op: op as "and" | "or" })}
-        />
-        {value.rules.map((rule, index) => (
-          <ViewFilterEditor
-            key={index}
-            value={rule}
-            fields={fields}
-            depth={depth + 1}
-            onChange={(next) => {
-              const rules = next
-                ? value.rules.map((old, i) => (i === index ? next : old))
-                : value.rules.filter((_, i) => i !== index);
-              onChange(rules.length ? { ...value, rules } : null);
+      <fieldset className="engine-rule-group advanced-filter-group">
+        <legend>
+          <GitBranch size={15} aria-hidden="true" />
+          {depth ? "زیرگروه شرط‌ها" : "گروه شرط‌ها"}
+        </legend>
+        <div className="advanced-filter-logic" role="group" aria-label="نحوهٔ ترکیب شرط‌ها">
+          <button type="button" aria-pressed={value.op === "and"} onClick={() => onChange({ ...value, op: "and" })}>
+            همهٔ شرط‌ها <b>و</b>
+          </button>
+          <button type="button" aria-pressed={value.op === "or"} onClick={() => onChange({ ...value, op: "or" })}>
+            حداقل یک شرط <b>یا</b>
+          </button>
+        </div>
+        <p className="advanced-filter-explanation">
+          {value.op === "and"
+            ? "رکورد باید تمام شرط‌های این گروه را داشته باشد."
+            : "داشتن یکی از شرط‌های این گروه برای نمایش رکورد کافی است."}
+        </p>
+        <div className="advanced-filter-children">
+          {value.rules.map((rule, index) => (
+            // eslint-disable-next-line react/no-array-index-key -- The condition contract identifies controlled rule slots by their position, including repeated fields.
+            <div key={index} className="advanced-filter-branch">
+              {index > 0 && (
+                <span className="advanced-filter-join" aria-hidden="true">
+                  {value.op === "and" ? "و" : "یا"}
+                </span>
+              )}
+              <FilterNode
+                value={rule}
+                fields={fields}
+                depth={depth + 1}
+                onChange={(next) => {
+                  const rules = next
+                    ? value.rules.map((old, i) => (i === index ? next : old))
+                    : value.rules.filter((_, i) => i !== index);
+                  onChange(rules.length ? { ...value, rules } : null);
+                }}
+              />
+            </div>
+          ))}
+        </div>
+        <div className="advanced-filter-actions">
+          <button
+            type="button"
+            className="button button-secondary"
+            disabled={!fresh()}
+            onClick={() => {
+              const rule = fresh();
+              if (rule) onChange({ ...value, rules: [...value.rules, rule] });
             }}
-          />
-        ))}
-        <button
-          type="button"
-          onClick={() => onChange({ ...value, rules: [...value.rules, { field: first, op: "eq", value: "" }] })}
-        >
-          شرط جدید
-        </button>
-        <button type="button" onClick={() => onChange(null)}>
-          حذف گروه
-        </button>
+          >
+            <Plus size={15} aria-hidden="true" />
+            افزودن شرط
+          </button>
+          {depth < 5 && (
+            <button
+              type="button"
+              className="button button-secondary"
+              disabled={!fresh()}
+              onClick={() => {
+                const rule = fresh();
+                if (rule) onChange({ ...value, rules: [...value.rules, { op: "and", rules: [rule] }] });
+              }}
+            >
+              <GitBranch size={15} aria-hidden="true" />
+              افزودن زیرگروه
+            </button>
+          )}
+          <button type="button" className="advanced-filter-remove" onClick={() => onChange(null)}>
+            <Trash2 size={14} aria-hidden="true" />
+            حذف گروه
+          </button>
+        </div>
       </fieldset>
     );
   const field = fields.find((f) => f.code === value.field),
     dynamic = value.value && typeof value.value === "object" && !Array.isArray(value.value) && "dynamic" in value.value;
   return (
-    <fieldset className="engine-rule-group">
+    <fieldset className="engine-rule-group advanced-filter-condition">
+      <legend>شرط</legend>
       <div className="engine-view-filter-leaf">
         <SearchableSelect
           showLabel
           label="فیلد شرط"
           value={value.field}
           options={fields.filter((f) => f.filterable).map((f) => ({ id: f.code, title: f.title }))}
-          onChange={(fieldCode) => onChange({ field: fieldCode, op: "eq", value: null })}
+          onChange={(fieldCode) => onChange(newFilterCondition(fields, fieldCode))}
         />
         <SearchableSelect
           showLabel
@@ -189,12 +290,16 @@ export function ViewFilterEditor({
         {field &&
           !["empty", "not_empty"].includes(value.op) &&
           (dynamic ? (
-            <p>
-              امروز{" "}
-              <button type="button" onClick={() => onChange({ ...value, value: null })}>
+            <div className="advanced-filter-dynamic">
+              <span>مقدار مقایسه: امروز</span>
+              <button
+                className="button button-secondary"
+                type="button"
+                onClick={() => onChange({ ...value, value: null })}
+              >
                 انتخاب تاریخ ثابت
               </button>
-            </p>
+            </div>
           ) : (
             <ViewValueInput
               field={field}
@@ -203,19 +308,38 @@ export function ViewFilterEditor({
               onChange={(next) => onChange({ ...value, value: next })}
             />
           ))}
+        {["empty", "not_empty"].includes(value.op) && (
+          <p className="advanced-filter-no-value">برای این مقایسه نیازی به وارد کردن مقدار نیست.</p>
+        )}
       </div>
-      <div className="engine-actions">
-        {field && ["date", "datetime"].includes(field.kind) && (
-          <button type="button" onClick={() => onChange({ ...value, value: { dynamic: "today" } })}>
-            مقایسه با امروز
-          </button>
-        )}
+      <div className="advanced-filter-actions">
+        {field &&
+          ["date", "datetime"].includes(field.kind) &&
+          !["empty", "not_empty", "in", "not_in"].includes(value.op) && (
+            <button
+              className="button button-secondary"
+              type="button"
+              onClick={() => onChange({ ...value, value: { dynamic: "today" } })}
+            >
+              مقایسه با امروز
+            </button>
+          )}
         {depth < 6 && (
-          <button type="button" onClick={() => onChange({ op: "and", rules: [value] })}>
-            گروه تو‌در‌تو
+          <button
+            className="button button-secondary"
+            type="button"
+            disabled={!fresh()}
+            onClick={() => {
+              const rule = fresh();
+              if (rule) onChange({ op: "and", rules: [value, rule] });
+            }}
+          >
+            <Plus size={15} aria-hidden="true" />
+            افزودن شرط
           </button>
         )}
-        <button type="button" onClick={() => onChange(null)}>
+        <button className="advanced-filter-remove" type="button" onClick={() => onChange(null)}>
+          <Trash2 size={14} aria-hidden="true" />
           حذف شرط
         </button>
       </div>
@@ -242,6 +366,10 @@ export function ColumnEditor({
     onChange({ ...value, columns: value.columns.map((c) => (c.field === field ? { ...c, ...patch } : c)) });
   return (
     <div className="engine-column-editor">
+      <div className="engine-column-intro">
+        <strong>{value.columns.length.toLocaleString("fa-IR")} ستون انتخاب‌شده</strong>
+        <p>با فلش‌ها ترتیب را تغییر دهید؛ عرض و پین هر ستون در تنظیمات آن قرار دارد.</p>
+      </div>
       <div className="engine-column-tools">
         <label className="engine-column-search">
           <span>جستجو در ستون‌ها</span>
@@ -262,13 +390,25 @@ export function ColumnEditor({
           }
         />
       </div>
-      {fields
-        .filter((f) => f.kind === "relation" && f.title.includes(search) && f.code.split(".").length < 4)
-        .map((f) => (
-          <button type="button" className="button button-ghost" key={f.code} onClick={() => void onLoadPath(f.code)}>
-            ستون‌های مسیر {f.title} ←
-          </button>
-        ))}
+      {fields.some((f) => f.kind === "relation" && f.title.includes(search) && f.code.split(".").length < 4) && (
+        <details className="engine-column-paths engine-advanced-setting">
+          <summary>افزودن ستون از اطلاعات مرتبط</summary>
+          <div>
+            {fields
+              .filter((f) => f.kind === "relation" && f.title.includes(search) && f.code.split(".").length < 4)
+              .map((f) => (
+                <button
+                  type="button"
+                  className="button button-ghost"
+                  key={f.code}
+                  onClick={() => void onLoadPath(f.code)}
+                >
+                  ستون‌های مسیر {f.title} ←
+                </button>
+              ))}
+          </div>
+        </details>
+      )}
       {value.columns
         .filter((c) => !search || (fields.find((f) => f.code === c.field)?.title || c.field).includes(search))
         .map((column) => (
@@ -349,7 +489,7 @@ export function ColumnEditor({
             <span className="engine-column-actions">
               <button
                 type="button"
-                aria-label="ستون به بالا"
+                aria-label={`انتقال ${fields.find((f) => f.code === column.field)?.title || "ستون"} به بالا`}
                 title="انتقال به بالا"
                 disabled={value.columns.findIndex((item) => item.field === column.field) === 0}
                 onClick={() => {
@@ -432,7 +572,6 @@ export function ColumnEditor({
       {!columnsOnly && (
         <details className="engine-column-advanced engine-advanced-setting">
           <summary>تنظیمات پیشرفتهٔ نمای شخصی</summary>
-          <h3>مرتب‌سازی چندستونه</h3>
           <fieldset>
             <legend>ستون‌های خلاصه اطلاعات من</legend>
             <p>ستون‌ها را انتخاب و برای تغییر ترتیب جابه‌جا کنید. بدون انتخاب، خلاصه رسمی استفاده می‌شود.</p>
@@ -471,8 +610,10 @@ export function ColumnEditor({
               </div>
             ))}
           </fieldset>
+          <h3>مرتب‌سازی چندستونه</h3>
           {value.sort.map((sort, i) => (
-            <div className="engine-actions" key={`${i}:${sort.field}`}>
+            // eslint-disable-next-line react/no-array-index-key -- Controlled sort slots can temporarily select the same field while editing.
+            <div className="engine-column-sort-row" key={`${i}:${sort.field}`}>
               <SearchableSelect
                 showLabel
                 label={`فیلد مرتب‌سازی ${i + 1}`}
@@ -501,6 +642,7 @@ export function ColumnEditor({
               />
               <button
                 type="button"
+                aria-label={`حذف مرتب‌سازی ${i + 1}`}
                 onClick={() => onChange({ ...value, sort: value.sort.filter((_, index) => index !== i) })}
               >
                 ×

@@ -197,15 +197,20 @@ export default function IssuesPage() {
             {pager}
           </div>
         ) : (
-          <IssueKanbanBoard
-            issues={filtered}
-            onStatusChange={(issue, nextStatus) => updateStatus.mutate({ issue, status: nextStatus })}
-            readOnly={!isAdmin && tab === "history"}
-            onCreate={canCreate ? () => setCreate(true, "issue") : undefined}
-            transferMembers={members}
-            transferDisabled={reassign.isPending}
-            onAssigneeChange={(issue, assigneeId) => reassign.mutate({ issue, assigneeId })}
-          />
+          <>
+            <p className="kanban-scroll-hint">
+              برای تغییر وضعیت، کارت را روی ستون مقصد رها کنید. در صفحه‌های کوچک ستون‌ها زیر هم قرار می‌گیرند.
+            </p>
+            <IssueKanbanBoard
+              issues={filtered}
+              onStatusChange={(issue, nextStatus) => updateStatus.mutate({ issue, status: nextStatus })}
+              readOnly={!isAdmin && tab === "history"}
+              onCreate={canCreate ? () => setCreate(true, "issue") : undefined}
+              transferMembers={members}
+              transferDisabled={reassign.isPending}
+              onAssigneeChange={(issue, assigneeId) => reassign.mutate({ issue, assigneeId })}
+            />
+          </>
         )}
         {view === "board" && !loading && filtered.length > 0 && <div className="table-card">{pager}</div>}
       </section>

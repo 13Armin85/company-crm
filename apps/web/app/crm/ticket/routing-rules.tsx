@@ -22,7 +22,16 @@ import type { FieldDefinition, LookupOptionDefinition } from "../engine/api";
 import { ConditionEditor } from "../engine/rule-editors";
 import { Button, EmptyState, Skeleton } from "../components";
 import { formatWorkingMinutes } from "../workflow/model";
-import { METHOD_LABELS, PRIORITY_LABELS, faDigits, minutesFrom, moveRule, ruleProblems, ruleSentence } from "./model";
+import {
+  METHOD_LABELS,
+  PRIORITY_LABELS,
+  faDigits,
+  minutesFrom,
+  moveRule,
+  ruleProblems,
+  ruleSentence,
+  routingRuleForMethod,
+} from "./model";
 
 const EMPTY: Partial<RoutingRule> = {
   name: "",
@@ -49,11 +58,16 @@ function RecordPicker({ selected, onChange }: { selected: string[]; onChange: (i
     void api
       .post(
         `/api/workspaces/${slug}/engine/entities/${code}/query/`,
-        { definition: { version: 1, type: "table", columns: [{ field: titleField, width: 180 }], sort: [] }, page_size: 200 },
+        {
+          definition: { version: 1, type: "table", columns: [{ field: titleField, width: 180 }], sort: [] },
+          page_size: 200,
+        },
         { signal: controller.signal }
       )
       .then((response) =>
-        setOptions((response.data.results as { id: string; title: string }[]).map((row) => ({ id: row.id, title: row.title })))
+        setOptions(
+          (response.data.results as { id: string; title: string }[]).map((row) => ({ id: row.id, title: row.title }))
+        )
       )
       .catch(() => setOptions([]));
     return () => controller.abort();
@@ -103,27 +117,42 @@ function RuleEditor({ initial, onClose }: { initial: Partial<RoutingRule>; onClo
   const memberOptions = (members.data ?? []).map((m) => ({ id: m.id, title: m.displayName, description: m.email }));
   const pool = rule.method === "round_robin" || rule.method === "least_loaded";
   return (
-    <ModalCore isOpen className="create-modal organization-modal" handleClose={() => !save.isPending && onClose()}>
+    <ModalCore
+      isOpen
+      className="create-modal organization-modal routing-rule-modal"
+      handleClose={() => !save.isPending && onClose()}
+    >
       <form
-        className="ticket-dialog"
+        className="ticket-dialog routing-rule-editor"
         noValidate
         onSubmit={(event) => {
           event.preventDefault();
           setSubmitted(true);
           if (problems.length) return;
-          save.mutate(rule, { onSuccess: onClose });
+          save.mutate(
+            { ...routingRuleForMethod(rule, rule.method ?? "round_robin"), name: rule.name?.trim() },
+            { onSuccess: onClose }
+          );
         }}
       >
         <header>
           <span className="modal-kicker">قاعدهٔ ارجاع</span>
           <DialogTitle as="h2">{rule.id ? "ویرایش قاعده" : "قاعدهٔ جدید"}</DialogTitle>
+          <p>مشخص کنید کدام کارها، با چه روشی و به چه کسی ارجاع شوند.</p>
         </header>
         <label>
           <span>نام قاعده</span>
-          <input value={rule.name ?? ""} onChange={(event) => setRule({ ...rule, name: event.target.value })} />
+          <input
+            required
+            maxLength={255}
+            placeholder="مثلاً ارجاع درخواست‌های پشتیبانی"
+            value={rule.name ?? ""}
+            onChange={(event) => setRule({ ...rule, name: event.target.value })}
+          />
         </label>
         <fieldset className="routing-rule-form">
           <legend>اگر…</legend>
+          <p className="ticket-hint">انتخاب نکردن معیار یعنی همهٔ کارها. معیارهای انتخاب‌شده باید هم‌زمان برقرار باشند.</p>
           <CompactMultiSelector
             label="نوع تیکت"
             options={(types.data ?? []).map((t) => ({ id: t.id, title: t.name }))}
@@ -136,30 +165,43 @@ function RuleEditor({ initial, onClose }: { initial: Partial<RoutingRule>; onClo
             selected={conditions.priorities ?? []}
             onChange={(priorities) => setConditions({ ...conditions, priorities })}
           />
-          <CompactMultiSelector
-            label="پروژه"
-            options={(projects.data ?? []).map((p) => ({ id: p.id, title: p.name }))}
-            selected={conditions.project_ids ?? []}
-            onChange={(project_ids) => setConditions({ ...conditions, project_ids })}
-          />
-          <CompactMultiSelector
-            label="واحد درخواست‌کننده (با زیرواحدها)"
-            options={(units.data ?? []).map((u) => ({ id: u.id, title: u.title }))}
-            selected={conditions.unit_ids ?? []}
-            onChange={(unit_ids) => setConditions({ ...conditions, unit_ids })}
-          />
-          <RecordPicker
-            selected={conditions.customer_ids ?? []}
-            onChange={(customer_ids) => setConditions({ ...conditions, customer_ids })}
-          />
-          <ConditionEditor
-            label="شرط پیشرفته (همان زبان شرط فرم و گردش‌کار)"
-            description="بدون شرط پیشرفته، فقط معیارهای بالا بررسی می‌شوند."
-            value={conditions.expression ?? null}
-            onChange={(expression) => setConditions({ ...conditions, expression })}
-            fields={conditionFields}
-            lookupValues={lookupValues}
-          />
+          <details
+            className="routing-extra"
+            open={
+              Boolean(
+                conditions.project_ids?.length ||
+                conditions.unit_ids?.length ||
+                conditions.customer_ids?.length ||
+                conditions.expression
+              ) || undefined
+            }
+          >
+            <summary>معیارهای بیشتر</summary>
+            <CompactMultiSelector
+              label="پروژه"
+              options={(projects.data ?? []).map((p) => ({ id: p.id, title: p.name }))}
+              selected={conditions.project_ids ?? []}
+              onChange={(project_ids) => setConditions({ ...conditions, project_ids })}
+            />
+            <CompactMultiSelector
+              label="واحد درخواست‌کننده (با زیرواحدها)"
+              options={(units.data ?? []).map((u) => ({ id: u.id, title: u.title }))}
+              selected={conditions.unit_ids ?? []}
+              onChange={(unit_ids) => setConditions({ ...conditions, unit_ids })}
+            />
+            <RecordPicker
+              selected={conditions.customer_ids ?? []}
+              onChange={(customer_ids) => setConditions({ ...conditions, customer_ids })}
+            />
+            <ConditionEditor
+              label="شرط پیشرفته (همان زبان شرط فرم و گردش‌کار)"
+              description="بدون شرط پیشرفته، فقط معیارهای بالا بررسی می‌شوند."
+              value={conditions.expression ?? null}
+              onChange={(expression) => setConditions({ ...conditions, expression })}
+              fields={conditionFields}
+              lookupValues={lookupValues}
+            />
+          </details>
         </fieldset>
         <fieldset className="routing-rule-form">
           <legend>آنگاه به…</legend>
@@ -167,7 +209,7 @@ function RuleEditor({ initial, onClose }: { initial: Partial<RoutingRule>; onClo
             showLabel
             label="روش انتخاب مقصد"
             value={rule.method ?? "round_robin"}
-            onChange={(method) => setRule({ ...rule, method: method as RoutingMethod })}
+            onChange={(method) => setRule(routingRuleForMethod(rule, method as RoutingMethod))}
             options={Object.entries(METHOD_LABELS).map(([id, title]) => ({ id, title }))}
           />
           {rule.method === "user" && (
@@ -181,13 +223,13 @@ function RuleEditor({ initial, onClose }: { initial: Partial<RoutingRule>; onClo
           )}
           {pool && (
             <CompactMultiSelector
-              label="اعضای نوبت (خالی = دارندگان نقش/اعضای واحد)"
+              label="افراد مجاز برای انتخاب"
               options={memberOptions}
               selected={rule.member_ids ?? []}
               onChange={(member_ids) => setRule({ ...rule, member_ids })}
             />
           )}
-          {(rule.method === "manager" || rule.method === "group" || pool) && (
+          {(rule.method === "manager" || rule.method === "group" || (pool && !rule.member_ids?.length)) && (
             <SearchableSelect
               showLabel
               label={rule.method === "group" ? "نقش گروه" : "نقش لازم"}
@@ -196,13 +238,16 @@ function RuleEditor({ initial, onClose }: { initial: Partial<RoutingRule>; onClo
               options={[{ id: "", title: "بدون نقش" }, ...(roles.data ?? []).map((r) => ({ id: r.id, title: r.name }))]}
             />
           )}
-          {(rule.method === "manager" || pool) && (
+          {(rule.method === "manager" || (pool && !rule.member_ids?.length)) && (
             <SearchableSelect
               showLabel
               label={rule.method === "manager" ? "واحد شروع" : "واحد اعضا"}
               value={rule.unit_id ?? ""}
               onChange={(unit_id) => setRule({ ...rule, unit_id: unit_id || null })}
-              options={[{ id: "", title: "بدون واحد" }, ...(units.data ?? []).map((u) => ({ id: u.id, title: u.title }))]}
+              options={[
+                { id: "", title: "بدون واحد" },
+                ...(units.data ?? []).map((u) => ({ id: u.id, title: u.title })),
+              ]}
             />
           )}
           <p className="ticket-hint">
@@ -239,7 +284,7 @@ function RuleEditor({ initial, onClose }: { initial: Partial<RoutingRule>; onClo
   );
 }
 
-function TestPanel() {
+function TestPanelContent() {
   const [issueId, setIssueId] = useState("");
   const preview = usePreviewRouting();
   const slug = useSlug() ?? "";
@@ -250,7 +295,10 @@ function TestPanel() {
     void api
       .post(
         `/api/workspaces/${slug}/engine/entities/ticket/query/`,
-        { definition: { version: 1, type: "table", columns: [{ field: "title", width: 180 }], sort: [] }, page_size: 200 },
+        {
+          definition: { version: 1, type: "table", columns: [{ field: "title", width: 180 }], sort: [] },
+          page_size: 200,
+        },
         { signal: controller.signal }
       )
       .then((response) =>
@@ -265,12 +313,9 @@ function TestPanel() {
     return () => controller.abort();
   }, [slug]);
   return (
-    <section className="routing-test" aria-labelledby="routing-test-title">
-      <h3 id="routing-test-title">
-        <FlaskConical size={16} aria-hidden /> آزمایش قاعده
-      </h3>
+    <div className="routing-test-content">
       <form
-        className="ticket-actions"
+        className="ticket-actions routing-test-form"
         onSubmit={(event) => {
           event.preventDefault();
           if (issueId.trim()) preview.mutate(issueId.trim());
@@ -291,7 +336,9 @@ function TestPanel() {
       {preview.data && (
         <div className="ticket-preview" aria-live="polite">
           <strong>
-            {preview.data.rule ? `قاعدهٔ «${preview.data.rule.name}» (${preview.data.rule.method_title})` : "هیچ قاعده‌ای منطبق نیست"}
+            {preview.data.rule
+              ? `قاعدهٔ «${preview.data.rule.name}» (${preview.data.rule.method_title})`
+              : "هیچ قاعده‌ای منطبق نیست"}
           </strong>
           <span>{preview.data.user ? `مقصد: ${preview.data.user.name}` : "مقصد: صف بدون مسئول"}</span>
           <span>دلیل: {preview.data.reason}</span>
@@ -303,6 +350,31 @@ function TestPanel() {
         </div>
       )}
       {preview.error && <p className="ticket-error-text">{errorMessage(preview.error, "آزمایش انجام نشد.")}</p>}
+    </div>
+  );
+}
+
+function TestPanel() {
+  const [open, setOpen] = useState(false);
+  return (
+    <section className="routing-test" aria-labelledby="routing-test-title">
+      <button
+        type="button"
+        className="routing-test-toggle"
+        id="routing-test-title"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <FlaskConical size={18} aria-hidden />
+        <span>آزمایش قاعده</span>
+        <span className="routing-test-chevron" aria-hidden>
+          {open ? "−" : "+"}
+        </span>
+      </button>
+      <p className="workflow-muted">
+        یک تیکت نمونه انتخاب کنید تا پیش از تغییر قواعد، مقصد ارجاع آن را ببینید. آزمایش، تیکت را جابه‌جا نمی‌کند.
+      </p>
+      {open && <TestPanelContent />}
     </section>
   );
 }
@@ -401,6 +473,7 @@ export function RoutingRulesManager({ canManage }: { canManage: boolean }) {
   if (!canManage) return null;
   const rows = rules.data ?? [];
   const ids = rows.map((row) => row.id);
+  const positions = new Map(ids.map((id, index) => [id, index]));
   const shown = rows.filter((row) => !query.trim() || row.name.includes(query.trim()));
   const apply = (next: string[]) => {
     if (next.join() !== ids.join()) reorder.mutate(next);
@@ -417,7 +490,7 @@ export function RoutingRulesManager({ canManage }: { canManage: boolean }) {
             قاعدهٔ جدید
           </Button>
         </header>
-        <label>
+        <label className="routing-search">
           <span className="sr-only">جستجوی قاعده</span>
           <input
             aria-label="جستجوی نام قاعده"
@@ -436,11 +509,14 @@ export function RoutingRulesManager({ canManage }: { canManage: boolean }) {
             </button>
           </div>
         ) : !shown.length ? (
-          <EmptyState title="قاعده‌ای نیست" description="برای ارجاع خودکار تیکت‌ها یک قاعده بسازید." />
+          <EmptyState
+            title={query.trim() ? "قاعده‌ای با این نام پیدا نشد" : "قاعده‌ای نیست"}
+            description={query.trim() ? "عبارت جستجو را تغییر دهید." : "برای ارجاع خودکار تیکت‌ها یک قاعده بسازید."}
+          />
         ) : (
           <ol className="routing-rules-list">
             {shown.map((rule) => {
-              const index = ids.indexOf(rule.id);
+              const index = positions.get(rule.id) ?? 0;
               return (
                 <li
                   key={rule.id}

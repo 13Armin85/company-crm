@@ -1318,7 +1318,7 @@ body:has(.dashboard-overlay) .selector-single-options {
   outline: none;
 }
 .dashboard-view-switch .selector-input-row:focus-within {
-  outline: 2px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  outline: none;
   border-color: var(--accent);
 }
 

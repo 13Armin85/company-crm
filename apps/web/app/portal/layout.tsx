@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/reac
 import { FilePlus2, Headphones, ListChecks, LogOut, Settings } from "lucide-react";
 import { onSessionExpired } from "./api/client";
 import { usePortalLogout, usePortalSession } from "./api/portal";
+import { PageHelp } from "../crm/components/page-help";
 
 export const EXPIRED_FLAG = "portal-session-expired";
 
@@ -78,6 +79,7 @@ function PortalShell() {
           </NavLink>
         </nav>
         <div className="portal-user">
+          <PageHelp />
           <span className="portal-account-avatar" aria-hidden>
             {account.display_name.slice(0, 1)}
           </span>

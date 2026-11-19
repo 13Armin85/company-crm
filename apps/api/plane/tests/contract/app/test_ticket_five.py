@@ -542,6 +542,23 @@ def test_round_robin_and_least_loaded(org):
     assert load[lighter] == 0
 
 
+def test_round_robin_preview_keeps_cursor_and_assignment_unchanged(org):
+    routing = rule(org, "preview round robin", "round_robin", 1,
+                   member_ids=[str(org["colleague"].id), str(org["employee"].id)])
+    issue = ticket(org)
+    original_cursor = routing.cursor
+    first = TicketRoutingService.preview(issue)
+    second = TicketRoutingService.preview(issue)
+    routing.refresh_from_db()
+    assert routing.cursor == original_cursor
+    assert first["user"] == second["user"]
+    assert not IssueAssignee.objects.filter(issue=issue).exists()
+    assert not TicketRoutingDecision.objects.filter(issue=issue).exists()
+    assert not TicketRoleQueueEntry.objects.filter(issue=issue).exists()
+    decision = TicketRoutingService.route_auto(issue)
+    assert str(decision.assigned_user_id) == first["user"]["id"]
+
+
 def test_absent_person_is_replaced_by_delegate_and_all_absent_goes_unassigned(org):
     OrganizationUnitDelegate.objects.create(unit=org["team"], user=org["delegate"])
     window = {"starts_at": timezone.now() - timedelta(hours=1), "ends_at": timezone.now() + timedelta(days=1)}

@@ -5536,3 +5536,131 @@ body:has(.engine-workspace) .selector-single-option[data-selected] {
     transform: none;
   }
 }
+/* Page picker in the form and table design workspace. */
+.engine-sidebar-manager {
+  display: grid;
+  gap: 18px;
+}
+.engine-sidebar-manager > .engine-entity-search {
+  display: grid;
+  gap: 8px;
+  max-width: 420px;
+}
+.engine-sidebar-manager > .engine-entity-search input {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+}
+.engine-sidebar-manager-list {
+  display: grid;
+  gap: 8px;
+  max-height: min(68vh, 740px);
+  overflow-y: auto;
+}
+.engine-sidebar-manager-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+.engine-sidebar-manager-row > div:first-child {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.engine-sidebar-manager-row small {
+  color: var(--text-muted);
+}
+.engine-sidebar-manager-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+@media (max-width: 700px) {
+  .engine-sidebar-manager-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .engine-sidebar-manager-actions > button {
+    flex: 1 1 auto;
+  }
+}
+/* Keep form field titles readable inside the narrow design workspace. */
+.engine-designer-columns .engine-library-field {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 5px 8px;
+  min-height: 68px;
+  line-height: 1.65;
+}
+.engine-designer-columns .engine-library-field > span {
+  grid-column: 1 / -1;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.engine-designer-columns .engine-library-field small {
+  margin-inline-start: 0;
+  white-space: normal;
+}
+.engine-designer-columns .engine-library-field b {
+  justify-self: end;
+}
+.engine-designer-columns .engine-side-panel-heading > div {
+  min-width: 0;
+}
+.engine-designer-columns .engine-side-panel-heading p,
+.engine-designer-columns .engine-side-panel-heading h3 {
+  overflow-wrap: anywhere;
+}
+.engine-design-section .engine-drag-item:has(> .engine-binding) {
+  min-width: 0;
+  width: 100%;
+}
+.engine-design-section .engine-drag-item:has(> .engine-binding) > button:not(.engine-binding) {
+  flex-shrink: 0;
+}
+.engine-design-section .engine-binding {
+  align-items: flex-start;
+  width: 100%;
+  line-height: 1.7;
+  white-space: normal;
+}
+.engine-design-section .engine-binding > .engine-binding-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-inline-start: 0;
+  overflow-wrap: anywhere;
+  text-align: start;
+}
+.engine-design-section .engine-binding > .engine-binding-lock {
+  flex: 0 0 auto;
+  margin-inline-start: auto;
+}
+@container engine-workspace-main (max-width: 760px) {
+  .engine-designer-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .engine-binding-settings {
+    grid-column: auto;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .engine-binding-settings > * {
+    grid-column: 1 !important;
+  }
+}
+@container engine-workspace-main (max-width: 520px) {
+  .engine-design-section .engine-drag-item:has(> .engine-binding) {
+    flex-wrap: wrap;
+  }
+  .engine-design-section .engine-binding {
+    flex: 1 1 calc(100% - 36px);
+  }
+}

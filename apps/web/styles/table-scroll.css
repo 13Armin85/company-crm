@@ -21,7 +21,7 @@
   overscroll-behavior-inline: contain;
   scrollbar-width: auto;
   scrollbar-color: var(--text-muted, #94a3b8) var(--surface-soft, #f1f5f9);
-  scrollbar-gutter: stable;
+  scrollbar-gutter: auto;
   -webkit-overflow-scrolling: touch;
 }
 .horizontal-table-scroll:focus-visible {

@@ -1,4 +1,5 @@
 .work-list-panel {
+  container: work-list / inline-size;
   min-width: 0;
   padding: 0;
   overflow: hidden;
@@ -58,8 +59,65 @@
   border-radius: 0;
   box-shadow: none;
 }
-.work-list-panel > .kanban-board {
+.kanban-board.kanban-board-grouped {
   padding: 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  align-items: start;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  margin-inline: 0;
+  overscroll-behavior-inline: contain;
+  scrollbar-gutter: auto;
+  overflow: visible;
+  max-height: none;
+  scroll-snap-type: none;
+  scroll-padding-inline: 20px;
+}
+.kanban-board-grouped > .kanban-category {
+  display: contents;
+}
+.kanban-board-grouped .kanban-category-columns {
+  display: contents;
+}
+.kanban-board-grouped .kanban-category-title {
+  display: none;
+}
+.kanban-board-grouped .kanban-column {
+  width: 100%;
+  min-height: 180px;
+  margin: 0;
+  scroll-snap-align: none;
+}
+.kanban-board-grouped .kanban-column > div {
+  min-height: 100px;
+}
+.kanban-board-grouped .kanban-column.is-over {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  background: var(--accent-soft);
+}
+.kanban-board-grouped :is(.kanban-column, .kanban-card) {
+  min-width: 0;
+}
+.kanban-board-grouped :is(.kanban-card h3, .issue-people, .kanban-category-title) {
+  overflow-wrap: anywhere;
+}
+.kanban-board-grouped .kanban-card footer {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.kanban-board:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -3px;
+}
+.work-list-panel > .kanban-scroll-hint {
+  display: none;
+  margin: 0;
+  padding: 8px 20px 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
 }
 .work-list-panel .surface-table-toolbar {
   padding-inline: 24px;
@@ -230,5 +288,99 @@
   }
   .work-list-controls .toolbar-actions {
     width: 100%;
+    flex: 0 1 auto;
+  }
+  .work-list-controls .ticket-presets {
+    flex: 0 1 auto;
+    align-items: center;
+  }
+  .work-list-controls .search-box {
+    flex: 0 1 auto;
+  }
+}
+.work-list-panel > .kanban-scroll-hint {
+  display: block;
+}
+.routing-rule-modal {
+  width: min(640px, calc(100vw - 24px));
+}
+.routing-rule-editor {
+  width: 100%;
+  max-width: none;
+  gap: 18px;
+  padding: 24px;
+}
+.routing-rule-editor > * {
+  min-width: 0;
+  max-width: 100%;
+}
+:root .routing-rule-modal form.routing-rule-editor > header {
+  display: block;
+  text-align: start;
+  margin: 0;
+  padding: 0 0 14px;
+}
+:root .routing-rule-modal form.routing-rule-editor > header h2 {
+  margin: 6px 0;
+  font-size: var(--fs-lg);
+  overflow-wrap: normal;
+}
+.routing-rule-editor input:not([type="checkbox"]) {
+  min-width: 0;
+  max-width: 100%;
+}
+.routing-rule-editor header p {
+  color: var(--text-secondary);
+  margin: 8px 0 0;
+  font-size: var(--fs-sm);
+  line-height: 1.9;
+}
+.routing-rule-editor > fieldset {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-soft);
+  gap: 14px;
+}
+.routing-rule-editor legend {
+  padding-inline: 8px;
+  font-weight: 700;
+}
+.routing-extra {
+  min-width: 0;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+.routing-extra summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-size: var(--fs-sm);
+}
+.routing-extra > :not(summary) {
+  margin-top: 14px;
+}
+.routing-rule-editor .searchable-select {
+  min-width: 0;
+  width: 100%;
+}
+:root .routing-rule-modal form.routing-rule-editor > footer {
+  position: sticky;
+  bottom: -24px;
+  z-index: 5;
+  margin: 0;
+  padding: 14px 0;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+@media (max-width: 600px) {
+  .routing-rule-editor {
+    padding: 16px;
+  }
+  .routing-rule-editor > fieldset {
+    padding: 12px;
+  }
+  .routing-rule-editor footer {
+    bottom: -16px;
   }
 }

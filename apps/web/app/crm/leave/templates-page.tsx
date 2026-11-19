@@ -42,7 +42,7 @@ export default function LeaveTemplatesPage() {
   const data = overview.data;
   return (
     <ConfiguredFields code="leave-templates">
-      <div className="leave-page" dir="rtl">
+      <div className="leave-page leave-template-page" dir="rtl">
         <PageHeader
           eyebrow="مرخصی"
           title="قالب Word فرم مرخصی"
@@ -60,7 +60,7 @@ export default function LeaveTemplatesPage() {
           onCreate={() => sample.mutate()}
           error={sample.isError ? errorMessage(sample.error, "افزودن قالب آماده ممکن نشد.") : undefined}
         />
-        <section className="leave-card" aria-label="بارگذاری نسخهٔ تازه">
+        <section className="leave-card leave-template-upload" aria-label="بارگذاری نسخهٔ تازه">
           <h2>بارگذاری نسخهٔ تازه</h2>
           <div className="leave-grid">
             <div className="leave-field">
@@ -110,15 +110,19 @@ export default function LeaveTemplatesPage() {
           </div>
           {upload.isError && <ErrorNotice message={errorMessage(upload.error, "بارگذاری قالب ممکن نشد.")} />}
         </section>
-        <section className="leave-card" aria-label="جایگاه‌های داده">
+        <section className="leave-card leave-template-slots" aria-label="جایگاه‌های داده">
           <h2>جایگاه‌های داده</h2>
           <p className="workflow-muted">
             جایگاه‌ها را دقیقاً به همین شکل در فایل Word بنویسید. جایگاه ناشناخته یا نبودِ جایگاه الزامی، قالب را نامعتبر
             می‌کند.
           </p>
+          <p className="workflow-muted">
+            هنگام ساخت فرم، کدهای داخل آکولاد با دادهٔ درخواست جایگزین می‌شوند. جایگاه ساعت شروع و پایان در مرخصی روزانه
+            خالی می‌ماند.
+          </p>
           {data && <PlaceholderTable placeholders={data.placeholders} />}
         </section>
-        <section className="leave-card" aria-label="نسخه‌ها">
+        <section className="leave-card leave-template-versions" aria-label="نسخه‌ها">
           <h2>نسخه‌ها</h2>
           {!data ? (
             <Skeleton rows={3} />

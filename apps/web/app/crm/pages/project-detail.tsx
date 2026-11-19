@@ -201,17 +201,19 @@ export default function ProjectDetailPage() {
         </div>
       )}
       {tab === "board" && (
-        <IssueKanbanBoard
-          issues={issues}
-          project={project}
-          states={statesQuery.data}
-          onStatusChange={(issue, status, nativeValue) => updateStatus.mutate({ issue, status, nativeValue })}
-          transferPresentation="inline"
-          onCreate={access?.can("Issue.Create") ? () => setCreate(true, "issue") : undefined}
-          transferMembers={members}
-          transferDisabled={reassign.isPending}
-          onAssigneeChange={(issue, assigneeId) => reassign.mutate({ issue, assigneeId })}
-        />
+        <section className="panel work-list-panel" aria-label="برد کانبان پروژه">
+          <IssueKanbanBoard
+            issues={issues}
+            project={project}
+            states={statesQuery.data}
+            onStatusChange={(issue, status, nativeValue) => updateStatus.mutate({ issue, status, nativeValue })}
+            transferPresentation="inline"
+            onCreate={access?.can("Issue.Create") ? () => setCreate(true, "issue") : undefined}
+            transferMembers={members}
+            transferDisabled={reassign.isPending}
+            onAssigneeChange={(issue, assigneeId) => reassign.mutate({ issue, assigneeId })}
+          />
+        </section>
       )}
       {tab === "cycles" && (
         <CyclesTab

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { CloseOutline, SearchOutline } from "@makeplane/propel/icons";
-import { GitBranch, LayoutTemplate, Plus, SearchX, Table2 } from "lucide-react";
+import { GitBranch, LayoutTemplate, ListChecks, Plus, SearchX, Table2 } from "lucide-react";
 import { NewPageDialog } from "./sidebar-pages";
 import { normalizePersianSearch } from "@plane/ui";
 import { Button, Skeleton } from "../components";
@@ -16,6 +16,7 @@ import { RelationSettings } from "./relation-settings";
 import { WorkflowDesigner } from "../workflow/designer";
 import { useEngineCatalog, useEngineDefinitions, useEngineForm, useEngineQuery } from "./api";
 import type { FieldDefinition } from "./api";
+import { readDesignSidebar, saveDesignSidebar, visibleDesignPages } from "./design-sidebar";
 
 type DesignTab = "fields" | "layout" | "preview" | "versions" | "table" | "rules" | "relations" | "workflow";
 type Surface = { code: string; path: string; title: string; native_columns: string[] };
@@ -50,6 +51,11 @@ export function DesignWorkspace() {
     setTab(params.get("mode") === "columns" ? "table" : "layout");
   }, [params]);
   const [search, setSearch] = useState("");
+  const [managerSearch, setManagerSearch] = useState("");
+  const workspace = useUIStore((state) => state.workspaceSlug) || "";
+  const [sidebarCodes, setSidebarCodes] = useState<string[] | null>(() => readDesignSidebar(workspace));
+  const [managingPages, setManagingPages] = useState(false);
+  useEffect(() => setSidebarCodes(readDesignSidebar(workspace)), [workspace]);
   const [general, setGeneral] = useState(false);
   const [creatingPage, setCreatingPage] = useState(false);
   const form = useEngineForm(code, Boolean(catalog.data?.entities.some((item) => item.code === code)));
@@ -58,11 +64,36 @@ export function DesignWorkspace() {
   const surfaceCode = code === "user" ? "users" : code === "unit" ? "units" : code;
   const surface = surfaces.data?.results.find((item) => item.code === surfaceCode);
   const pages = (surfaces.data?.results || []).filter(
-    (item) => item.code !== "task" && !entities.some((candidate) => candidate.code === item.code)
+    (item) =>
+      item.code !== "task" &&
+      !entities.some(
+        (candidate) =>
+          candidate.code === item.code ||
+          (candidate.code === "user" && item.code === "users") ||
+          (candidate.code === "unit" && item.code === "units")
+      )
   );
+  const allPages = [
+    ...entities.map((item) => ({
+      code: item.code,
+      title: item.code === "ticket" ? "کارهـا" : item.title,
+      kind: item.parent ? "نوع فرعی" : item.adapter ? "بخش اصلی سامانه" : "بخش سفارشی",
+    })),
+    ...pages.map((item) => ({ code: item.code, title: item.title, kind: "فرم و جدول صفحه" })),
+  ];
+  const selectedPages = visibleDesignPages(allPages, sidebarCodes);
+  const togglePage = (pageCode: string) => {
+    const current = sidebarCodes ?? allPages.map((item) => item.code);
+    const next = current.includes(pageCode) ? current.filter((item) => item !== pageCode) : [...current, pageCode];
+    setSidebarCodes(next);
+    saveDesignSidebar(workspace, next);
+  };
   const codes = form.data?.draft.sections.flatMap((section) => section.bindings.map((binding) => binding.field)) || [];
   const choose = (next: string) => {
-    if (next === code) return;
+    if (next === code) {
+      setManagingPages(false);
+      return;
+    }
     if (
       useUIStore.getState().dirtyForms.length &&
       !window.confirm("تغییرات ذخیره‌نشده کنار گذاشته شود و به بخش دیگر برویم؟")
@@ -71,6 +102,7 @@ export function DesignWorkspace() {
     setCode(next);
     setParams({ page: next }, { replace: true });
     setTab("layout");
+    setManagingPages(false);
   };
   const selectTab = (next: DesignTab) => {
     if (tab === "table" && next !== "table") {
@@ -103,7 +135,7 @@ export function DesignWorkspace() {
         </Button>
       </div>
     );
-  const list = entities.filter((item) =>
+  const list = selectedPages.filter((item) =>
     normalizePersianSearch(item.title + item.code).includes(normalizePersianSearch(search))
   );
   const currentTab = tabs.find((item) => item.id === tab)!;
@@ -113,7 +145,7 @@ export function DesignWorkspace() {
       <aside className="engine-workspace-sidebar" aria-label="فرم‌ها و جدول‌ها">
         <header>
           <strong>فرم‌ها و جدول‌ها</strong>
-          <small>{(entities.length + pages.length).toLocaleString("fa-IR")} بخش قابل تنظیم</small>
+          <small>{selectedPages.length.toLocaleString("fa-IR")} بخش قابل تنظیم</small>
         </header>
         <div className="engine-entity-search">
           <label htmlFor="engine-entity-search-input">جستجوی بخش</label>
@@ -137,55 +169,42 @@ export function DesignWorkspace() {
           {list.map((item) => (
             <button
               type="button"
-              key={item.id}
+              key={item.code}
               className={code === item.code ? "active" : ""}
               aria-current={code === item.code ? "page" : undefined}
               onClick={() => choose(item.code)}
             >
-              <strong>{item.code === "ticket" ? "کارها" : item.title}</strong>
-              <small>{item.parent ? "نوع فرعی" : item.adapter ? "بخش اصلی سامانه" : "بخش سفارشی"}</small>
+              <strong>{item.title}</strong>
+              <small>{item.kind}</small>
             </button>
           ))}
-          {pages
-            .filter((item) => normalizePersianSearch(item.title + item.code).includes(normalizePersianSearch(search)))
-            .map((item) => (
-              <button
-                type="button"
-                key={item.code}
-                className={code === item.code ? "active" : ""}
-                aria-current={code === item.code ? "page" : undefined}
-                onClick={() => choose(item.code)}
-              >
-                <strong>{item.title}</strong>
-                <small>فرم و جدول صفحه</small>
-              </button>
-            ))}
         </nav>
-        {!list.length &&
-          !pages.some((item) =>
-            normalizePersianSearch(item.title + item.code).includes(normalizePersianSearch(search))
-          ) && (
-            <div className="engine-search-empty" role="status">
-              <span className="engine-search-empty-icon" aria-hidden="true">
-                <SearchX size={22} />
-              </span>
-              <strong>{search.trim() ? `بخشی با «${search.trim()}» پیدا نشد` : "هنوز بخشی وجود ندارد"}</strong>
-              <p>املای نام را بررسی کنید یا با کد انگلیسی بخش جستجو کنید.</p>
-              <div className="engine-search-empty-actions">
-                {search && (
-                  <Button variant="secondary" onClick={() => setSearch("")}>
-                    پاک کردن جستجو
-                  </Button>
-                )}
-                {access?.can("EntityType.Create") && access?.can("FormDesigner.Publish") && (
-                  <Button onClick={() => setCreatingPage(true)}>
-                    <Plus size={15} aria-hidden="true" />
-                    {search.trim() ? `ساخت صفحهٔ «${search.trim()}»` : "ساخت صفحهٔ جدید"}
-                  </Button>
-                )}
-              </div>
+        {!list.length && (
+          <div className="engine-search-empty" role="status">
+            <span className="engine-search-empty-icon" aria-hidden="true">
+              <SearchX size={22} />
+            </span>
+            <strong>{search.trim() ? `بخشی با «${search.trim()}» پیدا نشد` : "هنوز بخشی وجود ندارد"}</strong>
+            <p>املای نام را بررسی کنید یا با کد انگلیسی بخش جستجو کنید.</p>
+            <div className="engine-search-empty-actions">
+              {search && (
+                <Button variant="secondary" onClick={() => setSearch("")}>
+                  پاک کردن جستجو
+                </Button>
+              )}
+              {access?.can("EntityType.Create") && access?.can("FormDesigner.Publish") && (
+                <Button onClick={() => setCreatingPage(true)}>
+                  <Plus size={15} aria-hidden="true" />
+                  {search.trim() ? `ساخت صفحهٔ «${search.trim()}»` : "ساخت صفحهٔ جدید"}
+                </Button>
+              )}
             </div>
-          )}
+          </div>
+        )}
+        <Button variant="secondary" onClick={() => setManagingPages(true)}>
+          <ListChecks size={16} aria-hidden="true" />
+          مدیریت صفحات سایدبار
+        </Button>
         {creatingPage && <NewPageDialog initialTitle={search.trim()} onClose={() => setCreatingPage(false)} />}
         {access?.can("View.Official.Manage") && (
           <Button variant="ghost" onClick={() => setGeneral(true)}>
@@ -194,7 +213,52 @@ export function DesignWorkspace() {
         )}
       </aside>
       <main className="engine-workspace-main">
-        {entity ? (
+        {managingPages ? (
+          <section className="engine-workspace-panel engine-sidebar-manager" aria-label="مدیریت صفحات سایدبار">
+            <div className="engine-workspace-panel-heading">
+              <h2>مدیریت صفحات سایدبار</h2>
+              <p>
+                صفحه‌های موردنیاز را به فهرست سمت راست اضافه کنید یا از آن بردارید. روی نام هر صفحه بزنید تا فرم و جدول
+                آن برای ویرایش باز شود.
+              </p>
+            </div>
+            <label className="engine-entity-search" htmlFor="engine-sidebar-manager-search">
+              جستجوی همهٔ صفحات قابل طراحی
+              <input
+                id="engine-sidebar-manager-search"
+                type="search"
+                value={managerSearch}
+                onChange={(event) => setManagerSearch(event.target.value)}
+                placeholder="نام یا کد صفحه"
+              />
+            </label>
+            <div className="engine-sidebar-manager-list">
+              {allPages
+                .filter((item) =>
+                  normalizePersianSearch(item.title + item.code).includes(normalizePersianSearch(managerSearch))
+                )
+                .map((item) => {
+                  const included = selectedPages.some((page) => page.code === item.code);
+                  return (
+                    <div className="engine-sidebar-manager-row" key={item.code}>
+                      <div>
+                        <strong>{item.title}</strong>
+                        <small>{item.kind}</small>
+                      </div>
+                      <div className="engine-sidebar-manager-actions">
+                        <Button variant="ghost" onClick={() => choose(item.code)}>
+                          طراحی صفحه
+                        </Button>
+                        <Button variant={included ? "secondary" : "primary"} onClick={() => togglePage(item.code)}>
+                          {included ? "حذف از سایدبار" : "افزودن به سایدبار"}
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </section>
+        ) : entity ? (
           <>
             <header className="engine-workspace-heading">
               <div>
@@ -346,7 +410,16 @@ export function DesignWorkspace() {
                 مشاهده صفحه
               </Link>
             </header>
-            <PageEditor key={surfaceCode} code={surfaceCode} embedded />
+            <section
+              className="engine-workspace-panel engine-workspace-surface-panel"
+              aria-label={`طراحی فرم و جدول ${surface.title}`}
+            >
+              <div className="engine-workspace-panel-heading">
+                <h3>طراحی فرم و جدول</h3>
+                <p>ورودی‌های فرم و ستون‌های جدول این بخش را تنظیم کنید.</p>
+              </div>
+              <PageEditor key={surfaceCode} code={surfaceCode} embedded />
+            </section>
           </>
         ) : (
           <section className="engine-workspace-start">

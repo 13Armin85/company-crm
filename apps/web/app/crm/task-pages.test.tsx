@@ -138,6 +138,10 @@ describe("member task pages", () => {
       </MemoryRouter>
     );
     expect(html).toContain('aria-disabled="true"');
+    expect(html).toContain('role="region" aria-label="برد کانبان کارها" tabindex="0"');
+    expect(html).toContain("--kanban-column-count:");
+    expect(html).toContain('data-status="Todo"');
+    expect(html).not.toContain("kanban-scroll-controls");
     expect(html).not.toContain('aria-label="افزودن کار به');
     expect(html).not.toContain('role="combobox"');
   });

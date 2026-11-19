@@ -33,11 +33,21 @@ import type {
   SummarySetting,
 } from "./view-types";
 
-function ViewDrawer({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
+function ViewDrawer({
+  title,
+  children,
+  onClose,
+  filter = false,
+}: {
+  title: string;
+  children: React.ReactNode;
+  onClose: () => void;
+  filter?: boolean;
+}) {
   return (
     <Dialog open onClose={onClose} className="engine-view-dialog">
       <div className="engine-view-backdrop" />
-      <DialogPanel className="engine-view-drawer">
+      <DialogPanel className={`engine-view-drawer${filter ? " engine-view-drawer--filter" : ""}`}>
         <div className="engine-actions">
           <DialogTitle>{title}</DialogTitle>
           <button type="button" aria-label="بستن تنظیمات" onClick={onClose}>
@@ -441,6 +451,7 @@ export function EntityViewsPage({ entityCode }: { entityCode?: string } = {}) {
     [search, setSearch] = useState(""),
     [debouncedSearch, setDebouncedSearch] = useState(""),
     [preset, setPreset] = useState<PresetId>("all");
+  const [filterDraft, setFilterDraft] = useState<Condition | null>(null);
   const [page, setPage] = useState(1),
     [selected, setSelected] = useState<string[]>([]),
     [drawer, setDrawer] = useState<
@@ -465,7 +476,8 @@ export function EntityViewsPage({ entityCode }: { entityCode?: string } = {}) {
     if (!definition && schema.data && saved.data) {
       const requestedView = urlParams.get("view") || saved.data.default_id;
       const view = saved.data.results.find((v) => v.id === requestedView);
-      const base = view?.definition || schema.data.definition;
+      const original = view?.definition || schema.data.definition;
+      const base: ViewDefinition = urlParams.get("layout") === "table" ? { ...original, type: "table" } : original;
       let drillFilter: Condition | null = null;
       try {
         const raw = urlParams.get("dashboard_filter");
@@ -732,7 +744,13 @@ export function EntityViewsPage({ entityCode }: { entityCode?: string } = {}) {
               <SlidersHorizontal size={16} />
               ستون‌ها و ترتیب
             </Button>
-            <Button variant="secondary" onClick={() => setDrawer("filter")}>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setFilterDraft(definition.filter || null);
+                setDrawer("filter");
+              }}
+            >
               <Filter size={16} />
               فیلتر پیشرفته
             </Button>
@@ -1011,6 +1029,7 @@ export function EntityViewsPage({ entityCode }: { entityCode?: string } = {}) {
       </div>
       {drawer && (
         <ViewDrawer
+          filter={drawer === "filter"}
           title={
             {
               columns: "ستون، مرتب‌سازی و گروه‌بندی",
@@ -1031,12 +1050,23 @@ export function EntityViewsPage({ entityCode }: { entityCode?: string } = {}) {
           {drawer === "imports" && <RecordImport code={code} subtype={subtype} />}
           {drawer === "filter" && (
             <>
-              <ViewFilterEditor
-                value={definition.filter}
-                onChange={(filter) => update({ ...definition, filter })}
-                fields={fields}
-              />
-              <Button onClick={() => setDrawer(null)}>نمایش نتیجه</Button>
+              <ViewFilterEditor value={filterDraft} onChange={setFilterDraft} fields={fields} />
+              <div className="advanced-filter-footer">
+                <p>شرط‌ها پس از انتخاب «اعمال فیلتر» روی جدول اجرا می‌شوند.</p>
+                <div>
+                  <Button variant="secondary" onClick={() => setDrawer(null)}>
+                    انصراف
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      update({ ...definition, filter: filterDraft });
+                      setDrawer(null);
+                    }}
+                  >
+                    اعمال فیلتر
+                  </Button>
+                </div>
+              </div>
             </>
           )}
           {(drawer === "save" || drawer === "copy") && (

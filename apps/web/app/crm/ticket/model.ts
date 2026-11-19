@@ -39,11 +39,16 @@ export const CATEGORY_TITLES: Record<WorkCategoryId, string> = {
 
 export function workCategory({ group, status }: { group?: string | null; status?: string | null }): WorkCategoryId {
   if (group) return GROUP_CATEGORY[group.trim().toLowerCase()] ?? "todo";
-  return STATUS_CATEGORY[String(status ?? "").trim().toLowerCase()] ?? "todo";
+  return (
+    STATUS_CATEGORY[
+      String(status ?? "")
+        .trim()
+        .toLowerCase()
+    ] ?? "todo"
+  );
 }
 
-export const faDigits = (value: number | string) =>
-  String(value).replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[Number(d)]);
+export const faDigits = (value: number | string) => String(value).replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[Number(d)]);
 
 export type Tone = "neutral" | "info" | "warning" | "danger" | "success";
 
@@ -362,6 +367,18 @@ export function ruleProblems(rule: Partial<RoutingRule>): string[] {
   )
     errors.push("اعضای نوبت را انتخاب کنید یا نقش/واحد را مشخص کنید.");
   return errors;
+}
+
+export function routingRuleForMethod(rule: Partial<RoutingRule>, method: RoutingMethod): Partial<RoutingRule> {
+  const pool = method === "round_robin" || method === "least_loaded";
+  return {
+    ...rule,
+    method,
+    target_user_id: method === "user" ? rule.target_user_id : null,
+    member_ids: pool ? (rule.member_ids ?? []) : [],
+    unit_id: method === "manager" || pool ? rule.unit_id : null,
+    required_role_id: method !== "user" ? rule.required_role_id : null,
+  };
 }
 
 /** New order after moving one rule up (-1) or down (+1). */

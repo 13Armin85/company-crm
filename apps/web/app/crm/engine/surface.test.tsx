@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { configureNativeFields, SurfaceTable } from "./surface";
 import type { NativeField, SurfaceSchema } from "./surface";
 import { createTableTabId, reorderColumn } from "./page-studio";
+import { useUIStore } from "../store";
 
 const native: NativeField = {
   code: "description",
@@ -174,6 +175,19 @@ describe("native form customization", () => {
     } finally {
       vi.unstubAllGlobals();
     }
+    client.setQueryData(["workspace-access", useUIStore.getState().workspaceSlug], {
+      can: (permission: string) => permission === "View.Personal.Create",
+    });
+    client.setQueryData(["entity-engine", slug, "surface", "surfaces/roles/"], { ...data, engine: "role" });
+    client.setQueryData(["entity-engine", slug, "views", "entities/role/views/"], {
+      default_id: "personal-view",
+      official_id: "official-view",
+      results: [],
+    });
+    const personalEntry = renderTable();
+    expect(personalEntry).toContain('href="/entities/role?layout=table"');
+    expect(personalEntry).toContain('<th data-column="native:نام نقش">نام نقش</th>');
+    expect(personalEntry).not.toContain("engine-view-controls");
     client.clear();
   });
 });
