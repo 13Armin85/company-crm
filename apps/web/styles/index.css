@@ -125,11 +125,23 @@ h4 {
   color: var(--text-muted);
   font-size: var(--fs-sm);
   white-space: nowrap;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.breadcrumb:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: 8px;
 }
 .breadcrumb ol {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  flex: 0 0 auto;
   gap: 4px;
   min-width: 0;
   margin: 0;
@@ -143,6 +155,10 @@ h4 {
   align-items: center;
   gap: 6px;
   min-width: 0;
+}
+.breadcrumb li,
+.breadcrumb svg {
+  flex-shrink: 0;
 }
 .breadcrumb a,
 .breadcrumb-label {
@@ -3203,9 +3219,6 @@ h4 {
   .stats-grid {
     grid-template-columns: repeat(2, 1fr);
   }
-  .breadcrumb {
-    display: none;
-  }
 }
 @media (max-width: 1024px) {
   .dashboard-grid {
@@ -3228,9 +3241,6 @@ h4 {
   }
   .workspace-switcher {
     padding: 0 5px;
-  }
-  .breadcrumb {
-    display: none;
   }
   .page-content {
     padding: 20px 14px 40px;

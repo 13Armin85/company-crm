@@ -38,6 +38,7 @@ describe("role breadcrumb", () => {
   it("uses the database role name and real parent links with one current page", () => {
     const html = render();
     expect(html).toContain('aria-label="مسیر صفحه"');
+    expect(html).toContain('tabindex="0"');
     expect(html).toContain('href="/roles"');
     expect(html).toContain('href="/"');
     expect(html).toContain("پشتیبانی");

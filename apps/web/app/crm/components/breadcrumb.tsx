@@ -1,13 +1,29 @@
 /** Route-aware breadcrumb trail. */
 import { ChevronLeft, House } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { Link, useLocation, useMatch } from "react-router";
 import { useOrganizationRole, useWorkspaceAccess } from "../api";
 
 type BreadcrumbItem = { id: string; label: string; to?: string };
 
 function BreadcrumbTrail({ items }: { items: BreadcrumbItem[] }) {
+  const trailRef = useRef<HTMLElement>(null);
+  const trailKey = JSON.stringify(items);
+  useEffect(() => {
+    const trail = trailRef.current;
+    if (!trail) return;
+    // RTL scroll offsets are negative: keep the current page visible after
+    // navigation, a database title update, or a change in available width.
+    const revealCurrent = () => {
+      trail.scrollLeft = -trail.scrollWidth;
+    };
+    revealCurrent();
+    const observer = new ResizeObserver(revealCurrent);
+    observer.observe(trail);
+    return () => observer.disconnect();
+  }, [trailKey]);
   return (
-    <nav className="breadcrumb" aria-label="مسیر صفحه" dir="rtl">
+    <nav ref={trailRef} className="breadcrumb" aria-label="مسیر صفحه" dir="rtl" tabIndex={0}>
       <ol>
         {items.map((item, index) => (
           <li key={item.id}>

@@ -186,8 +186,8 @@ function AppLayout() {
               <span aria-hidden="true">{(workspace?.name ?? "ش").trim().charAt(0)}</span>
               <b>{workspace?.name ?? "شرکت"}</b>
             </span>
-            <Breadcrumb />
           </div>
+          <Breadcrumb />
           <div className="shell-header-actions">
             <PageHelp />
             <button type="button" className="shell-search" onClick={() => setCommand(true)}>
