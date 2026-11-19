@@ -4,9 +4,7 @@
 ARG FRONTEND_BASE_IMAGE=company-crm-local-frontend:installed-deps
 FROM ${FRONTEND_BASE_IMAGE}
 WORKDIR /app
-COPY apps/web/app/crm/ ./apps/web/app/crm/
-COPY apps/web/app/routes.ts ./apps/web/app/routes.ts
-COPY apps/web/styles/ ./apps/web/styles/
+COPY apps/web/ ./apps/web/
 COPY packages/ui/src/ ./packages/ui/src/
 COPY packages/ui/styles/ ./packages/ui/styles/
 COPY packages/ui/package.json packages/ui/tsdown.config.ts ./packages/ui/
