@@ -5,18 +5,27 @@ import { describe, expect, it } from "vitest";
 import { useUIStore } from "../store";
 import { SidebarPages, customPages, suggestCode } from "./sidebar-pages";
 import type { EntityDefinition } from "./api";
+import { NavigationContext } from "../navigation";
+import type { NavigationDocument } from "../navigation-paths";
 
 const entity = (code: string, title: string, extra: Partial<EntityDefinition> = {}) =>
   ({ id: code, code, title, is_active: true, parent: null, adapter: "", ...extra }) as EntityDefinition;
 
-function render(entities: EntityDefinition[], canCreate: boolean) {
+function render(entities: EntityDefinition[], canCreate: boolean, navigation?: NavigationDocument) {
   const client = new QueryClient();
   useUIStore.setState({ workspaceSlug: "" });
   client.setQueryData(["entity-engine", "", "catalog", "catalog/"], { entities });
   const html = renderToStaticMarkup(
     <QueryClientProvider client={client}>
       <MemoryRouter>
-        <SidebarPages canCreate={canCreate} collapsed={false} onNavigate={() => {}} />
+        <NavigationContext.Provider value={navigation}>
+          <SidebarPages
+            category={navigation ? "data" : undefined}
+            canCreate={canCreate}
+            collapsed={false}
+            onNavigate={() => {}}
+          />
+        </NavigationContext.Provider>
       </MemoryRouter>
     </QueryClientProvider>
   );
@@ -50,6 +59,20 @@ describe("sidebar pages", () => {
     const entities = Array.from({ length: 10 }, (_, i) => entity(`page-${i}`, `صفحه ${i}`));
     const html = render(entities, false);
     expect(html.match(/href="\/entities\/page-/g)).toHaveLength(8);
+    expect(html).toContain("همه صفحه‌ها (۱۰)");
+  });
+
+  it("opens the authorized category for all pages without linking members to the admin directory", () => {
+    const entities = Array.from({ length: 10 }, (_, i) => entity(`page-${i}`, `صفحه ${i}`));
+    const navigation = {
+      categories: [{ id: "data", to: "/sections/data", items: [] }],
+      entities: entities.map((page) => ({ code: page.code, category: "data" })),
+      routes: [],
+    } as unknown as NavigationDocument;
+    const html = render(entities, false, navigation);
+    expect(html).toContain('href="/sections/data"');
+    expect(html).not.toContain('href="/entities"');
+    expect(html).not.toContain('href="/sections/data/entities"');
     expect(html).toContain("همه صفحه‌ها (۱۰)");
   });
 

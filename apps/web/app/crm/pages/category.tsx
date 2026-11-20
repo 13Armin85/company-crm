@@ -1,6 +1,7 @@
 import { Link, useParams } from "react-router";
 import { useNavigationDocument } from "../navigation";
 import { PageHeader } from "../components";
+import { categoryEntries } from "../navigation-paths";
 import HomePage from "./home";
 import NotFoundPage from "./not-found";
 
@@ -14,7 +15,7 @@ export default function CategoryPage() {
     <section>
       <PageHeader title={category.title} />
       <nav className="quick-links" aria-label={category.title}>
-        {category.items.map((item) => (
+        {categoryEntries(document, category.id).map((item) => (
           <Link className="button button-secondary" key={item.code} to={item.to}>
             {item.label}
           </Link>

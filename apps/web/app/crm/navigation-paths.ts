@@ -18,6 +18,22 @@ export type NavigationDocument = {
   preferences: { design_sidebar: string[] | null };
 };
 
+/** Entries authorized by the server, including categories with custom pages only. */
+export function categoryEntries(document: NavigationDocument | undefined, code: string) {
+  if (!document) return [];
+  const category = document.categories.find((item) => item.id === code);
+  if (!category) return [];
+  const entries = [
+    ...category.items.map((item) => ({ code: item.code, label: item.label, to: item.to })),
+    ...document.entities
+      .filter((page) => page.category === code)
+      .map((page) => ({ code: page.code, label: page.title, to: page.to })),
+  ];
+  const unique = new Map<string, (typeof entries)[number]>();
+  for (const entry of entries) if (!unique.has(entry.to)) unique.set(entry.to, entry);
+  return Array.from(unique.values());
+}
+
 /** Only the explicit CRM namespace is removed; portal and API URLs are untouched. */
 export function logicalPath(pathname: string): string {
   return pathname.replace(/^\/sections\/[a-z][a-z0-9-]{0,39}(?=\/|$)/, "") || "/";

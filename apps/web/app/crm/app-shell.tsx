@@ -67,13 +67,13 @@ export function ShellNavigation({
 
   const chooseGroup = (group: ShellGroup) => {
     setSelected(group.id);
+    const target = group.items[0]?.to ?? navigation?.categories.find((category) => category.id === group.id)?.to;
+    if (target && group.id !== routeGroup) navigate(target);
     if (panelFloats()) {
       onOpenMobile();
       return;
     }
     if (collapsed) onToggleCollapsed();
-    const first = group.items[0];
-    if (first && group.id !== routeGroup) navigate(first.to);
   };
   const togglePanel = () => {
     if (panelFloats()) {
@@ -152,7 +152,7 @@ export function ShellNavigation({
                 type="button"
                 className={group.id === current?.id ? "is-selected" : ""}
                 aria-pressed={group.id === current?.id}
-                onClick={() => setSelected(group.id)}
+                onClick={() => chooseGroup(group)}
               >
                 {group.label}
               </button>

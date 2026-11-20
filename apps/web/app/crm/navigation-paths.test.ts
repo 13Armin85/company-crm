@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { categoryForRoute, categoryUrl, logicalPath, type NavigationDocument } from "./navigation-paths";
+import {
+  categoryEntries,
+  categoryForRoute,
+  categoryUrl,
+  logicalPath,
+  type NavigationDocument,
+} from "./navigation-paths";
 import { canAccessPath } from "./access/permission-map";
 
 const document = {
@@ -16,6 +22,31 @@ const document = {
 } as unknown as NavigationDocument;
 
 describe("database navigation URLs", () => {
+  it("opens a member category containing authorized custom pages without designer menu items", () => {
+    const memberDocument = {
+      ...document,
+      categories: [{ id: "data", items: [] }],
+      entities: [
+        { code: "contracts", title: "قراردادها", category: "data", to: "/sections/data/entities/contracts" },
+        { code: "other", title: "دیگر", category: "work", to: "/sections/work/entities/other" },
+      ],
+    } as unknown as NavigationDocument;
+    expect(categoryEntries(memberDocument, "data")).toEqual([
+      { code: "contracts", label: "قراردادها", to: "/sections/data/entities/contracts" },
+    ]);
+    expect(categoryEntries(memberDocument, "missing")).toEqual([]);
+    expect(categoryEntries(undefined, "data")).toEqual([]);
+    expect(canAccessPath("/sections/data/entities", () => false)).toBe(false);
+  });
+
+  it("keeps the configured menu label when a native page points to the same URL", () => {
+    const shared = { code: "projects", label: "پروژه‌های مجاز", to: "/sections/work/projects" };
+    const sharedDocument = {
+      categories: [{ id: "work", items: [shared] }],
+      entities: [{ code: "project", title: "پروژه", category: "work", to: shared.to }],
+    } as unknown as NavigationDocument;
+    expect(categoryEntries(sharedDocument, "work")).toEqual([shared]);
+  });
   it("uses the configured category, including descendants and custom pages", () => {
     expect(categoryUrl(document, "/roles/123/permissions")).toBe("/sections/company/roles/123/permissions");
     expect(categoryForRoute(document, "/daily-report/team")).toBe("reports");

@@ -147,9 +147,13 @@ export function SidebarPages({
   const catalog = useEngineCatalog();
   const navigation = useNavigationDocument();
   const [creating, setCreating] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const pages = customPages(catalog.data?.entities).filter(
     (page) => !category || navigation?.entities.some((item) => item.code === page.code && item.category === category)
   );
+  const allPagesTo =
+    navigation?.categories.flatMap((item) => item.items).find((item) => item.path === "/entities")?.to ??
+    navigation?.categories.find((item) => item.id === category)?.to;
   if (!pages.length && !canCreate) return null;
   return (
     <div className="recent-projects sidebar-pages">
@@ -161,7 +165,7 @@ export function SidebarPages({
           </button>
         )}
       </p>
-      {pages.slice(0, VISIBLE_PAGES).map((page) => (
+      {pages.slice(0, expanded ? undefined : VISIBLE_PAGES).map((page) => (
         <NavLink
           key={page.code}
           to={categoryUrl(navigation, `/entities/${page.code}`)}
@@ -172,17 +176,23 @@ export function SidebarPages({
           <span>{page.title}</span>
         </NavLink>
       ))}
-      {pages.length > VISIBLE_PAGES && (
-        <NavLink
-          to={categoryUrl(navigation, "/entities")}
-          end
-          title={collapsed ? "همه صفحه‌ها" : undefined}
-          onClick={onNavigate}
-        >
-          <LayoutGrid size={15} aria-hidden="true" />
-          <span>همه صفحه‌ها ({pages.length.toLocaleString("fa-IR")})</span>
-        </NavLink>
-      )}
+      {pages.length > VISIBLE_PAGES &&
+        (allPagesTo ? (
+          <NavLink to={allPagesTo} end title={collapsed ? "همه صفحه‌ها" : undefined} onClick={onNavigate}>
+            <LayoutGrid size={15} aria-hidden="true" />
+            <span>همه صفحه‌ها ({pages.length.toLocaleString("fa-IR")})</span>
+          </NavLink>
+        ) : (
+          <button
+            type="button"
+            className="sidebar-pages-empty"
+            aria-expanded={expanded}
+            onClick={() => setExpanded(!expanded)}
+          >
+            <LayoutGrid size={15} aria-hidden="true" />
+            <span>{expanded ? "نمایش کمتر" : `همه صفحه‌ها (${pages.length.toLocaleString("fa-IR")})`}</span>
+          </button>
+        ))}
       {!pages.length && canCreate && (
         <button type="button" className="sidebar-pages-empty" onClick={() => setCreating(true)}>
           <Plus size={15} aria-hidden="true" />

@@ -31,6 +31,7 @@ import {
 import { useUIStore } from "./store";
 import { toFa } from "./utils";
 import { canAccessPath } from "./access/permission-map";
+import { categoryEntries } from "./navigation-paths";
 import {
   hidePrivateContent,
   revealPrivateContent,
@@ -66,10 +67,7 @@ function AppLayout() {
   const { data: access, error: accessError } = useWorkspaceAccess();
   const navigation = useCrmNavigation();
   const categoryLanding = /^\/sections\/([^/]+)\/?$/.exec(location.canonicalPathname);
-  const canOpenCategory = Boolean(
-    categoryLanding &&
-    navigation.data?.categories.some((category) => category.id === categoryLanding[1] && category.items.length > 0)
-  );
+  const canOpenCategory = Boolean(categoryLanding && categoryEntries(navigation.data, categoryLanding[1]).length > 0);
   const canCreate = access?.can("Issue.Create") === true && location.pathname.replace(/\/+$/, "") !== "/my-work";
   const [gPressed, setGPressed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
