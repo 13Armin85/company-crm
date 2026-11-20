@@ -16,7 +16,7 @@ from plane.db.models import (
     Workspace,
     WorkspaceMember,
 )
-from .permission_registry import PERMISSION_REGISTRY
+from .permission_registry import ADMIN_ONLY_PERMISSIONS, PERMISSION_REGISTRY
 
 
 def active_period(queryset, now):
@@ -185,13 +185,17 @@ def get_effective_permissions(user, workspace, *, now=None, include_delegation=T
         for row in exceptions:
             if row["effect"] == effect:
                 sources[row["permission__code"]] = {"source": source, "exception_id": str(row["id"])}
+    if "admin" not in system_roles:
+        for code in ADMIN_ONLY_PERMISSIONS:
+            sources[code] = {"source": "admin_only"}
     explanations = [
         {
             **permission,
             **sources.get(permission["code"], {"source": "no_access"}),
             "exception_effects": sorted(effects.get(permission["code"], set())),
             "has_conflict": len(effects.get(permission["code"], set())) > 1,
-            "granted": permission["code"] in sources and sources[permission["code"]]["source"] != "user_deny",
+            "granted": permission["code"] in sources
+            and sources[permission["code"]]["source"] not in {"user_deny", "admin_only"},
         }
         for permission in catalog
     ]

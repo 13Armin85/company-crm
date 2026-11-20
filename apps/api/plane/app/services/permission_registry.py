@@ -34,7 +34,7 @@ DEFINITIONS = (
         "Routing",
         "مسیریابی",
         ("View", "Manage", "Route", "Queue.View", "Queue.ViewAll", "Queue.Claim"),
-        ("View", "Route", "Queue.View", "Queue.Claim"),
+        (),
     ),
     ("Workspace", "شرکت", ("Edit",), ()),
     ("EntityType", "موجودیت‌ها", ("View", "Create", "Edit", "Delete"), ()),
@@ -100,8 +100,6 @@ MEMBER_PERMISSIONS = {
     "Issue.Status.Edit",
     "Issue.Assign",
     "Referral.View",
-    "Routing.Queue.View",
-    "Routing.Queue.Claim",
 }
 
 TICKET_SIX_PERMISSIONS = {
@@ -271,8 +269,15 @@ PERMISSION_REGISTRY.update(
         for code, title in REPORT_PERMISSIONS.items()
     }
 )
-REPORT_MEMBER_PERMISSIONS = {"DailyReport.Submit", "Report.View"}
+REPORT_MEMBER_PERMISSIONS = {"DailyReport.Submit"}
 MEMBER_PERMISSIONS.update(REPORT_MEMBER_PERMISSIONS)
+
+# These modules require the active built-in administrator role in this workspace.
+# Keep the restriction in the evaluator: historical grants, custom roles, direct
+# ALLOW exceptions and temporary delegation must not reopen them to ordinary users.
+ADMIN_ONLY_PERMISSIONS = frozenset(
+    code for code in PERMISSION_REGISTRY if code.startswith(("Report.", "Routing."))
+) | {"DailyReport.Team.View", "DailyReport.Reminder.Manage"}
 
 
 @transaction.atomic

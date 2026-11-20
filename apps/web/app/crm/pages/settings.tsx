@@ -100,7 +100,7 @@ export default function SettingsPage() {
         title="تنظیمات"
         description="فضای کاری و تجربه شخصی خود را مدیریت کنید"
         actions={
-          access?.can("Workspace.Edit") ? (
+          access?.can("Workspace.Edit") && section === "general" ? (
             <Button
               icon={Save}
               onClick={() =>
@@ -209,65 +209,67 @@ export default function SettingsPage() {
             <SecuritySettings />
           ) : (
             <>
-              <section className="settings-section">
-                <header>
-                  <div>
-                    <h2>مشخصات شرکت</h2>
-                    <p>نام شرکت در بالای همه صفحه‌ها نمایش داده می‌شود و فقط از همین‌جا تغییر می‌کند.</p>
+              {access?.can("Workspace.Edit") && (
+                <section className="settings-section">
+                  <header>
+                    <div>
+                      <h2>مشخصات شرکت</h2>
+                      <p>نام شرکت در بالای همه صفحه‌ها نمایش داده می‌شود و فقط از همین‌جا تغییر می‌کند.</p>
+                    </div>
+                  </header>
+                  <div className="workspace-profile">
+                    <span className="workspace-logo">{workspace?.name.slice(0, 1) ?? "هـ"}</span>
                   </div>
-                </header>
-                <div className="workspace-profile">
-                  <span className="workspace-logo">{workspace?.name.slice(0, 1) ?? "هـ"}</span>
-                </div>
-                <SurfaceFields
-                  code="workspace"
-                  recordId={workspace?.id || ""}
-                  onChange={setWorkspaceExtra}
-                  disabled={!access?.can("Workspace.Edit") || updateWorkspace.isPending}
-                >
-                  <div className="form-grid">
-                    <label>
-                      <span>نام شرکت</span>
-                      <input
-                        value={workspaceName}
-                        readOnly={!access?.can("Workspace.Edit")}
-                        onChange={(event) => setWorkspaceName(event.target.value)}
-                      />
+                  <SurfaceFields
+                    code="workspace"
+                    recordId={workspace?.id || ""}
+                    onChange={setWorkspaceExtra}
+                    disabled={!access?.can("Workspace.Edit") || updateWorkspace.isPending}
+                  >
+                    <div className="form-grid">
+                      <label>
+                        <span>نام شرکت</span>
+                        <input
+                          value={workspaceName}
+                          readOnly={!access?.can("Workspace.Edit")}
+                          onChange={(event) => setWorkspaceName(event.target.value)}
+                        />
+                      </label>
+                      <label>
+                        <span>آدرس اختصاصی</span>
+                        <div className="slug-input">
+                          <span>app.hamkar.ir/</span>
+                          <input dir="ltr" value={workspace?.slug ?? ""} readOnly />
+                        </div>
+                      </label>
+                    </div>
+                  </SurfaceFields>
+                  {workspaces.length > 1 && (
+                    <label className="workspace-switch-field">
+                      <span>شرکت فعال</span>
+                      <select
+                        value={workspace?.slug ?? ""}
+                        onChange={(event) => {
+                          const next = workspaces.find((item) => item.slug === event.target.value);
+                          if (!next) return;
+                          if (useUIStore.getState().dirtyForms.length) {
+                            useUIStore.getState().toast("ابتدا تغییرات فرم باز را ذخیره یا لغو کنید", "info");
+                            return;
+                          }
+                          useUIStore.getState().setWorkspaceSlug(next.slug);
+                          selectWorkspace.mutate(next.id);
+                        }}
+                      >
+                        {workspaces.map((item) => (
+                          <option key={item.id} value={item.slug}>
+                            {item.name}
+                          </option>
+                        ))}
+                      </select>
                     </label>
-                    <label>
-                      <span>آدرس اختصاصی</span>
-                      <div className="slug-input">
-                        <span>app.hamkar.ir/</span>
-                        <input dir="ltr" value={workspace?.slug ?? ""} readOnly />
-                      </div>
-                    </label>
-                  </div>
-                </SurfaceFields>
-                {workspaces.length > 1 && (
-                  <label className="workspace-switch-field">
-                    <span>شرکت فعال</span>
-                    <select
-                      value={workspace?.slug ?? ""}
-                      onChange={(event) => {
-                        const next = workspaces.find((item) => item.slug === event.target.value);
-                        if (!next) return;
-                        if (useUIStore.getState().dirtyForms.length) {
-                          useUIStore.getState().toast("ابتدا تغییرات فرم باز را ذخیره یا لغو کنید", "info");
-                          return;
-                        }
-                        useUIStore.getState().setWorkspaceSlug(next.slug);
-                        selectWorkspace.mutate(next.id);
-                      }}
-                    >
-                      {workspaces.map((item) => (
-                        <option key={item.id} value={item.slug}>
-                          {item.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                )}
-              </section>
+                  )}
+                </section>
+              )}
               <section className="settings-section appearance-section">
                 <header>
                   <div>

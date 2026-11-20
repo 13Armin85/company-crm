@@ -24,8 +24,23 @@ function PermissionProbe() {
 }
 
 const canAssignRolePermission = (code: string) => code === "Role.Permission.Assign";
+const memberCan = (code: string) => code === "Issue.View" || code === "DailyReport.Submit";
 
 describe("effective permission UI", () => {
+  it("hides the page directory without blocking separately authorized record pages", () => {
+    for (const path of [
+      "/entities",
+      "/entities/",
+      "/sections/data/entities",
+      "/reports",
+      "/routing",
+      "/settings/engine",
+    ])
+      expect(canAccessPath(path, memberCan)).toBe(false);
+    expect(canAccessPath("/entities/approved-page", memberCan)).toBe(true);
+    expect(canAccessPath("/daily-report", memberCan)).toBe(true);
+    expect(canAccessPath("/entities", (code) => code === "EntityType.View")).toBe(true);
+  });
   it("allows independent role permission assignment without metadata editing or role list access", () => {
     expect(canAccessPath("/roles/role-id/permissions", canAssignRolePermission)).toBe(true);
     expect(canAccessPath("/roles", canAssignRolePermission)).toBe(false);

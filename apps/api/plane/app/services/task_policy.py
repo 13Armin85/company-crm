@@ -3,7 +3,7 @@
 from functools import wraps
 from uuid import UUID
 
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from plane.db.models import UserOrganizationRole, WorkspaceMember, ProjectMember
 
@@ -34,6 +34,8 @@ def validate_other_assignees(user, workspace, assignee_ids):
 def validate_creation_assignees(user, slug, data, *, project_id=None, assignee_field="assignee_ids", allow_routing=False):
     if is_workspace_administrator(user, slug):
         return
+    if allow_routing and data.get("routing_rule_id"):
+        raise PermissionDenied("انتخاب قاعدهٔ ارجاع هوشمند فقط برای مدیر سامانه مجاز است.")
     supplied = data.get(assignee_field)
     recipients = supplied if isinstance(supplied, list) else [supplied] if supplied else []
     if not recipients and not (allow_routing and data.get("routing_rule_id")):

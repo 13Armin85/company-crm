@@ -145,6 +145,7 @@ export function UserAccessPanel({ userId }: { userId: string }) {
                           <td>
                             {final?.granted ? "مجاز" : "غیرمجاز"}
                             {final?.source === "user_deny" && <small>منع مستقیم؛ منشأ نقش حفظ شده است.</small>}
+                            {final?.source === "admin_only" && <small>این بخش فقط برای مدیر سامانه فعال است.</small>}
                             {final?.has_conflict && <small>تعارض؛ منع اولویت دارد.</small>}
                           </td>
                         </tr>

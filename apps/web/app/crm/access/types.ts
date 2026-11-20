@@ -5,7 +5,7 @@ export interface PermissionExplanation {
   category: string;
   description?: string;
   granted: boolean;
-  source: "user_deny" | "user_allow" | "role" | "delegation" | "no_access";
+  source: "user_deny" | "user_allow" | "role" | "delegation" | "no_access" | "admin_only";
   role_ids?: string[];
   role_names?: string[];
   exception_id?: string;

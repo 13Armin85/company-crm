@@ -23,7 +23,13 @@ def _page(request):
         return 1, 50
 
 
-class ReportSourcesEndpoint(EngineAPIView):
+class ReportAPIView(EngineAPIView):
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+        sources.require_view(request.user, self.workspace(kwargs["slug"]), request)
+
+
+class ReportSourcesEndpoint(ReportAPIView):
     def get(self, request, slug):
         workspace = self.workspace(slug)
         sources.require_view(request.user, workspace, request)
@@ -45,7 +51,7 @@ class ReportSourcesEndpoint(EngineAPIView):
         )
 
 
-class ReportRunEndpoint(EngineAPIView):
+class ReportRunEndpoint(ReportAPIView):
     def post(self, request, slug):
         workspace = self.workspace(slug)
         page, size = _page(request)
@@ -61,7 +67,7 @@ class ReportRunEndpoint(EngineAPIView):
         return Response(result)
 
 
-class SavedReportsEndpoint(EngineAPIView):
+class SavedReportsEndpoint(ReportAPIView):
     def get(self, request, slug):
         workspace = self.workspace(slug)
         sources.require_view(request.user, workspace, request)
@@ -75,7 +81,7 @@ class SavedReportsEndpoint(EngineAPIView):
         return Response(saved.payload(row, request.user, request), status=201)
 
 
-class SavedReportDetailEndpoint(EngineAPIView):
+class SavedReportDetailEndpoint(ReportAPIView):
     def get(self, request, slug, report_id):
         workspace = self.workspace(slug)
         sources.require_view(request.user, workspace, request)
@@ -92,7 +98,7 @@ class SavedReportDetailEndpoint(EngineAPIView):
         return Response(status=204)
 
 
-class SavedReportRunEndpoint(EngineAPIView):
+class SavedReportRunEndpoint(ReportAPIView):
     def post(self, request, slug, report_id):
         workspace = self.workspace(slug)
         page, size = _page(request)
@@ -108,7 +114,7 @@ class SavedReportRunEndpoint(EngineAPIView):
         return Response(result)
 
 
-class SavedReportCopyEndpoint(EngineAPIView):
+class SavedReportCopyEndpoint(ReportAPIView):
     def post(self, request, slug, report_id):
         workspace = self.workspace(slug)
         sources.require_view(request.user, workspace, request)
@@ -116,14 +122,14 @@ class SavedReportCopyEndpoint(EngineAPIView):
         return Response(saved.payload(row, request.user, request), status=201)
 
 
-class ReportShareOptionsEndpoint(EngineAPIView):
+class ReportShareOptionsEndpoint(ReportAPIView):
     def get(self, request, slug):
         workspace = self.workspace(slug)
         self.require(request, workspace, "Report.Share")
         return Response(saved.share_options(workspace))
 
 
-class ReportExportsEndpoint(EngineAPIView):
+class ReportExportsEndpoint(ReportAPIView):
     def post(self, request, slug):
         workspace = self.workspace(slug)
         job = exports.request_export(workspace, request.user, request.data, request)
@@ -139,7 +145,7 @@ class ReportExportsEndpoint(EngineAPIView):
         return Response({"results": [exports.job_payload(row) for row in rows]})
 
 
-class ReportExportDetailEndpoint(EngineAPIView):
+class ReportExportDetailEndpoint(ReportAPIView):
     def get(self, request, slug, export_id, download=False):
         workspace = self.workspace(slug)
         # Only the requester's own report jobs exist for them; anyone else gets 404.

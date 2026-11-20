@@ -30,7 +30,7 @@ PAGE_PERMISSIONS = {
     "/issues": ("Issue.View",),
     "/projects": ("Project.View",),
     "/reports": ("Report.View", "Report.ViewAll"),
-    "/entities": (),
+    "/entities": ("EntityType.View", "FormDesigner.View"),
     "/team": ("User.View",),
     "/organization": ("OrganizationUnit.View",),
     "/roles": ("Role.View",),
@@ -193,12 +193,17 @@ def navigation_payload(request, workspace):
     preference = SurfaceConfiguration.objects.filter(
         workspace=workspace, code=f"navigation-user-{request.user.id}"
     ).first()
+    if not designer:
+        page_categories = {page["category"] for page in pages}
+        categories = [category for category in categories if category["items"] or category["id"] in page_categories]
+        visible_paths = {item["path"] for category in categories for item in category["items"]}
+        routes = [route for route in routes if route["path"] in visible_paths]
     return {
         "categories": categories,
         "routes": routes,
         "entities": pages,
         "design_pages": design_pages,
-        "design_tabs": document.get("design_tabs", []),
+        "design_tabs": document.get("design_tabs", []) if designer else [],
         "all_design_title": str(document.get("all_design_title", "همه دسته‌ها"))[:255],
         "preferences": (
             preference.definition if preference else {"design_sidebar": None}

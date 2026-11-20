@@ -151,8 +151,8 @@ def test_public_api_rejects_direct_self_assignment(session_client, workspace):
     assert response.status_code == 400, response.data
 
 
-def test_routing_cannot_assign_self_or_fall_back_to_self(session_client, workspace, mocker):
-    from plane.db.models import OrganizationRole, OrganizationUnit, TicketRoutingRule, TicketRoleQueueEntry, UserOrganizationRole
+def test_member_cannot_select_routing_even_with_the_required_role(session_client, workspace, mocker):
+    from plane.db.models import OrganizationRole, OrganizationUnit, TicketRoutingRule, UserOrganizationRole
 
     mocker.patch("plane.app.views.issue.base.issue_activity.delay")
     mocker.patch("plane.app.views.issue.base.model_activity.delay")
@@ -169,18 +169,9 @@ def test_routing_cannot_assign_self_or_fall_back_to_self(session_client, workspa
     session_client.force_authenticate(actor)
     path = f"/api/workspaces/{workspace.slug}/projects/{project.id}/issues/"
     body = {"name": "Routed task", "routing_rule_id": str(rule.id)}
-    assert session_client.post(path, body, format="json").status_code == 400
-    assert not Issue.objects.exists()
-    unit.manager = recipient
-    unit.save(update_fields=["manager"])
-    accepted = session_client.post(path, body, format="json")
-    assert accepted.status_code == 201, accepted.data
-    assert list(IssueAssignee.objects.values_list("assignee_id", flat=True)) == [recipient.id]
-    unit.manager = None
-    unit.save(update_fields=["manager"])
-    queued = session_client.post(path, body, format="json")
-    assert queued.status_code == 201, queued.data
-    assert not IssueAssignee.objects.filter(issue_id=queued.data["id"]).exists()
-    entry = TicketRoleQueueEntry.objects.get(issue_id=queued.data["id"])
-    claim = session_client.post(f"/api/workspaces/{workspace.slug}/organization/role-queue/{entry.id}/claim/", {}, format="json")
-    assert claim.status_code == 400, claim.data
+    for manager in (actor, recipient, None):
+        unit.manager = manager
+        unit.save(update_fields=["manager"])
+        response = session_client.post(path, body, format="json")
+        assert response.status_code == 403, response.data
+        assert not Issue.objects.exists()
