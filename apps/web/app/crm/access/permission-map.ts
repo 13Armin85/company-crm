@@ -29,7 +29,6 @@ export function permissionsForPath(pathname: string): string[] {
 export function canAccessPath(pathname: string, can: (code: string) => boolean): boolean {
   pathname = logicalPath(pathname);
   if (pathname.startsWith("/sections/")) return false;
-  if (pathname.replace(/\/+$/, "") === "/entities") return can("EntityType.View") || can("FormDesigner.View");
   if (pathname.startsWith("/settings/engine"))
     return [
       "FormDesigner.View",

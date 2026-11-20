@@ -30,7 +30,7 @@ PAGE_PERMISSIONS = {
     "/issues": ("Issue.View",),
     "/projects": ("Project.View",),
     "/reports": ("Report.View", "Report.ViewAll"),
-    "/entities": ("EntityType.View", "FormDesigner.View"),
+    "/entities": (),  # Read-only directory; catalog and records enforce their own scope.
     "/team": ("User.View",),
     "/organization": ("OrganizationUnit.View",),
     "/roles": ("Role.View",),

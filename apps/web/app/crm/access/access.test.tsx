@@ -27,16 +27,10 @@ const canAssignRolePermission = (code: string) => code === "Role.Permission.Assi
 const memberCan = (code: string) => code === "Issue.View" || code === "DailyReport.Submit";
 
 describe("effective permission UI", () => {
-  it("hides the page directory without blocking separately authorized record pages", () => {
-    for (const path of [
-      "/entities",
-      "/entities/",
-      "/sections/data/entities",
-      "/reports",
-      "/routing",
-      "/settings/engine",
-    ])
-      expect(canAccessPath(path, memberCan)).toBe(false);
+  it("opens the scoped page directory while keeping administrator tools closed", () => {
+    for (const path of ["/reports", "/routing", "/settings/engine"]) expect(canAccessPath(path, memberCan)).toBe(false);
+    for (const path of ["/entities", "/entities/", "/sections/data/entities"])
+      expect(canAccessPath(path, memberCan)).toBe(true);
     expect(canAccessPath("/entities/approved-page", memberCan)).toBe(true);
     expect(canAccessPath("/daily-report", memberCan)).toBe(true);
     expect(canAccessPath("/entities", (code) => code === "EntityType.View")).toBe(true);

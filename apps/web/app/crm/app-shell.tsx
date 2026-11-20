@@ -196,20 +196,9 @@ export function ShellNavigation({
               )}
             </section>
           )}
-          {current &&
-            (current.items.some((item) => item.path === "/entities") ||
-              navigation?.entities.some(
-                (page) => page.category === current.id && page.path.startsWith("/entities/")
-              )) && (
-              <section className="shell-section shell-section-pages">
-                <SidebarPages
-                  category={current.id}
-                  collapsed={false}
-                  canCreate={canCreatePage}
-                  onNavigate={onCloseMobile}
-                />
-              </section>
-            )}
+          <section className="shell-section shell-section-pages" aria-label="صفحه‌های ساخته‌شده">
+            <SidebarPages collapsed={false} canCreate={canCreatePage} onNavigate={onCloseMobile} />
+          </section>
         </div>
       </aside>
     </>

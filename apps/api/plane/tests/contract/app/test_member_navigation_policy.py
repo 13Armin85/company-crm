@@ -13,6 +13,7 @@ from plane.app.services.entity_schema import initialize_engine
 from plane.app.services.permission_registry import ADMIN_ONLY_PERMISSIONS, MEMBER_PERMISSIONS
 from plane.app.services.task_policy import validate_creation_assignees
 from plane.db.models import (
+    EntityType,
     OrganizationPermission,
     OrganizationRole,
     OrganizationUnit,
@@ -79,13 +80,12 @@ def test_navigation_contains_only_accessible_sections(ordinary):
     assert response.status_code == 200
     document = response.data
     paths = {item["path"] for category in document["categories"] for item in category["items"]}
-    assert {"/my-work", "/daily-report", "/leave-requests", "/settings"} <= paths
+    assert {"/my-work", "/daily-report", "/leave-requests", "/settings", "/entities"} <= paths
     assert not paths.intersection(
         {
             "/reports",
             "/daily-report/team",
             "/routing",
-            "/entities",
             "/settings/engine",
             "/roles",
             "/team",
@@ -101,6 +101,29 @@ def test_navigation_contains_only_accessible_sections(ordinary):
         for category in document["categories"]
     )
     assert document["design_pages"] == document["design_tabs"] == []
+
+
+def test_member_directory_and_navigation_share_page_permissions(ordinary):
+    workspace, user, client = ordinary
+    for code, grant in [("member-page", "Issue.View"), ("admin-page", "EntityType.View")]:
+        EntityType.objects.create(
+            workspace=workspace,
+            code=code,
+            title=code,
+            record_permissions={"view": grant},
+        )
+    navigation = client.get(f"/api/workspaces/{workspace.slug}/navigation/").data
+    catalog = client.get(f"/api/workspaces/{workspace.slug}/engine/catalog/")
+    assert catalog.status_code == 200
+    for pages in [navigation["entities"], catalog.data["entities"]]:
+        codes = {page["code"] for page in pages}
+        assert "member-page" in codes
+        assert "admin-page" not in codes
+    directory = next(route for route in navigation["routes"] if route["path"] == "/entities")
+    assert directory["to"] == "/sections/data/entities"
+    assert "EntityType.View" not in get_effective_permissions(user, workspace)["permissions"]
+    denied = client.get(f"/api/workspaces/{workspace.slug}/engine/entities/admin-page/records/")
+    assert denied.status_code == 403
 
 
 @pytest.mark.parametrize(

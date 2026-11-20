@@ -31,16 +31,16 @@ export function EntityDirectoryPage() {
   const [creatingPage, setCreatingPage] = useState(false);
   const [showInactive, setShowInactive] = useState(false);
   const navigation = useNavigationDocument();
+  const pageNavigation = useMemo(() => new Map(navigation?.entities.map((page) => [page.code, page])), [navigation]);
   const entities = useMemo(
     () =>
       data?.entities.filter(
-        (entity) => !entity.parent && (entity.is_active || (showInactive && entity.page_management?.can_manage))
+        (entity) =>
+          !entity.parent &&
+          ((entity.is_active && (!navigation || pageNavigation.has(entity.code))) ||
+            (showInactive && entity.page_management?.can_manage))
       ) || [],
-    [data?.entities, showInactive]
-  );
-  const pageCategories = useMemo(
-    () => new Map(navigation?.entities.map((page) => [page.code, page.category])),
-    [navigation]
+    [data?.entities, showInactive, navigation, pageNavigation]
   );
   const subtypeCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -51,7 +51,7 @@ export function EntityDirectoryPage() {
   const normalizedSearch = normalizePersianSearch(search);
   const visible = entities.filter(
     (entity) =>
-      (category === "all" || pageCategories.get(entity.code) === category) &&
+      (category === "all" || pageNavigation.get(entity.code)?.category === category) &&
       normalizePersianSearch(`${entityDisplayTitle(entity.title)} ${entity.description}`).includes(normalizedSearch)
   );
   const entityIcons = { ticket: Ticket, project: FolderKanban, task: CheckSquare2, leave: CalendarDays };
@@ -122,7 +122,10 @@ export function EntityDirectoryPage() {
             const subtypes = subtypeCounts.get(entity.id) ?? 0;
             return (
               <article key={entity.id} className="engine-entity-card">
-                <Link to={categoryUrl(navigation, `/entities/${entity.code}`)} className="engine-entity-card-open">
+                <Link
+                  to={pageNavigation.get(entity.code)?.to ?? categoryUrl(navigation, `/entities/${entity.code}`)}
+                  className="engine-entity-card-open"
+                >
                   <div className="engine-entity-card-heading">
                     <span className="engine-entity-icon">
                       <Icon size={24} aria-hidden="true" />

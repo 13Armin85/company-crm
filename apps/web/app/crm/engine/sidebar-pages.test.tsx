@@ -19,12 +19,7 @@ function render(entities: EntityDefinition[], canCreate: boolean, navigation?: N
     <QueryClientProvider client={client}>
       <MemoryRouter>
         <NavigationContext.Provider value={navigation}>
-          <SidebarPages
-            category={navigation ? "data" : undefined}
-            canCreate={canCreate}
-            collapsed={false}
-            onNavigate={() => {}}
-          />
+          <SidebarPages canCreate={canCreate} collapsed={false} onNavigate={() => {}} />
         </NavigationContext.Provider>
       </MemoryRouter>
     </QueryClientProvider>
@@ -62,23 +57,24 @@ describe("sidebar pages", () => {
     expect(html).toContain("همه صفحه‌ها (۱۰)");
   });
 
-  it("opens the authorized category for all pages without linking members to the admin directory", () => {
+  it("keeps authorized pages across categories and links to the backend directory", () => {
     const entities = Array.from({ length: 10 }, (_, i) => entity(`page-${i}`, `صفحه ${i}`));
     const navigation = {
-      categories: [{ id: "data", to: "/sections/data", items: [] }],
-      entities: entities.map((page) => ({ code: page.code, category: "data" })),
+      categories: [{ id: "data", to: "/sections/data", items: [{ path: "/entities", to: "/sections/data/entities" }] }],
+      entities: entities.map((page, index) => ({ code: page.code, category: index % 2 ? "work" : "data" })),
       routes: [],
     } as unknown as NavigationDocument;
     const html = render(entities, false, navigation);
-    expect(html).toContain('href="/sections/data"');
+    expect(html.match(/href="\/sections\/(data|work)\/entities\/page-/g)).toHaveLength(8);
     expect(html).not.toContain('href="/entities"');
-    expect(html).not.toContain('href="/sections/data/entities"');
-    expect(html).toContain("همه صفحه‌ها (۱۰)");
+    expect(html).toContain('href="/sections/data/entities"');
+    expect(html).toContain("همه صفحه‌ها");
   });
 
-  it("invites the first page when none exist, and hides the section without permission", () => {
+  it("keeps the section visible when empty without offering creation to members", () => {
     expect(render([], true)).toContain("اولین صفحه را بسازید");
-    expect(render([], false)).toBe("");
+    expect(render([], false)).toContain("صفحهٔ سفارشی در دسترس نیست.");
+    expect(render([], false)).not.toContain("اولین صفحه را بسازید");
   });
 
   it("suggests a valid English code", () => {

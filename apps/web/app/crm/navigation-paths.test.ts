@@ -36,7 +36,7 @@ describe("database navigation URLs", () => {
     ]);
     expect(categoryEntries(memberDocument, "missing")).toEqual([]);
     expect(categoryEntries(undefined, "data")).toEqual([]);
-    expect(canAccessPath("/sections/data/entities", () => false)).toBe(false);
+    expect(canAccessPath("/sections/data/entities", () => false)).toBe(true);
   });
 
   it("keeps the configured menu label when a native page points to the same URL", () => {
