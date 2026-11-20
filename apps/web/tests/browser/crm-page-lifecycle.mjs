@@ -52,6 +52,29 @@ try {
   await page.locator(".page-content h1").filter({ hasText: title }).waitFor();
   await page.reload();
   await page.locator(".page-content h1").filter({ hasText: title }).waitFor();
+  for (const width of [320, 375, 768, 1440]) {
+    await page.setViewportSize({ width, height: 950 });
+    // Allow the responsive sidebar's resize listener and CSS transition to settle.
+    await page
+      .waitForFunction(() => document.documentElement.scrollWidth <= innerWidth + 1, {}, { timeout: 2000 })
+      .catch(() => {});
+    const layout = await page.evaluate(() => ({
+      fits: document.documentElement.scrollWidth <= innerWidth + 1,
+      width: document.documentElement.scrollWidth,
+      offenders: [...document.querySelectorAll("main *")]
+        .filter(
+          (element) =>
+            element.getBoundingClientRect().right > innerWidth + 1 || element.getBoundingClientRect().left < -1
+        )
+        .slice(0, 12)
+        .map((element) => ({ className: element.className, width: element.getBoundingClientRect().width })),
+    }));
+    if (!layout.fits) {
+      console.log("PAGE_LAYOUT_FAILURE", width, JSON.stringify(layout));
+      await page.screenshot({ path: resolve(".cache/quality-page-overflow.png"), fullPage: true });
+    }
+    assert(layout.fits, `Page management overflows at ${width}px`);
+  }
   const beforeDelete = await (await page.request.get(`${base}/api/workspaces/${slug}/engine/catalog/`)).json();
   const management = beforeDelete.entities.find((row) => row.code === code)?.page_management;
   console.log("PAGE_DELETE_CAPABILITY", JSON.stringify(management));
@@ -59,6 +82,9 @@ try {
   console.log("PAGE_ACTIONS", JSON.stringify(await page.locator(".page-header button").allTextContents()));
   await page.screenshot({ path: resolve(".cache/quality-page-before-delete.png"), fullPage: true });
   await page.getByRole("button", { name: `حذف صفحهٔ ${title}`, exact: true }).click();
+  await page.setViewportSize({ width: 320, height: 812 });
+  const bounds = await page.getByRole("dialog").boundingBox();
+  assert(bounds && bounds.x >= 0 && bounds.x + bounds.width <= 321, "Deletion dialog exceeds the mobile viewport");
   await page.getByRole("dialog").getByRole("button", { name: "حذف صفحه", exact: true }).click();
   await page.waitForURL((url) => url.pathname.endsWith("/entities"));
   const catalog = await (await page.request.get(`${base}/api/workspaces/${slug}/engine/catalog/`)).json();
