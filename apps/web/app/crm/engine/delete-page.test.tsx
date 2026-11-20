@@ -64,4 +64,19 @@ describe("server-controlled page deletion", () => {
     expect(html).not.toContain("غیرفعال‌سازی صفحه");
     expect(html).not.toContain("button-danger");
   });
+  it("names the available action instead of promising deletion of a protected page", () => {
+    const html = renderToStaticMarkup(
+      <DeletePageButton
+        entity={entity({
+          can_manage: true,
+          can_delete: false,
+          can_archive: false,
+          can_restore: true,
+          delete_blockers: ["این صفحه رکورد دارد."],
+        })}
+      />
+    );
+    expect(html).toContain("بازگردانی صفحهٔ قراردادها");
+    expect(html).not.toContain("حذف صفحه");
+  });
 });

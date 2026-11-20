@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Trash2 } from "lucide-react";
+import { Archive, RotateCcw, Trash2 } from "lucide-react";
 import { AccessModal } from "../access/components";
 import { errorMessage } from "../api";
 import { Button } from "../components";
@@ -9,11 +9,20 @@ import type { EntityDefinition } from "./api";
 
 export function DeletePageButton({ entity, onRemoved }: { entity: EntityDefinition; onRemoved?: () => void }) {
   const [open, setOpen] = useState(false);
-  if (!entity.page_management?.can_manage) return null;
+  const controls = entity.page_management;
+  if (!controls?.can_manage) return null;
+  const label = controls.can_delete
+    ? "حذف صفحه"
+    : controls.can_restore
+      ? "بازگردانی صفحه"
+      : controls.can_archive
+        ? "غیرفعال‌سازی صفحه"
+        : "بررسی حذف صفحه";
+  const Icon = controls.can_delete ? Trash2 : controls.can_restore ? RotateCcw : Archive;
   return (
     <>
-      <Button variant="ghost" onClick={() => setOpen(true)} aria-label={`حذف صفحهٔ ${entity.title}`}>
-        <Trash2 size={15} aria-hidden="true" /> حذف صفحه
+      <Button variant="ghost" onClick={() => setOpen(true)} aria-label={`${label}ٔ ${entity.title}`}>
+        <Icon size={15} aria-hidden="true" /> {label}
       </Button>
       {open && <DeletePageDialog entity={entity} onClose={() => setOpen(false)} onRemoved={onRemoved} />}
     </>
@@ -48,7 +57,7 @@ export function DeletePageDialog({
     }
   };
   return (
-    <AccessModal title={`حذف صفحهٔ «${entity.title}»`} onClose={onClose} busy={mutation.isPending}>
+    <AccessModal title={`مدیریت صفحهٔ «${entity.title}»`} onClose={onClose} busy={mutation.isPending}>
       {blockers.length ? (
         <>
           <p>این صفحه وابستگی دارد و قابل حذف نیست:</p>
