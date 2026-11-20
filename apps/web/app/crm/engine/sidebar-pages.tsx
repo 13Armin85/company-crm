@@ -149,7 +149,6 @@ export function SidebarPages({
   const pages = customPages(catalog.data?.entities).filter(
     (page) => !navigation || navigation.entities.some((item) => item.code === page.code)
   );
-  const allPagesTo = navigation?.categories.flatMap((item) => item.items).find((item) => item.path === "/entities")?.to;
   return (
     <div className="recent-projects sidebar-pages">
       <p>
@@ -171,12 +170,7 @@ export function SidebarPages({
           <span>{page.title}</span>
         </NavLink>
       ))}
-      {allPagesTo ? (
-        <NavLink to={allPagesTo} end title={collapsed ? "همه صفحه‌ها" : undefined} onClick={onNavigate}>
-          <LayoutGrid size={15} aria-hidden="true" />
-          <span>همه صفحه‌ها</span>
-        </NavLink>
-      ) : pages.length > VISIBLE_PAGES ? (
+      {pages.length > VISIBLE_PAGES && (
         <button
           type="button"
           className="sidebar-pages-empty"
@@ -184,9 +178,9 @@ export function SidebarPages({
           onClick={() => setExpanded(!expanded)}
         >
           <LayoutGrid size={15} aria-hidden="true" />
-          <span>{expanded ? "نمایش کمتر" : `همه صفحه‌ها (${pages.length.toLocaleString("fa-IR")})`}</span>
+          <span>{expanded ? "نمایش کمتر" : `نمایش بیشتر (${pages.length.toLocaleString("fa-IR")})`}</span>
         </button>
-      ) : null}
+      )}
       {!pages.length && !canCreate && <p className="shell-empty">صفحهٔ سفارشی در دسترس نیست.</p>}
       {!pages.length && canCreate && (
         <button type="button" className="sidebar-pages-empty" onClick={() => setCreating(true)}>

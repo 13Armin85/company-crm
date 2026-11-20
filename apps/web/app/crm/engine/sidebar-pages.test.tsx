@@ -50,14 +50,15 @@ describe("sidebar pages", () => {
     expect(render(entities, false)).not.toContain("ساخت صفحهٔ جدید");
   });
 
-  it("collapses long lists behind an all-pages link", () => {
+  it("expands long lists without duplicating the all-pages link", () => {
     const entities = Array.from({ length: 10 }, (_, i) => entity(`page-${i}`, `صفحه ${i}`));
     const html = render(entities, false);
     expect(html.match(/href="\/entities\/page-/g)).toHaveLength(8);
-    expect(html).toContain("همه صفحه‌ها (۱۰)");
+    expect(html).toContain("نمایش بیشتر (۱۰)");
+    expect(html).not.toContain("همه صفحه‌ها");
   });
 
-  it("keeps authorized pages across categories and links to the backend directory", () => {
+  it("keeps authorized pages across categories without a duplicate directory link", () => {
     const entities = Array.from({ length: 10 }, (_, i) => entity(`page-${i}`, `صفحه ${i}`));
     const navigation = {
       categories: [{ id: "data", to: "/sections/data", items: [{ path: "/entities", to: "/sections/data/entities" }] }],
@@ -67,8 +68,8 @@ describe("sidebar pages", () => {
     const html = render(entities, false, navigation);
     expect(html.match(/href="\/sections\/(data|work)\/entities\/page-/g)).toHaveLength(8);
     expect(html).not.toContain('href="/entities"');
-    expect(html).toContain('href="/sections/data/entities"');
-    expect(html).toContain("همه صفحه‌ها");
+    expect(html).not.toContain('href="/sections/data/entities"');
+    expect(html).toContain("نمایش بیشتر (۱۰)");
   });
 
   it("keeps the section visible when empty without offering creation to members", () => {

@@ -534,10 +534,9 @@
   flex-wrap: wrap;
   gap: 20px;
   margin-block: 8px 24px;
-  padding: 16px 20px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 .engine-directory-count {
   display: flex;
@@ -664,7 +663,6 @@
 }
 @media (max-width: 720px) {
   .engine-directory-toolbar {
-    padding: 14px;
     gap: 14px;
   }
   .engine-directory-toolbar > .search-box {
