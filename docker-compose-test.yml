@@ -55,6 +55,7 @@ services:
 
   test-mq:
     image: rabbitmq:3.13.6-management-alpine
+    user: "100:101"
     networks:
       - test_env
     env_file:
@@ -63,6 +64,9 @@ services:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-plane}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-plane}
       RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-plane}
+      # Isolated tests own this cookie; never inherit a production cookie from .env.
+      RABBITMQ_ERLANG_COOKIE: crm-isolated-test-cookie
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "+S 2:2"
     tmpfs:
       - /var/lib/rabbitmq:uid=100,gid=101,mode=0770
     healthcheck:

@@ -21,7 +21,7 @@ import vazirmatnWoff2 from "../../../packages/tailwind-config/fonts/Vazirmatn-Va
 import "@fontsource/material-symbols-rounded";
 import "@fontsource/ibm-plex-mono";
 
-const APP_TITLE = "مدیریت هم‌کار | God mode";
+const APP_TITLE = "مدیریت هم‌کار";
 const APP_DESCRIPTION = "مدیریت فضاهای کاری، دسترسی‌ها و تنظیمات سامانه هم‌کار";
 
 export const links: LinksFunction = () => [
@@ -50,7 +50,7 @@ export function Layout({ children }: { children: ReactNode }) {
         <Links />
       </head>
       <body className="antialiased" suppressHydrationWarning>
-        <AppProviders>{children}</AppProviders>
+        {children}
         <Scripts />
       </body>
     </html>
@@ -73,9 +73,11 @@ export const meta: Route.MetaFunction = () => [
 
 export default function Root() {
   return (
-    <div className="min-h-screen bg-canvas">
-      <Outlet />
-    </div>
+    <AppProviders>
+      <div className="min-h-screen bg-canvas">
+        <Outlet />
+      </div>
+    </AppProviders>
   );
 }
 
@@ -90,7 +92,10 @@ export function HydrateFallback() {
 export function ErrorBoundary({ error: _error }: Route.ErrorBoundaryProps) {
   return (
     <div>
-      <p>Something went wrong.</p>
+      <p role="alert">بارگذاری بخش مدیریت انجام نشد.</p>
+      <button type="button" onClick={() => window.location.reload()}>
+        تلاش دوباره
+      </button>
     </div>
   );
 }

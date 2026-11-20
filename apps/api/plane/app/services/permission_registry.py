@@ -1,5 +1,9 @@
 """Developer-owned CRM permission catalog. Codes are a stable public contract."""
 
+from crum import get_current_user
+from django.db import transaction
+from django.utils import timezone
+
 # category, localized title, actions, delegatable actions
 DEFINITIONS = (
     ("User", "کاربران / اعضای تیم", ("View", "Create", "Edit", "Delete", "ChangePassword", "Role.Assign"), ("View",)),
@@ -113,7 +117,18 @@ TICKET_SIX_PERMISSIONS = {
     "FormDesigner.View": "مشاهده فرم‌ساز",
     "FormDesigner.Publish": "ویرایش و انتشار فرم",
 }
-PERMISSION_REGISTRY.update({code: {"name": title, "description": title, "category": code.split(".")[0], "is_delegatable": False, "is_active": True} for code, title in TICKET_SIX_PERMISSIONS.items()})
+PERMISSION_REGISTRY.update(
+    {
+        code: {
+            "name": title,
+            "description": title,
+            "category": code.split(".")[0],
+            "is_delegatable": False,
+            "is_active": True,
+        }
+        for code, title in TICKET_SIX_PERMISSIONS.items()
+    }
+)
 MEMBER_PERMISSIONS.add("View.Personal.Create")
 
 TICKET_SEVEN_PERMISSIONS = {
@@ -125,7 +140,12 @@ TICKET_SEVEN_PERMISSIONS = {
     "Dashboard.Team.Assign": "ارجاع از روی کارت تیم",
     "Dashboard.Team.Remind": "ارسال یادآور به اعضای تیم",
 }
-PERMISSION_REGISTRY.update({code: {"name": title, "description": title, "category": "Dashboard", "is_delegatable": False, "is_active": True} for code, title in TICKET_SEVEN_PERMISSIONS.items()})
+PERMISSION_REGISTRY.update(
+    {
+        code: {"name": title, "description": title, "category": "Dashboard", "is_delegatable": False, "is_active": True}
+        for code, title in TICKET_SEVEN_PERMISSIONS.items()
+    }
+)
 MEMBER_PERMISSIONS.add("Dashboard.Personal.Manage")
 
 WORK_CALENDAR_PERMISSIONS = {
@@ -139,7 +159,18 @@ WORK_CALENDAR_PERMISSIONS = {
     "WorkEvent.Create": "ایجاد جلسه، مأموریت و رویداد کاری",
     "WorkEvent.Manage": "مدیریت رویدادهای کاری زیرمجموعه",
 }
-PERMISSION_REGISTRY.update({code: {"name": title, "description": title, "category": code.split(".")[0], "is_delegatable": False, "is_active": True} for code, title in WORK_CALENDAR_PERMISSIONS.items()})
+PERMISSION_REGISTRY.update(
+    {
+        code: {
+            "name": title,
+            "description": title,
+            "category": code.split(".")[0],
+            "is_delegatable": False,
+            "is_active": True,
+        }
+        for code, title in WORK_CALENDAR_PERMISSIONS.items()
+    }
+)
 WORK_CALENDAR_MEMBER_PERMISSIONS = {"WorkSchedule.ViewOwn", "WorkEvent.Create"}
 MEMBER_PERMISSIONS.update(WORK_CALENDAR_MEMBER_PERMISSIONS)
 
@@ -243,17 +274,37 @@ PERMISSION_REGISTRY.update(
 REPORT_MEMBER_PERMISSIONS = {"DailyReport.Submit", "Report.View"}
 MEMBER_PERMISSIONS.update(REPORT_MEMBER_PERMISSIONS)
 
+
+@transaction.atomic
 def sync_permission_catalog(workspace):
-    from plane.db.models import OrganizationPermission
+    from plane.db.models import OrganizationPermission, Workspace
 
+    # Serialize catalog/bootstrap updates without one SELECT + UPDATE per code.
+    Workspace.objects.select_for_update().get(pk=workspace.pk)
+    existing = {row.code: row for row in OrganizationPermission.objects.filter(workspace=workspace)}
+    actor = get_current_user()
+    actor_id = actor.pk if actor is not None and not actor.is_anonymous else None
+    now = timezone.now()
+    created, changed = [], []
+    fields = ("name", "description", "category", "is_delegatable", "is_active")
     for code, defaults in PERMISSION_REGISTRY.items():
-        OrganizationPermission.objects.update_or_create(workspace=workspace, code=code, defaults=defaults)
+        row = existing.get(code)
+        if row is None:
+            created.append(OrganizationPermission(workspace=workspace, code=code, created_by_id=actor_id, **defaults))
+        elif any(getattr(row, key) != defaults[key] for key in fields):
+            for key in fields:
+                setattr(row, key, defaults[key])
+            row.updated_at, row.updated_by_id = now, actor_id
+            changed.append(row)
+    OrganizationPermission.objects.bulk_create(created, batch_size=500)
+    OrganizationPermission.objects.bulk_update(changed, [*fields, "updated_at", "updated_by"], batch_size=500)
     # Preserve historical definitions and assignments, but unknown codes grant nothing.
-    OrganizationPermission.objects.filter(workspace=workspace).exclude(code__in=PERMISSION_REGISTRY).update(
-        is_active=False
-    )
+    OrganizationPermission.objects.filter(workspace=workspace, is_active=True).exclude(
+        code__in=PERMISSION_REGISTRY
+    ).update(is_active=False, updated_at=now, updated_by_id=actor_id)
 
 
+@transaction.atomic
 def bootstrap_workspace_access(workspace):
     """Idempotent explicit bootstrap; never called by the permission evaluator."""
     from plane.db.models import OrganizationRole, RolePermission, UserOrganizationRole, WorkspaceMember
@@ -275,8 +326,15 @@ def bootstrap_workspace_access(workspace):
                 suffix += 1
             role = OrganizationRole.objects.create(workspace=workspace, system_key=key, name=default_name)
         if created:
-            for permission in workspace.organization_permissions.filter(code__in=codes):
-                RolePermission.objects.get_or_create(role=role, permission=permission)
+            actor = get_current_user()
+            actor_id = actor.pk if actor is not None and not actor.is_anonymous else None
+            RolePermission.objects.bulk_create(
+                [
+                    RolePermission(role=role, permission=permission, created_by_id=actor_id)
+                    for permission in workspace.organization_permissions.filter(code__in=codes)
+                ],
+                batch_size=500,
+            )
     roles = {role.system_key: role for role in workspace.organization_roles.filter(system_key__in=["admin", "member"])}
     for membership in WorkspaceMember.objects.filter(workspace=workspace, is_active=True):
         # Only initialize users who have no CRM assignments; do not undo deliberate changes.
@@ -308,4 +366,3 @@ def initialize_bulk_memberships(memberships):
                 UserOrganizationRole.objects.get_or_create(
                     workspace_id=membership.workspace_id, user_id=membership.member_id, role=role
                 )
-

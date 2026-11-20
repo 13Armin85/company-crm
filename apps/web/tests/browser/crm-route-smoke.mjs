@@ -106,8 +106,10 @@ try {
         links: [...document.querySelectorAll("main a[href]")].map((a) => a.getAttribute("href")),
         alerts: [...document.querySelectorAll("[role=alert]")].map((e) => e.textContent?.trim()),
       }));
-      for (const link of snapshot.links)
-        if (/^\/(projects|team|roles|leave-requests|reports\/saved|entities)\/.+/.test(link)) dynamic.add(link);
+      for (const link of snapshot.links) {
+        const logical = link?.replace(/^\/sections\/[^/]+/, "");
+        if (/^\/(projects|team|roles|leave-requests|reports\/saved|entities)\/.+/.test(logical)) dynamic.add(link);
+      }
       delete snapshot.links;
       await page.screenshot({ path: resolve(output, `${route.replaceAll("/", "_") || "home"}.png`), fullPage: true });
       results.push({ route, ...snapshot });
@@ -121,9 +123,10 @@ try {
     // A representative real record for every dynamic route family.
     const covered = new Set();
     for (const route of dynamic) {
-      const family = route
+      const logical = route.replace(/^\/sections\/[^/]+/, "");
+      const family = logical
         .split("/")
-        .slice(0, route.startsWith("/reports") ? 3 : 2)
+        .slice(0, logical.startsWith("/reports") ? 3 : 2)
         .join("/");
       if (covered.has(family)) continue;
       covered.add(family);

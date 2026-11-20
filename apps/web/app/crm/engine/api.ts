@@ -17,6 +17,13 @@ export interface EntityDefinition {
   numbering: { prefix?: string; padding?: number };
   record_permissions: Record<string, string>;
   can_create?: boolean;
+  page_management?: {
+    can_manage: boolean;
+    can_delete: boolean;
+    can_archive: boolean;
+    can_restore?: boolean;
+    delete_blockers: string[];
+  };
 }
 export interface LookupDefinition {
   id: string;

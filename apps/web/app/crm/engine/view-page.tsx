@@ -2,7 +2,7 @@ import { ErrorNotice, ErrorState } from "../error-state";
 import { TicketPresetBar } from "../ticket/preset-bar";
 import type { PresetId } from "../ticket/model";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogPanel, DialogTitle } from "@headlessui/react";
 import { Plus, SlidersHorizontal, Filter, Download, Palette, X } from "lucide-react";
@@ -17,6 +17,7 @@ import { ViewFilterEditor, ColumnEditor, ViewValueInput } from "./view-controls"
 import { ViewRenderer, ViewValue, numberText } from "./view-renderers";
 import { viewKinds } from "./view-types";
 import { entityDisplayTitle } from "./presentation";
+import { DeletePageButton } from "./delete-page";
 import { RecordSummaryDrawer } from "./record-drawer";
 import { RecordImport } from "./record-import";
 import { DuplicateFeedback, duplicateDetails } from "./duplicate-feedback";
@@ -425,6 +426,7 @@ function PresentationEditor({
 }
 
 export function EntityViewsPage({ entityCode }: { entityCode?: string } = {}) {
+  const navigate = useNavigate();
   const [urlParams] = useSearchParams();
   const [summaryId, setSummaryId] = useState<string | null>(null);
   const [summaryPage, setSummaryPage] = useState<{ page: number; direction: -1 | 1 } | null>(null);
@@ -669,13 +671,13 @@ export function EntityViewsPage({ entityCode }: { entityCode?: string } = {}) {
         />
       )}
       <PageHeader
-        eyebrow="موجودیت‌ها و فرم‌ها"
+        eyebrow="صفحه‌ها"
         title={entityDisplayTitle(entity?.title || "رکوردها")}
         description="رکوردهای این فرم را جستجو کنید و با نمای دلخواه ببینید."
         actions={
           <div className="engine-actions">
             <Link className="button button-secondary" to="/entities">
-              همه فرم‌ها
+              همه صفحه‌ها
             </Link>
             {entity?.can_create && (
               <Link className="button button-primary" to={`/entities/${code}/new`}>
@@ -683,6 +685,7 @@ export function EntityViewsPage({ entityCode }: { entityCode?: string } = {}) {
                 ثبت جدید
               </Link>
             )}
+            {entity && <DeletePageButton entity={entity} onRemoved={() => navigate("/entities")} />}
           </div>
         }
       />
@@ -959,7 +962,25 @@ export function EntityViewsPage({ entityCode }: { entityCode?: string } = {}) {
         (records.isLoading ? (
           <Skeleton rows={6} />
         ) : currentData && !currentData.results.length ? (
-          <EmptyState title="رکوردی یافت نشد" description="فیلتر و محدوده مشاهده را بررسی کنید." />
+          <EmptyState
+            title={
+              search.trim() || definition.filter || preset !== "all" ? "نتیجه‌ای پیدا نشد" : "هنوز رکوردی در دسترس نیست"
+            }
+            description={
+              search.trim() || definition.filter || preset !== "all"
+                ? "عبارت جستجو یا فیلترها را تغییر دهید."
+                : entity?.can_create
+                  ? "برای شروع، یک رکورد در این صفحه ثبت کنید."
+                  : "رکوردهای مجاز این صفحه در این بخش نمایش داده می‌شوند."
+            }
+            action={
+              entity?.can_create ? (
+                <Link className="button button-primary" to={`/entities/${code}/new`}>
+                  ثبت رکورد جدید
+                </Link>
+              ) : undefined
+            }
+          />
         ) : (
           currentData && (
             <ViewRenderer

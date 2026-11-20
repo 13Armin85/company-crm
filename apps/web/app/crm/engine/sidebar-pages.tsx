@@ -17,22 +17,24 @@ const CODE_PATTERN = /^[a-z][a-z0-9-]{1,59}$/;
 
 /** Tables built in the form designer; system tables already have their own menu items. */
 export function customPages(entities: EntityDefinition[] = []) {
-  return entities
-    .filter((entity) => !entity.parent && !entity.adapter && entity.is_active)
-    .sort((a, b) => a.title.localeCompare(b.title, "fa"));
+  return (
+    entities
+      .filter((entity) => !entity.parent && !entity.adapter && entity.is_active)
+      // eslint-disable-next-line unicorn/no-array-sort -- filter creates a private array; support ES2022.
+      .sort((a, b) => a.title.localeCompare(b.title, "fa"))
+  );
 }
 
 export const suggestCode = () => `page-${Math.random().toString(36).slice(2, 7)}`;
-
-const defaultDraft = {
-  tabs: [],
-  sections: [{ id: "main", title: "اطلاعات اصلی", columns: 2, bindings: [{ field: "title" }] }],
-};
 
 export function NewPageDialog({ onClose, initialTitle = "" }: { onClose: () => void; initialTitle?: string }) {
   const slug = useEngineSlug();
   const client = useQueryClient();
   const navigate = useNavigate();
+  const navigation = useNavigationDocument();
+  const [category, setCategory] = useState(
+    navigation?.categories.find((item) => item.id === "data")?.id ?? navigation?.categories[0]?.id ?? ""
+  );
   const [title, setTitle] = useState(initialTitle);
   const [code, setCode] = useState(suggestCode);
   const [busy, setBusy] = useState(false);
@@ -44,17 +46,18 @@ export function NewPageDialog({ onClose, initialTitle = "" }: { onClose: () => v
     setError(null);
     const base = enginePath(slug);
     try {
-      // A page is a table plus a published form, so records can be added right away.
-      await api.post(`${base}/definitions/entities/`, { code, title: title.trim() });
-      const saved = (await api.put(`${base}/forms/${code}/`, { revision: 0, draft: defaultDraft })).data as {
-        revision: number;
-      };
-      await api.post(`${base}/forms/${code}/`, { revision: saved.revision, change_note: "ساخت صفحه" });
+      const created = (
+        await api.post<{ to: string }>(`${base}/pages/`, {
+          code,
+          title: title.trim(),
+          ...(category ? { category } : {}),
+        })
+      ).data;
       await client.invalidateQueries({ queryKey: ["entity-engine", slug] });
       await client.invalidateQueries({ queryKey: ["crm-navigation", slug] });
       useUIStore.getState().toast(`صفحهٔ «${title.trim()}» ساخته شد`);
       onClose();
-      navigate(`/entities/${code}`);
+      navigate(created.to);
     } catch (failure) {
       setError(failure);
     } finally {
@@ -85,11 +88,28 @@ export function NewPageDialog({ onClose, initialTitle = "" }: { onClose: () => v
             onChange={(event) => setTitle(event.target.value)}
           />
         </label>
+        {navigation?.categories.length ? (
+          <label>
+            دسته‌بندی
+            <select
+              aria-label="دسته‌بندی صفحهٔ جدید"
+              value={category}
+              onChange={(event) => setCategory(event.target.value)}
+            >
+              {navigation.categories.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.title}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
         <label>
           کد انگلیسی
           <input
             required
             dir="ltr"
+            aria-label="کد انگلیسی"
             maxLength={60}
             value={code}
             aria-invalid={!validCode}

@@ -6,7 +6,7 @@ import { useInRouterContext } from "react-router";
 import { iconForPath, navigationGroups } from "../shell-nav";
 import { useNavigationDocument } from "../navigation";
 import { ChoiceLabelsContext } from "../choice-label-context";
-import type { ReactNode } from "react";
+import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { Archive, CircleAlert, Search } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useCurrentUser } from "../api";
@@ -96,20 +96,16 @@ export function Button({
   children,
   variant = "primary",
   icon: Icon,
-  onClick,
   type = "button",
-  disabled,
-}: {
-  children: ReactNode;
+  className = "",
+  ...buttonProps
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: "primary" | "secondary" | "ghost" | "danger";
   icon?: LucideIcon;
-  onClick?: () => void;
-  type?: "button" | "submit";
-  disabled?: boolean;
 }) {
   return (
-    <button className={`button button-${variant}`} type={type} onClick={onClick} disabled={disabled}>
-      {Icon && <Icon size={16} />}
+    <button {...buttonProps} className={`button button-${variant}${className ? ` ${className}` : ""}`} type={type}>
+      {Icon && <Icon size={16} aria-hidden="true" />}
       {children}
     </button>
   );

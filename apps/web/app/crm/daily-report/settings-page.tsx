@@ -3,10 +3,11 @@ import { ConfiguredFields } from "../engine/surface";
  * company default. Only in-app reminders exist; e-mail/SMS stay disabled until a provider is configured. */
 import { useEffect, useState } from "react";
 import { BellRing } from "lucide-react";
+import { normalizePersianSearch } from "@plane/ui";
 import { useReminderSettings, useSaveReminder } from "../api/reports";
 import type { ReminderSettings, ReminderValue } from "../api/reports";
 import { errorMessage } from "../api/client";
-import { Button, EmptyState, PageHeader, Skeleton } from "../components";
+import { Button, EmptyState, PageHeader, SearchBox, Skeleton } from "../components";
 import { toFa } from "../utils";
 import { Pill } from "./components";
 
@@ -89,26 +90,31 @@ const full = (value: ReminderValue | null | undefined, base: Required<ReminderVa
   weekdays: value?.weekdays ?? base.weekdays,
 });
 
-function UnitRow({ unit, base }: { unit: ReminderSettings["units"][number]; base: Required<ReminderValue> }) {
+export function UnitRow({ unit, base }: { unit: ReminderSettings["units"][number]; base: Required<ReminderValue> }) {
   const save = useSaveReminder();
   const [value, setValue] = useState(full(unit.reminder, base));
   const [allow, setAllow] = useState<boolean>(unit.allow_personal ?? true);
+  const [open, setOpen] = useState(false);
   return (
-    <details className="dr-unit">
+    <details className="dr-unit" onToggle={(event) => setOpen(event.currentTarget.open)}>
       <summary>
         {unit.title} {unit.reminder ? <Pill tone="info">تنظیم واحد</Pill> : <Pill tone="neutral">پیش‌فرض شرکت</Pill>}
       </summary>
-      <ReminderEditor idPrefix={`unit-${unit.id}`} value={value} onChange={setValue} />
-      <label className="dr-check">
-        <input type="checkbox" checked={allow} onChange={(event) => setAllow(event.target.checked)} />
-        افراد این واحد می‌توانند یادآوری شخصی تنظیم کنند
-      </label>
-      <Button
-        disabled={save.isPending}
-        onClick={() => save.mutate({ level: "unit", unit: unit.id, reminder: value, allow_personal: allow })}
-      >
-        ذخیرهٔ تنظیم واحد
-      </Button>
+      {open && (
+        <>
+          <ReminderEditor idPrefix={`unit-${unit.id}`} value={value} onChange={setValue} />
+          <label className="dr-check">
+            <input type="checkbox" checked={allow} onChange={(event) => setAllow(event.target.checked)} />
+            افراد این واحد می‌توانند یادآوری شخصی تنظیم کنند
+          </label>
+          <Button
+            disabled={save.isPending}
+            onClick={() => save.mutate({ level: "unit", unit: unit.id, reminder: value, allow_personal: allow })}
+          >
+            ذخیرهٔ تنظیم واحد
+          </Button>
+        </>
+      )}
     </details>
   );
 }
@@ -226,6 +232,7 @@ export default function DailyReportSettingsPage() {
   const settings = useReminderSettings();
   const save = useSaveReminder();
   const [personal, setPersonal] = useState<Required<ReminderValue> | null>(null);
+  const [unitSearch, setUnitSearch] = useState("");
   useEffect(() => {
     if (settings.data) setPersonal(full(settings.data.personal, settings.data.effective));
   }, [settings.data]);
@@ -284,9 +291,14 @@ export default function DailyReportSettingsPage() {
       {data.units.length > 0 && (
         <section className="dr-card">
           <h2>تنظیم واحدها</h2>
-          {data.units.map((unit) => (
-            <UnitRow key={unit.id} unit={unit} base={full(null, data.effective)} />
-          ))}
+          {data.units.length > 10 && (
+            <SearchBox value={unitSearch} onChange={setUnitSearch} placeholder="جستجوی واحد سازمانی…" />
+          )}
+          {data.units
+            .filter((unit) => normalizePersianSearch(unit.title).includes(normalizePersianSearch(unitSearch)))
+            .map((unit) => (
+              <UnitRow key={unit.id} unit={unit} base={full(null, data.effective)} />
+            ))}
         </section>
       )}
       {data.can_manage_workspace && data.workspace && <CompanySettings policy={data.workspace as unknown as Policy} />}

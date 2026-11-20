@@ -57,9 +57,17 @@ const icons: Record<string, LucideIcon> = {
 };
 export function navigationGroups(document: NavigationDocument | undefined): ShellGroup[] {
   return (document?.categories ?? []).map((group) => ({
-    ...group,
+    id: group.id,
+    label: group.label,
+    title: group.title,
     icon: icons[group.icon] ?? LayoutGrid,
-    items: group.items.map((item) => ({ ...item, icon: icons[item.icon] ?? LayoutGrid })),
+    items: group.items.map((item) => ({
+      to: item.to,
+      path: item.path,
+      label: item.label,
+      end: item.end,
+      icon: icons[item.icon] ?? LayoutGrid,
+    })),
   }));
 }
 const matches = (item: ShellItem, pathname: string) => {
@@ -73,23 +81,26 @@ export function groupForPath(pathname: string, groups: ShellGroup[] = []): strin
   const candidates = groups.flatMap((group) =>
     group.items.filter((item) => matches(item, path)).map((item) => ({ group, item }))
   );
-  // eslint-disable-next-line unicorn/no-array-sort -- Sorting a new array works with ES2022.
-  return (
-    candidates.sort((a, b) => (b.item.path ?? b.item.to).length - (a.item.path ?? a.item.to).length)[0]?.group.id ??
-    groups[0]?.id ??
-    ""
+  const best = candidates.reduce<(typeof candidates)[number] | undefined>(
+    (current, candidate) =>
+      !current || (candidate.item.path ?? candidate.item.to).length > (current.item.path ?? current.item.to).length
+        ? candidate
+        : current,
+    undefined
   );
+  return best?.group.id ?? groups[0]?.id ?? "";
 }
 export function iconForPath(pathname: string, groups: ShellGroup[] = []): LucideIcon {
   const group = groups.find((entry) => entry.id === groupForPath(pathname, groups));
-  // eslint-disable-next-line unicorn/no-array-sort -- Sorting a new array works with ES2022.
-  return (
-    group?.items
-      .filter((item) => matches(item, logicalPath(pathname)))
-      .sort((a, b) => (b.path ?? b.to).length - (a.path ?? a.to).length)[0]?.icon ??
-    group?.icon ??
-    Home
+  const path = logicalPath(pathname);
+  const best = group?.items.reduce<ShellItem | undefined>(
+    (current, item) =>
+      matches(item, path) && (!current || (item.path ?? item.to).length > (current.path ?? current.to).length)
+        ? item
+        : current,
+    undefined
   );
+  return best?.icon ?? group?.icon ?? Home;
 }
 export function sectionTitleForPath(pathname: string, groups: ShellGroup[] = []): string {
   return groups.find((group) => group.id === groupForPath(pathname, groups))?.title ?? "";

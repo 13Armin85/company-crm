@@ -22,6 +22,19 @@ vi.mock("../api", async () => ({
 function renderPage(children: React.ReactNode) {
   const client = new QueryClient();
   useUIStore.setState({ workspaceSlug: "" });
+  client.setQueryData(["crm-navigation", undefined], {
+    categories: [
+      { id: "work", title: "کارها" },
+      { id: "settings", title: "تنظیمات" },
+    ],
+    design_pages: [
+      { code: "ticket", title: "کارها", category: "work" },
+      { code: "profile", title: "پروفایل من", category: "settings" },
+    ],
+    design_tabs: [],
+    preferences: { design_sidebar: null },
+    all_design_title: "همه دسته‌ها",
+  });
   client.setQueryData(["entity-engine", "", "surfaces", "surfaces/"], {
     results: [
       { code: "ticket", title: "کارها", native_columns: ["عنوان"] },

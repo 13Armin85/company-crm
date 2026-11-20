@@ -588,6 +588,22 @@
 .engine-entity-card:hover {
   box-shadow: var(--shadow);
 }
+.engine-entity-card-open {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+.engine-entity-card-open:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.engine-entity-card > .button {
+  align-self: flex-start;
+  margin-top: 12px;
+}
 .engine-entity-card:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
