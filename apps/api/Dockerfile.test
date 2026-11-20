@@ -1,6 +1,9 @@
 FROM plane-dev-api
 
-COPY requirements/test.txt /code/requirements/test.txt
+COPY requirements/ /code/requirements/
 RUN pip install -r /code/requirements/test.txt --compile --no-cache-dir
+
+# Keep standalone CI runs on the same source and templates as the dependency set.
+COPY . /code/
 
 CMD ["pytest"]

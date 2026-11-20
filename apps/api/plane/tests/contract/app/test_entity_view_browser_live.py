@@ -33,6 +33,7 @@ def test_live_ten_thousand_record_browser(engine, live_server, settings):
     client.force_login(owner)
     ready = Path(".pytest_cache/entity-view-live-ready.json")
     done = Path(".pytest_cache/entity-view-live-done.json")
+    ready.parent.mkdir(parents=True, exist_ok=True)
     done.unlink(missing_ok=True)
     ready.write_text(
         json.dumps(

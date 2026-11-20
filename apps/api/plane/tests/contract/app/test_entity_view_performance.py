@@ -175,7 +175,9 @@ def test_ten_thousand_records_filter_sort_relation_aggregate_and_export(engine, 
     assert job.status == "ready", job.error
     assert job.row_count == 10000
     report["export"] = {"seconds": round(perf_counter() - start, 4), "rows": job.row_count, "format": "csv"}
-    Path(".pytest_cache/entity-view-performance.json").write_text(json.dumps(report, ensure_ascii=False, indent=2))
+    report_path = Path(".pytest_cache/entity-view-performance.json")
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print("ENTITY_VIEW_PERFORMANCE=" + json.dumps({k: v for k, v in report.items() if k != "plan"}, ensure_ascii=False))
     # Regression guard, not a new product SLA; measurements and hardware are reported.
     assert max(s["api_seconds"] for s in report["scenarios"]) < 10
