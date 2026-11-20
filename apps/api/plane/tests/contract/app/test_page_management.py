@@ -13,6 +13,7 @@ from plane.db.models import (
     EntityType,
     EntityRecord,
     FormLayout,
+    FormVersion,
     IssueView,
     User,
     Workspace,
@@ -56,6 +57,21 @@ def test_failed_form_creation_rolls_back_the_page(engine, monkeypatch):
     response = client.post(endpoint(workspace, "pages/"), {"code": "incomplete", "title": "Incomplete"}, format="json")
     assert response.status_code == 400
     assert not EntityType.all_objects.filter(workspace=workspace, code="incomplete").exists()
+
+
+def test_unused_page_deletion_cleans_up_soft_deleted_form_history(engine):
+    workspace, _, client = engine
+    result = client.post(endpoint(workspace, "pages/"), {"code": "old-form", "title": "Old form"}, format="json")
+    assert result.status_code == 201, result.data
+    identifier = result.data["id"]
+    form = FormLayout.objects.get(entity_id=identifier)
+    FormVersion.objects.filter(layout=form).update(deleted_at=timezone.now())
+    FormLayout.objects.filter(pk=form.pk).update(deleted_at=timezone.now())
+    response = client.delete(endpoint(workspace, f"definitions/entities/{identifier}/"))
+    assert response.status_code == 204, response.data
+    assert not EntityType.all_objects.filter(pk=identifier).exists()
+    assert not FormLayout.all_objects.filter(pk=form.pk).exists()
+    assert not FormVersion.all_objects.filter(layout_id=form.pk).exists()
 
 
 def test_page_creation_rejects_unregistered_policy_input(engine):

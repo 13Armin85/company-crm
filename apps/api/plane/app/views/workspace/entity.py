@@ -423,11 +423,12 @@ class EngineDefinitionEndpoint(EngineAPIView):
                 if Issue.all_objects.filter(workspace=workspace, type=native_type).exists():
                     raise ValidationError("این زیرنوع در تیکت‌های فعلی یا تاریخی استفاده شده است؛ آن را غیرفعال کنید.")
                 native_type.delete(soft=False)
-            form = FormLayout.objects.filter(entity=row).first()
+            form = FormLayout.all_objects.filter(entity=row).first()
             if form:
                 form.published = None
                 form.save(update_fields=["published", "updated_at"])
-                form.versions.all().delete(soft=False)
+                # all_objects uses Django's plain queryset and includes historical versions.
+                FormVersion.all_objects.filter(layout=form).delete()
                 form.delete(soft=False)
         row.delete(soft=False)
         return Response(status=204)
