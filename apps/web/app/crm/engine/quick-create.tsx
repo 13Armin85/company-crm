@@ -1,4 +1,4 @@
-import { useLocation } from "react-router";
+import { useCrmLocation as useLocation } from "../navigation";
 import { AccessModal } from "../access/components";
 import { useUIStore } from "../store";
 import { EngineRecordForm } from "./record-form";

@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import type { DayPayload, ReportItem, Suggestion, TeamDay } from "../api/reports";
 import { canAccessPath, reportPermissions } from "../access/permission-map";
 import { presentNotification } from "../notification-presentation";
-import { groupForPath } from "../shell-nav";
+import { groupForPath, type ShellGroup } from "../shell-nav";
 import { AbsenceBanner, DayContext, FullLeaveNotice, ItemSection, LeaveBanner, SuggestionCard } from "./components";
 import {
   EFFORT_LABEL,
@@ -353,8 +353,12 @@ describe("daily report — team view, navigation and reminders", () => {
     expect(canAccessPath("/daily-report/team", can([reportPermissions.teamDaily]))).toBe(true);
     expect(canAccessPath("/reports", can([reportPermissions.view]))).toBe(true);
     expect(canAccessPath("/reports/saved/x", can([]))).toBe(false);
-    expect(groupForPath("/daily-report/team")).toBe("reports");
-    expect(groupForPath("/daily-report")).toBe("home");
+    const groups = [
+      { id: "home", items: [{ to: "/sections/home/daily-report", path: "/daily-report" }] },
+      { id: "reports", items: [{ to: "/sections/reports/daily-report/team", path: "/daily-report/team" }] },
+    ] as ShellGroup[];
+    expect(groupForPath("/daily-report/team", groups)).toBe("reports");
+    expect(groupForPath("/daily-report", groups)).toBe("home");
   });
 
   it("opens the day from an in-app reminder", () => {

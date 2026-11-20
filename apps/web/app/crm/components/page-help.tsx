@@ -1,6 +1,6 @@
+import { useCrmLocation as useLocation } from "../navigation";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useLocation } from "react-router";
 import { BookOpen, CircleHelp, X } from "lucide-react";
 import "../../../styles/page-help.css";
 

@@ -1,6 +1,6 @@
+import { useCrmLocation as useLocation } from "../navigation";
 /** Global quick-create modal backed by the entity engine. */
 import { lazy, Suspense } from "react";
-import { useLocation } from "react-router";
 import { useWorkspaceAccess } from "../api";
 import { useUIStore } from "../store";
 import { Skeleton } from "./primitives";

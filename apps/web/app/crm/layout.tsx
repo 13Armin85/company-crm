@@ -1,10 +1,12 @@
+import { useCrmLocation as useLocation } from "./navigation";
+import { CategorizedOutlet, NavigationContext, useCrmNavigation } from "./navigation";
 import { ErrorState } from "./error-state";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BusinessChoicesProvider } from "./engine/choice-provider";
 import { ModalVisibilityContext } from "@plane/ui";
 import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { createCrmQueryClient } from "./report-cache";
-import { Navigate, NavLink, Outlet, useBlocker, useLocation, useNavigate } from "react-router";
+import { Navigate, NavLink, useBlocker, useNavigate } from "react-router";
 import { Bell, Menu, Moon, Plus, Search, Sun } from "lucide-react";
 import {
   useAppearance,
@@ -62,6 +64,12 @@ function AppLayout() {
   const { data: unreadCount = 0 } = useUnreadNotificationCount();
   const { data: currentUser } = useCurrentUser();
   const { data: access, error: accessError } = useWorkspaceAccess();
+  const navigation = useCrmNavigation();
+  const categoryLanding = /^\/sections\/([^/]+)\/?$/.exec(location.canonicalPathname);
+  const canOpenCategory = Boolean(
+    categoryLanding &&
+    navigation.data?.categories.some((category) => category.id === categoryLanding[1] && category.items.length > 0)
+  );
   const canCreate = access?.can("Issue.Create") === true && location.pathname.replace(/\/+$/, "") !== "/my-work";
   const [gPressed, setGPressed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -143,169 +151,178 @@ function AppLayout() {
   const workspace = workspaces.find((item) => item.slug === workspaceSlug) ?? workspaces[0];
   const can = useMemo(() => (code: string) => access?.can(code) === true, [access]);
   return (
-    <div
-      className={`app-shell ${collapsed ? "is-panel-collapsed" : ""} ${mobileSidebarOpen ? "is-mobile-nav-open" : ""}`}
-    >
-      <a className="skip-link" href="#main-content">
-        رفتن به محتوای اصلی
-      </a>
-      <ShellNavigation
-        can={can}
-        collapsed={collapsed}
-        mobileOpen={mobileSidebarOpen}
-        unreadCount={unreadCount}
-        projects={projects}
-        canCreateProject={access?.can("Project.Create") === true}
-        canCreatePage={Boolean(access?.can("EntityType.Create") && access?.can("FormDesigner.Publish"))}
-        onCreateProject={() => setCreate(true, "project")}
-        onToggleCollapsed={() => setCollapsed(!collapsed)}
-        onOpenMobile={() => setMobileSidebarOpen(true)}
-        onCloseMobile={() => setMobileSidebarOpen(false)}
-      />
-      <button
-        type="button"
-        className="shell-backdrop"
-        aria-label="بستن منوی اصلی"
-        tabIndex={mobileSidebarOpen ? 0 : -1}
-        onClick={() => setMobileSidebarOpen(false)}
-      />
-      <div className="shell-main">
-        <header className="shell-header">
-          <div className="shell-header-start">
-            <button
-              type="button"
-              className="icon-button shell-menu-button"
-              aria-label="بازکردن منوی اصلی"
-              aria-controls="primary-navigation"
-              aria-expanded={mobileSidebarOpen}
-              onClick={() => setMobileSidebarOpen(true)}
-            >
-              <Menu size={20} />
-            </button>
-            <span className="shell-workspace" title={workspace?.name}>
-              <span aria-hidden="true">{(workspace?.name ?? "ش").trim().charAt(0)}</span>
-              <b>{workspace?.name ?? "شرکت"}</b>
-            </span>
-          </div>
-          <Breadcrumb />
-          <div className="shell-header-actions">
-            <PageHelp />
-            <button type="button" className="shell-search" onClick={() => setCommand(true)}>
-              <Search size={16} aria-hidden="true" />
-              <span>جستجو یا اجرای فرمان…</span>
-              <kbd>Ctrl K</kbd>
-            </button>
-            {canCreate && (
+    <NavigationContext.Provider value={navigation.data}>
+      <div
+        className={`app-shell ${collapsed ? "is-panel-collapsed" : ""} ${mobileSidebarOpen ? "is-mobile-nav-open" : ""}`}
+      >
+        <a className="skip-link" href="#main-content">
+          رفتن به محتوای اصلی
+        </a>
+        <ShellNavigation
+          can={can}
+          collapsed={collapsed}
+          mobileOpen={mobileSidebarOpen}
+          unreadCount={unreadCount}
+          projects={projects}
+          canCreateProject={access?.can("Project.Create") === true}
+          canCreatePage={Boolean(access?.can("EntityType.Create") && access?.can("FormDesigner.Publish"))}
+          onCreateProject={() => setCreate(true, "project")}
+          onToggleCollapsed={() => setCollapsed(!collapsed)}
+          onOpenMobile={() => setMobileSidebarOpen(true)}
+          onCloseMobile={() => setMobileSidebarOpen(false)}
+        />
+        <button
+          type="button"
+          className="shell-backdrop"
+          aria-label="بستن منوی اصلی"
+          tabIndex={mobileSidebarOpen ? 0 : -1}
+          onClick={() => setMobileSidebarOpen(false)}
+        />
+        <div className="shell-main">
+          <header className="shell-header">
+            <div className="shell-header-start">
               <button
                 type="button"
-                className="shell-create"
-                aria-label="ایجاد کار جدید"
-                onClick={() => setCreate(true, "issue")}
+                className="icon-button shell-menu-button"
+                aria-label="بازکردن منوی اصلی"
+                aria-controls="primary-navigation"
+                aria-expanded={mobileSidebarOpen}
+                onClick={() => setMobileSidebarOpen(true)}
               >
-                <Plus size={17} aria-hidden="true" />
-                <span>کار جدید</span>
+                <Menu size={20} />
               </button>
-            )}
-            <IconButton
-              label="اعلان‌ها"
-              className={`notification-button ${unreadCount ? "has-notification" : ""}`}
-              onClick={() => setNotifications(true)}
-            >
-              <Bell size={18} />
-              {unreadCount > 0 && (
-                <span
-                  className="notification-badge"
-                  role="status"
-                  aria-live="polite"
-                  aria-label={`${toFa(unreadCount)} اعلان خوانده‌نشده`}
+              <span className="shell-workspace" title={workspace?.name}>
+                <span aria-hidden="true">{(workspace?.name ?? "ش").trim().charAt(0)}</span>
+                <b>{workspace?.name ?? "شرکت"}</b>
+              </span>
+            </div>
+            <Breadcrumb />
+            <div className="shell-header-actions">
+              <PageHelp />
+              <button type="button" className="shell-search" onClick={() => setCommand(true)}>
+                <Search size={16} aria-hidden="true" />
+                <span>جستجو یا اجرای فرمان…</span>
+                <kbd>Ctrl K</kbd>
+              </button>
+              {canCreate && (
+                <button
+                  type="button"
+                  className="shell-create"
+                  aria-label="ایجاد کار جدید"
+                  onClick={() => setCreate(true, "issue")}
                 >
-                  {unreadCount > 99 ? "۹۹+" : toFa(unreadCount)}
-                </span>
+                  <Plus size={17} aria-hidden="true" />
+                  <span>کار جدید</span>
+                </button>
               )}
-            </IconButton>
-            <IconButton
-              label={resolvedDark ? "پوسته روشن" : "پوسته تیره"}
-              onClick={() => {
-                const next = resolvedDark ? "light" : "dark";
-                setTheme(next);
-                updateAppearance.mutate({ theme: next });
-              }}
-            >
-              {resolvedDark ? <Sun size={18} /> : <Moon size={18} />}
-            </IconButton>
-            <NavLink to="/settings?section=profile" className="user-avatar" aria-label="حساب کاربری">
-              {currentUser?.avatarUrl ? (
-                <img src={currentUser.avatarUrl} alt={currentUser.displayName} />
-              ) : (
-                currentUser?.initials || "؟"
-              )}
-              <span />
-            </NavLink>
-          </div>
-        </header>
-        <main className="page-content" id="main-content" tabIndex={-1}>
-          {workspaceError || accessError ? (
-            <ErrorState message="اطلاعات شرکت دریافت نشد؛ اتصال را بررسی کنید." />
-          ) : workspacesPending ? (
-            <div className="page-status" role="status">
-              در حال بارگذاری فضای کاری…
-            </div>
-          ) : !workspaces.length ? (
-            <p className="page-status" role="status">
-              عضویت فعالی در یک شرکت ندارید.
-            </p>
-          ) : !access ? (
-            <div className="page-status" role="status">
-              در حال بررسی دسترسی…
-            </div>
-          ) : canAccessPath(location.pathname, access.can) ? (
-            <Outlet />
-          ) : (
-            <section role="alert" className="panel">
-              <h2>دسترسی به این صفحه را ندارید</h2>
-              <p>برای تغییر دسترسی با مدیر شرکت هماهنگ کنید.</p>
-              <NavLink to="/settings">تنظیمات حساب</NavLink>
-            </section>
-          )}
-        </main>
-      </div>
-      <NotificationDrawer />
-      <CommandPalette />
-      <CreateModal />
-      {navigationBlocker.state === "blocked" && (
-        <div className="modal-layer" role="presentation">
-          <section
-            className="create-modal logout-modal"
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="unsaved-title"
-          >
-            <header>
-              <div>
-                <span className="modal-kicker">تغییرات ذخیره‌نشده</span>
-                <h2 id="unsaved-title">از این صفحه خارج شوید؟</h2>
-              </div>
-            </header>
-            <p>فرم یا کار در حال ویرایش است. ماندن در صفحه، اطلاعات فعلی را حفظ می‌کند.</p>
-            <footer>
-              <Button variant="secondary" onClick={() => navigationBlocker.reset()}>
-                ماندن و ادامه ویرایش
-              </Button>
-              <Button
-                variant="danger"
+              <IconButton
+                label="اعلان‌ها"
+                className={`notification-button ${unreadCount ? "has-notification" : ""}`}
+                onClick={() => setNotifications(true)}
+              >
+                <Bell size={18} />
+                {unreadCount > 0 && (
+                  <span
+                    className="notification-badge"
+                    role="status"
+                    aria-live="polite"
+                    aria-label={`${toFa(unreadCount)} اعلان خوانده‌نشده`}
+                  >
+                    {unreadCount > 99 ? "۹۹+" : toFa(unreadCount)}
+                  </span>
+                )}
+              </IconButton>
+              <IconButton
+                label={resolvedDark ? "پوسته روشن" : "پوسته تیره"}
                 onClick={() => {
-                  clearDirtyForms();
-                  navigationBlocker.proceed();
+                  const next = resolvedDark ? "light" : "dark";
+                  setTheme(next);
+                  updateAppearance.mutate({ theme: next });
                 }}
               >
-                خروج بدون ذخیره
-              </Button>
-            </footer>
-          </section>
+                {resolvedDark ? <Sun size={18} /> : <Moon size={18} />}
+              </IconButton>
+              <NavLink to="/settings?section=profile" className="user-avatar" aria-label="حساب کاربری">
+                {currentUser?.avatarUrl ? (
+                  <img src={currentUser.avatarUrl} alt={currentUser.displayName} />
+                ) : (
+                  currentUser?.initials || "؟"
+                )}
+                <span />
+              </NavLink>
+            </div>
+          </header>
+          <main className="page-content" id="main-content" tabIndex={-1}>
+            {workspaceError || accessError ? (
+              <ErrorState message="اطلاعات شرکت دریافت نشد؛ اتصال را بررسی کنید." />
+            ) : workspacesPending ? (
+              <div className="page-status" role="status">
+                در حال بارگذاری فضای کاری…
+              </div>
+            ) : !workspaces.length ? (
+              <p className="page-status" role="status">
+                عضویت فعالی در یک شرکت ندارید.
+              </p>
+            ) : !access ? (
+              <div className="page-status" role="status">
+                در حال بررسی دسترسی…
+              </div>
+            ) : navigation.error ? (
+              <section className="panel" role="alert">
+                <p>دسته‌بندی‌های سامانه دریافت نشد.</p>
+                <Button onClick={() => void navigation.refetch()}>تلاش دوباره</Button>
+              </section>
+            ) : !navigation.data ? (
+              <p role="status">در حال دریافت دسته‌بندی‌ها…</p>
+            ) : canOpenCategory || canAccessPath(location.pathname, access.can) ? (
+              <CategorizedOutlet />
+            ) : (
+              <section role="alert" className="panel">
+                <h2>دسترسی به این صفحه را ندارید</h2>
+                <p>برای تغییر دسترسی با مدیر شرکت هماهنگ کنید.</p>
+                <NavLink to="/settings">تنظیمات حساب</NavLink>
+              </section>
+            )}
+          </main>
         </div>
-      )}
-      <ToastRegion />
-    </div>
+        <NotificationDrawer />
+        <CommandPalette />
+        <CreateModal />
+        {navigationBlocker.state === "blocked" && (
+          <div className="modal-layer" role="presentation">
+            <section
+              className="create-modal logout-modal"
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="unsaved-title"
+            >
+              <header>
+                <div>
+                  <span className="modal-kicker">تغییرات ذخیره‌نشده</span>
+                  <h2 id="unsaved-title">از این صفحه خارج شوید؟</h2>
+                </div>
+              </header>
+              <p>فرم یا کار در حال ویرایش است. ماندن در صفحه، اطلاعات فعلی را حفظ می‌کند.</p>
+              <footer>
+                <Button variant="secondary" onClick={() => navigationBlocker.reset()}>
+                  ماندن و ادامه ویرایش
+                </Button>
+                <Button
+                  variant="danger"
+                  onClick={() => {
+                    clearDirtyForms();
+                    navigationBlocker.proceed();
+                  }}
+                >
+                  خروج بدون ذخیره
+                </Button>
+              </footer>
+            </section>
+          </div>
+        )}
+        <ToastRegion />
+      </div>
+    </NavigationContext.Provider>
   );
 }
 

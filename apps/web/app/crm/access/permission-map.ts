@@ -1,3 +1,5 @@
+import { logicalPath } from "../navigation-paths";
+
 export const pagePermissions: Record<string, string> = {
   "/": "Dashboard.Personal.Manage",
   "/my-work": "Issue.View",
@@ -16,6 +18,7 @@ export const pagePermissions: Record<string, string> = {
 };
 
 export function permissionsForPath(pathname: string): string[] {
+  pathname = logicalPath(pathname);
   const paths = Object.keys(pagePermissions);
   paths.sort((left, right) => right.length - left.length);
   const path = paths.find((entry) => pathname === entry || (entry !== "/" && pathname.startsWith(`${entry}/`)));
@@ -24,6 +27,8 @@ export function permissionsForPath(pathname: string): string[] {
 }
 
 export function canAccessPath(pathname: string, can: (code: string) => boolean): boolean {
+  pathname = logicalPath(pathname);
+  if (pathname.startsWith("/sections/")) return false;
   if (pathname.startsWith("/settings/engine"))
     return [
       "FormDesigner.View",

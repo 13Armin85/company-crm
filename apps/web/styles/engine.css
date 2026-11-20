@@ -1329,6 +1329,22 @@
   display: grid;
   gap: 18px;
 }
+.engine-design-category {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  min-width: 0;
+}
+.engine-design-category h3 {
+  margin: 12px 8px 4px;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+@media (max-width: 1100px) {
+  .engine-workspace-sidebar nav > .engine-design-category {
+    flex: 0 0 min(240px, 80vw);
+  }
+}
 .engine-workspace-heading {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;

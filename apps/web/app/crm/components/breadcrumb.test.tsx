@@ -2,6 +2,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Breadcrumb } from "./breadcrumb";
+import { NavigationContext } from "../navigation";
+import type { NavigationDocument } from "../navigation-paths";
 
 const state = vi.hoisted(() => ({
   permissions: ["Role.View"],
@@ -35,6 +37,30 @@ beforeEach(() => {
 });
 
 describe("role breadcrumb", () => {
+  it("renders database category and page titles with categorized parent links", () => {
+    const document = {
+      categories: [{ id: "company", title: "دسته از دیتابیس", to: "/sections/company" }],
+      routes: [
+        { path: "/roles", category: "company", label: "نقش‌های شرکت" },
+        { path: "/", category: "home" },
+      ],
+      entities: [],
+      design_pages: [],
+    } as unknown as NavigationDocument;
+    const html = renderToStaticMarkup(
+      <MemoryRouter initialEntries={["/sections/company/roles/role-1/permissions"]}>
+        <NavigationContext.Provider value={document}>
+          <Breadcrumb />
+        </NavigationContext.Provider>
+      </MemoryRouter>
+    );
+    expect(html).toContain("دسته از دیتابیس");
+    expect(html).toContain("نقش‌های شرکت");
+    expect(html).toContain("پشتیبانی");
+    expect(html).toContain('href="/sections/company"');
+    expect(html).toContain('href="/sections/company/roles"');
+    expect(html.match(/aria-current="page"/g)).toHaveLength(1);
+  });
   it("uses the database role name and real parent links with one current page", () => {
     const html = render();
     expect(html).toContain('aria-label="مسیر صفحه"');

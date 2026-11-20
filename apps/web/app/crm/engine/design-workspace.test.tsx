@@ -16,6 +16,15 @@ describe("design workspace page picker", () => {
   it("lists API pages and opens the matching full page editor from a direct selection", () => {
     useUIStore.setState({ workspaceSlug: "" });
     const client = new QueryClient();
+    client.setQueryData(["crm-navigation", undefined], {
+      categories: [{ id: "org", title: "سازمان", items: [] }],
+      design_pages: [
+        { code: "roles", title: "نقش‌های سازمانی", category: "org", kind: "فرم و جدول", to: "/sections/org/roles" },
+      ],
+      design_tabs: [{ id: "layout", label: "فرم", hint: "طراحی فرم" }],
+      preferences: { design_sidebar: null },
+      all_design_title: "همه دسته‌ها",
+    });
     client.setQueryData(["entity-engine", "", "catalog", "catalog/"], { entities: [], field_kinds: [] });
     client.setQueryData(["entity-engine", "", "fields", "definitions/fields/"], []);
     client.setQueryData(["entity-engine", "", "surfaces", "surfaces/"], {

@@ -1,10 +1,13 @@
+import { useCrmLocation as useLocation } from "./navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { NavLink, useLocation, useNavigate } from "react-router";
+import { NavLink, useNavigate } from "react-router";
 import { BrandLogo } from "@plane/ui";
 import { PanelRightClose, PanelRightOpen, Plus, X } from "lucide-react";
 import { canAccessPath } from "./access/permission-map";
-import { groupForPath, shellGroups } from "./shell-nav";
+import { groupForPath, navigationGroups } from "./shell-nav";
+import { useNavigationDocument } from "./navigation";
+import { categoryUrl } from "./navigation-paths";
 import type { ShellGroup, ShellItem } from "./shell-nav";
 import { SidebarPages } from "./engine/sidebar-pages";
 import { toFa } from "./utils";
@@ -41,7 +44,9 @@ export function ShellNavigation({
 }: ShellProps) {
   const location = useLocation();
   const navigate = useNavigate();
-  const routeGroup = groupForPath(location.pathname);
+  const navigation = useNavigationDocument();
+  const shellGroups = useMemo(() => navigationGroups(navigation), [navigation]);
+  const routeGroup = groupForPath(location.canonicalPathname, shellGroups);
   const [selected, setSelected] = useState(routeGroup);
   useEffect(() => setSelected(routeGroup), [routeGroup]);
 
@@ -49,10 +54,14 @@ export function ShellNavigation({
     () =>
       shellGroups.reduce<ShellGroup[]>((visible, group) => {
         const items = group.items.filter((item) => canAccessPath(item.to, can));
-        if (items.length || group.id === "data") visible.push({ ...group, items });
+        if (
+          items.length ||
+          navigation?.entities.some((page) => page.category === group.id && page.path.startsWith("/entities/"))
+        )
+          visible.push({ ...group, items });
         return visible;
       }, []),
-    [can]
+    [can, shellGroups, navigation]
   );
   const current = groups.find((group) => group.id === selected) ?? groups[0];
 
@@ -96,7 +105,7 @@ export function ShellNavigation({
               >
                 <span className="shell-rail-icon">
                   <Icon size={20} strokeWidth={1.8} />
-                  {group.id === "home" && unreadCount > 0 && (
+                  {group.items.some((item) => item.path === "/inbox") && unreadCount > 0 && (
                     <b aria-label={`${toFa(unreadCount)} اعلان خوانده‌نشده`}>
                       {unreadCount > 99 ? "۹۹+" : toFa(unreadCount)}
                     </b>
@@ -155,12 +164,12 @@ export function ShellNavigation({
             <nav className="shell-links" aria-label={current.title}>
               {current.items.map((item) => (
                 <ShellLink key={item.to} item={item} onNavigate={onCloseMobile}>
-                  {item.to === "/inbox" && unreadCount > 0 && <b>{toFa(unreadCount)}</b>}
+                  {item.path === "/inbox" && unreadCount > 0 && <b>{toFa(unreadCount)}</b>}
                 </ShellLink>
               ))}
             </nav>
           )}
-          {current?.id === "work" && (
+          {current?.items.some((item) => item.path === "/projects") && (
             <section className="shell-section">
               <h3>
                 <span>پروژه‌های اخیر</span>
@@ -174,7 +183,7 @@ export function ShellNavigation({
                 projects.slice(0, 6).map((project) => (
                   <NavLink
                     key={project.id}
-                    to={`/projects/${project.id}`}
+                    to={categoryUrl(navigation, `/projects/${project.id}`)}
                     className="shell-link"
                     onClick={onCloseMobile}
                   >
@@ -187,11 +196,20 @@ export function ShellNavigation({
               )}
             </section>
           )}
-          {current?.id === "data" && (
-            <section className="shell-section shell-section-pages">
-              <SidebarPages collapsed={false} canCreate={canCreatePage} onNavigate={onCloseMobile} />
-            </section>
-          )}
+          {current &&
+            (current.items.some((item) => item.path === "/entities") ||
+              navigation?.entities.some(
+                (page) => page.category === current.id && page.path.startsWith("/entities/")
+              )) && (
+              <section className="shell-section shell-section-pages">
+                <SidebarPages
+                  category={current.id}
+                  collapsed={false}
+                  canCreate={canCreatePage}
+                  onNavigate={onCloseMobile}
+                />
+              </section>
+            )}
         </div>
       </aside>
     </>

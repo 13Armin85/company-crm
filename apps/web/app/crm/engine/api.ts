@@ -175,6 +175,7 @@ export function useEngineMutation(successMessage = "تغییرات ذخیره ش
     onSuccess: () => {
       for (const key of [
         "entity-engine",
+        "crm-navigation",
         "issues",
         "projects",
         "project",

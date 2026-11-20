@@ -6,6 +6,8 @@ import { AccessModal } from "../access/components";
 import { api, errorMessage } from "../api";
 import { Button } from "../components";
 import { ErrorNotice } from "../error-state";
+import { useNavigationDocument } from "../navigation";
+import { categoryUrl } from "../navigation-paths";
 import { useUIStore } from "../store";
 import { enginePath, useEngineCatalog, useEngineSlug } from "./api";
 import type { EntityDefinition } from "./api";
@@ -49,6 +51,7 @@ export function NewPageDialog({ onClose, initialTitle = "" }: { onClose: () => v
       };
       await api.post(`${base}/forms/${code}/`, { revision: saved.revision, change_note: "ساخت صفحه" });
       await client.invalidateQueries({ queryKey: ["entity-engine", slug] });
+      await client.invalidateQueries({ queryKey: ["crm-navigation", slug] });
       useUIStore.getState().toast(`صفحهٔ «${title.trim()}» ساخته شد`);
       onClose();
       navigate(`/entities/${code}`);
@@ -111,17 +114,22 @@ export function NewPageDialog({ onClose, initialTitle = "" }: { onClose: () => v
 }
 
 export function SidebarPages({
+  category,
   canCreate,
   collapsed,
   onNavigate,
 }: {
+  category?: string;
   canCreate: boolean;
   collapsed: boolean;
   onNavigate: () => void;
 }) {
   const catalog = useEngineCatalog();
+  const navigation = useNavigationDocument();
   const [creating, setCreating] = useState(false);
-  const pages = customPages(catalog.data?.entities);
+  const pages = customPages(catalog.data?.entities).filter(
+    (page) => !category || navigation?.entities.some((item) => item.code === page.code && item.category === category)
+  );
   if (!pages.length && !canCreate) return null;
   return (
     <div className="recent-projects sidebar-pages">
@@ -136,7 +144,7 @@ export function SidebarPages({
       {pages.slice(0, VISIBLE_PAGES).map((page) => (
         <NavLink
           key={page.code}
-          to={`/entities/${page.code}`}
+          to={categoryUrl(navigation, `/entities/${page.code}`)}
           title={collapsed ? page.title : undefined}
           onClick={onNavigate}
         >
@@ -145,7 +153,12 @@ export function SidebarPages({
         </NavLink>
       ))}
       {pages.length > VISIBLE_PAGES && (
-        <NavLink to="/entities" end title={collapsed ? "همه صفحه‌ها" : undefined} onClick={onNavigate}>
+        <NavLink
+          to={categoryUrl(navigation, "/entities")}
+          end
+          title={collapsed ? "همه صفحه‌ها" : undefined}
+          onClick={onNavigate}
+        >
           <LayoutGrid size={15} aria-hidden="true" />
           <span>همه صفحه‌ها ({pages.length.toLocaleString("fa-IR")})</span>
         </NavLink>

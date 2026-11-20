@@ -1,8 +1,10 @@
+import { useCrmLocation as useLocation } from "../navigation";
 /** Small presentational building blocks shared by every CRM page. */
 import { PersianDatePicker } from "@plane/ui";
 import { useContext, useEffect } from "react";
-import { useInRouterContext, useLocation } from "react-router";
-import { iconForPath } from "../shell-nav";
+import { useInRouterContext } from "react-router";
+import { iconForPath, navigationGroups } from "../shell-nav";
+import { useNavigationDocument } from "../navigation";
 import { ChoiceLabelsContext } from "../choice-label-context";
 import type { ReactNode } from "react";
 import { Archive, CircleAlert, Search } from "lucide-react";
@@ -69,7 +71,8 @@ export function PageHeader({
 /** Each page carries its section's icon, so the header reads the same across the app. */
 function PageHeaderIcon() {
   const { pathname } = useLocation();
-  const Icon = iconForPath(pathname);
+  const navigation = useNavigationDocument();
+  const Icon = iconForPath(pathname, navigationGroups(navigation));
   return (
     <span className="page-header-icon" aria-hidden="true">
       <Icon size={22} strokeWidth={1.8} />

@@ -1,4 +1,5 @@
 from django.urls import path
+from plane.app.views.workspace.navigation import NavigationEndpoint
 from plane.app.views.workspace.dashboard import DashboardEndpoint, DashboardRoleEndpoint, DashboardWidgetEndpoint, DashboardWidgetCreateEndpoint, DashboardTeamEndpoint, DashboardTeamSettingsEndpoint, DashboardTeamDetailEndpoint, DashboardTeamAssignEndpoint, DashboardTeamRemindEndpoint
 from plane.app.views.workspace.entity_import import EngineRecordImportEndpoint
 from plane.app.views.workspace.entity_governance import EngineFieldUsageEndpoint, EngineDeletePreviewEndpoint
@@ -28,6 +29,7 @@ from plane.app.views.workspace.entity import (
 
 
 urlpatterns = [
+    path("workspaces/<str:slug>/navigation/", NavigationEndpoint.as_view()),
     path("workspaces/<str:slug>/dashboard/", DashboardEndpoint.as_view()),
     path("workspaces/<str:slug>/dashboard/defaults/<uuid:role_id>/", DashboardRoleEndpoint.as_view()),
     path("workspaces/<str:slug>/dashboard/defaults/<uuid:role_id>/widgets/", DashboardWidgetCreateEndpoint.as_view()),

@@ -51,6 +51,7 @@ export const invalidateOrganizationAccess = (client: QueryClient, slug: string) 
   Promise.all(
     [
       "entity-engine",
+      "crm-navigation",
       "organization-roles",
       "organization-role",
       "organization-units",
