@@ -2,6 +2,7 @@
 
 import json
 import threading
+from copy import deepcopy
 from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
@@ -274,6 +275,54 @@ def test_validation_reports_each_problem_in_persian(org):
     assert response.status_code == 400 and response.data["issues"]
     # A return loop with an exit to the end is valid.
     assert engine.validate_graph(version.definition, approval_graph()) == []
+
+
+def test_malformed_designer_graphs_return_issues_instead_of_server_errors(org):
+    workspace, admin = org["workspace"], org["admin"]
+    _, version = create_workflow(admin, workspace, publish=False)
+    cases = [
+        ("steps list", lambda graph: graph.update(steps="bad")),
+        ("transitions list", lambda graph: graph.update(transitions={})),
+        ("step", lambda graph: graph["steps"].append(None)),
+        ("transition", lambda graph: graph["transitions"].append(None)),
+        ("reminder", lambda graph: graph["steps"][1].update(reminder="soon")),
+        ("pause", lambda graph: graph["steps"][1].update(pause="customer")),
+        ("assignee", lambda graph: graph["steps"][1].update(assignee="manager")),
+        ("required fields", lambda graph: graph["steps"][1].update(required_fields=42)),
+        ("status", lambda graph: graph["steps"][1].update(status_code=[])),
+        ("step title", lambda graph: graph["steps"][1].update(title=[])),
+        ("transition code", lambda graph: graph["transitions"][0].update(code=[])),
+        ("transition label", lambda graph: graph["transitions"][0].update(label=[])),
+        ("assignee id", lambda graph: graph["steps"][1].update(assignee={"type": "user", "user_id": "invalid"})),
+    ]
+    for label, change in cases:
+        graph = deepcopy(approval_graph())
+        change(graph)
+        checked = client_for(admin).post(
+            url(workspace, f"versions/{version.id}/validate/"), {"graph": graph}, format="json"
+        )
+        assert checked.status_code == 200, label
+        assert checked.data["valid"] is False and checked.data["issues"], label
+        simulated = client_for(admin).post(
+            url(workspace, f"versions/{version.id}/simulate/"), {"graph": graph}, format="json"
+        )
+        assert simulated.status_code == 200, label
+        assert simulated.data["issues"] and simulated.data["path"] == [], label
+    for graph in (None, [], "bad"):
+        checked = client_for(admin).post(
+            url(workspace, f"versions/{version.id}/validate/"), {"graph": graph}, format="json"
+        )
+        assert checked.status_code == 200 and checked.data["valid"] is False
+        simulated = client_for(admin).post(
+            url(workspace, f"versions/{version.id}/simulate/"), {"graph": graph}, format="json"
+        )
+        assert simulated.status_code == 200 and simulated.data["path"] == []
+    broken = approval_graph()
+    broken["steps"][1]["pause"] = "customer"
+    saved = client_for(admin).put(url(workspace, f"versions/{version.id}/"), {"graph": broken}, format="json")
+    assert saved.status_code == 200
+    published = client_for(admin).post(url(workspace, f"versions/{version.id}/publish/"), {}, format="json")
+    assert published.status_code == 400 and published.data["issues"]
 
 
 def test_design_and_publish_require_permissions(org):

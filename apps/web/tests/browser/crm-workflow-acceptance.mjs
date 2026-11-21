@@ -222,16 +222,7 @@ try {
     steps: [step("start", "ثبت", "start", "todo"), step("end", "پایان", "end", "done", { type: "none" })],
     transitions: [move("submit", "start", "end", "advance", "ارسال")],
   });
-  await adminPage.goto(`${base}/settings/engine`);
-  await adminPage
-    .getByRole("navigation", { name: "انتخاب بخش" })
-    .getByRole("button", { name: /کارها/ })
-    .first()
-    .click();
-  await adminPage
-    .getByRole("button", { name: /گردش‌کار/ })
-    .first()
-    .click();
+  await adminPage.goto(`${base}/settings/engine?page=ticket&tab=workflow`);
   const designer = adminPage.locator(".workflow-designer");
   await designer.waitFor();
   const choose = async (scope, label, option) => {
@@ -240,10 +231,12 @@ try {
   };
   await designer.getByRole("button", { name: "یک تأیید", exact: true }).click();
   await designer.locator("details.workflow-test summary").filter({ hasText: "امتحان و بررسی" }).click();
-  const [checked] = await Promise.all([
-    waitFor(adminPage, "/validate/"),
-    designer.getByRole("button", { name: "بررسی مشکلات", exact: true }).click(),
-  ]);
+  const savedDraft = waitFor(adminPage, `/versions/${prepared.draft.id}/`, "PUT");
+  const validation = waitFor(adminPage, "/validate/");
+  await designer.getByRole("button", { name: "بررسی مشکلات", exact: true }).click();
+  const savedResponse = await savedDraft;
+  assert.equal(savedResponse.status(), 200, await savedResponse.text());
+  const checked = await validation;
   assert.equal(checked.status(), 200);
   await designer.locator(".workflow-card.is-approval .workflow-card-problem").waitFor();
   await capture(1, "مرحلهٔ تأیید با کلیک اضافه شد و «بررسی مشکلات» خطای فارسی را کنار همان مرحله نشان داد", adminPage);

@@ -157,7 +157,7 @@ class WorkflowValidateEndpoint(WorkflowBase):
     def post(self, request, slug, version_id):
         workspace = self.base(request, slug, "Workflow.Design")
         version = self.version(workspace, version_id)
-        graph = request.data.get("graph") if isinstance(request.data.get("graph"), dict) else version.graph
+        graph = request.data.get("graph") if "graph" in request.data else version.graph
         issues = engine.validate_graph(version.definition, graph)
         return Response({"valid": not issues, "issues": issues})
 
@@ -168,14 +168,14 @@ class WorkflowSimulateEndpoint(WorkflowBase):
     def post(self, request, slug, version_id):
         workspace = self.base(request, slug, "Workflow.Design")
         version = self.version(workspace, version_id)
-        graph = request.data.get("graph") if isinstance(request.data.get("graph"), dict) else version.graph
+        graph = request.data.get("graph") if "graph" in request.data else version.graph
         values = request.data.get("values") if isinstance(request.data.get("values"), dict) else {}
         subject = None
         if request.data.get("subject"):
             subject = actions._member(workspace, request.data["subject"], "subject")
         with transaction.atomic():
             issues = engine.validate_graph(version.definition, graph)
-            path = engine.simulate(version.definition, graph, values, subject=subject)
+            path = [] if issues else engine.simulate(version.definition, graph, values, subject=subject)
             transaction.set_rollback(True)
         return Response({"issues": issues, "path": path})
 

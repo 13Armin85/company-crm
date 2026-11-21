@@ -218,13 +218,19 @@ def validate_graph(definition, graph):
     if not isinstance(graph, dict) or not isinstance(graph.get("steps"), list):
         _issue(issues, "ساختار گردش‌کار معتبر نیست؛ فهرست مرحله‌ها پیدا نشد.")
         return issues
-    transitions = graph.get("transitions") if isinstance(graph.get("transitions"), list) else []
+    transitions = graph.get("transitions")
+    if not isinstance(transitions, list):
+        _issue(issues, "ساختار گردش‌کار معتبر نیست؛ فهرست انتقال‌ها پیدا نشد.")
+        return issues
     entity, subtype = definition.entity, definition.subtype
     fields = entity_fields(entity, subtype)
     statuses = {row["code"] for row in status_options(entity, definition.settings)}
     steps, codes = {}, []
     for step in graph["steps"]:
-        code = step.get("code") if isinstance(step, dict) else None
+        if not isinstance(step, dict):
+            _issue(issues, "هر مرحله باید یک شیء باشد.")
+            continue
+        code = step.get("code")
         if not code or not isinstance(code, str):
             _issue(issues, "هر مرحله باید کد داشته باشد.")
             continue
@@ -240,11 +246,13 @@ def validate_graph(definition, graph):
         _issue(issues, "گردش‌کار دست‌کم یک مرحلهٔ پایان لازم دارد.")
     for code, step in steps.items():
         title = step.get("title") or code
-        if step.get("type") not in STEP_TYPES:
+        if not isinstance(step.get("type"), str) or step["type"] not in STEP_TYPES:
             _issue(issues, f"نوع مرحلهٔ «{title}» معتبر نیست.", step=code)
-        if not step.get("title"):
-            _issue(issues, f"مرحلهٔ «{code}» عنوان ندارد.", step=code)
-        if step.get("status_code") and step["status_code"] not in statuses:
+        if not isinstance(step.get("title"), str) or not step["title"].strip():
+            _issue(issues, f"مرحلهٔ «{code}» عنوان معتبر ندارد.", step=code)
+        if step.get("status_code") and (
+            not isinstance(step["status_code"], str) or step["status_code"] not in statuses
+        ):
             _issue(issues, f"وضعیت «{step['status_code']}» در فهرست وضعیت‌های فعال این رکورد نیست.", step=code)
         if not step.get("status_code") and statuses:
             _issue(issues, f"برای مرحلهٔ «{title}» وضعیت رکورد انتخاب نشده است.", step=code)
@@ -252,45 +260,81 @@ def validate_graph(definition, graph):
         if minutes is not None and (not isinstance(minutes, int) or isinstance(minutes, bool) or minutes <= 0):
             _issue(issues, f"مدت هدف مرحلهٔ «{title}» باید عددی مثبت (دقیقهٔ کاری) باشد.", step=code)
         for key, label in (("required_fields", "لازم"), ("editable_fields", "قابل ویرایش")):
-            for field in step.get(key) or []:
-                if field not in fields:
+            selected = step.get(key) or []
+            if not isinstance(selected, list):
+                _issue(issues, f"فهرست فیلدهای {label} مرحلهٔ «{title}» معتبر نیست.", step=code)
+                continue
+            for field in selected:
+                if not isinstance(field, str) or field not in fields:
                     _issue(issues, f"فیلد {label} «{field}» در فرم این رکورد وجود ندارد.", step=code)
         reminder = step.get("reminder") or {}
+        if not isinstance(reminder, dict):
+            _issue(issues, f"آستانهٔ یادآوری مرحلهٔ «{title}» معتبر نیست.", step=code)
+            reminder = {}
         if reminder:
             value = reminder.get("value")
-            if reminder.get("type") not in {"percent", "minutes"} or not isinstance(value, int) or value <= 0:
+            if (
+                not isinstance(reminder.get("type"), str)
+                or reminder["type"] not in {"percent", "minutes"}
+                or type(value) is not int
+                or value <= 0
+            ):
                 _issue(issues, f"آستانهٔ یادآوری مرحلهٔ «{title}» معتبر نیست.", step=code)
             elif reminder["type"] == "percent" and value >= 100:
                 _issue(issues, f"درصد یادآوری مرحلهٔ «{title}» باید کمتر از ۱۰۰ باشد.", step=code)
+        pause = step.get("pause") or {}
+        if not isinstance(pause, dict) or any(
+            kind not in PAUSE_KINDS or not isinstance(allowed, bool) for kind, allowed in pause.items()
+        ):
+            _issue(issues, f"تنظیم توقف مرحلهٔ «{title}» معتبر نیست.", step=code)
         if step.get("type") != "end":
-            message = assignee_rule_problem(definition, step.get("assignee") or {}, fields)
+            assignee = step.get("assignee") or {}
+            message = (
+                assignee_rule_problem(definition, assignee, fields)
+                if isinstance(assignee, dict)
+                else "قاعدهٔ مسئول مرحله معتبر نیست."
+            )
             if message:
                 _issue(issues, message, step=code)
     seen = set()
     outgoing = {code: [] for code in steps}
     for index, row in enumerate(transitions):
-        code = row.get("code") or f"#{fa_number(index + 1)}"
-        label = row.get("label") or code
+        if not isinstance(row, dict):
+            _issue(issues, f"انتقال شمارهٔ {fa_number(index + 1)} باید یک شیء باشد.")
+            continue
+        code = row.get("code")
+        if not isinstance(code, str) or not code:
+            _issue(issues, f"کد انتقال شمارهٔ {fa_number(index + 1)} معتبر نیست.")
+            continue
+        if row.get("label") is not None and (not isinstance(row["label"], str) or not row["label"].strip()):
+            _issue(issues, f"عنوان انتقال «{code}» معتبر نیست.", transition=code)
+        label = row.get("label") if isinstance(row.get("label"), str) and row["label"].strip() else code
         if code in seen:
             _issue(issues, f"کد انتقال «{code}» تکراری است.", transition=code)
         seen.add(code)
-        if row.get("from") not in steps or row.get("to") not in steps:
+        if (
+            not isinstance(row.get("from"), str)
+            or not isinstance(row.get("to"), str)
+            or row["from"] not in steps
+            or row["to"] not in steps
+        ):
             _issue(issues, f"مبدأ یا مقصد انتقال «{label}» مرحلهٔ موجودی نیست.", transition=code)
             continue
         if steps[row["from"]].get("type") == "end":
             _issue(issues, f"از مرحلهٔ پایان نمی‌توان انتقالی داشت («{label}»).", transition=code)
-        if row.get("kind") not in TRANSITION_KINDS:
+        if not isinstance(row.get("kind"), str) or row["kind"] not in TRANSITION_KINDS:
             _issue(issues, f"نوع انتقال «{label}» معتبر نیست.", transition=code)
-        if row.get("kind") in REASON_KINDS and row.get("reason_required") is False:
+            continue
+        if row["kind"] in REASON_KINDS and row.get("reason_required") is False:
             _issue(
                 issues, f"انتقال «{label}» از نوع رد یا بازگشت است و دلیل آن نمی‌تواند اختیاری باشد.", transition=code
             )
-        if row.get("auto") and row.get("kind") in REASON_KINDS:
+        if row.get("auto") and row["kind"] in REASON_KINDS:
             _issue(issues, f"انتقال «{label}» دلیل لازم دارد و نمی‌تواند خودکار باشد.", transition=code)
         if row.get("condition") is not None:
             try:
                 validate_condition(row["condition"], fields)
-            except ValidationError:
+            except (ValidationError, TypeError, KeyError, AttributeError):
                 missing = sorted(field for field in _safe_fields(row["condition"]) if field not in fields)
                 detail = f" (فیلد ناموجود: {'، '.join(missing)})" if missing else ""
                 _issue(issues, f"شرط انتقال «{label}» ناقص یا نامعتبر است{detail}.", transition=code)
@@ -314,7 +358,7 @@ def validate_graph(definition, graph):
     auto = {code: [row for row in rows if row.get("auto")] for code, rows in outgoing.items()}
     cycle = _auto_cycle(auto)
     if cycle:
-        names = " ← ".join(steps[code].get("title") or code for code in cycle)
+        names = " ← ".join(str(steps[code].get("title") or code) for code in cycle)
         _issue(issues, f"چرخهٔ انتقال‌های خودکار بدون اقدام انسانی وجود دارد: {names}.", step=cycle[0])
     return issues
 
@@ -364,20 +408,28 @@ def _auto_cycle(auto):
 
 def assignee_rule_problem(definition, rule, fields):
     kind = rule.get("type") or "none"
-    if kind not in ASSIGNEE_TYPES:
+    if not isinstance(kind, str) or kind not in ASSIGNEE_TYPES:
         return "قاعدهٔ مسئول مرحله معتبر نیست."
     workspace = definition.workspace
     if kind == "user":
-        if not rule.get("user_id") or not _members(workspace).filter(member_id=rule["user_id"]).exists():
+        try:
+            active = bool(rule.get("user_id")) and _members(workspace).filter(member_id=rule["user_id"]).exists()
+        except (ValueError, TypeError, DjangoValidationError):
+            active = False
+        if not active:
             return "کاربر مسئول انتخاب‌شده عضو فعال این شرکت نیست."
     if kind == "role":
-        if (
-            not rule.get("role_id")
-            or not OrganizationRole.objects.filter(workspace=workspace, id=rule["role_id"], is_active=True).exists()
-        ):
+        try:
+            active = bool(rule.get("role_id")) and OrganizationRole.objects.filter(
+                workspace=workspace, id=rule["role_id"], is_active=True
+            ).exists()
+        except (ValueError, TypeError, DjangoValidationError):
+            active = False
+        if not active:
             return "نقش مسئول انتخاب‌شده فعال نیست یا وجود ندارد."
     if kind == "record_field":
-        field = fields.get(rule.get("field") or "")
+        field_code = rule.get("field")
+        field = fields.get(field_code) if isinstance(field_code, str) else None
         if not field or field["kind"] != "user":
             return "فیلد مسئول باید یکی از فیلدهای «کاربر» همین فرم باشد."
     return None
