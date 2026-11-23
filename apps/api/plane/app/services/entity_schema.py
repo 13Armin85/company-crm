@@ -95,7 +95,7 @@ DISPLAY_SETTINGS = {
 
 
 def field_dict(field):
-    return {
+    result = {
         "id": str(field.id),
         "code": field.code,
         "title": field.title,
@@ -115,6 +115,12 @@ def field_dict(field):
             for key in ("show_in_summary", "searchable", "filterable", "table_visible")
         },
     }
+    if field.code == "ticket_assignees":
+        result["title"] = "گیرنده"
+        result["config"]["depends_on"] = "project"
+    elif field.code == "assignee":
+        result["title"] = "گیرنده"
+    return result
 
 
 def bindings(layout):

@@ -105,6 +105,8 @@ class DashboardTeamEndpoint(EngineAPIView):
 
 
 def _issue_idle_alerts(workspace, manager, result):
+    # Idle notifications are meaningful only for members of the production
+    # organization structure; team cards can have a broader viewing scope.
     with transaction.atomic():
         settings = type(settings_for(workspace, manager)).objects.select_for_update().get(workspace=workspace, user=manager)
         if not settings.alert_enabled:
@@ -118,6 +120,11 @@ def _issue_idle_alerts(workspace, manager, result):
         last_alerted = dict(settings.last_alerted)
         start = datetime.combine(local.date(), settings.workday_start, tzinfo=local.tzinfo)
         for card in result["cards"]:
+            if not any(
+                segment.strip() in {"تولید", "واحد تولید", "سازمان تولید"}
+                for segment in card.get("unit_path", "").split("/")
+            ):
+                continue
             if card["presence"] != "present" or card["in_progress_count"]:
                 continue
             since = datetime.fromisoformat(card["last_activity"]).astimezone(local.tzinfo) if card["last_activity"] else start

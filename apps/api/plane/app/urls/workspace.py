@@ -24,6 +24,7 @@ from plane.app.views.workspace.ticket import (
 )
 from plane.app.views.workspace.task_history import TaskHistoryEndpoint
 from plane.app.views.workspace.task_table import TaskTableEndpoint
+from plane.app.views.workspace.task import TaskNotesEndpoint
 from plane.app.views.workspace.access import (
     AccessMeEndpoint,
     EffectivePermissionsEndpoint,
@@ -199,6 +200,11 @@ urlpatterns = [
         "workspaces/<str:slug>/tasks/<uuid:task_id>/",
         WorkspaceTaskDetailEndpoint.as_view(),
         name="workspace-task-detail",
+    ),
+    path(
+        "workspaces/<str:slug>/tasks/<uuid:task_id>/notes/",
+        TaskNotesEndpoint.as_view(),
+        name="task-notes",
     ),
     path(
         "workspace-slug-check/",

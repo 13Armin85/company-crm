@@ -1,7 +1,7 @@
-import { jalaliToDateOnly, parseDateOnly, SearchableSelect, zonedDateTime } from "@plane/ui";
+import { jalaliToDateOnly, parseDateOnly, zonedDateTime } from "@plane/ui";
 import { useMemo, useState } from "react";
 import { jalaaliMonthLength } from "jalaali-js";
-import { CalendarPlus, CalendarRange, Clock, Plus } from "lucide-react";
+import { CalendarPlus, CalendarRange, Clock } from "lucide-react";
 import {
   useCancelPresence,
   useConfirmActivity,
@@ -9,19 +9,15 @@ import {
   useCreateWorkEvent,
   useCurrentUser,
   useDeclarePresence,
-  useIssues,
   usePendingActivities,
-  useProjects,
   useSaveScheduleVersion,
   useScheduleVersions,
   useWorkCalendar,
   useWorkCalendarPeople,
-  useWorkspaceAccess,
 } from "../api";
 import type { WeekDayInput } from "../api/work-calendar";
 import { Button, PageHeader } from "../components";
 import { IssueCalendar } from "../issue-calendar";
-import { useUIStore } from "../store";
 import {
   ExceptionForm,
   LayerChips,
@@ -48,11 +44,6 @@ type Panel = "schedule" | "exception" | "event" | null;
 
 export default function CalendarPage() {
   const { data: currentUser } = useCurrentUser();
-  const [projectFilter, setProjectFilter] = useState("all");
-  const setCreate = useUIStore((state) => state.setCreateOpen);
-  const { data: issues = [], isLoading } = useIssues();
-  const { data: projects = [] } = useProjects();
-  const { data: access } = useWorkspaceAccess();
   const [date, setDate] = useState(() => zonedDateTime(new Date(), currentUser?.timeZone)!.date);
   const [personId, setPersonId] = useState("");
   const [layers, setLayers] = useState<Set<LayerId>>(ALL_LAYERS);
@@ -83,9 +74,6 @@ export default function CalendarPage() {
     start: day.start ?? "08:00",
     end: day.end ?? "16:00",
   }));
-  const visibleIssues = layers.has("tasks")
-    ? issues.filter((issue) => projectFilter === "all" || issue.projectId === projectFilter)
-    : [];
 
   return (
     <div className="work-calendar-page">
@@ -104,11 +92,6 @@ export default function CalendarPage() {
                 رویداد جدید
               </Button>
             )}
-            {access?.can("Issue.Create") ? (
-              <Button icon={Plus} onClick={() => setCreate(true, "issue")}>
-                کار جدید
-              </Button>
-            ) : undefined}
           </>
         }
       />
@@ -198,31 +181,15 @@ export default function CalendarPage() {
         />
       )}
       <IssueCalendar
-        issues={visibleIssues}
-        projects={projects}
+        issues={[]}
+        projects={[]}
         timeZone={currentUser?.timeZone}
-        isLoading={isLoading || calendarLoading}
+        isLoading={calendarLoading}
         value={date}
         onValueChange={setDate}
         emptyHidden
+        hideIssueCount
         renderDay={(day) => <LayerChips chips={dayChips(calendar, day, layers)} />}
-        toolbarEnd={
-          layers.has("tasks") ? (
-            <div className="calendar-project-filter">
-              <label htmlFor="calendar-project-filter">نمایش کارهای پروژه</label>
-              <SearchableSelect
-                id="calendar-project-filter"
-                label="فیلتر پروژه"
-                value={projectFilter}
-                onChange={setProjectFilter}
-                options={[
-                  { id: "all", title: "همه پروژه‌ها" },
-                  ...projects.map((project) => ({ id: project.id, title: project.name })),
-                ]}
-              />
-            </div>
-          ) : undefined
-        }
       />
       <PendingConfirmations
         items={pending}

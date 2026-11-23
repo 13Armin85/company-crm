@@ -682,7 +682,8 @@ export function SchemaDrivenForm(props: SchemaFormProps) {
   const update = (field: SchemaField, value: FieldValue) => {
     const next = { ...values, [field.code]: value };
     for (const child of schema.fields)
-      if (child.config.depends_on === field.code) next[child.code] = child.kind === "multi_select" ? [] : null;
+      if (child.config.depends_on === field.code)
+        next[child.code] = child.kind === "multi_select" || child.config.multiple ? [] : null;
     onChange(next);
   };
   const firstError = Object.entries(props.errors || {}).find(([, message]) => message);

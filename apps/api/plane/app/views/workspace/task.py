@@ -3,16 +3,64 @@
 
 from django.db import transaction
 from django.db.models import Q
+from django.shortcuts import get_object_or_404
+from django.utils.html import escape
+from rest_framework.exceptions import ValidationError
 from rest_framework import status
 from rest_framework.response import Response
 
 from plane.app.permissions.crm import require_permission
 from plane.app.services.access_control import has_permission
 from plane.app.services.task_policy import other_assignees_only
+from plane.app.services.task_visibility import visible_issues
 from plane.app.serializers import WorkspaceTaskSerializer
 from plane.app.services.crm_notifications import notify_workspace_task, task_snapshot
 from plane.app.views.base import BaseAPIView
-from plane.db.models import Workspace, WorkspaceTask
+from plane.db.models import Issue, IssueComment, Workspace, WorkspaceTask
+
+
+class TaskNotesEndpoint(BaseAPIView):
+    """A shared, server-owned conversation for everyone who has the task."""
+
+    def _issue(self, request, slug, task_id):
+        rows = visible_issues(Issue.objects.filter(workspace__slug=slug), request.user, slug, request=request)
+        return get_object_or_404(rows, id=task_id)
+
+    @require_permission("Issue.View")
+    def get(self, request, slug, task_id):
+        issue = self._issue(request, slug, task_id)
+        notes = IssueComment.objects.filter(issue=issue, access="INTERNAL").select_related("actor").order_by("created_at", "id")
+        return Response({"results": [self._payload(note) for note in notes]})
+
+    @require_permission("Issue.View")
+    def post(self, request, slug, task_id):
+        issue = self._issue(request, slug, task_id)
+        body = request.data.get("body")
+        if not isinstance(body, str) or not body.strip() or len(body) > 10000:
+            raise ValidationError({"body": "متن یادداشت باید بین ۱ تا ۱۰۰۰۰ نویسه باشد."})
+        parent_id = request.data.get("parent_id")
+        parent = None
+        if parent_id:
+            parent = get_object_or_404(IssueComment, id=parent_id, issue=issue, access="INTERNAL")
+        note = IssueComment(
+            workspace=issue.workspace, project=issue.project, issue=issue,
+            actor=request.user, created_by=request.user, updated_by=request.user,
+            parent=parent, access="INTERNAL", comment_html=f"<p>{escape(body.strip())}</p>",
+        )
+        note.save(disable_auto_set_user=True)
+        return Response(self._payload(note), status=status.HTTP_201_CREATED)
+
+    @staticmethod
+    def _payload(note):
+        return {
+            "id": str(note.id), "body": note.comment_stripped,
+            "parent_id": str(note.parent_id) if note.parent_id else None,
+            "author": {
+                "id": str(note.actor_id) if note.actor_id else "",
+                "name": (note.actor.display_name or note.actor.email) if note.actor_id else "سامانه",
+            },
+            "created_at": note.created_at.isoformat(),
+        }
 from plane.utils.issue_search import search_workspace_tasks
 
 

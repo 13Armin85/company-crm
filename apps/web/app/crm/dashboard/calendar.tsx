@@ -1,4 +1,3 @@
-import { ErrorState } from "../error-state";
 import {
   displayPersianDate,
   jalaliToDateOnly,
@@ -12,12 +11,10 @@ import { ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
 import { jalaaliMonthLength } from "jalaali-js";
 import { useState } from "react";
 import { Link } from "react-router";
-import { errorMessage, useIssues } from "../api";
 import { useWorkCalendar } from "../api/work-calendar";
 import { dayChips } from "../work-calendar/model";
 import type { LayerId } from "../work-calendar/model";
 import { persianDate } from "../utils";
-import { useWidgetData } from "./api";
 import type { DashboardWidget } from "./types";
 
 const weekdays = ["شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه"];
@@ -57,11 +54,7 @@ export function DashboardCalendar({ widget }: { widget: DashboardWidget }) {
   const [selectedDate, setSelectedDate] = useState(today);
   const view = widget.config.calendar_view === "week" ? "week" : "month";
   const range = dashboardCalendarRange(selectedDate, view)!;
-  const queryWidget = { ...widget, config: { ...widget.config, calendar_range: range } };
-  const result = useWidgetData(queryWidget);
-  const { data: issues = [] } = useIssues();
   const workCalendar = useWorkCalendar(undefined, range.start, shiftDate(range.end, -1));
-  const entity = String(widget.config.entity || "ticket");
   const selected = parseDateOnly(selectedDate)!;
   const monthName = persianMonths[selected.jm - 1];
   const title =
@@ -74,25 +67,6 @@ export function DashboardCalendar({ widget }: { widget: DashboardWidget }) {
     { length: view === "month" ? Math.ceil((offset + days) / 7) * 7 : 7 },
     (_, index) => index - offset
   );
-  const items = Array.isArray(result.data?.items)
-    ? (result.data.items as { id: string; date: string; title?: string }[]).map((item) => ({
-        id: item.id,
-        date: item.date,
-        title: item.title,
-        to: `/entities/${entity}/${item.id}`,
-      }))
-    : [];
-  const known = new Set(entity === "ticket" ? items.map((item) => item.id) : []);
-  for (const issue of issues) {
-    const date = issue.dueDate || issue.createdAt;
-    if (!date || known.has(issue.id)) continue;
-    items.push({ id: issue.id, date, title: issue.name, to: `/entities/ticket/${issue.id}` });
-  }
-  const events = new Map<string, typeof items>();
-  for (const item of items) {
-    const date = /^\d{4}-\d{2}-\d{2}$/.test(item.date) ? item.date : zonedDateTime(item.date)?.date;
-    if (date && date >= range.start && date < range.end) events.set(date, [...(events.get(date) || []), item]);
-  }
 
   return (
     <section className="dashboard-persian-calendar" dir="rtl" aria-label="تقویم شمسی داشبورد">
@@ -127,68 +101,49 @@ export function DashboardCalendar({ widget }: { widget: DashboardWidget }) {
           onChange={setSelectedDate}
         />
       </div>
-      {result.isError ? (
-        <ErrorState
-          message={errorMessage(result.error, "دریافت تقویم انجام نشد")}
-          onRetry={() => void result.refetch()}
-        />
-      ) : (
-        <>
-          <div className="dashboard-calendar-weekdays" aria-hidden="true">
-            {weekdays.map((day) => (
-              <span key={day}>{day}</span>
-            ))}
-          </div>
-          <div className="dashboard-calendar-grid" aria-label={title}>
-            {cells.map((offsetDay) => {
-              const iso = offsetDay >= 0 && offsetDay < days ? shiftDate(range.start, offsetDay) : "";
-              const jalali = iso ? displayPersianDate(iso) : undefined;
-              const dayEvents = iso ? events.get(iso) || [] : [];
-              const workChips = iso ? dayChips(workCalendar.data, iso, calendarLayers) : [];
-              return (
-                <div
-                  key={offsetDay}
-                  className={`dashboard-calendar-day${iso ? "" : " outside"}${iso === today ? " today" : ""}`}
-                  aria-label={
-                    jalali
-                      ? `${persianDigits(jalali.jd)} ${persianMonths[jalali.jm - 1]} ${persianDigits(jalali.jy)}`
-                      : undefined
-                  }
-                >
-                  {jalali && (
-                    <>
-                      <div className="dashboard-calendar-day-heading">
-                        <span>{persianDigits(jalali.jd)}</span>
-                        {dayEvents.length + workChips.length > 0 && (
-                          <small>{persianDigits(dayEvents.length + workChips.length)} رویداد</small>
-                        )}
-                      </div>
-                      {dayEvents.map((item) => (
-                        <Link
-                          key={item.id}
-                          to={item.to}
-                          title={item.title || `${persianDigits(jalali.jd)} ${persianMonths[jalali.jm - 1]}`}
-                        >
-                          {item.title || "باز کردن رکورد"}
-                        </Link>
-                      ))}
-                      {workChips.map((chip) => (
-                        <Link key={chip.key} to="/calendar" title={chip.detail || chip.label}>
-                          {chip.label}
-                        </Link>
-                      ))}
-                    </>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          {result.isLoading && <p className="dashboard-calendar-status">در حال دریافت رویدادها…</p>}
-          {!result.isLoading && !items.length && !workCalendar.data?.events.length && (
-            <p className="dashboard-calendar-status">رویدادی در این {view === "week" ? "هفته" : "ماه"} ثبت نشده است.</p>
-          )}
-        </>
-      )}
+      <>
+        <div className="dashboard-calendar-weekdays" aria-hidden="true">
+          {weekdays.map((day) => (
+            <span key={day}>{day}</span>
+          ))}
+        </div>
+        <div className="dashboard-calendar-grid" aria-label={title}>
+          {cells.map((offsetDay) => {
+            const iso = offsetDay >= 0 && offsetDay < days ? shiftDate(range.start, offsetDay) : "";
+            const jalali = iso ? displayPersianDate(iso) : undefined;
+            const workChips = iso ? dayChips(workCalendar.data, iso, calendarLayers) : [];
+            return (
+              <div
+                key={offsetDay}
+                className={`dashboard-calendar-day${iso ? "" : " outside"}${iso === today ? " today" : ""}`}
+                aria-label={
+                  jalali
+                    ? `${persianDigits(jalali.jd)} ${persianMonths[jalali.jm - 1]} ${persianDigits(jalali.jy)}`
+                    : undefined
+                }
+              >
+                {jalali && (
+                  <>
+                    <div className="dashboard-calendar-day-heading">
+                      <span>{persianDigits(jalali.jd)}</span>
+                      {workChips.length > 0 && <small>{persianDigits(workChips.length)} رویداد</small>}
+                    </div>
+                    {workChips.map((chip) => (
+                      <Link key={chip.key} to="/calendar" title={chip.detail || chip.label}>
+                        {chip.label}
+                      </Link>
+                    ))}
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {workCalendar.isLoading && <p className="dashboard-calendar-status">در حال دریافت رویدادها…</p>}
+        {!workCalendar.isLoading && !workCalendar.data?.events.length && (
+          <p className="dashboard-calendar-status">رویدادی در این {view === "week" ? "هفته" : "ماه"} ثبت نشده است.</p>
+        )}
+      </>
     </section>
   );
 }

@@ -228,7 +228,7 @@ export const FIELD_LABELS: Record<string, string> = {
   ticket_state: "وضعیت",
   task_status: "وضعیت",
   priority: "اولویت",
-  ticket_assignees: "مسئولان",
+  ticket_assignees: "گیرنده",
   assignee: "مسئول",
   due_date: "سررسید",
   project: "پروژه",

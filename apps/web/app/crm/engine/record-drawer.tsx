@@ -14,6 +14,7 @@ import { ViewValue } from "./view-value";
 import { RelatedRecords } from "./related-records";
 import { WorkflowPanel } from "../workflow/panel";
 import { TicketCorePanel } from "../ticket/ticket-panel";
+import { TaskNotes } from "./task-notes";
 import type { ViewField, ViewResult, ViewRow } from "./view-types";
 
 const editable = (field: ViewField & { field: string }) => !field.config.readonly && !field.field.includes(".");
@@ -155,6 +156,7 @@ export function RecordSummaryDrawer({
                   ))}
               </dl>
               <div className="record-drawer-related">
+                {["task", "ticket"].includes(code) && <TaskNotes id={id} />}
                 {code === "ticket" && <TicketCorePanel id={id} />}
                 <WorkflowPanel code={code} id={id} />
                 {code !== "ticket" && <RelatedRecords code={code} id={id} />}

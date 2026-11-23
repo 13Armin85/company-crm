@@ -40,6 +40,26 @@ def endpoint(workspace, suffix):
     return f"/api/workspaces/{workspace.slug}/engine/{suffix}"
 
 
+def test_ticket_recipient_options_are_limited_to_project_members(engine):
+    from plane.db.models import Project, ProjectMember
+
+    workspace, actor, client = engine
+    other = User.objects.create_user(email="other-recipient@example.test", username="other-recipient", password="SafePassword!2026")
+    WorkspaceMember.objects.create(workspace=workspace, member=other, role=15)
+    project = Project.objects.create(workspace=workspace, name="Recipient project", identifier="RCP")
+    ProjectMember.objects.create(workspace=workspace, project=project, member=actor, role=15)
+    schema = client.get(endpoint(workspace, "entities/ticket/schema/"))
+    assert schema.status_code == 200, schema.data
+    recipient = next(field for field in schema.data["fields"] if field["code"] == "ticket_assignees")
+    assert recipient["title"] == "گیرنده"
+    assert recipient["config"]["depends_on"] == "project"
+    path = endpoint(workspace, "entities/ticket/options/ticket_assignees/")
+    options = client.get(path, {"parent": str(project.id)})
+    assert options.status_code == 200, options.data
+    assert {row["id"] for row in options.data["results"]} == {str(actor.id)}
+    assert str(other.id) not in {row["id"] for row in options.data["results"]}
+
+
 def make_entity(engine, fields=None, code="sample", extra_bindings=None):
     workspace, actor, client = engine
     entity = EntityType.objects.create(

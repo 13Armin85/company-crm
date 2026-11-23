@@ -233,13 +233,8 @@ export default function ProjectDetailPage() {
       )}
       {tab === "calendar" && (
         <div className="panel tab-content">
-          <h2>موعدهای پروژه</h2>
-          <ProjectCalendar
-            issues={issues}
-            project={project}
-            timeZone={currentUser?.timeZone}
-            isLoading={issuesQuery.isLoading}
-          />
+          <h2>رویدادهای تقویم</h2>
+          <ProjectCalendar timeZone={currentUser?.timeZone} />
         </div>
       )}
       {tab === "members" && (
@@ -423,17 +418,7 @@ function Overview({
   );
 }
 
-function ProjectCalendar({
-  issues,
-  project,
-  timeZone,
-  isLoading,
-}: {
-  issues: NonNullable<ReturnType<typeof useIssues>["data"]>;
-  project: NonNullable<ReturnType<typeof useProject>["data"]>;
-  timeZone?: string;
-  isLoading: boolean;
-}) {
+function ProjectCalendar({ timeZone }: { timeZone?: string }) {
   const [date, setDate] = useState(() => zonedDateTime(new Date(), timeZone)!.date);
   const month = parseDateOnly(date)!;
   const calendar = useWorkCalendar(
@@ -443,11 +428,12 @@ function ProjectCalendar({
   );
   return (
     <IssueCalendar
-      issues={issues}
-      projects={[project]}
+      issues={[]}
+      projects={[]}
       timeZone={timeZone}
-      isLoading={isLoading}
-      showAgenda
+      isLoading={calendar.isLoading}
+      emptyHidden
+      hideIssueCount
       value={date}
       onValueChange={setDate}
       renderDay={(day) => <LayerChips chips={dayChips(calendar.data, day, projectCalendarLayers)} />}

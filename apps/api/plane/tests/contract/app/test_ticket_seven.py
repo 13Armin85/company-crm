@@ -359,12 +359,16 @@ def test_idle_alert_uses_eight_to_sixteen_tehran_and_can_be_disabled(engine):
 
     workspace, manager, _ = engine
     subordinate = User.objects.create(username="dashboard-idle", email="dashboard-idle@example.test")
-    result = {"cards": [{"id": str(subordinate.id), "name": "عضو", "presence": "present", "in_progress_count": 0, "last_activity": None}]}
+    result = {"cards": [{"id": str(subordinate.id), "name": "عضو", "unit_path": "مدیریت / واحد تولید", "presence": "present", "in_progress_count": 0, "last_activity": None}]}
     zone = ZoneInfo("Asia/Tehran")
     with patch("plane.app.views.workspace.dashboard.timezone.now", return_value=datetime(2026, 10, 26, 7, 59, tzinfo=zone)):
         _issue_idle_alerts(workspace, manager, result)
     assert not Notification.objects.filter(workspace=workspace, entity_name="team_idle").exists()
     with patch("plane.app.views.workspace.dashboard.timezone.now", return_value=datetime(2026, 10, 26, 8, 31, tzinfo=zone)):
+        _issue_idle_alerts(workspace, manager, result)
+    assert Notification.objects.filter(workspace=workspace, entity_name="team_idle").count() == 1
+    result["cards"][0]["unit_path"] = "مدیریت / واحد فروش"
+    with patch("plane.app.views.workspace.dashboard.timezone.now", return_value=datetime(2026, 10, 26, 9, 31, tzinfo=zone)):
         _issue_idle_alerts(workspace, manager, result)
     assert Notification.objects.filter(workspace=workspace, entity_name="team_idle").count() == 1
     settings = settings_for(workspace, manager)

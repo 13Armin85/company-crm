@@ -118,7 +118,8 @@ class TaskTableEndpoint(BaseAPIView):
         today = parse_day(request.query_params.get("today")) or timezone.localdate()
         received = Q(mine=True) & ~Q(created_by=user) & ~DONE & ~ARCHIVED
         if view == "mine":
-            mine = rows.filter(Q(mine=True) if admin else received)
+            # A sent task remains in the sender's own work alongside the recipient's.
+            mine = rows.filter(Q(mine=True) | Q(created_by=user)).exclude(ARCHIVED)
             open_rows = mine.exclude(DONE)
             tabs = {
                 "all": open_rows,
@@ -127,9 +128,7 @@ class TaskTableEndpoint(BaseAPIView):
             }
             if admin:
                 tabs["done"] = mine.filter(DONE)
-            completed_week = rows.filter(mine=True, completed_at__gte=timezone.now() - timedelta(days=7))
-            if not admin:
-                completed_week = completed_week.exclude(created_by=user)
+            completed_week = mine.filter(completed_at__gte=timezone.now() - timedelta(days=7))
             extra = {"stats": {"completed_this_week": completed_week.count()}}
         else:
             tabs = (

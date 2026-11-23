@@ -93,7 +93,7 @@ def test_member_task_tabs_follow_received_history_and_sent_rules(workspace, crea
     assert data["tab_counts"] == {"received": 1, "history": 3, "sent": 1}
     assert names(view="all", tab="sent")[0] == ["sent-to-manager"]
     assert "someone-elses" not in names(view="all", tab="history")[0]
-    assert names(view="mine", tab="all")[0] == ["received"]
+    assert names(view="mine", tab="all")[0] == ["received", "self-created", "sent-to-manager"]
     assert names(view="all", tab="history", statuses="Done")[0] == ["finished"]
 
 

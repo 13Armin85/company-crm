@@ -4,7 +4,7 @@ from django.utils import timezone
 from plane.app.services.access_control import has_permission
 from plane.app.services.permission_registry import PERMISSION_REGISTRY
 from plane.app.services.user_identity import reserve_username
-from plane.db.models import Issue, IssueAssignee, Project, ProjectMember, State, User, WorkspaceMember, WorkspaceTask
+from plane.db.models import Issue, IssueAssignee, IssueComment, Project, ProjectMember, State, User, WorkspaceMember, WorkspaceTask
 
 pytestmark = pytest.mark.django_db
 
@@ -35,6 +35,52 @@ def test_members_see_received_and_sent_tasks_but_cannot_update_recipient_status(
     assert denied.data["error"] == "این کار به شما واگذار نشده است."
     session_client.force_authenticate(recipient)
     assert {row["id"] for row in session_client.get(f"/api/workspaces/{workspace.slug}/tasks/").data} == {task_id}
+
+
+def test_task_notes_are_shared_with_sender_and_recipient_and_support_replies(session_client, workspace):
+    sender = member(workspace, "note-sender")
+    recipient = member(workspace, "note-recipient")
+    outsider = member(workspace, "note-outsider")
+    session_client.force_authenticate(sender)
+    created = session_client.post(
+        f"/api/workspaces/{workspace.slug}/tasks/",
+        {"name": "Shared task", "assignee_id": str(recipient.id)}, format="json",
+    )
+    assert created.status_code == 201, created.data
+    path = f"/api/workspaces/{workspace.slug}/tasks/{created.data['id']}/notes/"
+    first = session_client.post(path, {"body": "First <script>alert(1)</script>"}, format="json")
+    assert first.status_code == 201, first.data
+    assert first.data["author"]["id"] == str(sender.id)
+    assert first.data["created_at"]
+    assert "<script>" not in IssueComment.objects.get(id=first.data["id"]).comment_html
+    session_client.force_authenticate(recipient)
+    assert len(session_client.get(path).data["results"]) == 1
+    reply = session_client.post(path, {"body": "Reply", "parent_id": first.data["id"]}, format="json")
+    assert reply.status_code == 201, reply.data
+    assert reply.data["parent_id"] == first.data["id"]
+    session_client.force_authenticate(sender)
+    assert [row["author"]["id"] for row in session_client.get(path).data["results"]] == [str(sender.id), str(recipient.id)]
+    session_client.force_authenticate(outsider)
+    assert session_client.get(path).status_code == 404
+    assert session_client.post(path, {"body": "Unauthorized"}, format="json").status_code == 404
+
+
+def test_project_task_notes_are_visible_to_both_project_participants(session_client, workspace):
+    sender = member(workspace, "project-note-sender")
+    recipient = member(workspace, "project-note-recipient")
+    project = Project.objects.create(workspace=workspace, name="Notes project", identifier="NOTE")
+    for user in (sender, recipient):
+        ProjectMember.objects.create(workspace=workspace, project=project, member=user, role=15)
+    state = State.objects.create(workspace=workspace, project=project, name="Todo", group="unstarted")
+    issue = Issue.objects.create(workspace=workspace, project=project, name="Project task", state=state)
+    Issue.objects.filter(id=issue.id).update(created_by=sender)
+    IssueAssignee.objects.create(workspace=workspace, project=project, issue=issue, assignee=recipient)
+    path = f"/api/workspaces/{workspace.slug}/tasks/{issue.id}/notes/"
+    session_client.force_authenticate(sender)
+    created = session_client.post(path, {"body": "Project note"}, format="json")
+    assert created.status_code == 201, created.data
+    session_client.force_authenticate(recipient)
+    assert [row["body"] for row in session_client.get(path).data["results"]] == ["Project note"]
 
 
 def test_project_task_visibility_and_administrator_access_without_project_membership(session_client, workspace, create_user):

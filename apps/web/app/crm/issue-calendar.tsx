@@ -26,6 +26,7 @@ export function IssueCalendar({
   onValueChange,
   renderDay,
   emptyHidden = false,
+  hideIssueCount = false,
 }: {
   issues: Issue[];
   projects: Project[];
@@ -39,6 +40,7 @@ export function IssueCalendar({
   /** Extra content per day cell, e.g. work-calendar layers. */
   renderDay?: (date: string) => ReactNode;
   emptyHidden?: boolean;
+  hideIssueCount?: boolean;
 }) {
   const todayValue = zonedDateTime(new Date(), timeZone)!.date;
   const today = parseDateOnly(todayValue)!;
@@ -80,7 +82,9 @@ export function IssueCalendar({
           description={
             isLoading
               ? "در حال دریافت موعدها…"
-              : `${toFa(Array.from(events.values()).reduce((count, items) => count + items.length, 0))} کار در این ماه`
+              : hideIssueCount
+                ? "رویدادهای این ماه"
+                : `${toFa(Array.from(events.values()).reduce((count, items) => count + items.length, 0))} کار در این ماه`
           }
         />
         {toolbarEnd}

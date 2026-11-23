@@ -5697,3 +5697,57 @@ body:has(.engine-workspace) .selector-single-option[data-selected] {
     flex: 1 1 calc(100% - 36px);
   }
 }
+.task-notes {
+  margin: 1.5rem 0;
+  padding: 1rem;
+  border: 1px solid var(--border-subtle, #d9dfe8);
+  border-radius: 12px;
+}
+.task-notes h3 {
+  margin: 0 0 1rem;
+}
+.task-note {
+  padding: 0.75rem;
+  border-radius: 8px;
+  background: var(--surface-2, #f5f7fa);
+  margin-bottom: 0.4rem;
+}
+.task-note-reply {
+  margin-inline-start: 1.5rem;
+  border-inline-start: 2px solid var(--border-subtle, #d9dfe8);
+}
+.task-note header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.task-note time {
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+.task-note p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.task-note button,
+.task-note-reply-target button {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: var(--text-primary, #334fd1);
+}
+.task-notes form {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+.task-notes textarea {
+  min-height: 5rem;
+  padding: 0.6rem;
+  border: 1px solid var(--border-subtle, #d9dfe8);
+  border-radius: 8px;
+}
+.task-notes form > button {
+  justify-self: start;
+}

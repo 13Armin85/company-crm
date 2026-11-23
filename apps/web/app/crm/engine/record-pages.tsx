@@ -11,6 +11,7 @@ import { useUIStore } from "../store";
 import { persianDate, plainText } from "../utils";
 import { EngineRecordForm } from "./record-form";
 import { EntityRecordSummary } from "./record-summary";
+import { TaskNotes } from "./task-notes";
 import { RelatedRecords } from "./related-records";
 import { WorkflowPanel } from "../workflow/panel";
 import { TicketCorePanel } from "../ticket/ticket-panel";
@@ -282,6 +283,7 @@ export function EntityRecordPage() {
       )}
       {mutation.error && <ErrorNotice message={errorMessage(mutation.error, "عملیات انجام نشد.")} />}
       {!creating && <EntityRecordSummary code={code} id={recordId} />}
+      {!creating && ["task", "ticket"].includes(code) && <TaskNotes id={recordId} />}
       {!creating && code === "ticket" && <TicketCorePanel id={recordId} />}
       {!creating && <WorkflowPanel code={code} id={recordId} />}
       {!creating && code !== "ticket" && <RelatedRecords code={code} id={recordId} />}

@@ -100,10 +100,10 @@ describe("dashboard Persian calendar", () => {
     expect(html).toContain('aria-label="تقویم شمسی داشبورد"');
     expect(html).toContain("فروردین ۱۴۰۳");
     expect(html).toContain('aria-label="۱ فروردین ۱۴۰۳"');
-    expect(html).toContain("/entities/ticket/new-year");
-    expect(html).toContain("کار نوروز");
-    expect(html).toContain("کار دوم");
-    expect(html).toContain("کار بدون موعد");
+    expect(html).not.toContain("/entities/ticket/new-year");
+    expect(html).not.toContain("کار نوروز");
+    expect(html).not.toContain("کار دوم");
+    expect(html).not.toContain("کار بدون موعد");
     expect(html).toContain("جلسه تیم");
     expect(html).not.toContain("/entities/ticket/previous-year");
   });

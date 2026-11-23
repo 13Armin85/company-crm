@@ -4,7 +4,6 @@ import type { TimeRange, WeekDayInput, WorkCalendarData, WorkMode } from "../api
 import { toFa } from "../utils";
 
 export type LayerId =
-  | "tasks"
   | "schedule"
   | "exception"
   | "off"
@@ -16,7 +15,6 @@ export type LayerId =
   | "busy";
 
 export const LAYERS: { id: LayerId; label: string }[] = [
-  { id: "tasks", label: "موعد کارها" },
   { id: "schedule", label: "برنامهٔ هفتگی" },
   { id: "exception", label: "استثنای تاریخ‌دار" },
   { id: "off", label: "روز غیرکاری" },

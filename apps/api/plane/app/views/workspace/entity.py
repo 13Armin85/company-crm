@@ -828,6 +828,17 @@ class EngineOptionsEndpoint(EngineAPIView):
             )
             if resolving:
                 rows = rows.filter(id__in=selected)
+            if kind == "user" and field_code == "ticket_assignees" and request.query_params.get("parent"):
+                from plane.db.models import ProjectMember
+
+                rows = rows.filter(
+                    id__in=ProjectMember.objects.filter(
+                        workspace=entity.workspace,
+                        project_id=request.query_params["parent"],
+                        is_active=True,
+                        role__gte=15,
+                    ).values("member_id")
+                )
             count = rows.distinct().count()
             result = [
                 {

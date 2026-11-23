@@ -154,9 +154,10 @@ describe("work calendar layers", () => {
   });
 
   it("lists every layer with a Persian label in the filter", () => {
-    const html = renderToStaticMarkup(<LayerFilter enabled={new Set<LayerId>(["tasks"])} onChange={() => undefined} />);
+    const html = renderToStaticMarkup(
+      <LayerFilter enabled={new Set<LayerId>(["meeting"])} onChange={() => undefined} />
+    );
     for (const label of [
-      "موعد کارها",
       "برنامهٔ هفتگی",
       "استثنای تاریخ‌دار",
       "روز غیرکاری",
@@ -197,9 +198,9 @@ describe("weekly schedule editor", () => {
   it("renders a non-working Thursday, a 10:00 Sunday start, breaks and the effective date", () => {
     const week = defaultWeek().map((day) =>
       day.weekday === 3
-        ? { ...day, is_working: false }
+        ? Object.assign({}, day, { is_working: false })
         : day.weekday === 6
-          ? { ...day, start: "10:00", breaks: [{ start: "12:00", end: "12:30" }] }
+          ? Object.assign({}, day, { start: "10:00", breaks: [{ start: "12:00", end: "12:30" }] })
           : day
     );
     const html = renderToStaticMarkup(<WeeklyScheduleEditor initial={week} onSubmit={() => undefined} />);
@@ -218,17 +219,16 @@ describe("weekly schedule editor", () => {
     expect(validateWeek(week)).toEqual([]);
     const broken = week.map((day) =>
       day.weekday === 5
-        ? { ...day, start: "16:00", end: "08:00" }
+        ? Object.assign({}, day, { start: "16:00", end: "08:00" })
         : day.weekday === 6
-          ? { ...day, breaks: [{ start: "07:00", end: "07:30" }] }
+          ? Object.assign({}, day, { breaks: [{ start: "07:00", end: "07:30" }] })
           : day.weekday === 0
-            ? {
-                ...day,
+            ? Object.assign({}, day, {
                 breaks: [
                   { start: "12:00", end: "13:00" },
                   { start: "12:30", end: "13:30" },
                 ],
-              }
+              })
             : day
     );
     expect(validateWeek(broken)).toEqual([
@@ -237,7 +237,9 @@ describe("weekly schedule editor", () => {
       "دوشنبه: بازه‌های استراحت نباید با هم هم‌پوشانی داشته باشند.",
     ]);
     // Non-working days are not validated.
-    expect(validateWeek(week.map((day) => ({ ...day, is_working: false, start: "16:00", end: "08:00" })))).toEqual([]);
+    expect(
+      validateWeek(week.map((day) => Object.assign({}, day, { is_working: false, start: "16:00", end: "08:00" })))
+    ).toEqual([]);
   });
 });
 
