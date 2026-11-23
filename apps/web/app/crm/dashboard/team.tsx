@@ -11,6 +11,7 @@ import {
   LayoutGrid,
   Network,
   Palette,
+  RefreshCw,
   Rows3,
   Search,
   SlidersHorizontal,
@@ -109,6 +110,8 @@ export function TeamWidget() {
     return () => window.clearTimeout(timer);
   }, [rulesOpen, rules, slug]);
   const cards = data.data?.cards || [];
+  const statusSummary = Object.entries(data.data?.summary || {});
+  const totalMembers = statusSummary.reduce((total, [, count]) => total + Number(count), 0);
   const units = [...new Map(cards.map((card) => [card.unit_id, card.unit])).entries()];
   const trayTasks = [...new Map(cards.flatMap((card) => card.active_tasks).map((task) => [task.id, task])).values()];
   const roles = [
@@ -179,101 +182,36 @@ export function TeamWidget() {
     );
   return (
     <div className="dashboard-team team-v2">
-      <div className="team-toolbar">
-        <label className="team-search">
-          <Search size={15} aria-hidden="true" />
-          <span className="sr-only">جستجوی نام</span>
-          <input placeholder="جستجوی عضو…" value={search} onChange={(event) => setSearch(event.target.value)} />
-        </label>
-        <select aria-label="فیلتر واحد" value={unit} onChange={(event) => setUnit(event.target.value)}>
-          <option value="">همه واحدها</option>
-          {units.map(([id, name]) => (
-            <option key={id} value={id}>
-              {name}
-            </option>
-          ))}
-        </select>
-        <select aria-label="فیلتر نقش" value={role} onChange={(event) => setRole(event.target.value)}>
-          <option value="">همه نقش‌ها</option>
-          {roles.map(([id, name]) => (
-            <option key={id} value={id}>
-              {name}
-            </option>
-          ))}
-        </select>
-        <select aria-label="مرتب‌سازی" value={sort} onChange={(event) => setSort(event.target.value)}>
-          <option value="name">مرتب‌سازی: نام</option>
-          <option value="workload">مرتب‌سازی: بار کاری</option>
-        </select>
-        <div className="team-segment" role="group" aria-label="نوع نمایش">
-          <button type="button" aria-pressed={view === "cards"} onClick={() => setView("cards")} title="نمای کارت">
-            <LayoutGrid size={15} aria-hidden="true" />
-            <span>کارت</span>
-          </button>
-          <button type="button" aria-pressed={view === "tree"} onClick={() => setView("tree")} title="نمای درختی">
-            <Network size={15} aria-hidden="true" />
-            <span>درختی</span>
-          </button>
+      <div className="team-overview">
+        <div className="team-overview-copy">
+          <span className="team-overview-eyebrow">نمای زنده تیم</span>
+          <strong>{toFa(totalMembers)} عضو در تیم</strong>
+          <p>وضعیت حضور و بار کاری اعضا را در یک نگاه ببینید.</p>
         </div>
         <button
           type="button"
-          className="team-icon-toggle"
-          aria-pressed={compact}
-          onClick={() => setCompact(!compact)}
-          title={compact ? "نمایش کارت کامل" : "نمایش کارت فشرده"}
-          aria-label={compact ? "نمایش کارت کامل" : "نمایش کارت فشرده"}
+          className="team-refresh"
+          disabled={data.isFetching}
+          onClick={() => void data.refetch()}
+          aria-label="به‌روزرسانی وضعیت تیم"
         >
-          <Rows3 size={16} aria-hidden="true" />
+          <RefreshCw size={16} className={data.isFetching ? "team-refresh-spin" : undefined} aria-hidden="true" />
+          <span>به‌روزرسانی</span>
         </button>
-        <details className="team-more">
-          <summary>
-            <SlidersHorizontal size={15} aria-hidden="true" />
-            تنظیمات
-          </summary>
-          <div className="team-more-panel">
-            <label className="team-check">
-              <input type="checkbox" checked={descendants} onChange={(event) => setDescendants(event.target.checked)} />
-              نمایش همه زیرمجموعه‌ها
-            </label>
-            <label className="team-check">
-              <input type="checkbox" checked={Boolean(settings.data?.alert_enabled)} onChange={toggleAlerts} />
-              هشدار برای اعضای بدون کار
-            </label>
-            <label className="team-alert-minutes">
-              <span>هشدار پس از</span>
-              <input
-                aria-label="دقیقه هشدار"
-                type="number"
-                min={5}
-                max={480}
-                defaultValue={settings.data?.alert_minutes || 30}
-                key={settings.data?.alert_minutes}
-                onBlur={async (event) => {
-                  try {
-                    await api.put(`${dashboardUrl(slug)}team/settings/`, {
-                      alert_minutes: Number(event.target.value),
-                    });
-                    await settings.refetch();
-                    toast("فاصله هشدار ذخیره شد", "success");
-                  } catch (error) {
-                    toast(errorMessage(error, "تنظیم هشدار انجام نشد"), "error");
-                  }
-                }}
-              />
-              <span>دقیقه</span>
-            </label>
-            <small>هشدارها فقط در ساعت کاری ۸ تا ۱۶ ارسال می‌شوند.</small>
-            {access?.can("Dashboard.Team.Rules") && (
-              <Button variant="secondary" icon={Palette} onClick={() => setRulesOpen(true)}>
-                قواعد رنگ وضعیت
-              </Button>
-            )}
-          </div>
-        </details>
       </div>
-      {Object.keys(data.data?.summary || {}).length > 0 && (
+      {statusSummary.length > 0 && (
         <div className="team-status-chips" role="group" aria-label="فیلتر وضعیت">
-          {Object.entries(data.data?.summary || {}).map(([color, count]) => (
+          <button
+            type="button"
+            className="team-chip team-chip-all"
+            aria-pressed={!status}
+            onClick={() => setStatus("")}
+          >
+            <UsersRound size={18} aria-hidden="true" />
+            <span>همه اعضا</span>
+            <b>{toFa(totalMembers)}</b>
+          </button>
+          {statusSummary.map(([color, count]) => (
             <button
               type="button"
               key={color}
@@ -282,14 +220,117 @@ export function TeamWidget() {
               onClick={() => setStatus(status === color ? "" : color)}
             >
               <i aria-hidden="true" />
-              {cards.find((card) => (rulePreview[card.id]?.color || card.color) === color)?.label ||
-                statusNames[color] ||
-                color}
+              <span>
+                {cards.find((card) => (rulePreview[card.id]?.color || card.color) === color)?.label ||
+                  rules.find((rule) => rule.color === color)?.label ||
+                  statusNames[color] ||
+                  "سایر وضعیت‌ها"}
+              </span>
               <b>{toFa(Number(count))}</b>
             </button>
           ))}
         </div>
       )}
+      <div className="team-toolbar">
+        <div className="team-toolbar-filters">
+          <label className="team-search">
+            <Search size={15} aria-hidden="true" />
+            <span className="sr-only">جستجوی نام</span>
+            <input placeholder="جستجوی عضو…" value={search} onChange={(event) => setSearch(event.target.value)} />
+          </label>
+          <select aria-label="فیلتر واحد" value={unit} onChange={(event) => setUnit(event.target.value)}>
+            <option value="">همه واحدها</option>
+            {units.map(([id, name]) => (
+              <option key={id} value={id}>
+                {name}
+              </option>
+            ))}
+          </select>
+          <select aria-label="فیلتر نقش" value={role} onChange={(event) => setRole(event.target.value)}>
+            <option value="">همه نقش‌ها</option>
+            {roles.map(([id, name]) => (
+              <option key={id} value={id}>
+                {name}
+              </option>
+            ))}
+          </select>
+          <select aria-label="مرتب‌سازی" value={sort} onChange={(event) => setSort(event.target.value)}>
+            <option value="name">مرتب‌سازی: نام</option>
+            <option value="workload">مرتب‌سازی: بار کاری</option>
+          </select>
+        </div>
+        <div className="team-toolbar-actions">
+          <div className="team-segment" role="group" aria-label="نوع نمایش">
+            <button type="button" aria-pressed={view === "cards"} onClick={() => setView("cards")} title="نمای کارت">
+              <LayoutGrid size={15} aria-hidden="true" />
+              <span>کارت</span>
+            </button>
+            <button type="button" aria-pressed={view === "tree"} onClick={() => setView("tree")} title="نمای درختی">
+              <Network size={15} aria-hidden="true" />
+              <span>درختی</span>
+            </button>
+          </div>
+          <button
+            type="button"
+            className="team-icon-toggle"
+            aria-pressed={compact}
+            onClick={() => setCompact(!compact)}
+            title={compact ? "نمایش کارت کامل" : "نمایش کارت فشرده"}
+            aria-label={compact ? "نمایش کارت کامل" : "نمایش کارت فشرده"}
+          >
+            <Rows3 size={16} aria-hidden="true" />
+          </button>
+          <details className="team-more">
+            <summary>
+              <SlidersHorizontal size={15} aria-hidden="true" />
+              تنظیمات
+            </summary>
+            <div className="team-more-panel">
+              <label className="team-check">
+                <input
+                  type="checkbox"
+                  checked={descendants}
+                  onChange={(event) => setDescendants(event.target.checked)}
+                />
+                نمایش همه زیرمجموعه‌ها
+              </label>
+              <label className="team-check">
+                <input type="checkbox" checked={Boolean(settings.data?.alert_enabled)} onChange={toggleAlerts} />
+                هشدار برای اعضای بدون کار
+              </label>
+              <label className="team-alert-minutes">
+                <span>هشدار پس از</span>
+                <input
+                  aria-label="دقیقه هشدار"
+                  type="number"
+                  min={5}
+                  max={480}
+                  defaultValue={settings.data?.alert_minutes || 30}
+                  key={settings.data?.alert_minutes}
+                  onBlur={async (event) => {
+                    try {
+                      await api.put(`${dashboardUrl(slug)}team/settings/`, {
+                        alert_minutes: Number(event.target.value),
+                      });
+                      await settings.refetch();
+                      toast("فاصله هشدار ذخیره شد", "success");
+                    } catch (error) {
+                      toast(errorMessage(error, "تنظیم هشدار انجام نشد"), "error");
+                    }
+                  }}
+                />
+                <span>دقیقه</span>
+              </label>
+              <small>هشدارها فقط در ساعت کاری ۸ تا ۱۶ ارسال می‌شوند.</small>
+              {access?.can("Dashboard.Team.Rules") && (
+                <Button variant="secondary" icon={Palette} onClick={() => setRulesOpen(true)}>
+                  قواعد رنگ وضعیت
+                </Button>
+              )}
+            </div>
+          </details>
+        </div>
+      </div>
       {trayTasks.length > 0 && (
         <div className="team-tray">
           <span className="team-tray-hint">
@@ -384,6 +425,10 @@ export function TeamWidget() {
                       </div>
                     </div>
                     <div className="team-member-tasks">
+                      <div className="team-member-tasks-heading">
+                        <span>کارهای در حال انجام</span>
+                        <b>{toFa(card.in_progress_count)}</b>
+                      </div>
                       {card.active_tasks.length ? (
                         <>
                           {card.active_tasks.slice(0, 3).map((task) => (
@@ -444,7 +489,7 @@ export function TeamWidget() {
       )}
       {selected && (
         <div className="dashboard-overlay" role="presentation" onMouseDown={() => setSelected("")}>
-          <aside className="dashboard-drawer" onMouseDown={(event) => event.stopPropagation()}>
+          <aside className="dashboard-drawer team-detail-drawer" onMouseDown={(event) => event.stopPropagation()}>
             <header>
               <h2>{details.data?.card.name || "جزئیات عضو"}</h2>
               <button onClick={() => setSelected("")} aria-label="بستن">
@@ -456,18 +501,54 @@ export function TeamWidget() {
             ) : (
               details.data && (
                 <>
-                  <p>
-                    کارهای باز: {details.data.card.open_count} · دارای تأخیر: {details.data.card.overdue_count}
-                  </p>
-                  <p>کارهای امروز و در حال انجام:</p>
-                  {details.data.card.active_tasks.map((task) => (
-                    <Link key={task.id} to={`/entities/ticket/${task.id}`}>
-                      {task.number} · {task.title}
-                    </Link>
-                  ))}
+                  <div className="team-detail-intro">
+                    <span className="team-detail-avatar">
+                      {details.data.card.avatar ? (
+                        <img src={details.data.card.avatar} alt="" />
+                      ) : (
+                        details.data.card.name.slice(0, 1)
+                      )}
+                    </span>
+                    <div>
+                      <strong>{details.data.card.name}</strong>
+                      <span>{[details.data.card.position, details.data.card.unit].filter(Boolean).join(" · ")}</span>
+                    </div>
+                    <span className={`team-detail-status team-${details.data.card.color}`}>
+                      {details.data.card.label}
+                    </span>
+                  </div>
+                  <dl className="team-detail-stats">
+                    <div>
+                      <dt>کار باز</dt>
+                      <dd>{toFa(details.data.card.open_count)}</dd>
+                    </div>
+                    <div>
+                      <dt>در حال انجام</dt>
+                      <dd>{toFa(details.data.card.in_progress_count)}</dd>
+                    </div>
+                    <div>
+                      <dt>تأخیری</dt>
+                      <dd>{toFa(details.data.card.overdue_count)}</dd>
+                    </div>
+                  </dl>
+                  <section className="team-detail-section">
+                    <h3>کارهای در حال انجام</h3>
+                    {details.data.card.active_tasks.length ? (
+                      <div className="team-detail-task-list">
+                        {details.data.card.active_tasks.map((task) => (
+                          <Link key={task.id} to={`/entities/ticket/${task.id}`}>
+                            <small>{task.number}</small>
+                            <span>{task.title}</span>
+                          </Link>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="team-detail-muted">کاری در حال انجام نیست.</p>
+                    )}
+                  </section>
                   {access?.can("Dashboard.Team.Rules") && (
-                    <label>
-                      ظرفیت کار{" "}
+                    <label className="team-detail-capacity">
+                      ظرفیت کار
                       <input
                         type="number"
                         min={1}
@@ -488,16 +569,24 @@ export function TeamWidget() {
                       />
                     </label>
                   )}
-                  <p>ساعت‌های ثبت‌شده: {details.data.hours_logged ?? "داده‌ای موجود نیست"}</p>
-                  <p>آخرین فعالیت: {dateText(details.data.card.last_activity)}</p>
-                  <div className="dashboard-week">
-                    {Object.entries(details.data.week_activity).map(([day, count]) => (
-                      <span key={day}>
-                        {persianDate(day, { year: "numeric" })}: {toFa(count)}
-                      </span>
-                    ))}
+                  <div className="team-detail-meta">
+                    <span>
+                      ساعت‌های ثبت‌شده:{" "}
+                      {details.data.hours_logged == null ? "داده‌ای موجود نیست" : toFa(details.data.hours_logged)}
+                    </span>
+                    <span>آخرین فعالیت: {dateText(details.data.card.last_activity)}</span>
                   </div>
-                  <div className="dashboard-detail-actions">
+                  <section className="team-detail-section">
+                    <h3>فعالیت هفته</h3>
+                    <div className="dashboard-week team-detail-week">
+                      {Object.entries(details.data.week_activity).map(([day, count]) => (
+                        <span key={day}>
+                          {persianDate(day, { year: "numeric" })}: {toFa(count)}
+                        </span>
+                      ))}
+                    </div>
+                  </section>
+                  <div className="dashboard-detail-actions team-detail-actions">
                     <Link to="/my-work">ارجاع کار جدید</Link>
                     <Link to="/calendar">تقویم و مرخصی‌ها</Link>
                     <Link to="/organization">جانشین</Link>

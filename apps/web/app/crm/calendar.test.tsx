@@ -27,6 +27,12 @@ afterEach(() => {
 });
 
 describe("Jalali issue calendars", () => {
+  it("shows undated tasks on their creation day", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2024-03-20T12:00:00Z"));
+    const html = renderCalendar([{ ...issue("کار تازه"), createdAt: "2024-03-21T09:00:00Z" }]);
+    expect(html).toContain("کار تازه");
+  });
   it("orders the agenda without requiring ES2023 array methods or changing the input", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2024-03-20T12:00:00Z"));

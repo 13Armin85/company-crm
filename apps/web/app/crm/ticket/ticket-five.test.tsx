@@ -89,7 +89,13 @@ const card = (deadline: Partial<TicketDeadline> = {}, extra: Partial<TicketCard>
 
 const target = (deadline: Partial<TicketDeadline>, readOnly = false) =>
   renderToStaticMarkup(
-    <TargetCard deadline={{ ...base, ...deadline }} readOnly={readOnly} onSetTarget={noop} onExtension={noop} onDecide={noop} />
+    <TargetCard
+      deadline={{ ...base, ...deadline }}
+      readOnly={readOnly}
+      onSetTarget={noop}
+      onExtension={noop}
+      onDecide={noop}
+    />
   );
 
 function withClient(node: ReactNode, seed?: (client: QueryClient) => void) {
@@ -104,7 +110,12 @@ function withClient(node: ReactNode, seed?: (client: QueryClient) => void) {
 
 describe("target card states (section 6.2)", () => {
   it("shows no target with a manager action only for the manager", () => {
-    const html = target({ state: "none", target_minutes: null, total_minutes: null, can: { ...base.can, request_extension: false } });
+    const html = target({
+      state: "none",
+      target_minutes: null,
+      total_minutes: null,
+      can: { ...base.can, request_extension: false },
+    });
     expect(html).toContain("مدت هدف تعیین نشده");
     expect(html).not.toContain("تعیین مدت هدف");
     const manager = target({ state: "none", target_minutes: null, can: { ...base.can, set_target: true } });
@@ -225,7 +236,13 @@ describe("overdue banner and delay report", () => {
     expect(renderToStaticMarkup(<OverdueBanner deadline={base} onReport={noop} />)).toBe("");
     const html = renderToStaticMarkup(
       <OverdueBanner
-        deadline={{ ...base, state: "overdue", overdue_minutes: 120, delay_report_needed: true, can: { ...base.can, report_delay: true } }}
+        deadline={{
+          ...base,
+          state: "overdue",
+          overdue_minutes: 120,
+          delay_report_needed: true,
+          can: { ...base.can, report_delay: true },
+        }}
         onReport={noop}
       />
     );
@@ -297,7 +314,12 @@ describe("referral card", () => {
     expect(mine).toContain("رد با دلیل");
     expect(mine).toContain("ارجاع به فرد دیگر");
     const other = renderToStaticMarkup(
-      <ReferralCard card={card({}, { active_referral: { ...active, mine: false } })} onRefer={noop} onRespond={noop} onAccept={noop} />
+      <ReferralCard
+        card={card({}, { active_referral: { ...active, mine: false } })}
+        onRefer={noop}
+        onRespond={noop}
+        onAccept={noop}
+      />
     );
     expect(other).toContain("در انتظار پاسخ colleague");
     expect(other).toContain("یک ارجاع در انتظار پاسخ است.");
@@ -305,7 +327,12 @@ describe("referral card", () => {
 
   it("without permission the refer action is disabled with a reason; read-only hides it", () => {
     const html = renderToStaticMarkup(
-      <ReferralCard card={card({}, { can: { refer: false, contact: true } })} onRefer={noop} onRespond={noop} onAccept={noop} />
+      <ReferralCard
+        card={card({}, { can: { refer: false, contact: true } })}
+        onRefer={noop}
+        onRespond={noop}
+        onAccept={noop}
+      />
     );
     expect(html).toContain("disabled");
     expect(html).toContain("فقط مسئول یا مدیر دارای مجوز ارجاع می‌تواند ارجاع دهد.");
@@ -319,7 +346,11 @@ describe("referral card", () => {
 describe("ready filters and deadline badges (section 6.7)", () => {
   it("renders all five presets with server counts", () => {
     const html = renderToStaticMarkup(
-      <TicketPresetBar value="overdue" counts={{ all: 12, mine: 3, unassigned: 2, overdue: 1, closed: 6 }} onChange={noop} />
+      <TicketPresetBar
+        value="overdue"
+        counts={{ all: 12, mine: 3, unassigned: 2, overdue: 1, closed: 6 }}
+        onChange={noop}
+      />
     );
     for (const label of ["همه", "من", "بدون مسئول", "عقب‌افتاده", "بسته‌شده"]) expect(html).toContain(label);
     expect(html).toContain("۱۲");
@@ -327,8 +358,12 @@ describe("ready filters and deadline badges (section 6.7)", () => {
   });
 
   it("badge has icon and text for each state", () => {
-    expect(renderToStaticMarkup(<TicketDeadlineBadge badge={{ state: "overdue", target_text: "x" }} />)).toContain("دیرکرده");
-    expect(renderToStaticMarkup(<TicketDeadlineBadge badge={{ state: "near_due", target_text: "x" }} />)).toContain("نزدیک موعد");
+    expect(renderToStaticMarkup(<TicketDeadlineBadge badge={{ state: "overdue", target_text: "x" }} />)).toContain(
+      "دیرکرده"
+    );
+    expect(renderToStaticMarkup(<TicketDeadlineBadge badge={{ state: "near_due", target_text: "x" }} />)).toContain(
+      "نزدیک موعد"
+    );
     expect(renderToStaticMarkup(<TicketDeadlineBadge />)).toBe("");
   });
 
@@ -406,7 +441,10 @@ describe("core fields (ن۱)", () => {
     expect(html).toContain("تغییر تیکت والد");
     const hidden = renderToStaticMarkup(
       <MemoryRouter>
-        <TicketDetailsCard card={card({}, { details: { ...details, parent: null, parent_hidden: true }, read_only: true })} onParent={noop} />
+        <TicketDetailsCard
+          card={card({}, { details: { ...details, parent: null, parent_hidden: true }, read_only: true })}
+          onParent={noop}
+        />
       </MemoryRouter>
     );
     expect(hidden).toContain("تیکت والد خارج از دسترسی شماست");
@@ -468,8 +506,7 @@ describe("ticket header and tabs (۶.۲)", () => {
     expect(html).toContain("TT1921");
     expect(html).toContain("قطعی سامانه");
     expect(html).toContain('aria-label="وضعیت"');
-    expect(html).toContain('<optgroup label="انجام‌نشده">');
-    expect(html).toContain('<optgroup label="در حال انجام">');
+    expect(html).not.toContain("<optgroup");
     expect(html).toContain("بانک نمونه");
     for (const label of ["نوع", "اولویت", "مشتری", "پروژه", "ثبت‌کننده"]) expect(html).toContain(`<dt>${label}</dt>`);
     expect(html).toContain('aria-label="اقدام‌های دیگر تیکت"');

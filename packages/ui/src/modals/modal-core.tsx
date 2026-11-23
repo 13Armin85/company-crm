@@ -21,6 +21,7 @@ type Props = {
   position?: EModalPosition;
   width?: EModalWidth;
   className?: string;
+  dialogClassName?: string;
 };
 export function ModalCore(props: Props) {
   const {
@@ -30,13 +31,14 @@ export function ModalCore(props: Props) {
     position = EModalPosition.CENTER,
     width = EModalWidth.XXL,
     className = "",
+    dialogClassName = "",
   } = props;
   const modalsVisible = useContext(ModalVisibilityContext);
   const isOpen = requestedOpen && modalsVisible;
 
   return (
     <Transition.Root show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-30" onClose={() => handleClose && handleClose()}>
+      <Dialog as="div" className={cn("relative z-30", dialogClassName)} onClose={() => handleClose && handleClose()}>
         <Transition.Child
           as={Fragment}
           enter="ease-out duration-300"

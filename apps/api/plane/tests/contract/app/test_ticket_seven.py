@@ -256,6 +256,9 @@ def test_my_work_widget_uses_assignee_and_open_state(engine):
     assert owned.status_code == 201, owned.data
     closed = client.post(tasks_url, {"name": "کار بسته", "assignee_id": str(user.id), "status": "done"}, format="json")
     assert closed.status_code == 201, closed.data
+    removed = client.post(tasks_url, {"name": "کار حذف‌شده", "assignee_id": str(user.id)}, format="json")
+    assert removed.status_code == 201, removed.data
+    assert client.delete(f"{tasks_url}{removed.data['id']}/").status_code == 204
     widget = {"type": "my-work", "config": {"entity": "ticket", "rows": 8}}
     response = client.post(dashboard_path(workspace, "widgets/data/"), {"widget": widget}, format="json")
     assert response.status_code == 200, response.data

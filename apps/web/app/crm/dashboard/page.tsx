@@ -1,5 +1,5 @@
 import { ErrorState } from "../error-state";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
@@ -100,6 +100,9 @@ export default function DashboardPage() {
   const [gallery, setGallery] = useState(false);
   const [search, setSearch] = useState("");
   const [configuredId, setConfiguredId] = useState("");
+  const [settingsDirty, setSettingsDirty] = useState(false);
+  const settingsVersion = useRef(0);
+  const settingsSaving = useRef(false);
   const [sharingId, setSharingId] = useState("");
   const [fullId, setFullId] = useState("");
   const [newTab, setNewTab] = useState("");
@@ -115,6 +118,27 @@ export default function DashboardPage() {
     setActiveId((id) => (dashboard.data!.tabs.some((tab) => tab.id === id) ? id : dashboard.data!.tabs[0]?.id || ""));
     if (dashboard.data.default_updated) toast("داشبورد پیش‌فرض به‌روز شد", "info");
   }, [dashboard.data, editing, toast]);
+  useEffect(() => {
+    if (!settingsDirty || settingsSaving.current) return;
+    const timer = window.setTimeout(async () => {
+      settingsSaving.current = true;
+      const version = settingsVersion.current;
+      try {
+        const result = await save.mutateAsync({ tabs, revision });
+        setRevision(result.revision);
+        if (version === settingsVersion.current) {
+          setTabs(duplicate(result.tabs));
+          setSettingsDirty(false);
+        }
+      } catch (error) {
+        setSettingsDirty(false);
+        toast(errorMessage(error, "ذخیره تنظیمات ویجت انجام نشد"), "error");
+      } finally {
+        settingsSaving.current = false;
+      }
+    }, 450);
+    return () => window.clearTimeout(timer);
+  }, [settingsDirty, tabs, revision, save, toast]);
   const active = sharedActive || tabs.find((tab) => tab.id === activeId);
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "صبح بخیر" : hour < 17 ? "روز بخیر" : "عصر بخیر";
@@ -282,7 +306,11 @@ export default function DashboardPage() {
               <Button variant="secondary" icon={X} onClick={cancel}>
                 انصراف
               </Button>
-              <Button icon={Check} onClick={commit} disabled={save.isPending}>
+              <Button
+                icon={Check}
+                onClick={commit}
+                disabled={save.isPending || settingsDirty || settingsSaving.current}
+              >
                 ذخیره
               </Button>
             </>
@@ -449,7 +477,15 @@ export default function DashboardPage() {
                     )}
                     <button
                       aria-label="تازه‌سازی ویجت"
-                      onClick={() => client.invalidateQueries({ queryKey: ["dashboard-widget", slug, widget.id] })}
+                      onClick={() => {
+                        void client.invalidateQueries({ queryKey: ["dashboard-widget", slug, widget.id] });
+                        if (widget.type === "team-cards")
+                          void client.invalidateQueries({ queryKey: ["dashboard-team", slug] });
+                        if (widget.type === "calendar") {
+                          void client.invalidateQueries({ queryKey: ["work-calendar", slug] });
+                          void client.invalidateQueries({ queryKey: ["issues", slug] });
+                        }
+                      }}
                     >
                       <RefreshCw size={16} />
                     </button>
@@ -640,6 +676,8 @@ export default function DashboardPage() {
               update={(next) => {
                 modifyWidget(configured.id, () => next);
                 setEditing(true);
+                settingsVersion.current += 1;
+                setSettingsDirty(true);
               }}
             />
           </aside>

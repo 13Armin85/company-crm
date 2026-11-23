@@ -3,7 +3,8 @@ import { EngineRecordForm } from "../engine/record-form";
 import { SurfaceForm } from "../engine/surface";
 import { WorkTable } from "../engine/work-table";
 import type { FormValues } from "@plane/ui";
-import { IdentifierBadge, SearchableSelect } from "@plane/ui";
+import { IdentifierBadge, SearchableSelect, jalaliToDateOnly, parseDateOnly, zonedDateTime } from "@plane/ui";
+import { jalaaliMonthLength } from "jalaali-js";
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import {
@@ -36,11 +37,15 @@ import {
   useStates,
   useUpdateIssueStatus,
   useWorkspaceAccess,
+  useWorkCalendar,
   useCycles,
   errorMessage,
 } from "../api";
 import { Avatar, AvatarStack, Button, EmptyState, IssueRow, PersianDateInput, Skeleton, TabBar } from "../components";
 import { IssueCalendar } from "../issue-calendar";
+import { LayerChips } from "../work-calendar/components";
+import { dayChips } from "../work-calendar/model";
+import type { LayerId } from "../work-calendar/model";
 import { useUIStore } from "../store";
 import { IssueKanbanBoard } from "../kanban";
 import { useDismissMenu } from "../use-dismiss-menu";
@@ -53,8 +58,10 @@ const tabs = [
   { id: "cycles", label: "چرخه‌ها" },
   { id: "calendar", label: "تقویم" },
   { id: "activity", label: "فعالیت" },
+  { id: "members", label: "اعضا" },
   { id: "settings", label: "تنظیمات" },
 ];
+const projectCalendarLayers = new Set<LayerId>(["meeting", "mission", "event", "absence", "presence", "busy"]);
 
 export default function ProjectDetailPage() {
   const { id = "" } = useParams();
@@ -109,7 +116,7 @@ export default function ProjectDetailPage() {
           <Link className="button button-secondary" to={`/edit/project/${id}`}>
             فرم کامل پروژه
           </Link>
-          <Button variant="secondary" icon={Users} onClick={() => setTab("overview")}>
+          <Button variant="secondary" icon={Users} onClick={() => setTab("members")}>
             اعضای پروژه ({toFa(members.length)})
           </Button>
           {access?.can("Issue.Create") && (
@@ -227,14 +234,34 @@ export default function ProjectDetailPage() {
       {tab === "calendar" && (
         <div className="panel tab-content">
           <h2>موعدهای پروژه</h2>
-          <IssueCalendar
+          <ProjectCalendar
             issues={issues}
-            projects={[project]}
+            project={project}
             timeZone={currentUser?.timeZone}
             isLoading={issuesQuery.isLoading}
-            showAgenda
           />
         </div>
+      )}
+      {tab === "members" && (
+        <section className="panel tab-content project-member-list">
+          <h2>اعضای پروژه</h2>
+          {members.length ? (
+            members.map((member) => (
+              <div key={member.id}>
+                <span>
+                  <Avatar member={member} size="sm" /> {member.displayName}
+                </span>
+              </div>
+            ))
+          ) : (
+            <EmptyState title="عضوی ثبت نشده است" description="اعضای پروژه در تنظیمات آن افزوده می‌شوند." />
+          )}
+          {canManage && (
+            <Button variant="secondary" onClick={() => setTab("settings")}>
+              مدیریت اعضا
+            </Button>
+          )}
+        </section>
       )}
       {tab === "activity" && (
         <div className="panel tab-content">
@@ -393,6 +420,38 @@ function Overview({
         </div>
       </aside>
     </div>
+  );
+}
+
+function ProjectCalendar({
+  issues,
+  project,
+  timeZone,
+  isLoading,
+}: {
+  issues: NonNullable<ReturnType<typeof useIssues>["data"]>;
+  project: NonNullable<ReturnType<typeof useProject>["data"]>;
+  timeZone?: string;
+  isLoading: boolean;
+}) {
+  const [date, setDate] = useState(() => zonedDateTime(new Date(), timeZone)!.date);
+  const month = parseDateOnly(date)!;
+  const calendar = useWorkCalendar(
+    undefined,
+    jalaliToDateOnly(month.jy, month.jm, 1),
+    jalaliToDateOnly(month.jy, month.jm, jalaaliMonthLength(month.jy, month.jm))
+  );
+  return (
+    <IssueCalendar
+      issues={issues}
+      projects={[project]}
+      timeZone={timeZone}
+      isLoading={isLoading}
+      showAgenda
+      value={date}
+      onValueChange={setDate}
+      renderDay={(day) => <LayerChips chips={dayChips(calendar.data, day, projectCalendarLayers)} />}
+    />
   );
 }
 

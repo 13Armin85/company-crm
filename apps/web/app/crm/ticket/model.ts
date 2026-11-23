@@ -305,7 +305,7 @@ export function persianMoment(value: string | null | undefined): string {
 export const METHOD_LABELS: Record<RoutingMethod, string> = {
   manager: "مدیر واحد (بالا رفتن در درخت واحد)",
   user: "فرد ثابت",
-  group: "گروه ثابت",
+  group: "عضو گروه با کمترین کار",
   round_robin: "نوبتی",
   least_loaded: "کمترین حجم کار",
 };
@@ -343,7 +343,7 @@ export function ruleSentence(rule: RoutingRule, names: Record<string, string> = 
     rule.method === "user"
       ? rule.target_user_name || "فرد انتخاب‌نشده"
       : rule.method === "group"
-        ? `صف «${rule.role_name || "نقش"}»`
+        ? `دارندگان نقش «${rule.role_name || "نقش"}»`
         : rule.method === "manager"
           ? `مدیر «${rule.unit_title || "واحد"}»`
           : rule.member_ids.length

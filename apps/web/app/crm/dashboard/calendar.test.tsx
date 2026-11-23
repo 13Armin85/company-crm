@@ -4,6 +4,34 @@ import { MemoryRouter } from "react-router";
 import { DashboardCalendar, dashboardCalendarRange, stepDashboardCalendar } from "./calendar";
 import type { DashboardWidget } from "./types";
 
+vi.mock("../api", () => ({
+  errorMessage: () => "خطا",
+  useIssues: () => ({
+    data: [
+      { id: "task-two", dueDate: "2024-03-21", name: "کار دوم" },
+      { id: "task-new", createdAt: "2024-03-23T08:00:00Z", name: "کار بدون موعد" },
+    ],
+  }),
+}));
+
+vi.mock("../api/work-calendar", () => ({
+  useWorkCalendar: () => ({
+    data: {
+      time_zone: "Asia/Tehran",
+      events: [
+        {
+          id: "meeting-one",
+          starts_at: "2024-03-22T09:00:00Z",
+          ends_at: "2024-03-22T10:00:00Z",
+          status: "planned",
+          kind: "meeting",
+          title: "جلسه تیم",
+        },
+      ],
+    },
+  }),
+}));
+
 vi.mock("./api", () => ({
   useWidgetData: () => ({
     data: {
@@ -74,6 +102,9 @@ describe("dashboard Persian calendar", () => {
     expect(html).toContain('aria-label="۱ فروردین ۱۴۰۳"');
     expect(html).toContain("/entities/ticket/new-year");
     expect(html).toContain("کار نوروز");
+    expect(html).toContain("کار دوم");
+    expect(html).toContain("کار بدون موعد");
+    expect(html).toContain("جلسه تیم");
     expect(html).not.toContain("/entities/ticket/previous-year");
   });
 });

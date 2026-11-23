@@ -14,13 +14,9 @@ export default function RoutingPage() {
       <PageHeader
         eyebrow="گردش کار سازمانی"
         title="صف کارها و ارجاع"
-        description="کارهای منتظر پذیرش و تیکت‌های بدون مسئول را ببینید؛ مدیران قواعد ارجاع خودکار را به ترتیب اجرا تنظیم می‌کنند."
+        description="کارهای بدون مسئول را پیگیری کنید و قواعد ارجاع خودکار را به ترتیب اجرا تنظیم کنید. ارجاع‌ها مستقیم به مسئول منتخب سپرده می‌شوند."
       />
-      <RoleQueue
-        canClaim={access.can("Routing.Queue.Claim")}
-        canViewAll={access.can("Routing.Queue.ViewAll")}
-        canViewProject={access.can("Project.View")}
-      />
+      <RoleQueue canViewAll={access.can("Routing.Queue.ViewAll")} canViewProject={access.can("Project.View")} />
       <RoutingRulesManager canManage={canManage} />
       {access.can("Ticket.TargetSet") && <TypeTargets />}
     </div>

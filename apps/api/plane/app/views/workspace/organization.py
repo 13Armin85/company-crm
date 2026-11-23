@@ -605,6 +605,10 @@ class TicketRoleQueueEndpoint(BaseAPIView):
     @require_permission("Routing.Queue.View")
     def get(self, request, slug):
         from plane.app.services.project_visibility import visible_projects
+        from plane.app.services.ticket_core import open_q
+        from django.db.models import Exists, OuterRef
+
+        assigned = IssueAssignee.objects.filter(issue_id=OuterRef("issue_id"), deleted_at__isnull=True)
 
         rows = TicketRoleQueueEntry.objects.filter(
             Q(issue__project__isnull=True)
@@ -614,7 +618,11 @@ class TicketRoleQueueEndpoint(BaseAPIView):
                 ).values("id")
             ),
             issue__workspace__slug=slug, status=TicketRoleQueueEntry.Status.OPEN,
-        ).select_related("issue", "issue__project", "rule", "required_role", "claimed_by")
+            issue__deleted_at__isnull=True, issue__archived_at__isnull=True, issue__is_draft=False,
+            issue__assignee__isnull=True,
+        ).filter(open_q("issue__")).annotate(has_assignee=Exists(assigned)).filter(has_assignee=False).select_related(
+            "issue", "issue__project", "rule", "required_role", "claimed_by"
+        )
         if not has_permission(request.user, slug, "Routing.Queue.ViewAll", request=request):
             active_roles = UserOrganizationRole.objects.filter(
                 workspace__slug=slug,

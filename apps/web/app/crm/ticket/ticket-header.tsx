@@ -7,8 +7,8 @@ import { Popover, PopoverButton, PopoverPanel } from "@headlessui/react";
 import { MoreHorizontal } from "lucide-react";
 import { useChangeTicketStatus } from "../api/ticket";
 import type { TicketCard } from "../api/ticket";
-import { CATEGORY_TITLES, PRIORITY_LABELS } from "./model";
-import type { WorkCategoryId } from "./model";
+import { PRIORITY_LABELS } from "./model";
+import { stateNameFa } from "../issue-status";
 
 export type HeaderAction = "refer" | "contact" | "parent" | "target" | "extension" | "delay";
 
@@ -16,9 +16,6 @@ export function TicketHeader({ card, onAction }: { card: TicketCard; onAction: (
   const d = card.details;
   const status = card.status;
   const change = useChangeTicketStatus(card.id);
-  const groups = (Object.keys(CATEGORY_TITLES) as WorkCategoryId[])
-    .map((category) => ({ category, options: (status?.options ?? []).filter((o) => o.category === category) }))
-    .filter((group) => group.options.length);
   const facts: [string, ReactNode][] = [
     ["نوع", d.type || "—"],
     ["اولویت", PRIORITY_LABELS[d.priority] || d.priority || "—"],
@@ -59,18 +56,12 @@ export function TicketHeader({ card, onAction }: { card: TicketCard; onAction: (
                 aria-describedby={!status.can_change ? `status-why-${card.id}` : undefined}
                 value={status.current ?? ""}
                 disabled={!status.can_change || change.isPending}
-                onChange={(event) =>
-                  status.field && change.mutate({ field: status.field, value: event.target.value })
-                }
+                onChange={(event) => status.field && change.mutate({ field: status.field, value: event.target.value })}
               >
-                {groups.map((group) => (
-                  <optgroup key={group.category} label={CATEGORY_TITLES[group.category]}>
-                    {group.options.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.title}
-                      </option>
-                    ))}
-                  </optgroup>
+                {status.options.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {stateNameFa(option.title)}
+                  </option>
                 ))}
               </select>
               {!status.can_change && (
@@ -98,7 +89,13 @@ export function TicketHeader({ card, onAction }: { card: TicketCard; onAction: (
                   <PopoverButton className="plain-icon" aria-label="اقدام‌های دیگر تیکت" aria-haspopup="menu">
                     <MoreHorizontal size={18} />
                   </PopoverButton>
-                  <PopoverPanel className="action-menu issue-action-menu" role="menu" anchor="bottom end" portal dir="rtl">
+                  <PopoverPanel
+                    className="action-menu issue-action-menu"
+                    role="menu"
+                    anchor="bottom end"
+                    portal
+                    dir="rtl"
+                  >
                     {menu
                       .filter(([, , enabled]) => enabled)
                       .map(([action, label]) => (

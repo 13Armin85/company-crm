@@ -61,8 +61,9 @@ export function IssueCalendar({
   const events = useMemo(() => {
     const grouped = new Map<number, Issue[]>();
     for (const issue of issues) {
-      if (!issue.dueDate) continue;
-      const jalali = displayPersianDate(issue.dueDate, timeZone);
+      const scheduledAt = issue.dueDate || issue.createdAt;
+      if (!scheduledAt) continue;
+      const jalali = displayPersianDate(scheduledAt, timeZone);
       if (!jalali || jalali.jy !== selected.year || jalali.jm !== selected.month) continue;
       grouped.set(jalali.jd, [...(grouped.get(jalali.jd) ?? []), issue]);
     }

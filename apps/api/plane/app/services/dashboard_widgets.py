@@ -89,7 +89,7 @@ WORK_CATEGORY = "__work_category__"
 def _ticket_rows(query):
     if query.entity.code != "ticket":
         raise ValidationError("این ویجت به دادهٔ کارها نیاز دارد.")
-    return Issue.objects.filter(id__in=query.rows.values("source_id"), workspace=query.entity.workspace)
+    return Issue.objects.filter(id__in=query.rows.values("source_id"), workspace=query.entity.workspace, deleted_at__isnull=True)
 
 
 def _table_display_values(payload, query, request, workspace):
@@ -262,7 +262,7 @@ def widget_data(widget, request, workspace):
         # One status mapping (ticket 5, ن۶): "open" = not in the done category.
         issues = (
             _ticket_rows(query)
-            .filter(Q(assignee=request.user) | Q(issue_assignee__assignee=request.user))
+            .filter(Q(assignee=request.user) | Q(issue_assignee__assignee=request.user, issue_assignee__deleted_at__isnull=True))
             .filter(open_q())
             .distinct()
         )
@@ -272,7 +272,7 @@ def widget_data(widget, request, workspace):
             When(priority="medium", then=Value(2)), When(priority="low", then=Value(3)),
             default=Value(4), output_field=IntegerField(),
         )).order_by("priority_rank", F("target_date").asc(nulls_last=True), "id").values_list("id", flat=True)[:size])
-        query.rows = query.rows.filter(source_id__in=ordered_ids)
+        query.rows = query.rows.filter(source_id__in=ordered_ids, deleted_at__isnull=True)
         payload = query.execute(1, size)
         positions = {str(identifier): index for index, identifier in enumerate(ordered_ids)}
         payload["results"].sort(key=lambda row: positions.get(str(row.get("source_id") or row["id"]), size))

@@ -1006,7 +1006,7 @@ def _check_project_member(issue, user):
 
 
 def refer(workspace, actor, issue_id, data, request=None, previous=None):
-    """Manual referral with a mandatory reason; the target must accept, reject or forward."""
+    """Manual referral assigns the target immediately without a separate acceptance."""
     from .task_policy import validate_other_assignees
 
     reason = _reason(data)
@@ -1037,7 +1037,8 @@ def refer(workspace, actor, issue_id, data, request=None, previous=None):
             previous=previous,
             method="manual",
             reason=reason,
-            response=TicketRoutingDecision.Response.PENDING,
+            response=TicketRoutingDecision.Response.ACCEPTED,
+            responded_at=timezone.now(),
             details={"previous_assignees": [str(x) for x in before]},
         )
         record(

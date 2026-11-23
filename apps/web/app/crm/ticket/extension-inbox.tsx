@@ -3,7 +3,9 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { useDecideTicketExtension, useTicketExtensionInbox } from "../api/ticket";
 import type { InboxExtension } from "../api/ticket";
+import { errorMessage } from "../api";
 import { Button, Skeleton } from "../components";
+import { ErrorState } from "../error-state";
 import { formatWorkingMinutes } from "../workflow/model";
 import { faDigits } from "./model";
 
@@ -61,6 +63,13 @@ function Row({ row }: { row: InboxExtension }) {
 export function TicketExtensionInbox() {
   const inbox = useTicketExtensionInbox();
   if (inbox.isLoading) return <Skeleton rows={2} />;
+  if (inbox.isError)
+    return (
+      <ErrorState
+        message={errorMessage(inbox.error, "دریافت درخواست‌های تمدید انجام نشد")}
+        onRetry={() => void inbox.refetch()}
+      />
+    );
   if (!inbox.data?.length) return null;
   return (
     <section className="workflow-inbox" aria-labelledby="ticket-extension-inbox">

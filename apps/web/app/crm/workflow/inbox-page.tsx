@@ -2,8 +2,9 @@
 import { Link } from "react-router";
 import { useWorkflowInbox, useWorkflowInstances } from "../api/workflow";
 import type { InboxItem } from "../api/workflow";
-import { useWorkspaceAccess } from "../api";
+import { errorMessage, useWorkspaceAccess } from "../api";
 import { EmptyState, PageHeader, Skeleton } from "../components";
+import { ErrorState } from "../error-state";
 import { DeadlineBadges } from "./panel";
 import { formatWorkingMinutes } from "./model";
 import { TicketExtensionInbox } from "../ticket/extension-inbox";
@@ -93,6 +94,13 @@ export function WorkflowInboxList({
 
 function ErrorInstances() {
   const rows = useWorkflowInstances("error");
+  if (rows.isError)
+    return (
+      <ErrorState
+        message={errorMessage(rows.error, "دریافت فرایندهای دارای خطا انجام نشد")}
+        onRetry={() => void rows.refetch()}
+      />
+    );
   if (!rows.data?.length) return null;
   return (
     <section className="workflow-inbox" aria-label="فرایندهای دارای خطا" dir="rtl">
@@ -126,6 +134,11 @@ export default function WorkflowInboxPage() {
       />
       {inbox.isLoading ? (
         <Skeleton rows={5} />
+      ) : inbox.isError ? (
+        <ErrorState
+          message={errorMessage(inbox.error, "دریافت موارد منتظر اقدام انجام نشد")}
+          onRetry={() => void inbox.refetch()}
+        />
       ) : (
         <WorkflowInboxList steps={inbox.data?.steps || []} extensions={inbox.data?.extensions || []} />
       )}

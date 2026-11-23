@@ -513,14 +513,28 @@ def test_each_criterion(org):
     assert {"rule": "نوع", "failed": ["نوع"]} in skipped
 
 
-def test_group_method_queues_for_the_role(org):
+def test_group_method_assigns_least_loaded_member_immediately(org):
     role = OrganizationRole.objects.create(workspace=org["workspace"], name="پشتیبان")
-    group = rule(org, "گروه", "group", 1, required_role=role)
+    UserOrganizationRole.objects.create(workspace=org["workspace"], user=org["employee"], role=role)
+    UserOrganizationRole.objects.create(workspace=org["workspace"], user=org["colleague"], role=role)
+    rule(org, "گروه", "group", 1, required_role=role)
+    ticket(org, assignee=org["employee"])
+    issue = ticket(org)
+    decision = TicketRoutingService.route_auto(issue)
+    assert decision.outcome == "assigned"
+    assert decision.assigned_user == org["colleague"]
+    assert IssueAssignee.objects.filter(issue=issue, assignee=org["colleague"]).exists()
+    assert not TicketRoleQueueEntry.objects.filter(issue=issue, status="open").exists()
+
+
+def test_group_method_without_available_members_is_unassigned(org):
+    role = OrganizationRole.objects.create(workspace=org["workspace"], name="بدون عضو")
+    rule(org, "گروه", "group", 1, required_role=role)
     issue = ticket(org)
     decision = TicketRoutingService.route_auto(issue)
     assert decision.outcome == "queued"
-    entry = TicketRoleQueueEntry.objects.get(issue=issue, status="open")
-    assert entry.rule == group and entry.required_role == role
+    assert decision.assigned_user is None
+    assert TicketRoleQueueEntry.objects.filter(issue=issue, rule__isnull=True, required_role__isnull=True, status="open").exists()
 
 
 def test_round_robin_and_least_loaded(org):
@@ -642,7 +656,7 @@ def refer_url(org, issue, suffix="refer/"):
     return f"/api/workspaces/{org['workspace'].slug}/tickets/{issue.id}/{suffix}"
 
 
-def test_referral_chain_reject_forward_accept(org):
+def test_referral_is_accepted_immediately_and_can_be_reassigned(org):
     issue = ticket(org, org["employee"])
     employee = client_for(org["employee"])
     assert employee.post(refer_url(org, issue), {"user_id": str(org["colleague"].id)}, format="json").status_code == 400
@@ -651,33 +665,20 @@ def test_referral_chain_reject_forward_accept(org):
     )
     assert sent.status_code == 201, sent.data
     assert list(IssueAssignee.objects.filter(issue=issue).values_list("assignee_id", flat=True)) == [org["colleague"].id]
+    assert core.referral_chain(issue)[0]["response"] == "accepted"
     colleague = client_for(org["colleague"])
-    no_reason = colleague.post(refer_url(org, issue, "referral/respond/"), {"action": "reject"}, format="json")
-    assert no_reason.status_code == 400
-    rejected = colleague.post(
-        refer_url(org, issue, "referral/respond/"), {"action": "reject", "reason": "مربوط به من نیست"}, format="json"
-    )
-    assert rejected.status_code == 200, rejected.data
-    assert list(IssueAssignee.objects.filter(issue=issue).values_list("assignee_id", flat=True)) == [org["employee"].id]
-    employee.post(refer_url(org, issue), {"user_id": str(org["colleague"].id), "reason": "دوباره ببین"}, format="json")
-    forwarded = colleague.post(
-        refer_url(org, issue, "referral/respond/"),
-        {"action": "forward", "user_id": str(org["delegate"].id), "reason": "همکارم بهتر است"},
-        format="json",
-    )
-    assert forwarded.status_code == 200, forwarded.data
-    outsider = client_for(org["outsider"]).post(refer_url(org, issue, "referral/respond/"), {"action": "accept"}, format="json")
-    assert outsider.status_code in {403, 404}
-    accepted = client_for(org["delegate"]).post(refer_url(org, issue, "referral/respond/"), {"action": "accept"}, format="json")
-    assert accepted.status_code == 200, accepted.data
+    assert colleague.post(refer_url(org, issue, "referral/respond/"), {"action": "accept"}, format="json").status_code == 400
+    forwarded = colleague.post(refer_url(org, issue), {
+        "user_id": str(org["delegate"].id), "reason": "همکارم بهتر است",
+    }, format="json")
+    assert forwarded.status_code == 201, forwarded.data
     chain = core.referral_chain(issue)
     assert [(row["to"], row["response"]) for row in chain] == [
-        ("colleague", "rejected"),
-        ("colleague", "forwarded"),
+        ("colleague", "accepted"),
         ("delegate", "accepted"),
     ]
     kinds = [e.event_type for e in EntityEvent.objects.filter(record_id=issue.id).order_by("created_at")]
-    assert kinds.count("ticket.referred") == 3 and "ticket.referral_rejected" in kinds
+    assert kinds.count("ticket.referred") == 2
 
 
 def test_referral_keeps_assignment_policy(org):

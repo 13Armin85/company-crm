@@ -272,13 +272,11 @@ class TicketRoutingService:
                     "skipped": [{"user": _name(user), "why": "غایب"}]
                 }
             return None, f"{_name(user)} غایب است و جانشین فعالی ندارد", {"skipped": [{"user": _name(user), "why": "غایب"}]}
-        if method == TicketRoutingRule.Method.GROUP:
-            return None, "گروه ثابت: تیکت در صف گروه قرار می‌گیرد تا یکی از اعضا آن را بردارد.", {"group": True}
         candidates = cls.pool(rule)
         if not candidates:
             return None, "این قاعده هیچ عضو فعالی برای انتخاب ندارد.", {"skipped": []}
         people = {str(u.id): u for u in User.objects.filter(id__in=candidates)}
-        if method == TicketRoutingRule.Method.LEAST_LOADED:
+        if method in (TicketRoutingRule.Method.LEAST_LOADED, TicketRoutingRule.Method.GROUP):
             load = cls.open_load(issue.workspace_id, candidates)
             ordered = sorted(candidates, key=lambda uid: (load[uid], candidates.index(uid)))
         else:
@@ -422,7 +420,7 @@ class TicketRoutingService:
             _record_routed(issue, actor_id, decision)
             return decision
         reason = f"قاعدهٔ «{rule.name}» ({rule.get_method_display()}): {why}"
-        cls._queue(issue, rule if rule.method == TicketRoutingRule.Method.GROUP else None, actor_id, reason)
+        cls._queue(issue, None, actor_id, reason)
         return TicketRoutingDecision.objects.create(
             issue=issue,
             rule=rule,

@@ -9,9 +9,6 @@ const state = vi.hoisted(() => ({
   entries: [] as TicketRoleQueueEntry[],
   loading: false,
   error: false,
-  pending: false,
-  claimError: false,
-  claimId: undefined as string | undefined,
 }));
 vi.mock("./api", async (importOriginal) => {
   const original = await importOriginal<typeof import("./api")>();
@@ -23,12 +20,6 @@ vi.mock("./api", async (importOriginal) => {
       isError: state.error,
       isFetching: state.loading,
       refetch: vi.fn(),
-    }),
-    useClaimTicketRoleQueue: () => ({
-      isPending: state.pending,
-      isError: state.claimError,
-      variables: state.claimId,
-      mutate: vi.fn(),
     }),
   };
 });
@@ -69,19 +60,16 @@ const entries: TicketRoleQueueEntry[] = [
   { ...entry, id: "entry-5", status: "closed" },
 ];
 const filters: QueueFilters = { search: "", roleId: "", projectId: "", sort: "oldest" };
-const render = (canClaim = true, canViewProject = true) =>
+const render = (canViewAll = true, canViewProject = true) =>
   renderToStaticMarkup(
     <MemoryRouter>
-      <RoleQueue canClaim={canClaim} canViewAll={false} canViewProject={canViewProject} />
+      <RoleQueue canViewAll={canViewAll} canViewProject={canViewProject} />
     </MemoryRouter>
   );
 beforeEach(() => {
   state.entries = [...entries];
   state.loading = false;
   state.error = false;
-  state.pending = false;
-  state.claimError = false;
-  state.claimId = undefined;
 });
 
 describe("role queue filtering and wait times", () => {
@@ -132,26 +120,25 @@ describe("role queue filtering and wait times", () => {
 describe("role queue presentation and permissions", () => {
   it("labels each card's role, project, routing rule and date in Persian", () => {
     const html = render();
-    expect(html).toContain("صف کارهای نقش‌ها");
+    expect(html).toContain("کارهای بدون مسئول");
     expect(html).toContain("مسیر ارجاع");
     expect(html).toMatch(/dateTime="2026-10-13T09:00:00Z"/i);
     expect(html).toContain('href="/projects/project-1"');
     expect(html).not.toContain("Role Queue");
     expect(html.match(/<article/g)).toHaveLength(3);
   });
-  it("hides claim actions for viewers and project links without project access", () => {
+  it("shows assignment links to managers and hides them for viewers", () => {
+    expect(render()).toContain('href="/entities/ticket/issue-1"');
     const html = render(false, false);
-    expect(html).not.toContain('aria-label="پذیرش کار');
+    expect(html).not.toContain('href="/entities/ticket/');
     expect(html).not.toContain('href="/projects/');
-    expect(html).toContain("دسترسی دریافت از صف");
+    expect(html).not.toContain("پذیرش کار");
   });
-  it("marks only the requested card as busy while blocking repeat submissions", () => {
-    state.pending = true;
-    state.claimId = "entry-2";
+  it("does not require acceptance for open queue entries", () => {
     const html = render();
-    expect(html.match(/aria-busy="true"/g)).toHaveLength(1);
-    expect(html.match(/<button[^>]*disabled=""[^>]*aria-label="پذیرش کار/g)).toHaveLength(3);
-    expect(html).toContain("در حال دریافت…");
+    expect(html).not.toContain("منتظر پذیرش");
+    expect(html).not.toContain("پذیرش کار");
+    expect(html.match(/href="\/entities\/ticket\//g)).toHaveLength(3);
   });
   it("shows a retryable fetch failure instead of a misleading empty queue", () => {
     state.entries = [];
@@ -159,7 +146,7 @@ describe("role queue presentation and permissions", () => {
     const html = render();
     expect(html).not.toContain('role="alert"');
     expect(html).toContain("تلاش دوباره");
-    expect(html).not.toContain("کاری در انتظار پذیرش نیست");
+    expect(html).not.toContain("کار بدون مسئول وجود ندارد");
     expect(html).not.toContain("role-queue-summary");
   });
   it("keeps previously loaded cards visible during refresh failures", () => {
@@ -167,18 +154,10 @@ describe("role queue presentation and permissions", () => {
     expect(render()).toContain("تلاش دوباره");
     expect(render().match(/<article/g)).toHaveLength(3);
   });
-  it("retains the failed claim and explains that the user can retry", () => {
-    state.claimError = true;
-    state.claimId = "entry-2";
-    const html = render();
-    expect(html).not.toContain("دریافت کار انجام نشد");
-    expect(html.match(/<article/g)).toHaveLength(3);
-    expect(html).not.toContain('aria-busy="true"');
-  });
   it("distinguishes a genuinely empty queue from loading", () => {
     state.entries = [];
-    expect(render()).toContain("کاری در انتظار پذیرش نیست");
+    expect(render()).toContain("کار بدون مسئول وجود ندارد");
     state.loading = true;
-    expect(render()).not.toContain("کاری در انتظار پذیرش نیست");
+    expect(render()).not.toContain("کار بدون مسئول وجود ندارد");
   });
 });

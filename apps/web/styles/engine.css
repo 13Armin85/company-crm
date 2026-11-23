@@ -142,6 +142,9 @@
   inset: 0;
   z-index: 100;
 }
+.ticket-dialog-layer {
+  z-index: 310 !important;
+}
 .engine-view-backdrop {
   position: fixed;
   inset: 0;

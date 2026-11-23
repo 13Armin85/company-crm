@@ -1,38 +1,17 @@
-import { ErrorNotice, ErrorState } from "./error-state";
+import { ErrorState } from "./error-state";
 import { IdentifierBadge, SearchableSelect } from "@plane/ui";
-import {
-  Clock3,
-  FolderOpen,
-  GitBranch,
-  Inbox,
-  LoaderCircle,
-  RefreshCw,
-  Search,
-  ShieldCheck,
-  UserCheck,
-} from "lucide-react";
+import { Clock3, FolderOpen, GitBranch, Inbox, RefreshCw, Search, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
-import { useClaimTicketRoleQueue, useTicketRoleQueue } from "./api";
+import { useTicketRoleQueue } from "./api";
 import { isUnassignedEntry } from "./role-queue-model";
 import { Button, EmptyState, Skeleton } from "./components";
 import { filterRoleQueue, isLongWaiting, queueWaitLabel } from "./role-queue-model";
 import type { QueueSort } from "./role-queue-model";
-import { useUIStore } from "./store";
 import { persianDate, toFa } from "./utils";
 
-export function RoleQueue({
-  canClaim,
-  canViewAll,
-  canViewProject,
-}: {
-  canClaim: boolean;
-  canViewAll: boolean;
-  canViewProject: boolean;
-}) {
-  const slug = useUIStore((state) => state.workspaceSlug) ?? "";
+export function RoleQueue({ canViewAll, canViewProject }: { canViewAll: boolean; canViewProject: boolean }) {
   const { data: entries = [], isLoading, isFetching, isError, refetch } = useTicketRoleQueue();
-  const claim = useClaimTicketRoleQueue(slug);
   const [search, setSearch] = useState("");
   const [roleId, setRoleId] = useState("");
   const [projectId, setProjectId] = useState("");
@@ -63,11 +42,11 @@ export function RoleQueue({
             <Inbox size={23} />
           </span>
           <div>
-            <h2 id="role-queue-title">صف کارهای نقش‌ها</h2>
+            <h2 id="role-queue-title">کارهای بدون مسئول</h2>
             <p>
               {canViewAll
-                ? "کارهای منتظر پذیرش در نقش‌های سازمان را بررسی و پیگیری کنید."
-                : "کارهای مرتبط با نقش شما اینجا منتظر پذیرش هستند."}
+                ? "کارهایی که ارجاع خودکار برایشان مسئولی پیدا نکرده است را بررسی و ارجاع کنید."
+                : "کارهای بدون مسئول مرتبط با نقش شما اینجا نمایش داده می‌شوند."}
             </p>
           </div>
         </div>
@@ -98,7 +77,7 @@ export function RoleQueue({
               <div>
                 <dt>
                   <Inbox size={16} aria-hidden="true" />
-                  منتظر پذیرش
+                  بدون مسئول
                 </dt>
                 <dd>
                   {toFa(queue.length)} <small>کار</small>
@@ -107,7 +86,7 @@ export function RoleQueue({
               <div>
                 <dt>
                   <ShieldCheck size={16} aria-hidden="true" />
-                  نقش‌های مورد نیاز
+                  نقش‌های مرتبط
                 </dt>
                 <dd>
                   {toFa(roleOptions.length)} <small>نقش</small>
@@ -116,7 +95,7 @@ export function RoleQueue({
               <div>
                 <dt>
                   <Clock3 size={16} aria-hidden="true" />
-                  بیشترین زمان انتظار
+                  بیشترین زمان بدون مسئول
                 </dt>
                 <dd className="role-queue-wait-stat">{oldest ? queueWaitLabel(oldest) : "—"}</dd>
               </div>
@@ -174,18 +153,11 @@ export function RoleQueue({
                 </button>
               )}
             </div>
-            {!canClaim && queue.length > 0 && (
-              <p className="role-queue-permission">
-                <ShieldCheck size={15} aria-hidden="true" />
-                برای پذیرش کار، دسترسی دریافت از صف لازم است.
-              </p>
-            )}
-
             {!queue.length ? (
               <EmptyState
                 icon={Inbox}
-                title="کاری در انتظار پذیرش نیست"
-                description="وقتی کار تازه‌ای برای نقش شما وارد صف شود، اینجا نمایش داده می‌شود."
+                title="کار بدون مسئول وجود ندارد"
+                description="اگر برای کاری مسئول مناسبی پیدا نشود، اینجا نمایش داده می‌شود."
               />
             ) : !visible.length ? (
               <EmptyState
@@ -199,17 +171,12 @@ export function RoleQueue({
                 }
               />
             ) : (
-              <ul className="role-queue-grid" aria-label="کارهای منتظر پذیرش">
+              <ul className="role-queue-grid" aria-label="کارهای بدون مسئول">
                 {visible.map((entry) => {
-                  const pending = claim.isPending && claim.variables === entry.id;
                   const hasDate = Boolean(entry.createdAt && Number.isFinite(Date.parse(entry.createdAt)));
                   return (
                     <li key={entry.id}>
-                      <article
-                        className="role-queue-card"
-                        aria-labelledby={`queue-title-${entry.id}`}
-                        aria-busy={pending}
-                      >
+                      <article className="role-queue-card" aria-labelledby={`queue-title-${entry.id}`}>
                         <div className="role-queue-card-top">
                           <span className="role-queue-role">
                             <ShieldCheck size={14} aria-hidden="true" />
@@ -268,42 +235,20 @@ export function RoleQueue({
                             {queueWaitLabel(entry)}
                             {hasDate ? " در انتظار" : ""}
                           </span>
-                          {isUnassignedEntry(entry) ? (
-                            canViewAll && (
-                              <Link className="button button-primary" to={`/entities/ticket/${entry.issueId}`}>
-                                ارجاع
-                              </Link>
-                            )
-                          ) : canClaim && (
-                            <button
-                              className="button button-primary"
-                              type="button"
-                              disabled={claim.isPending}
-                              aria-label={`پذیرش کار ${entry.issueName || "بدون عنوان"}`}
-                              onClick={() => claim.mutate(entry.id)}
-                            >
-                              {pending ? (
-                                <LoaderCircle size={16} className="role-queue-spin" aria-hidden="true" />
-                              ) : (
-                                <UserCheck size={16} aria-hidden="true" />
-                              )}
-                              {pending ? "در حال دریافت…" : "پذیرش کار"}
-                            </button>
+                          {canViewAll && (
+                            <Link className="button button-primary" to={`/entities/ticket/${entry.issueId}`}>
+                              ارجاع
+                            </Link>
                           )}
                         </footer>
-                        <ErrorNotice
-                          message={
-                            claim.isError && claim.variables === entry.id && "دریافت کار انجام نشد؛ دوباره تلاش کنید."
-                          }
-                        />
                       </article>
                     </li>
                   );
                 })}
               </ul>
             )}
-            {canClaim && queue.length > 0 && (
-              <p className="role-queue-help">با پذیرش کار، مسئولیت آن به شما واگذار می‌شود و از این صف خارج می‌شود.</p>
+            {canViewAll && queue.length > 0 && (
+              <p className="role-queue-help">با ارجاع کار به یک مسئول، از این فهرست خارج می‌شود.</p>
             )}
           </>
         )

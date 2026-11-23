@@ -105,24 +105,29 @@ function Dialog({
 }) {
   const form = (
     <form className="ticket-dialog" onSubmit={onSubmit} noValidate>
-        <header>
-          <span className="modal-kicker">{kicker}</span>
-          {bare ? <h2>{title}</h2> : <DialogTitle as="h2">{title}</DialogTitle>}
-        </header>
-        {children}
-        <footer>
-          <Button variant="secondary" disabled={pending} onClick={onClose}>
-            انصراف
-          </Button>
-          <Button type="submit" disabled={pending}>
-            {submitLabel}
-          </Button>
-        </footer>
+      <header>
+        <span className="modal-kicker">{kicker}</span>
+        {bare ? <h2>{title}</h2> : <DialogTitle as="h2">{title}</DialogTitle>}
+      </header>
+      {children}
+      <footer>
+        <Button variant="secondary" disabled={pending} onClick={onClose}>
+          انصراف
+        </Button>
+        <Button type="submit" disabled={pending}>
+          {submitLabel}
+        </Button>
+      </footer>
     </form>
   );
   if (bare) return form;
   return (
-    <ModalCore isOpen className="create-modal ticket-modal" handleClose={() => !pending && onClose()}>
+    <ModalCore
+      isOpen
+      className="create-modal ticket-modal"
+      dialogClassName="ticket-dialog-layer"
+      handleClose={() => !pending && onClose()}
+    >
       {form}
     </ModalCore>
   );
@@ -418,7 +423,9 @@ export function TargetDialog({
       {deadline.type_minutes ? (
         <p className="ticket-muted">پیش‌فرض نوع این تیکت: {formatWorkingMinutes(deadline.type_minutes)}</p>
       ) : null}
-      {!clearing && <DurationInputs label="مدت هدف" hours={hours} minutes={minutes} onHours={setHours} onMinutes={setMinutes} />}
+      {!clearing && (
+        <DurationInputs label="مدت هدف" hours={hours} minutes={minutes} onHours={setHours} onMinutes={setMinutes} />
+      )}
       {deadline.ticket_minutes ? (
         <label className="ticket-check">
           <input type="checkbox" checked={clearing} onChange={(event) => setClearing(event.target.checked)} />
@@ -700,7 +707,11 @@ export function ContactDialog({
       </div>
       {card.portal && (
         <label className="ticket-check">
-          <input type="checkbox" checked={notifyCustomer} onChange={(event) => setNotifyCustomer(event.target.checked)} />
+          <input
+            type="checkbox"
+            checked={notifyCustomer}
+            onChange={(event) => setNotifyCustomer(event.target.checked)}
+          />
           <span>اطلاع به مشتری — خلاصهٔ تماس در درگاه مشتری نمایش داده شود (در غیر این صورت فقط داخلی می‌ماند)</span>
         </label>
       )}
@@ -710,7 +721,15 @@ export function ContactDialog({
   );
 }
 
-function MemberSelect({ value, onChange, exclude = [] }: { value: string; onChange: (id: string) => void; exclude?: string[] }) {
+function MemberSelect({
+  value,
+  onChange,
+  exclude = [],
+}: {
+  value: string;
+  onChange: (id: string) => void;
+  exclude?: string[];
+}) {
   const members = useMembers();
   return (
     <SearchableSelect
@@ -759,11 +778,19 @@ export function ReferDialog({
         setSubmitted(true);
         if (errors.length) return;
         if (mode === "refer") refer.mutate({ user_id: userId, reason }, { onSuccess: onClose });
-        else respond.mutate({ action: mode, reason, ...(mode === "forward" ? { user_id: userId } : {}) }, { onSuccess: onClose });
+        else
+          respond.mutate(
+            { action: mode, reason, ...(mode === "forward" ? { user_id: userId } : {}) },
+            { onSuccess: onClose }
+          );
       }}
     >
       {mode !== "reject" && (
-        <MemberSelect value={userId} onChange={setUserId} exclude={card.active_referral ? [card.active_referral.to_id] : []} />
+        <MemberSelect
+          value={userId}
+          onChange={setUserId}
+          exclude={card.active_referral ? [card.active_referral.to_id] : []}
+        />
       )}
       {mode === "reject" && card.active_referral && (
         <p className="ticket-muted">تیکت به ارجاع‌دهنده ({card.active_referral.by}) برمی‌گردد.</p>
@@ -833,7 +860,9 @@ export function ReferralCard({
               <span>
                 {row.by} ← {row.to}
               </span>
-              {row.response_title && <span className={`ticket-chip-static is-${row.response}`}>{row.response_title}</span>}
+              {row.response_title && (
+                <span className={`ticket-chip-static is-${row.response}`}>{row.response_title}</span>
+              )}
             </li>
           ))}
         </ol>
@@ -861,7 +890,11 @@ export function TicketDetailsCard({ card, onParent }: { card: TicketCard; onPare
     ["نوع", Shapes, d.type || "—"],
     ["پروژه", FolderKanban, d.project || "بدون پروژه"],
     ["اولویت", Flag, PRIORITY_LABELS[d.priority] || d.priority || "—"],
-    ["سررسید", CalendarDays, d.due_date ? persianMoment(`${d.due_date}T12:00:00+03:30`).split("،").slice(0, 2).join("،") : "—"],
+    [
+      "سررسید",
+      CalendarDays,
+      d.due_date ? persianMoment(`${d.due_date}T12:00:00+03:30`).split("،").slice(0, 2).join("،") : "—",
+    ],
     ["تخمین", Gauge, d.estimate !== null && d.estimate !== undefined ? faDigits(String(d.estimate)) : "—"],
     ["برچسب‌ها", Tags, d.labels.length ? d.labels.join("، ") : "—"],
   ];
@@ -919,7 +952,17 @@ export function TicketDetailsCard({ card, onParent }: { card: TicketCard; onPare
   );
 }
 
-export function ParentDialog({ id, card, onClose, bare }: { id: string; card: TicketCard; onClose: () => void; bare?: boolean }) {
+export function ParentDialog({
+  id,
+  card,
+  onClose,
+  bare,
+}: {
+  id: string;
+  card: TicketCard;
+  onClose: () => void;
+  bare?: boolean;
+}) {
   const slug = useSlug() ?? "";
   const [parentId, setParentId] = useState(card.details.parent?.id ?? "");
   const [options, setOptions] = useState<{ id: string; title: string }[]>([]);
@@ -930,7 +973,10 @@ export function ParentDialog({ id, card, onClose, bare }: { id: string; card: Ti
     void api
       .post(
         `/api/workspaces/${slug}/engine/entities/ticket/query/`,
-        { definition: { version: 1, type: "table", columns: [{ field: "title", width: 180 }], sort: [] }, page_size: 200 },
+        {
+          definition: { version: 1, type: "table", columns: [{ field: "title", width: 180 }], sort: [] },
+          page_size: 200,
+        },
         { signal: controller.signal }
       )
       .then((response) =>
@@ -1017,43 +1063,45 @@ export function TicketHistory({ id }: { id: string }) {
         <p className="ticket-muted">رویدادی برای این فیلتر ثبت نشده است.</p>
       ) : (
         <ol className="ticket-timeline">
-          {history.data.filter((event) => !HIDDEN_EVENTS.has(event.type)).map((event) => {
-            const Glyph = EVENT_GLYPHS[event.kind] ?? PenLine;
-            const before = historyValue(event.before, event.field);
-            const after = historyValue(event.after, event.field);
-            const changed = before !== "—" || after !== "—";
-            const initial = before === "—" && after !== "—";
-            return (
-              <li key={event.id} className={`ticket-event ticket-event-${event.kind}`}>
-                <span className="ticket-event-icon" aria-hidden>
-                  <Glyph size={14} />
-                </span>
-                <div className="ticket-event-body">
-                  <div className="ticket-event-head">
-                    <strong>{eventTitle(event.type, event.field, event.metadata)}</strong>
-                    <time dateTime={event.created_at ?? undefined}>
-                      {event.created_text || persianMoment(event.created_at)}
-                    </time>
+          {history.data
+            .filter((event) => !HIDDEN_EVENTS.has(event.type))
+            .map((event) => {
+              const Glyph = EVENT_GLYPHS[event.kind] ?? PenLine;
+              const before = historyValue(event.before, event.field);
+              const after = historyValue(event.after, event.field);
+              const changed = before !== "—" || after !== "—";
+              const initial = before === "—" && after !== "—";
+              return (
+                <li key={event.id} className={`ticket-event ticket-event-${event.kind}`}>
+                  <span className="ticket-event-icon" aria-hidden>
+                    <Glyph size={14} />
+                  </span>
+                  <div className="ticket-event-body">
+                    <div className="ticket-event-head">
+                      <strong>{eventTitle(event.type, event.field, event.metadata)}</strong>
+                      <time dateTime={event.created_at ?? undefined}>
+                        {event.created_text || persianMoment(event.created_at)}
+                      </time>
+                    </div>
+                    <small className="ticket-event-actor">{event.actor}</small>
+                    {changed && (
+                      <span className="ticket-event-change">
+                        {initial ? (
+                          <>
+                            مقدار اولیه: <bdi>{after}</bdi>
+                          </>
+                        ) : (
+                          <>
+                            <bdi>{before}</bdi> ← <bdi>{after}</bdi>
+                          </>
+                        )}
+                      </span>
+                    )}
+                    {event.reason && <span className="ticket-event-reason">دلیل: {event.reason}</span>}
                   </div>
-                  <small className="ticket-event-actor">{event.actor}</small>
-                  {changed && (
-                    <span className="ticket-event-change">
-                      {initial ? (
-                        <>
-                          مقدار اولیه: <bdi>{after}</bdi>
-                        </>
-                      ) : (
-                        <>
-                          <bdi>{before}</bdi> ← <bdi>{after}</bdi>
-                        </>
-                      )}
-                    </span>
-                  )}
-                  {event.reason && <span className="ticket-event-reason">دلیل: {event.reason}</span>}
-                </div>
-              </li>
-            );
-          })}
+                </li>
+              );
+            })}
         </ol>
       )}
     </section>
@@ -1096,7 +1144,9 @@ function ReferralList({ card }: { card: TicketCard }) {
               {row.by && <span className="ticket-person">{row.by}</span>}
               {row.by && row.to && <ArrowLeft size={14} aria-hidden />}
               {row.to && <span className="ticket-person is-current">{row.to}</span>}
-              {row.response_title && <span className={`ticket-chip-static is-${row.response}`}>{row.response_title}</span>}
+              {row.response_title && (
+                <span className={`ticket-chip-static is-${row.response}`}>{row.response_title}</span>
+              )}
             </span>
             {row.reason && <span className="ticket-event-reason">دلیل: {row.reason}</span>}
             {row.response_reason && <span className="ticket-event-reason">پاسخ: {row.response_reason}</span>}

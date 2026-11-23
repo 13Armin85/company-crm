@@ -12,13 +12,17 @@ import { ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
 import { jalaaliMonthLength } from "jalaali-js";
 import { useState } from "react";
 import { Link } from "react-router";
-import { errorMessage } from "../api";
+import { errorMessage, useIssues } from "../api";
+import { useWorkCalendar } from "../api/work-calendar";
+import { dayChips } from "../work-calendar/model";
+import type { LayerId } from "../work-calendar/model";
 import { persianDate } from "../utils";
 import { useWidgetData } from "./api";
 import type { DashboardWidget } from "./types";
 
 const weekdays = ["شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه"];
 const oneDay = 86_400_000;
+const calendarLayers = new Set<LayerId>(["meeting", "mission", "event", "absence", "presence", "busy"]);
 
 function shiftDate(value: string, days: number) {
   const date = new Date(`${value}T12:00:00Z`);
@@ -55,6 +59,8 @@ export function DashboardCalendar({ widget }: { widget: DashboardWidget }) {
   const range = dashboardCalendarRange(selectedDate, view)!;
   const queryWidget = { ...widget, config: { ...widget.config, calendar_range: range } };
   const result = useWidgetData(queryWidget);
+  const { data: issues = [] } = useIssues();
+  const workCalendar = useWorkCalendar(undefined, range.start, shiftDate(range.end, -1));
   const entity = String(widget.config.entity || "ticket");
   const selected = parseDateOnly(selectedDate)!;
   const monthName = persianMonths[selected.jm - 1];
@@ -69,8 +75,19 @@ export function DashboardCalendar({ widget }: { widget: DashboardWidget }) {
     (_, index) => index - offset
   );
   const items = Array.isArray(result.data?.items)
-    ? (result.data.items as { id: string; date: string; title?: string }[])
+    ? (result.data.items as { id: string; date: string; title?: string }[]).map((item) => ({
+        id: item.id,
+        date: item.date,
+        title: item.title,
+        to: `/entities/${entity}/${item.id}`,
+      }))
     : [];
+  const known = new Set(entity === "ticket" ? items.map((item) => item.id) : []);
+  for (const issue of issues) {
+    const date = issue.dueDate || issue.createdAt;
+    if (!date || known.has(issue.id)) continue;
+    items.push({ id: issue.id, date, title: issue.name, to: `/entities/ticket/${issue.id}` });
+  }
   const events = new Map<string, typeof items>();
   for (const item of items) {
     const date = /^\d{4}-\d{2}-\d{2}$/.test(item.date) ? item.date : zonedDateTime(item.date)?.date;
@@ -127,6 +144,7 @@ export function DashboardCalendar({ widget }: { widget: DashboardWidget }) {
               const iso = offsetDay >= 0 && offsetDay < days ? shiftDate(range.start, offsetDay) : "";
               const jalali = iso ? displayPersianDate(iso) : undefined;
               const dayEvents = iso ? events.get(iso) || [] : [];
+              const workChips = iso ? dayChips(workCalendar.data, iso, calendarLayers) : [];
               return (
                 <div
                   key={offsetDay}
@@ -141,15 +159,22 @@ export function DashboardCalendar({ widget }: { widget: DashboardWidget }) {
                     <>
                       <div className="dashboard-calendar-day-heading">
                         <span>{persianDigits(jalali.jd)}</span>
-                        {dayEvents.length > 0 && <small>{persianDigits(dayEvents.length)} رویداد</small>}
+                        {dayEvents.length + workChips.length > 0 && (
+                          <small>{persianDigits(dayEvents.length + workChips.length)} رویداد</small>
+                        )}
                       </div>
                       {dayEvents.map((item) => (
                         <Link
                           key={item.id}
-                          to={`/entities/${entity}/${item.id}`}
+                          to={item.to}
                           title={item.title || `${persianDigits(jalali.jd)} ${persianMonths[jalali.jm - 1]}`}
                         >
                           {item.title || "باز کردن رکورد"}
+                        </Link>
+                      ))}
+                      {workChips.map((chip) => (
+                        <Link key={chip.key} to="/calendar" title={chip.detail || chip.label}>
+                          {chip.label}
                         </Link>
                       ))}
                     </>
@@ -159,7 +184,7 @@ export function DashboardCalendar({ widget }: { widget: DashboardWidget }) {
             })}
           </div>
           {result.isLoading && <p className="dashboard-calendar-status">در حال دریافت رویدادها…</p>}
-          {!result.isLoading && !items.length && (
+          {!result.isLoading && !items.length && !workCalendar.data?.events.length && (
             <p className="dashboard-calendar-status">رویدادی در این {view === "week" ? "هفته" : "ماه"} ثبت نشده است.</p>
           )}
         </>

@@ -232,7 +232,7 @@ function RuleEditor({ initial, onClose }: { initial: Partial<RoutingRule>; onClo
           {(rule.method === "manager" || rule.method === "group" || (pool && !rule.member_ids?.length)) && (
             <SearchableSelect
               showLabel
-              label={rule.method === "group" ? "نقش گروه" : "نقش لازم"}
+              label={rule.method === "group" ? "نقش اعضای گروه" : "نقش لازم"}
               value={rule.required_role_id ?? ""}
               onChange={(required_role_id) => setRule({ ...rule, required_role_id: required_role_id || null })}
               options={[{ id: "", title: "بدون نقش" }, ...(roles.data ?? []).map((r) => ({ id: r.id, title: r.name }))]}
