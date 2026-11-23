@@ -43,6 +43,7 @@ import {
 import type { TicketCard, TicketDeadline } from "../api/ticket";
 import { useMembers } from "../api/workspace";
 import { errorMessage } from "../api";
+import { plainText } from "../utils";
 import { Button, Skeleton } from "../components";
 import { RelatedRecords } from "../engine/related-records";
 import { TicketHeader, TicketTabs } from "./ticket-header";
@@ -1097,7 +1098,7 @@ export function TicketHistory({ id }: { id: string }) {
                         )}
                       </span>
                     )}
-                    {event.reason && <span className="ticket-event-reason">دلیل: {event.reason}</span>}
+                    {event.reason && <span className="ticket-event-reason">دلیل: {plainText(event.reason)}</span>}
                   </div>
                 </li>
               );

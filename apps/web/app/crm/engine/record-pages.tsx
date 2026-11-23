@@ -12,6 +12,7 @@ import { persianDate, plainText } from "../utils";
 import { EngineRecordForm } from "./record-form";
 import { EntityRecordSummary } from "./record-summary";
 import { TaskNotes } from "./task-notes";
+import { auditEventTitle, auditFieldTitle, auditValue } from "./audit-presentation";
 import { RelatedRecords } from "./related-records";
 import { WorkflowPanel } from "../workflow/panel";
 import { TicketCorePanel } from "../ticket/ticket-panel";
@@ -155,25 +156,6 @@ export function EntityDirectoryPage() {
   );
 }
 
-const eventTitles: Record<string, string> = {
-  "record.created": "ثبت رکورد",
-  "record.updated": "ویرایش رکورد",
-  "record.field_changed": "تغییر فیلد",
-  "record.status_changed": "تغییر وضعیت",
-  "record.deactivated": "غیرفعال‌سازی",
-  "record.activated": "فعال‌سازی",
-  "workflow.started": "شروع گردش‌کار",
-  "workflow.transition": "اقدام گردش‌کار",
-  "workflow.reassigned": "ارجاع مدیریتی",
-  "workflow.paused": "توقف مرحله",
-  "workflow.resumed": "ازسرگیری مرحله",
-  "workflow.delay_reported": "گزارش دیرکرد",
-  "workflow.extension_requested": "درخواست تمدید",
-  "workflow.extension_decided": "بررسی تمدید",
-  "workflow.converted_to_standard": "انتقال به مسیر عادی",
-  "workflow.migrated": "انتقال به نسخهٔ دیگر",
-  "workflow.error": "خطای گردش‌کار",
-};
 export function EntityRecordPage() {
   const { code = "", recordId = "new" } = useParams(),
     navigate = useNavigate();
@@ -314,24 +296,31 @@ export function EntityRecordPage() {
           </section>
           <section>
             <h2>تاریخچه تغییرات</h2>
-            {events.data?.results.map((event) => (
-              <details key={event.id}>
-                <summary>
-                  {eventTitles[event.type] || "تغییر رکورد"} · {event.actor} · {persianDate(event.at)}
-                </summary>
-                <p>{event.field}</p>
-                <div className="engine-audit-values">
-                  <span>
-                    مقدار پیشین:{" "}
-                    {typeof event.before === "object" ? JSON.stringify(event.before) : String(event.before ?? "—")}
-                  </span>
-                  <span>
-                    مقدار جدید:{" "}
-                    {typeof event.after === "object" ? JSON.stringify(event.after) : String(event.after ?? "—")}
-                  </span>
-                </div>
-              </details>
-            ))}
+            {events.isLoading && <p>در حال دریافت سابقه…</p>}
+            {events.error && <p role="alert">دریافت سابقه انجام نشد.</p>}
+            {!events.isLoading && !events.error && !events.data?.results.length && <p>هنوز تغییری ثبت نشده است.</p>}
+            <ol className="engine-audit-list">
+              {events.data?.results.map((event) => {
+                const field = auditFieldTitle(event.field, event.metadata);
+                const hasValues = event.before != null || event.after != null;
+                return (
+                  <li key={event.id} className="engine-audit-item">
+                    <div className="engine-audit-item-head">
+                      <strong>{auditEventTitle(event)}</strong>
+                      <time dateTime={event.at}>{persianDate(event.at, { hour: "2-digit", minute: "2-digit" })}</time>
+                    </div>
+                    <p className="engine-audit-actor">توسط {event.actor || "سامانه"}</p>
+                    {field && <p className="engine-audit-field">{field}</p>}
+                    {hasValues && (
+                      <div className="engine-audit-values">
+                        {event.before != null && <span>پیش از تغییر: {auditValue(event.before, event.field)}</span>}
+                        {event.after != null && <span>پس از تغییر: {auditValue(event.after, event.field)}</span>}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
           </section>
         </div>
       )}

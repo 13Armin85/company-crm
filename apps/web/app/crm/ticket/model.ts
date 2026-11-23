@@ -1,6 +1,7 @@
 /** Pure helpers of the ticket core UI (ticket 5); no React, no network. */
 import type { DeadlineState, RoutingConditions, RoutingMethod, RoutingRule, TicketDeadline } from "../api/ticket";
 import { formatWorkingMinutes } from "../workflow/model";
+import { auditValue } from "../engine/audit-presentation";
 
 // ---------------------------------------------------------------- ن۶ status categories
 
@@ -266,8 +267,8 @@ export const HIDDEN_EVENTS = new Set(["record.updated"]);
 export function historyValue(value: unknown, field = ""): string {
   if (value === null || value === undefined || value === "") return "—";
   if (typeof value === "string" && (field === "ticket_state" || field === "task_status" || field === "status"))
-    return STATUS_CODES[value] ?? value;
-  if (typeof value === "string" && field === "priority") return PRIORITY_CODES[value] ?? value;
+    return STATUS_CODES[value] ?? auditValue(value, field);
+  if (typeof value === "string" && field === "priority") return PRIORITY_CODES[value] ?? auditValue(value, field);
   if (typeof value === "number") return formatWorkingMinutes(value);
   if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}T/.test(value)) return persianMoment(value);
   if (Array.isArray(value)) return value.length ? faDigits(value.length) + " مورد" : "—";
@@ -275,7 +276,7 @@ export function historyValue(value: unknown, field = ""): string {
     const count = Object.keys(value as Record<string, unknown>).length;
     return count ? `${faDigits(count)} فیلد` : "—";
   }
-  return faDigits(String(value));
+  return auditValue(value, field);
 }
 
 export function persianMoment(value: string | null | undefined): string {
