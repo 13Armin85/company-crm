@@ -1146,7 +1146,7 @@
   background: var(--surface);
 }
 .engine-form-preview-frame {
-  width: min(100%, 560px);
+  width: min(100%, 596px);
   margin: 20px auto;
 }
 .engine-version-history > div {

@@ -36,7 +36,7 @@ import { browserId } from "../browser-id";
 import { useOrganizationRoles, useWorkspaceAccess } from "../api";
 import { useUIStore } from "../store";
 import { persianDate } from "../utils";
-import { useEngineForm, useEngineMutation, useEngineDefinitions } from "./api";
+import { useEngineForm, useEngineMutation, useEngineDefinitions, useEngineSchema } from "./api";
 import type { EntityDefinition, FieldDefinition, LookupDefinition, LookupOptionDefinition } from "./api";
 import { DefinitionEditor } from "./definition-editor";
 import { DefaultValueEditor, automaticDefaultMode, dynamicDefaultsFor } from "./default-value-editor";
@@ -118,6 +118,16 @@ export function formPreviewSchema(schema: EntityFormSchema, mode: "create" | "ed
   });
 }
 
+export function selectFormPreviewSchema(
+  current: EntityFormSchema | undefined,
+  draft: EntityFormSchema,
+  source: "current" | "draft",
+  mode: "create" | "edit"
+): EntityFormSchema | undefined {
+  const schema = source === "current" ? current : draft;
+  return schema ? formPreviewSchema(schema, mode) : undefined;
+}
+
 function DragItem({ id, children, label }: { id: string; children: ReactNode; label: string }) {
   const drag = useDraggable({ id }),
     drop = useDroppable({ id });
@@ -152,6 +162,7 @@ export function FormDesigner({
   viewMode?: "fields" | "layout" | "preview" | "versions";
 }) {
   const form = useEngineForm(entity.code),
+    activeSchema = useEngineSchema(entity.code),
     parent = entities.find((e) => e.id === entity.parent),
     parentForm = useEngineForm(parent?.code || "", Boolean(parent));
   const { data: roles = [] } = useOrganizationRoles(),
@@ -169,6 +180,7 @@ export function FormDesigner({
     [note, setNote] = useState(""),
     [newTab, setNewTab] = useState(""),
     [previewMode, setPreviewMode] = useState<"create" | "edit">("create"),
+    [previewSource, setPreviewSource] = useState<"current" | "draft">("current"),
     [previewErrors, setPreviewErrors] = useState<Record<string, string>>({}),
     [savedDraft, setSavedDraft] = useState<FormLayoutSchema>({ tabs: [], sections: [] }),
     [appliedDraft, setAppliedDraft] = useState<FormLayoutSchema | null>(null);
@@ -243,7 +255,10 @@ export function FormDesigner({
       schema_version: 1,
     };
   }, [draft, entity.code, entity.title, entities, fields, inherited, lookups, parent?.code]);
-  const previewSchema = useMemo(() => formPreviewSchema(liveSchema, previewMode), [liveSchema, previewMode]);
+  const previewSchema = useMemo(
+    () => selectFormPreviewSchema(activeSchema.data, liveSchema, previewSource, previewMode),
+    [activeSchema.data, liveSchema, previewMode, previewSource]
+  );
   const addSection = () =>
     setDraft((old) => ({
       ...old,
@@ -976,7 +991,31 @@ export function FormDesigner({
       </div>
       <section className="engine-live-preview" hidden={viewMode !== "preview"}>
         <h3>پیش‌نمایش فرم</h3>
-        <p>ورودی‌ها و پیام خطا را امتحان کنید. دادهٔ این پیش‌نمایش ثبت نمی‌شود.</p>
+        <p>نمای فرم فعلی از همان تعریف منتشرشده‌ای ساخته می‌شود که مودال ثبت استفاده می‌کند. دادهٔ پیش‌نمایش ثبت نمی‌شود.</p>
+        <div className="engine-workspace-subnav" role="group" aria-label="نسخهٔ فرم برای پیش‌نمایش">
+          <button
+            type="button"
+            aria-pressed={previewSource === "current"}
+            onClick={() => {
+              setPreviewSource("current");
+              setPreview({});
+              setPreviewErrors({});
+            }}
+          >
+            فرم فعلی
+          </button>
+          <button
+            type="button"
+            aria-pressed={previewSource === "draft"}
+            onClick={() => {
+              setPreviewSource("draft");
+              setPreview({});
+              setPreviewErrors({});
+            }}
+          >
+            پیش‌نویس طراحی
+          </button>
+        </div>
         <div className="engine-workspace-subnav" role="group" aria-label="حالت پیش‌نمایش">
           <button
             type="button"
@@ -1005,24 +1044,30 @@ export function FormDesigner({
             ? "نمای ویرایش با دادهٔ آزمایشی همین صفحه نشان داده می‌شود؛ دسترسی واقعی هر رکورد در زمان ویرایش بررسی می‌شود."
             : "نمای ثبت رکورد جدید"}
         </p>
-        <div className="engine-form-preview-frame">
-          <div className="engine-record-form">
-            <SchemaDrivenForm
-              schema={previewSchema}
-              values={preview}
-              errors={previewErrors}
-              editing={previewMode === "edit"}
-              onChange={(values) => {
-                setPreview(values);
-                setPreviewErrors({});
-              }}
-              {...transport}
-            />
+        {previewSource === "current" && activeSchema.isLoading ? <p role="status">در حال دریافت فرم فعلی…</p> : null}
+        {previewSource === "current" && activeSchema.error ? <p role="alert">دریافت فرم فعلی انجام نشد.</p> : null}
+        {previewSchema && (
+          <div className="engine-form-preview-frame">
+            <div className="engine-record-form">
+              <SchemaDrivenForm
+                schema={previewSchema}
+                values={preview}
+                errors={previewErrors}
+                editing={previewMode === "edit"}
+                onChange={(values) => {
+                  setPreview(values);
+                  setPreviewErrors({});
+                }}
+                {...transport}
+              />
+            </div>
           </div>
-        </div>
-        <Button variant="secondary" onClick={() => setPreviewErrors(validateSchemaValues(previewSchema, preview))}>
-          بررسی خطاهای فرم
-        </Button>
+        )}
+        {previewSchema && (
+          <Button variant="secondary" onClick={() => setPreviewErrors(validateSchemaValues(previewSchema, preview))}>
+            بررسی خطاهای فرم
+          </Button>
+        )}
       </section>
       <section className="engine-version-history" hidden={viewMode !== "versions"}>
         <h3>نسخه‌های قبلی فرم</h3>
