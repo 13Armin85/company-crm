@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { SchemaDrivenForm } from "@plane/ui";
 import type { EntityFormSchema, FormLayoutSchema } from "@plane/ui";
-import { formChangeSummary, formDesignState, moveBindingStep } from "./form-designer";
+import { formChangeSummary, formDesignState, formPreviewSchema, moveBindingStep } from "./form-designer";
 
 const layout: FormLayoutSchema = {
   tabs: [],
@@ -18,6 +18,45 @@ const layout: FormLayoutSchema = {
 };
 
 describe("مسیر سادهٔ طراحی فرم", () => {
+  it("uses the record form's field titles, order and edit rules in preview", () => {
+    const schema: EntityFormSchema = {
+      entity: "example",
+      title: "نمونه",
+      schema_version: 1,
+      layout: { tabs: [], sections: [{ id: "main", columns: 2, bindings: [{ field: "name" }, { field: "number" }] }] },
+      fields: [
+        {
+          id: "name",
+          code: "name",
+          title: "نام",
+          kind: "short_text",
+          config: {},
+          binding: { field: "name" },
+          is_active: true,
+        },
+        {
+          id: "number",
+          code: "number",
+          title: "شماره",
+          kind: "short_text",
+          config: { editable_after_create: false },
+          binding: { field: "number" },
+          is_active: true,
+        },
+      ],
+    };
+    const create = formPreviewSchema(schema, "create");
+    const edit = formPreviewSchema(schema, "edit");
+    expect(create.layout.sections[0].bindings.map((binding) => binding.field)).toEqual(["name", "number"]);
+    expect(create.fields[1].config.readonly).toBe(false);
+    expect(edit.fields[1].config.readonly).toBe(true);
+    const html = renderToStaticMarkup(
+      <SchemaDrivenForm schema={edit} values={{}} errors={{}} editing onChange={() => {}} />
+    );
+    expect(html.indexOf("نام")).toBeLessThan(html.indexOf("شماره"));
+    expect(html).toContain('style="--schema-columns:2"');
+  });
+
   it("moves a binding with buttons while preserving its settings and the source layout", () => {
     const moved = moveBindingStep(layout, "main", "name", 1);
     expect(moved.sections[0].bindings.map((binding) => binding.field)).toEqual(["phone", "name", "email"]);

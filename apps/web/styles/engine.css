@@ -1145,6 +1145,10 @@
   border-radius: var(--radius-lg);
   background: var(--surface);
 }
+.engine-form-preview-frame {
+  width: min(100%, 560px);
+  margin: 20px auto;
+}
 .engine-version-history > div {
   display: flex;
   align-items: center;

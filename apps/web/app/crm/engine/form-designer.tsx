@@ -42,6 +42,7 @@ import { DefinitionEditor } from "./definition-editor";
 import { DefaultValueEditor, automaticDefaultMode, dynamicDefaultsFor } from "./default-value-editor";
 import { ConditionEditor, conditionProblems } from "./rule-editors";
 import { useSchemaTransport } from "./record-form";
+import { entityDisplaySchema } from "./presentation";
 
 export function moveBinding(
   layout: FormLayoutSchema,
@@ -94,6 +95,27 @@ export function formDesignState(draft: FormLayoutSchema, saved: FormLayoutSchema
   if (!saved.sections.length && !applied) return "ذخیره‌نشده";
   if (JSON.stringify(saved) !== JSON.stringify(applied)) return "پیش‌نویس ذخیره شد";
   return "روی فرم اعمال شد";
+}
+
+export function formPreviewSchema(schema: EntityFormSchema, mode: "create" | "edit"): EntityFormSchema {
+  return entityDisplaySchema({
+    ...schema,
+    fields: schema.fields.map((field) => ({
+      ...field,
+      config: {
+        ...field.config,
+        ...(field.binding.required !== undefined ? { required: field.binding.required } : {}),
+        ...(field.binding.hidden !== undefined ? { hidden: field.binding.hidden } : {}),
+        ...(field.binding.required_if !== undefined ? { required_if: field.binding.required_if } : {}),
+        ...(field.binding.visible_if !== undefined ? { visible_if: field.binding.visible_if } : {}),
+        readonly: Boolean(
+          field.binding.readonly ||
+          field.config.readonly ||
+          (mode === "edit" && field.config.editable_after_create === false)
+        ),
+      },
+    })),
+  });
 }
 
 function DragItem({ id, children, label }: { id: string; children: ReactNode; label: string }) {
@@ -221,27 +243,7 @@ export function FormDesigner({
       schema_version: 1,
     };
   }, [draft, entity.code, entity.title, entities, fields, inherited, lookups, parent?.code]);
-  const previewSchema = useMemo<EntityFormSchema>(
-    () => ({
-      ...liveSchema,
-      fields: liveSchema.fields.map((field) => ({
-        ...field,
-        config: {
-          ...field.config,
-          ...(field.binding.required !== undefined ? { required: field.binding.required } : {}),
-          ...(field.binding.hidden !== undefined ? { hidden: field.binding.hidden } : {}),
-          ...(field.binding.required_if !== undefined ? { required_if: field.binding.required_if } : {}),
-          ...(field.binding.visible_if !== undefined ? { visible_if: field.binding.visible_if } : {}),
-          readonly: Boolean(
-            field.binding.readonly ||
-            field.config.readonly ||
-            (previewMode === "edit" && field.config.editable_after_create === false)
-          ),
-        },
-      })),
-    }),
-    [liveSchema, previewMode]
-  );
+  const previewSchema = useMemo(() => formPreviewSchema(liveSchema, previewMode), [liveSchema, previewMode]);
   const addSection = () =>
     setDraft((old) => ({
       ...old,
@@ -1003,16 +1005,21 @@ export function FormDesigner({
             ? "نمای ویرایش با دادهٔ آزمایشی همین صفحه نشان داده می‌شود؛ دسترسی واقعی هر رکورد در زمان ویرایش بررسی می‌شود."
             : "نمای ثبت رکورد جدید"}
         </p>
-        <SchemaDrivenForm
-          schema={previewSchema}
-          values={preview}
-          errors={previewErrors}
-          onChange={(values) => {
-            setPreview(values);
-            setPreviewErrors({});
-          }}
-          {...transport}
-        />
+        <div className="engine-form-preview-frame">
+          <div className="engine-record-form">
+            <SchemaDrivenForm
+              schema={previewSchema}
+              values={preview}
+              errors={previewErrors}
+              editing={previewMode === "edit"}
+              onChange={(values) => {
+                setPreview(values);
+                setPreviewErrors({});
+              }}
+              {...transport}
+            />
+          </div>
+        </div>
         <Button variant="secondary" onClick={() => setPreviewErrors(validateSchemaValues(previewSchema, preview))}>
           بررسی خطاهای فرم
         </Button>
