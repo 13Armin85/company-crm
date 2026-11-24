@@ -2,13 +2,7 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { SchemaDrivenForm } from "@plane/ui";
 import type { EntityFormSchema, FormLayoutSchema } from "@plane/ui";
-import {
-  formChangeSummary,
-  formDesignState,
-  formPreviewSchema,
-  moveBindingStep,
-  selectFormPreviewSchema,
-} from "./form-designer";
+import { formChangeSummary, formDesignState, formPreviewSchema, moveBindingStep } from "./form-designer";
 
 const layout: FormLayoutSchema = {
   tabs: [],
@@ -61,13 +55,6 @@ describe("مسیر سادهٔ طراحی فرم", () => {
     );
     expect(html.indexOf("نام")).toBeLessThan(html.indexOf("شماره"));
     expect(html).toContain('style="--schema-columns:2"');
-    const published: EntityFormSchema = {
-      ...schema,
-      layout: { ...schema.layout, sections: [{ ...schema.layout.sections[0], columns: 1 }] },
-    };
-    expect(selectFormPreviewSchema(published, schema, "current", "create")?.layout.sections[0].columns).toBe(1);
-    expect(selectFormPreviewSchema(published, schema, "draft", "create")?.layout.sections[0].columns).toBe(2);
-    expect(selectFormPreviewSchema(undefined, schema, "current", "create")).toBeUndefined();
   });
 
   it("moves a binding with buttons while preserving its settings and the source layout", () => {
