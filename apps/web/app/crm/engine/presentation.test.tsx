@@ -4,13 +4,9 @@ import { describe, expect, it } from "vitest";
 import { Breadcrumb } from "../components";
 import type { EntityFormSchema } from "@plane/ui";
 import { SchemaDrivenForm } from "@plane/ui";
-import { entityDisplaySchema, entityDisplayTitle, formColumnCount } from "./presentation";
+import { entityDisplaySchema, entityDisplayTitle } from "./presentation";
 
 describe("Persian entity presentation", () => {
-  it("uses the widest section to size the form and its preview", () => {
-    const schema = { layout: { sections: [{ columns: 1 }, { columns: 3 }] } } as EntityFormSchema;
-    expect(formColumnCount(schema)).toBe(3);
-  });
   it("displays historical browser fixture names without their generated suffix", () => {
     expect(entityDisplayTitle("آزمایش مرورگر mvf74zdd")).toBe("آزمایش مرورگر");
     expect(entityDisplayTitle("نماهای مرورگر mvfntauv")).toBe("نماهای مرورگر");

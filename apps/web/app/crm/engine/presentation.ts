@@ -23,7 +23,3 @@ export function entityDisplaySchema(schema: EntityFormSchema): EntityFormSchema 
     },
   };
 }
-
-export function formColumnCount(schema: EntityFormSchema): 1 | 2 | 3 {
-  return Math.max(1, ...schema.layout.sections.map((section) => section.columns)) as 1 | 2 | 3;
-}

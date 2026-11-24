@@ -507,14 +507,6 @@
 :root .access-modal {
   width: min(640px, calc(100vw - 28px));
 }
-:root .access-modal:has(.engine-record-form[data-form-columns="2"]) {
-  width: min(800px, calc(100vw - 28px));
-  max-width: none;
-}
-:root .access-modal:has(.engine-record-form[data-form-columns="3"]) {
-  width: min(1100px, calc(100vw - 28px));
-  max-width: none;
-}
 :root :is(.access-modal, .create-modal) > header {
   position: sticky;
   top: 0;
