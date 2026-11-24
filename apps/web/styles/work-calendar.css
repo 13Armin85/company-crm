@@ -140,13 +140,6 @@ body:has(.work-day-dialog) .selector-single-options {
   min-width: 0;
   overflow: visible;
 }
-.work-day-content .horizontal-table-shell {
-  min-width: 0;
-  width: 100%;
-}
-.work-day-content .horizontal-table-scroll {
-  max-width: 100%;
-}
 .work-day-content .work-schedule-editor > .work-muted {
   padding: 12px 14px;
   border-radius: 10px;
@@ -403,26 +396,89 @@ span.work-chip {
   display: grid;
   gap: 12px;
 }
-.work-schedule-editor table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--fs-md);
+.work-week-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 12px;
+  min-width: 0;
 }
-.work-schedule-editor th,
-.work-schedule-editor td {
-  padding: 6px;
-  border-bottom: 1px solid var(--border);
-  text-align: start;
-  vertical-align: top;
+.work-week-day {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
 }
-.work-schedule-editor tr[data-working="false"] td {
-  opacity: 0.6;
+.work-week-day[data-working="false"] {
+  background: var(--surface-soft);
 }
-.work-break {
+.work-week-day-header {
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin-bottom: 4px;
+  justify-content: space-between;
+  gap: 10px;
+}
+.work-week-day-header strong {
+  color: var(--text-primary);
+  font-size: var(--fs-lg);
+}
+.work-week-day-header .work-check {
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 9%, var(--surface));
+  font-size: var(--fs-sm);
+}
+.work-week-day-fields {
+  display: grid;
+  gap: 13px;
+  min-width: 0;
+}
+.work-week-time-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+.work-week-mode {
+  min-width: 0;
+}
+.work-week-breaks {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.work-week-breaks > span {
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+.work-week-off {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+}
+.work-break {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  align-items: end;
+  gap: 7px;
+  min-width: 0;
+}
+.work-break > * {
+  min-width: 0;
+}
+.work-week-day .persian-time-picker,
+.work-week-day .searchable-select {
+  min-width: 0;
+  width: 100%;
+}
+.work-week-day .persian-time-presets {
+  flex-wrap: wrap;
 }
 .work-icon-button,
 .work-link-button {
@@ -450,6 +506,32 @@ span.work-chip {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
+}
+.work-event-form {
+  min-width: 0;
+  gap: 16px;
+}
+.work-event-form .work-event-pair {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+  min-width: 0;
+}
+.work-event-form .work-event-pair > * {
+  min-width: 0;
+  width: 100%;
+}
+.work-event-form .persian-datetime-picker {
+  min-width: 0;
+  width: 100%;
+}
+.work-event-form .persian-date-trigger,
+.work-event-form .selector-trigger {
+  width: 100%;
+}
+.work-event-form .work-event-pair textarea {
+  min-height: 110px;
+  resize: vertical;
 }
 .work-field {
   display: grid;
@@ -501,11 +583,25 @@ span.work-chip {
 .work-pending li small {
   color: var(--text-secondary);
 }
-@media (max-width: 700px) {
-  .work-schedule-editor {
-    overflow-x: auto;
+@media (max-width: 800px) {
+  .work-week-grid {
+    grid-template-columns: 1fr;
   }
-  .work-schedule-editor table {
-    min-width: 640px;
+}
+@media (max-width: 600px) {
+  .work-event-form .work-event-pair {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 420px) {
+  .work-week-time-row {
+    grid-template-columns: 1fr;
+  }
+  .work-break {
+    grid-template-columns: 1fr 1fr;
+  }
+  .work-break .work-icon-button {
+    grid-column: 1 / -1;
+    justify-self: start;
   }
 }

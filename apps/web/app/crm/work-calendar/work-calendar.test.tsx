@@ -102,6 +102,7 @@ describe("work calendar layers", () => {
     const exceptionHtml = renderToStaticMarkup(<ExceptionForm fixedDate="2027-01-07" onSubmit={() => undefined} />);
     expect(eventHtml).toContain("رویداد کاری جدید");
     expect(eventHtml).toContain("رویداد برای");
+    expect(eventHtml.match(/class="work-form-row work-event-pair"/g)).toHaveLength(3);
     expect(exceptionHtml).toContain("تاریخ استثنا");
     expect(exceptionHtml).not.toContain("تا تاریخ (اختیاری)");
   });
@@ -227,6 +228,9 @@ describe("weekly schedule editor", () => {
       </QueryClientProvider>
     );
     expect(html).toContain('aria-label="ویرایش برنامهٔ هفتگی"');
+    expect(html).toContain('class="work-week-grid"');
+    expect(html).toContain('class="work-week-day"');
+    expect(html).not.toContain("horizontal-table-scroll");
     expect(html).toContain("معتبر از تاریخ");
     expect(html).not.toContain("تب‌های جدول");
     expect(html).not.toContain("جدول اصلی");

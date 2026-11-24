@@ -8,7 +8,6 @@ import {
   PersianDateTimePicker,
   PersianTimePicker,
   SearchableSelect,
-  ScrollableTable,
   zonedDateTime,
   zonedDateTimeToISO,
 } from "@plane/ui";
@@ -244,86 +243,85 @@ export function WeeklyScheduleEditor({
           هر ذخیره یک نسخهٔ تاریخ‌دار جدید می‌سازد و نسخهٔ قبلی بسته می‌شود ولی حذف نمی‌شود. تغییر برنامه هیچ مرخصی، غیبت یا
           تخلفی ثبت نمی‌کند.
         </p>
-        <ScrollableTable>
-          <thead>
-            <tr>
-              <th>روز</th>
-              <th>روز کاری</th>
-              <th>شروع</th>
-              <th>پایان</th>
-              <th>استراحت‌ها</th>
-              <th>شیوهٔ کار</th>
-            </tr>
-          </thead>
-          <tbody>
-            {WEEK_ORDER.map(({ weekday, label }) => {
-              const day = days.find((item) => item.weekday === weekday)!;
-              return (
-                <tr key={weekday} data-weekday={weekday} data-working={day.is_working}>
-                  <th scope="row">{label}</th>
-                  <td>
-                    <label className="work-check">
-                      <input
-                        type="checkbox"
-                        aria-label={`${label} روز کاری است`}
-                        checked={day.is_working}
-                        onChange={(event) => update(weekday, { is_working: event.target.checked })}
+        <div className="work-week-grid" aria-label="روزهای برنامهٔ هفتگی">
+          {WEEK_ORDER.map(({ weekday, label }) => {
+            const day = days.find((item) => item.weekday === weekday)!;
+            return (
+              <section
+                className="work-week-day"
+                key={weekday}
+                data-weekday={weekday}
+                data-working={day.is_working}
+                aria-label={label}
+              >
+                <header className="work-week-day-header">
+                  <strong>{label}</strong>
+                  <label className="work-check">
+                    <input
+                      type="checkbox"
+                      aria-label={`${label} روز کاری است`}
+                      checked={day.is_working}
+                      onChange={(event) => update(weekday, { is_working: event.target.checked })}
+                    />
+                    <span>{day.is_working ? "کاری" : "غیرکاری"}</span>
+                  </label>
+                </header>
+                {day.is_working && (
+                  <div className="work-week-day-fields">
+                    <div className="work-week-time-row">
+                      <PersianTimePicker
+                        label={`شروع ${label}`}
+                        value={day.start}
+                        onChange={(start) => update(weekday, { start })}
                       />
-                      <span>{day.is_working ? "کاری" : "غیرکاری"}</span>
-                    </label>
-                  </td>
-                  <td>
-                    <PersianTimePicker
-                      label={`شروع ${label}`}
-                      value={day.start}
-                      disabled={!day.is_working}
-                      onChange={(start) => update(weekday, { start })}
-                    />
-                  </td>
-                  <td>
-                    <PersianTimePicker
-                      label={`پایان ${label}`}
-                      value={day.end}
-                      disabled={!day.is_working}
-                      onChange={(end) => update(weekday, { end })}
-                    />
-                  </td>
-                  <td>
-                    {day.breaks.map((item, index) => (
-                      // Breaks have no identity of their own; their position is the identity.
-                      // oxlint-disable-next-line react/no-array-index-key
-                      <div className="work-break" key={index}>
-                        <PersianTimePicker
-                          label={`شروع استراحت ${label}`}
-                          value={item.start}
-                          disabled={!day.is_working}
-                          onChange={(start) =>
-                            update(weekday, {
-                              breaks: day.breaks.map((row, i) => (i === index ? { ...row, start } : row)),
-                            })
-                          }
-                        />
-                        <PersianTimePicker
-                          label={`پایان استراحت ${label}`}
-                          value={item.end}
-                          disabled={!day.is_working}
-                          onChange={(end) =>
-                            update(weekday, {
-                              breaks: day.breaks.map((row, i) => (i === index ? { ...row, end } : row)),
-                            })
-                          }
-                        />
-                        <button
-                          type="button"
-                          className="work-icon-button"
-                          aria-label={`حذف استراحت ${label}`}
-                          onClick={() => update(weekday, { breaks: day.breaks.filter((_, i) => i !== index) })}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    ))}
-                    {day.is_working && (
+                      <PersianTimePicker
+                        label={`پایان ${label}`}
+                        value={day.end}
+                        onChange={(end) => update(weekday, { end })}
+                      />
+                    </div>
+                    <div className="work-week-mode">
+                      <SearchableSelect
+                        label={`شیوهٔ کار ${label}`}
+                        value={day.work_mode || "none"}
+                        onChange={(mode) => update(weekday, { work_mode: (mode === "none" ? "" : mode) as WorkMode })}
+                        options={modeOptions}
+                      />
+                    </div>
+                    <div className="work-week-breaks">
+                      <span>استراحت‌ها</span>
+                      {day.breaks.map((item, index) => (
+                        // Breaks are ordered ranges without a separate identifier.
+                        // oxlint-disable-next-line react/no-array-index-key
+                        <div className="work-break" key={index}>
+                          <PersianTimePicker
+                            label={`شروع استراحت ${label}`}
+                            value={item.start}
+                            onChange={(start) =>
+                              update(weekday, {
+                                breaks: day.breaks.map((row, i) => (i === index ? { ...row, start } : row)),
+                              })
+                            }
+                          />
+                          <PersianTimePicker
+                            label={`پایان استراحت ${label}`}
+                            value={item.end}
+                            onChange={(end) =>
+                              update(weekday, {
+                                breaks: day.breaks.map((row, i) => (i === index ? { ...row, end } : row)),
+                              })
+                            }
+                          />
+                          <button
+                            type="button"
+                            className="work-icon-button"
+                            aria-label={`حذف استراحت ${label}`}
+                            onClick={() => update(weekday, { breaks: day.breaks.filter((_, i) => i !== index) })}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      ))}
                       <button
                         type="button"
                         className="work-link-button"
@@ -331,22 +329,14 @@ export function WeeklyScheduleEditor({
                       >
                         <Plus size={14} /> افزودن استراحت
                       </button>
-                    )}
-                  </td>
-                  <td>
-                    <SearchableSelect
-                      label={`شیوهٔ کار ${label}`}
-                      value={day.work_mode || "none"}
-                      disabled={!day.is_working}
-                      onChange={(mode) => update(weekday, { work_mode: (mode === "none" ? "" : mode) as WorkMode })}
-                      options={modeOptions}
-                    />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </ScrollableTable>
+                    </div>
+                  </div>
+                )}
+                {!day.is_working && <p className="work-week-off">برای این روز ساعت کاری ثبت نمی‌شود.</p>}
+              </section>
+            );
+          })}
+        </div>
         <div className="work-form-row">
           <PersianDatePicker
             label="معتبر از تاریخ"
@@ -572,7 +562,7 @@ export function WorkEventForm({
         }}
       >
         {fixedDate && <p className="work-fixed-date">رویداد برای {persianDate(fixedDate)}</p>}
-        <div className="work-form-row">
+        <div className="work-form-row work-event-pair">
           <SearchableSelect
             label="نوع"
             value={kind}
@@ -584,7 +574,7 @@ export function WorkEventForm({
             <input value={title} onChange={(event) => setTitle(event.target.value)} required />
           </label>
         </div>
-        <div className="work-form-row">
+        <div className="work-form-row work-event-pair">
           <PersianDateTimePicker
             label="شروع"
             value={startsAt}
@@ -610,14 +600,16 @@ export function WorkEventForm({
           selected={participants}
           onChange={setParticipants}
         />
-        <label className="work-field">
-          <span>توضیح (فقط برای افراد مرتبط و مدیران مجاز)</span>
-          <textarea value={description} onChange={(event) => setDescription(event.target.value)} />
-        </label>
-        <label className="work-field">
-          <span>یادداشت محرمانه</span>
-          <textarea value={privateNote} onChange={(event) => setPrivateNote(event.target.value)} />
-        </label>
+        <div className="work-form-row work-event-pair">
+          <label className="work-field">
+            <span>توضیح (برای افراد مرتبط و مدیران مجاز)</span>
+            <textarea value={description} onChange={(event) => setDescription(event.target.value)} />
+          </label>
+          <label className="work-field">
+            <span>یادداشت محرمانه</span>
+            <textarea value={privateNote} onChange={(event) => setPrivateNote(event.target.value)} />
+          </label>
+        </div>
         <p className="work-muted">همکاران دیگر فقط بازهٔ زمانی را با عنوان «در دسترس نیست» می‌بینند.</p>
         {submitted && errors.length > 0 && (
           <ul className="work-errors" role="alert">
