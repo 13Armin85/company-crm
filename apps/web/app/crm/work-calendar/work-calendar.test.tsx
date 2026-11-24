@@ -102,6 +102,9 @@ describe("work calendar layers", () => {
     const exceptionHtml = renderToStaticMarkup(<ExceptionForm fixedDate="2027-01-07" onSubmit={() => undefined} />);
     expect(eventHtml).toContain("رویداد کاری جدید");
     expect(eventHtml).toContain("رویداد برای");
+    expect(eventHtml).toContain('placeholder="عنوان"');
+    expect(eventHtml).toContain('aria-label="عنوان"');
+    expect(eventHtml).not.toContain("<span>عنوان</span>");
     expect(eventHtml.match(/class="work-form-row work-event-pair"/g)).toHaveLength(3);
     expect(exceptionHtml).toContain("تاریخ استثنا");
     expect(exceptionHtml).not.toContain("تا تاریخ (اختیاری)");

@@ -569,9 +569,14 @@ export function WorkEventForm({
             onChange={(value) => setKind(value as WorkEventKind)}
             options={kindOptions}
           />
-          <label className="work-field">
-            <span>عنوان</span>
-            <input value={title} onChange={(event) => setTitle(event.target.value)} required />
+          <label className="work-field work-event-title">
+            <input
+              aria-label="عنوان"
+              placeholder="عنوان"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              required
+            />
           </label>
         </div>
         <div className="work-form-row work-event-pair">

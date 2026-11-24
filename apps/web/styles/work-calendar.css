@@ -667,6 +667,9 @@ span.work-chip {
   min-width: 0;
   width: 100%;
 }
+.work-event-form .work-event-title {
+  align-self: end;
+}
 .work-event-form .persian-datetime-picker {
   min-width: 0;
   width: 100%;
