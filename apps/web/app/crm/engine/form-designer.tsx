@@ -43,6 +43,7 @@ import { DefaultValueEditor, automaticDefaultMode, dynamicDefaultsFor } from "./
 import { ConditionEditor, conditionProblems } from "./rule-editors";
 import { useSchemaTransport } from "./record-form";
 import { entityDisplaySchema } from "./presentation";
+import { formColumnCount } from "./presentation";
 
 export function moveBinding(
   layout: FormLayoutSchema,
@@ -67,6 +68,14 @@ export function moveBindingStep(layout: FormLayoutSchema, sectionId: string, fie
   const index = bindings.findIndex((binding) => binding.field === field);
   if (index < 0 || index + direction < 0 || index + direction >= bindings.length) return layout;
   return moveBinding(layout, sectionId, field, sectionId, bindings[direction === -1 ? index - 1 : index + 2]?.field);
+}
+
+export function moveSectionStep(layout: FormLayoutSchema, sectionId: string, direction: -1 | 1): FormLayoutSchema {
+  const index = layout.sections.findIndex((section) => section.id === sectionId);
+  if (index < 0 || index + direction < 0 || index + direction >= layout.sections.length) return layout;
+  const sections = [...layout.sections];
+  [sections[index], sections[index + direction]] = [sections[index + direction], sections[index]];
+  return { ...layout, sections };
 }
 
 const formCodes = (layout: FormLayoutSchema | null) =>
@@ -349,6 +358,8 @@ export function FormDesigner({
       }
       setDirty(`designer:${entity.code}`, false);
       const fresh = await form.refetch();
+      await activeSchema.refetch();
+      setPreviewSource("current");
       if (fresh.data && rollback) {
         setDraft(fresh.data.draft);
         setSavedDraft(fresh.data.draft);
@@ -1046,8 +1057,161 @@ export function FormDesigner({
         </p>
         {previewSource === "current" && activeSchema.isLoading ? <p role="status">در حال دریافت فرم فعلی…</p> : null}
         {previewSource === "current" && activeSchema.error ? <p role="alert">دریافت فرم فعلی انجام نشد.</p> : null}
+        {previewSource === "draft" && canPublish && (
+          <div className="engine-preview-editor" aria-label="ویرایش چیدمان در پیش‌نمایش">
+            <div className="engine-preview-editor-actions">
+              <SearchableSelect
+                showLabel
+                label="افزودن ورودی به فرم"
+                value=""
+                options={fields
+                  .filter((field) => field.is_active && !attached.has(field.code) && !inheritedCodes.has(field.code))
+                  .map((field) => ({ id: field.code, title: field.title }))}
+                onChange={(code) => {
+                  if (code) addField(code);
+                }}
+              />
+              <Button variant="secondary" onClick={addSection}>
+                <Plus size={16} /> افزودن بخش
+              </Button>
+              <input
+                aria-label="عنوان تب جدید"
+                placeholder="عنوان تب جدید"
+                value={newTab}
+                onChange={(event) => setNewTab(event.target.value)}
+              />
+              <Button
+                variant="secondary"
+                disabled={!newTab.trim()}
+                onClick={() => {
+                  if (newTab.trim()) {
+                    setDraft((old) => ({
+                      ...old,
+                      tabs: [...old.tabs, { id: `tab-${browserId()}`, title: newTab.trim() }],
+                    }));
+                    setNewTab("");
+                  }
+                }}
+              >
+                افزودن تب
+              </Button>
+            </div>
+            {draft.tabs.map((tab) => (
+              <div className="engine-preview-tab-controls" key={tab.id}>
+                <input
+                  aria-label="عنوان تب"
+                  value={tab.title}
+                  onChange={(event) =>
+                    setDraft((old) => ({
+                      ...old,
+                      tabs: old.tabs.map((item) =>
+                        item.id === tab.id ? { ...item, title: event.target.value } : item
+                      ),
+                    }))
+                  }
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    setDraft((old) => ({
+                      tabs: old.tabs.filter((item) => item.id !== tab.id),
+                      sections: old.sections.map((section) =>
+                        section.tab === tab.id ? { ...section, tab: undefined } : section
+                      ),
+                    }))
+                  }
+                >
+                  حذف تب
+                </button>
+              </div>
+            ))}
+            {draft.sections.map((section, index) => (
+              <div className="engine-preview-section-controls" key={section.id}>
+                <input
+                  aria-label={`عنوان بخش ${index + 1}`}
+                  value={section.title || ""}
+                  onChange={(event) =>
+                    setDraft((old) => ({
+                      ...old,
+                      sections: old.sections.map((item) =>
+                        item.id === section.id ? { ...item, title: event.target.value } : item
+                      ),
+                    }))
+                  }
+                />
+                <div role="group" aria-label={`تعداد ستون‌های ${section.title || "بخش"}`}>
+                  {([1, 2, 3] as const).map((count) => (
+                    <button
+                      key={count}
+                      type="button"
+                      aria-pressed={section.columns === count}
+                      onClick={() =>
+                        setDraft((old) => ({
+                          ...old,
+                          sections: old.sections.map((item) =>
+                            item.id === section.id ? { ...item, columns: count } : item
+                          ),
+                        }))
+                      }
+                    >
+                      {count.toLocaleString("fa-IR")} ستون
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  disabled={index === 0}
+                  onClick={() => setDraft((old) => moveSectionStep(old, section.id, -1))}
+                >
+                  بالا
+                </button>
+                <button
+                  type="button"
+                  disabled={index === draft.sections.length - 1}
+                  onClick={() => setDraft((old) => moveSectionStep(old, section.id, 1))}
+                >
+                  پایین
+                </button>
+                <SearchableSelect
+                  showLabel
+                  label="نمایش در تب"
+                  value={section.tab || ""}
+                  options={[{ id: "", title: "همهٔ تب‌ها" }, ...draft.tabs]}
+                  onChange={(value) =>
+                    setDraft((old) => ({
+                      ...old,
+                      sections: old.sections.map((item) =>
+                        item.id === section.id ? { ...item, tab: value || undefined } : item
+                      ),
+                    }))
+                  }
+                />
+                <button
+                  type="button"
+                  disabled={section.bindings.some((binding) => form.data?.locked_fields?.includes(binding.field))}
+                  onClick={() =>
+                    setDraft((old) => ({ ...old, sections: old.sections.filter((item) => item.id !== section.id) }))
+                  }
+                >
+                  حذف بخش
+                </button>
+                <div
+                  className="engine-preview-section-drop"
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    const [source, code] = event.dataTransfer.getData("text/plain").split(":");
+                    if (source && code) setDraft((old) => moveBinding(old, source, code, section.id));
+                  }}
+                >
+                  فیلد را به این بخش بکشید
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         {previewSchema && (
-          <div className="engine-form-preview-frame">
+          <div className="engine-form-preview-frame" data-form-columns={formColumnCount(previewSchema)}>
             <div className="engine-record-form">
               <SchemaDrivenForm
                 schema={previewSchema}
@@ -1058,6 +1222,156 @@ export function FormDesigner({
                   setPreview(values);
                   setPreviewErrors({});
                 }}
+                renderFieldAddon={
+                  previewSource === "draft" && canPublish
+                    ? (field) => {
+                        const section = draft.sections.find((item) =>
+                          item.bindings.some((binding) => binding.field === field.code)
+                        );
+                        if (!section) return null;
+                        const index = section.bindings.findIndex((binding) => binding.field === field.code);
+                        return (
+                          <div
+                            className="engine-preview-field-actions"
+                            onDragOver={(event) => event.preventDefault()}
+                            onDrop={(event) => {
+                              event.preventDefault();
+                              const [source, code] = event.dataTransfer.getData("text/plain").split(":");
+                              if (source && code)
+                                setDraft((old) => moveBinding(old, source, code, section.id, field.code));
+                            }}
+                          >
+                            <button
+                              type="button"
+                              draggable
+                              onDragStart={(event) =>
+                                event.dataTransfer.setData("text/plain", `${section.id}:${field.code}`)
+                              }
+                              aria-label={`کشیدن ${field.title}`}
+                            >
+                              <GripVertical size={15} />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={index === 0}
+                              onClick={() => setDraft((old) => moveBindingStep(old, section.id, field.code, -1))}
+                              aria-label={`انتقال ${field.title} به بالا`}
+                            >
+                              <ArrowUp size={15} />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={index === section.bindings.length - 1}
+                              onClick={() => setDraft((old) => moveBindingStep(old, section.id, field.code, 1))}
+                              aria-label={`انتقال ${field.title} به پایین`}
+                            >
+                              <ArrowDown size={15} />
+                            </button>
+                            <details>
+                              <summary>تنظیم فیلد</summary>
+                              <label>
+                                عنوان در فرم
+                                <input
+                                  value={section.bindings[index].title || ""}
+                                  placeholder={field.title}
+                                  onChange={(event) =>
+                                    setDraft((old) => ({
+                                      ...old,
+                                      sections: old.sections.map((item) =>
+                                        item.id === section.id
+                                          ? {
+                                              ...item,
+                                              bindings: item.bindings.map((binding) =>
+                                                binding.field === field.code
+                                                  ? { ...binding, title: event.target.value }
+                                                  : binding
+                                              ),
+                                            }
+                                          : item
+                                      ),
+                                    }))
+                                  }
+                                />
+                              </label>
+                              <label>
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(section.bindings[index].required ?? field.config.required)}
+                                  onChange={(event) =>
+                                    setDraft((old) => ({
+                                      ...old,
+                                      sections: old.sections.map((item) =>
+                                        item.id === section.id
+                                          ? {
+                                              ...item,
+                                              bindings: item.bindings.map((binding) =>
+                                                binding.field === field.code
+                                                  ? { ...binding, required: event.target.checked }
+                                                  : binding
+                                              ),
+                                            }
+                                          : item
+                                      ),
+                                    }))
+                                  }
+                                />{" "}
+                                الزامی
+                              </label>
+                              <label>
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(section.bindings[index].readonly ?? field.config.readonly)}
+                                  onChange={(event) =>
+                                    setDraft((old) => ({
+                                      ...old,
+                                      sections: old.sections.map((item) =>
+                                        item.id === section.id
+                                          ? {
+                                              ...item,
+                                              bindings: item.bindings.map((binding) =>
+                                                binding.field === field.code
+                                                  ? { ...binding, readonly: event.target.checked }
+                                                  : binding
+                                              ),
+                                            }
+                                          : item
+                                      ),
+                                    }))
+                                  }
+                                />{" "}
+                                فقط خواندنی
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => setEditingField(fields.find((item) => item.code === field.code) || null)}
+                              >
+                                ویرایش نوع و تنظیمات اصلی
+                              </button>
+                              <button
+                                type="button"
+                                disabled={form.data?.locked_fields?.includes(field.code)}
+                                onClick={() =>
+                                  setDraft((old) => ({
+                                    ...old,
+                                    sections: old.sections.map((item) =>
+                                      item.id === section.id
+                                        ? {
+                                            ...item,
+                                            bindings: item.bindings.filter((binding) => binding.field !== field.code),
+                                          }
+                                        : item
+                                    ),
+                                  }))
+                                }
+                              >
+                                حذف از فرم
+                              </button>
+                            </details>
+                          </div>
+                        );
+                      }
+                    : undefined
+                }
                 {...transport}
               />
             </div>
@@ -1067,6 +1381,20 @@ export function FormDesigner({
           <Button variant="secondary" onClick={() => setPreviewErrors(validateSchemaValues(previewSchema, preview))}>
             بررسی خطاهای فرم
           </Button>
+        )}
+        {previewSource === "draft" && canPublish && (
+          <div className="engine-preview-publish-actions">
+            <Button
+              variant="secondary"
+              disabled={mutation.isPending || !dirty}
+              onClick={() => void saveDraft().catch(() => {})}
+            >
+              ذخیرهٔ پیش‌نویس
+            </Button>
+            <Button disabled={mutation.isPending || (!dirty && !unpublished)} onClick={() => void publish()}>
+              اعمال چیدمان روی فرم
+            </Button>
+          </div>
         )}
       </section>
       <section className="engine-version-history" hidden={viewMode !== "versions"}>

@@ -7,6 +7,7 @@ import {
   formDesignState,
   formPreviewSchema,
   moveBindingStep,
+  moveSectionStep,
   selectFormPreviewSchema,
 } from "./form-designer";
 
@@ -24,6 +25,12 @@ const layout: FormLayoutSchema = {
 };
 
 describe("مسیر سادهٔ طراحی فرم", () => {
+  it("moves a whole section without changing its fields or the original layout", () => {
+    const moved = moveSectionStep(layout, "other", -1);
+    expect(moved.sections.map((section) => section.id)).toEqual(["other", "main"]);
+    expect(moved.sections[1].bindings.map((binding) => binding.field)).toEqual(["name", "phone", "email"]);
+    expect(layout.sections[0].id).toBe("main");
+  });
   it("uses the record form's field titles, order and edit rules in preview", () => {
     const schema: EntityFormSchema = {
       entity: "example",

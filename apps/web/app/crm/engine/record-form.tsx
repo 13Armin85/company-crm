@@ -21,7 +21,7 @@ import { AccessModal } from "../access/components";
 import { RelationFieldExtras, alignEntries, linkFieldsOf, missingLinkData, selectedIds } from "./relation-link-data";
 import type { LinkEntry } from "./relation-link-data";
 import type { EngineRecord } from "./api";
-import { entityDisplaySchema } from "./presentation";
+import { entityDisplaySchema, formColumnCount } from "./presentation";
 import { DuplicateFeedback, duplicateDetails } from "./duplicate-feedback";
 
 const noEmbeddedUpload = async (): Promise<string> => {
@@ -222,6 +222,7 @@ export function EngineRecordForm({
     <>
       <form
         className="engine-record-form"
+        data-form-columns={formColumnCount(schema)}
         onSubmit={async (event) => {
           event.preventDefault();
           if (!canEdit || mutation.isPending) return;
