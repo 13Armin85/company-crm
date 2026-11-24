@@ -1,4 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WorkCalendarData } from "../api/work-calendar";
 import { IssueCalendar } from "../issue-calendar";
@@ -219,6 +220,17 @@ describe("work calendar layers", () => {
 });
 
 describe("weekly schedule editor", () => {
+  it("keeps the weekly editor free of generic table tabs inside the day dialog", () => {
+    const html = renderToStaticMarkup(
+      <QueryClientProvider client={new QueryClient()}>
+        <WeeklyScheduleEditor initialDate="2026-11-24" onSubmit={() => undefined} />
+      </QueryClientProvider>
+    );
+    expect(html).toContain('aria-label="ویرایش برنامهٔ هفتگی"');
+    expect(html).toContain("معتبر از تاریخ");
+    expect(html).not.toContain("تب‌های جدول");
+    expect(html).not.toContain("جدول اصلی");
+  });
   it("renders a non-working Thursday, a 10:00 Sunday start, breaks and the effective date", () => {
     const week = defaultWeek().map((day) =>
       day.weekday === 3

@@ -1,4 +1,4 @@
-import { ConfiguredFields, SurfaceTable } from "../engine/surface";
+import { ConfiguredFields } from "../engine/surface";
 /** Presentational pieces of the work calendar. Data and permissions come from the server via props. */
 import { useState } from "react";
 import type { FormEvent } from "react";
@@ -8,6 +8,7 @@ import {
   PersianDateTimePicker,
   PersianTimePicker,
   SearchableSelect,
+  ScrollableTable,
   zonedDateTime,
   zonedDateTimeToISO,
 } from "@plane/ui";
@@ -243,7 +244,7 @@ export function WeeklyScheduleEditor({
           هر ذخیره یک نسخهٔ تاریخ‌دار جدید می‌سازد و نسخهٔ قبلی بسته می‌شود ولی حذف نمی‌شود. تغییر برنامه هیچ مرخصی، غیبت یا
           تخلفی ثبت نمی‌کند.
         </p>
-        <SurfaceTable code="work-schedule-table">
+        <ScrollableTable>
           <thead>
             <tr>
               <th>روز</th>
@@ -345,7 +346,7 @@ export function WeeklyScheduleEditor({
               );
             })}
           </tbody>
-        </SurfaceTable>
+        </ScrollableTable>
         <div className="work-form-row">
           <PersianDatePicker
             label="معتبر از تاریخ"

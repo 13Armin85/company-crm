@@ -16,7 +16,7 @@
 .work-day-dialog {
   position: fixed;
   inset: 0;
-  z-index: 1000;
+  z-index: 1300;
   display: grid;
   place-items: center;
   padding: 20px;
@@ -27,9 +27,16 @@
   background: rgb(17 24 39 / 62%);
   backdrop-filter: blur(4px);
 }
+body:has(.work-day-dialog) .persian-calendar {
+  z-index: 1400;
+}
+body:has(.work-day-dialog) .selector-single-options {
+  z-index: 1410;
+}
 .work-day-panel {
   position: relative;
-  width: min(900px, 100%);
+  width: min(1080px, 100%);
+  min-width: 0;
   max-height: min(850px, calc(100dvh - 40px));
   display: flex;
   flex-direction: column;
@@ -41,6 +48,7 @@
 }
 .work-day-header {
   display: flex;
+  flex: none;
   align-items: flex-start;
   gap: 16px;
   padding: 24px 26px 18px;
@@ -85,34 +93,64 @@
 }
 .work-day-tabs {
   display: flex;
-  gap: 5px;
+  flex: none;
+  gap: 7px;
   overflow-x: auto;
-  padding: 0 24px;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
+  padding: 10px 24px;
   border-bottom: 1px solid var(--border);
+  background: var(--surface);
 }
 .work-day-tabs button {
   flex: none;
-  padding: 12px 13px;
-  border: 0;
-  border-bottom: 2px solid transparent;
+  padding: 9px 13px;
+  border: 1px solid transparent;
+  border-radius: 10px;
   background: transparent;
   color: var(--text-secondary);
   font: inherit;
+  font-size: var(--fs-sm);
   cursor: pointer;
 }
+.work-day-tabs button:hover {
+  background: var(--surface-soft);
+  color: var(--text-primary);
+}
 .work-day-tabs button.active {
-  border-bottom-color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
   color: var(--accent);
   font-weight: 700;
 }
 .work-day-content {
-  min-height: 180px;
-  overflow: auto;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 22px 26px 28px;
 }
 .work-day-overview {
   display: grid;
   gap: 16px;
+}
+.work-day-content .work-schedule-editor {
+  min-width: 0;
+  overflow: visible;
+}
+.work-day-content .horizontal-table-shell {
+  min-width: 0;
+  width: 100%;
+}
+.work-day-content .horizontal-table-scroll {
+  max-width: 100%;
+}
+.work-day-content .work-schedule-editor > .work-muted {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--surface-soft);
 }
 .work-day-summary {
   display: flex;
@@ -197,6 +235,7 @@
     align-items: end;
   }
   .work-day-panel {
+    width: 100%;
     max-height: 95dvh;
     border-radius: 18px 18px 0 0;
   }
