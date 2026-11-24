@@ -901,6 +901,15 @@ body:has(.dashboard-overlay) .selector-single-options {
   border-radius: var(--radius-sm);
   background: var(--surface);
 }
+.dashboard-calendar-day[role="gridcell"]:not(.outside) {
+  cursor: pointer;
+}
+.dashboard-calendar-day[role="gridcell"]:focus-visible,
+.dashboard-calendar-day.selected {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+}
 .dashboard-calendar-day.outside {
   border-style: dashed;
   background: var(--surface-soft);
@@ -932,7 +941,7 @@ body:has(.dashboard-overlay) .selector-single-options {
   font-size: var(--fs-2xs);
   font-weight: 500;
 }
-.dashboard-calendar-day a {
+.dashboard-calendar-day .dashboard-calendar-chip {
   display: block;
   overflow: hidden;
   margin-top: 3px;

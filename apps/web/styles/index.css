@@ -1671,6 +1671,13 @@ h4 {
   box-shadow: inset 0 0 0 2px var(--accent);
   background: var(--accent-soft);
 }
+.calendar-grid > div[role="gridcell"][tabindex="0"] {
+  cursor: pointer;
+}
+.calendar-grid > div[role="gridcell"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
 @media (max-width: 600px) {
   .calendar-toolbar > .calendar-project-filter {
     width: 100%;

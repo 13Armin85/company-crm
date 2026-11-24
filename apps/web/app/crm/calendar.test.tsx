@@ -27,6 +27,21 @@ afterEach(() => {
 });
 
 describe("Jalali issue calendars", () => {
+  it("selects calendar days directly and removes the separate day picker when day actions are enabled", () => {
+    const html = renderToStaticMarkup(
+      <IssueCalendar
+        issues={[]}
+        projects={[]}
+        value="2024-03-20"
+        onValueChange={() => undefined}
+        onDayDoubleClick={() => undefined}
+      />
+    );
+    expect(html).toContain('role="gridcell"');
+    expect(html).toContain('tabindex="0"');
+    expect(html).toContain('aria-selected="true"');
+    expect(html).not.toContain("رفتن به یک روز مشخص");
+  });
   it("shows undated tasks on their creation day", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2024-03-20T12:00:00Z"));
@@ -159,7 +174,7 @@ describe("calendar date navigation", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2024-03-20T12:00:00Z"));
     const html = renderCalendar();
-    expect(html).toContain('data-selected="true" aria-label="۱ فروردین ۱۴۰۳"');
+    expect(html).toMatch(/data-selected="true"[^>]*aria-label="۱ فروردین ۱۴۰۳"/);
     expect(html).toContain("۰ کار در این ماه");
     expect(html).toContain("موعدی در این ماه ثبت نشده");
   });

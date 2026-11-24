@@ -27,6 +27,7 @@ export function IssueCalendar({
   renderDay,
   emptyHidden = false,
   hideIssueCount = false,
+  onDayDoubleClick,
 }: {
   issues: Issue[];
   projects: Project[];
@@ -41,6 +42,7 @@ export function IssueCalendar({
   renderDay?: (date: string) => ReactNode;
   emptyHidden?: boolean;
   hideIssueCount?: boolean;
+  onDayDoubleClick?: (date: string) => void;
 }) {
   const todayValue = zonedDateTime(new Date(), timeZone)!.date;
   const today = parseDateOnly(todayValue)!;
@@ -86,6 +88,7 @@ export function IssueCalendar({
                 ? "رویدادهای این ماه"
                 : `${toFa(Array.from(events.values()).reduce((count, items) => count + items.length, 0))} کار در این ماه`
           }
+          showDatePicker={!onDayDoubleClick}
         />
         {toolbarEnd}
       </div>
@@ -104,6 +107,34 @@ export function IssueCalendar({
                 key={`${selected.year}-${selected.month}-${day}`}
                 className={`${day < 1 || day > days ? "outside" : ""} ${day === today.jd && selected.month === today.jm && selected.year === today.jy ? "today" : ""} ${day === chosen.jd ? "selected-calendar-day" : ""}`}
                 data-selected={day === chosen.jd || undefined}
+                role="gridcell"
+                tabIndex={onDayDoubleClick && day >= 1 && day <= days ? 0 : undefined}
+                aria-selected={onDayDoubleClick && day >= 1 && day <= days ? day === chosen.jd : undefined}
+                onClick={
+                  onDayDoubleClick && day >= 1 && day <= days
+                    ? () => setDate(jalaliToDateOnly(selected.year, selected.month, day))
+                    : undefined
+                }
+                onDoubleClick={
+                  onDayDoubleClick && day >= 1 && day <= days
+                    ? () => onDayDoubleClick(jalaliToDateOnly(selected.year, selected.month, day))
+                    : undefined
+                }
+                onKeyDown={
+                  onDayDoubleClick && day >= 1 && day <= days
+                    ? (event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          const selectedDay = jalaliToDateOnly(selected.year, selected.month, day);
+                          setDate(selectedDay);
+                          onDayDoubleClick(selectedDay);
+                        } else if (event.key === " ") {
+                          event.preventDefault();
+                          setDate(jalaliToDateOnly(selected.year, selected.month, day));
+                        }
+                      }
+                    : undefined
+                }
                 aria-label={
                   day >= 1 && day <= days
                     ? `${toFa(day)} ${persianMonths[selected.month - 1]} ${toFa(selected.year)}`

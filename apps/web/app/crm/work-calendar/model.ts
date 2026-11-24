@@ -61,7 +61,7 @@ const localTime = (value: string, zone: string) => faTime(zonedDateTime(value, z
 const localDate = (value: string, zone: string) => zonedDateTime(value, zone)?.date ?? "";
 
 /** Local dates touched by [start, end); an end at exactly midnight does not touch the next day. */
-const touches = (start: string, end: string, date: string, zone: string) => {
+export const touchesCalendarDay = (start: string, end: string, date: string, zone: string) => {
   const last = localDate(new Date(Date.parse(end) - 1).toISOString(), zone);
   return localDate(start, zone) <= date && date <= last;
 };
@@ -97,7 +97,7 @@ export function dayChips(data: WorkCalendarData | undefined, date: string, layer
     }
   }
   for (const event of data.events) {
-    if (event.status === "cancelled" || !touches(event.starts_at, event.ends_at, date, zone)) continue;
+    if (event.status === "cancelled" || !touchesCalendarDay(event.starts_at, event.ends_at, date, zone)) continue;
     const time = event.all_day ? "تمام‌روز" : `${localTime(event.starts_at, zone)} تا ${localTime(event.ends_at, zone)}`;
     if (event.restricted || !event.kind) {
       if (layers.has("busy"))
@@ -124,7 +124,7 @@ export function dayChips(data: WorkCalendarData | undefined, date: string, layer
         });
   if (layers.has("absence"))
     for (const absence of data.absences ?? [])
-      if (touches(absence.starts_at, absence.ends_at, date, zone))
+      if (touchesCalendarDay(absence.starts_at, absence.ends_at, date, zone))
         chips.push({ key: `absence-${absence.id}-${date}`, layer: "absence", label: "مرخصی", detail: absence.reason });
   return chips;
 }

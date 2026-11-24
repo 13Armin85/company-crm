@@ -2,7 +2,6 @@ import {
   displayPersianDate,
   jalaliToDateOnly,
   parseDateOnly,
-  PersianDatePicker,
   persianDigits,
   persianMonths,
   zonedDateTime,
@@ -10,8 +9,8 @@ import {
 import { ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
 import { jalaaliMonthLength } from "jalaali-js";
 import { useState } from "react";
-import { Link } from "react-router";
 import { useWorkCalendar } from "../api/work-calendar";
+import { WorkCalendarDayDialog } from "../work-calendar/day-dialog";
 import { dayChips } from "../work-calendar/model";
 import type { LayerId } from "../work-calendar/model";
 import { persianDate } from "../utils";
@@ -52,9 +51,12 @@ export function stepDashboardCalendar(value: string, view: "month" | "week", dir
 export function DashboardCalendar({ widget }: { widget: DashboardWidget }) {
   const today = zonedDateTime(new Date())!.date;
   const [selectedDate, setSelectedDate] = useState(today);
+  const [openDate, setOpenDate] = useState<string | null>(null);
+  const [personId, setPersonId] = useState("");
+  const [layers, setLayers] = useState<Set<LayerId>>(calendarLayers);
   const view = widget.config.calendar_view === "week" ? "week" : "month";
   const range = dashboardCalendarRange(selectedDate, view)!;
-  const workCalendar = useWorkCalendar(undefined, range.start, shiftDate(range.end, -1));
+  const workCalendar = useWorkCalendar(personId || undefined, range.start, shiftDate(range.end, -1));
   const selected = parseDateOnly(selectedDate)!;
   const monthName = persianMonths[selected.jm - 1];
   const title =
@@ -94,12 +96,6 @@ export function DashboardCalendar({ widget }: { widget: DashboardWidget }) {
             <ChevronLeft size={17} />
           </button>
         </div>
-        <PersianDatePicker
-          label="رفتن به تاریخ در تقویم داشبورد"
-          value={selectedDate}
-          allowClear={false}
-          onChange={setSelectedDate}
-        />
       </div>
       <>
         <div className="dashboard-calendar-weekdays" aria-hidden="true">
@@ -111,11 +107,37 @@ export function DashboardCalendar({ widget }: { widget: DashboardWidget }) {
           {cells.map((offsetDay) => {
             const iso = offsetDay >= 0 && offsetDay < days ? shiftDate(range.start, offsetDay) : "";
             const jalali = iso ? displayPersianDate(iso) : undefined;
-            const workChips = iso ? dayChips(workCalendar.data, iso, calendarLayers) : [];
+            const workChips = iso ? dayChips(workCalendar.data, iso, layers) : [];
             return (
               <div
                 key={offsetDay}
-                className={`dashboard-calendar-day${iso ? "" : " outside"}${iso === today ? " today" : ""}`}
+                className={`dashboard-calendar-day${iso ? "" : " outside"}${iso === today ? " today" : ""}${iso === selectedDate ? " selected" : ""}`}
+                role="gridcell"
+                tabIndex={iso ? 0 : undefined}
+                aria-selected={iso ? iso === selectedDate : undefined}
+                onClick={iso ? () => setSelectedDate(iso) : undefined}
+                onDoubleClick={
+                  iso
+                    ? () => {
+                        setSelectedDate(iso);
+                        setOpenDate(iso);
+                      }
+                    : undefined
+                }
+                onKeyDown={
+                  iso
+                    ? (event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          setSelectedDate(iso);
+                          setOpenDate(iso);
+                        } else if (event.key === " ") {
+                          event.preventDefault();
+                          setSelectedDate(iso);
+                        }
+                      }
+                    : undefined
+                }
                 aria-label={
                   jalali
                     ? `${persianDigits(jalali.jd)} ${persianMonths[jalali.jm - 1]} ${persianDigits(jalali.jy)}`
@@ -129,9 +151,9 @@ export function DashboardCalendar({ widget }: { widget: DashboardWidget }) {
                       {workChips.length > 0 && <small>{persianDigits(workChips.length)} رویداد</small>}
                     </div>
                     {workChips.map((chip) => (
-                      <Link key={chip.key} to="/calendar" title={chip.detail || chip.label}>
+                      <span className="dashboard-calendar-chip" key={chip.key} title={chip.detail || chip.label}>
                         {chip.label}
-                      </Link>
+                      </span>
                     ))}
                   </>
                 )}
@@ -144,6 +166,16 @@ export function DashboardCalendar({ widget }: { widget: DashboardWidget }) {
           <p className="dashboard-calendar-status">رویدادی در این {view === "week" ? "هفته" : "ماه"} ثبت نشده است.</p>
         )}
       </>
+      {openDate && (
+        <WorkCalendarDayDialog
+          date={openDate}
+          personId={personId}
+          onPersonChange={setPersonId}
+          layers={layers}
+          onLayersChange={setLayers}
+          onClose={() => setOpenDate(null)}
+        />
+      )}
     </section>
   );
 }

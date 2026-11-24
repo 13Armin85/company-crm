@@ -8,6 +8,8 @@ import {
   PersianDateTimePicker,
   PersianTimePicker,
   SearchableSelect,
+  zonedDateTime,
+  zonedDateTimeToISO,
 } from "@plane/ui";
 import { CalendarCheck, Plus, Trash2 } from "lucide-react";
 import type {
@@ -195,6 +197,7 @@ const modeOptions = (Object.keys(WORK_MODE_LABELS) as WorkMode[]).map((mode) => 
 
 export function WeeklyScheduleEditor({
   initial,
+  initialDate,
   minDate,
   timeZone,
   saving,
@@ -202,6 +205,7 @@ export function WeeklyScheduleEditor({
   onCancel,
 }: {
   initial?: WeekDayInput[];
+  initialDate?: string;
   minDate?: string;
   timeZone?: string;
   saving?: boolean;
@@ -212,7 +216,7 @@ export function WeeklyScheduleEditor({
     const source = initial?.length === 7 ? initial : defaultWeek();
     return WEEK_ORDER.map(({ weekday }) => ({ ...source.find((day) => day.weekday === weekday)! }));
   });
-  const [effectiveFrom, setEffectiveFrom] = useState("");
+  const [effectiveFrom, setEffectiveFrom] = useState(initialDate ?? "");
   const [effectiveTo, setEffectiveTo] = useState("");
   const [reason, setReason] = useState("");
   const [submitted, setSubmitted] = useState(false);
@@ -386,12 +390,14 @@ export function WeeklyScheduleEditor({
 }
 
 export function ExceptionForm({
+  fixedDate,
   minDate,
   timeZone,
   saving,
   onSubmit,
   onCancel,
 }: {
+  fixedDate?: string;
   minDate?: string;
   timeZone?: string;
   saving?: boolean;
@@ -405,8 +411,8 @@ export function ExceptionForm({
   }) => void;
   onCancel?: () => void;
 }) {
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [dateFrom, setDateFrom] = useState(fixedDate ?? "");
+  const [dateTo, setDateTo] = useState(fixedDate ?? "");
   const [isWorking, setIsWorking] = useState(true);
   const [start, setStart] = useState("12:00");
   const [end, setEnd] = useState("18:00");
@@ -436,23 +442,26 @@ export function ExceptionForm({
         }}
       >
         <p className="work-muted">استثنا فقط همان تاریخ‌ها را تغییر می‌دهد و برنامهٔ هفتگی دست نمی‌خورد.</p>
-        <div className="work-form-row">
-          <PersianDatePicker
-            label="از تاریخ"
-            required
-            value={dateFrom}
-            min={minDate}
-            timeZone={timeZone}
-            onChange={setDateFrom}
-          />
-          <PersianDatePicker
-            label="تا تاریخ (اختیاری)"
-            value={dateTo}
-            min={dateFrom || minDate}
-            timeZone={timeZone}
-            onChange={setDateTo}
-          />
-        </div>
+        {!fixedDate && (
+          <div className="work-form-row">
+            <PersianDatePicker
+              label="از تاریخ"
+              required
+              value={dateFrom}
+              min={minDate}
+              timeZone={timeZone}
+              onChange={setDateFrom}
+            />
+            <PersianDatePicker
+              label="تا تاریخ (اختیاری)"
+              value={dateTo}
+              min={dateFrom || minDate}
+              timeZone={timeZone}
+              onChange={setDateTo}
+            />
+          </div>
+        )}
+        {fixedDate && <p className="work-fixed-date">تاریخ استثنا: {persianDate(fixedDate)}</p>}
         <label className="work-check">
           <input type="checkbox" checked={isWorking} onChange={(event) => setIsWorking(event.target.checked)} />
           <span>در این تاریخ‌ها کار می‌کند</span>
@@ -498,6 +507,7 @@ const kindOptions: { id: WorkEventKind; title: string }[] = [
 export function WorkEventForm({
   people,
   defaultParticipant,
+  fixedDate,
   timeZone,
   saving,
   onSubmit,
@@ -505,6 +515,7 @@ export function WorkEventForm({
 }: {
   people: CalendarPerson[];
   defaultParticipant: string;
+  fixedDate?: string;
   timeZone?: string;
   saving?: boolean;
   onSubmit: (payload: {
@@ -523,8 +534,8 @@ export function WorkEventForm({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [privateNote, setPrivateNote] = useState("");
-  const [startsAt, setStartsAt] = useState("");
-  const [endsAt, setEndsAt] = useState("");
+  const [startsAt, setStartsAt] = useState(() => (fixedDate ? zonedDateTimeToISO(fixedDate, "09:00", timeZone) : ""));
+  const [endsAt, setEndsAt] = useState(() => (fixedDate ? zonedDateTimeToISO(fixedDate, "10:00", timeZone) : ""));
   const [participants, setParticipants] = useState<string[]>([defaultParticipant]);
   const [submitted, setSubmitted] = useState(false);
   const errors = [
@@ -532,6 +543,9 @@ export function WorkEventForm({
     ...(startsAt && endsAt ? [] : ["زمان شروع و پایان را انتخاب کنید."]),
     ...(startsAt && endsAt && Date.parse(endsAt) <= Date.parse(startsAt)
       ? ["پایان رویداد باید بعد از شروع آن باشد."]
+      : []),
+    ...(fixedDate && [startsAt, endsAt].some((value) => value && zonedDateTime(value, timeZone)?.date !== fixedDate)
+      ? ["شروع و پایان رویداد باید در روز انتخاب‌شده باشد."]
       : []),
     ...(participants.length ? [] : ["دست‌کم یک فرد مرتبط انتخاب کنید."]),
   ];
@@ -556,6 +570,7 @@ export function WorkEventForm({
           });
         }}
       >
+        {fixedDate && <p className="work-fixed-date">رویداد برای {persianDate(fixedDate)}</p>}
         <div className="work-form-row">
           <SearchableSelect
             label="نوع"
@@ -569,8 +584,22 @@ export function WorkEventForm({
           </label>
         </div>
         <div className="work-form-row">
-          <PersianDateTimePicker label="شروع" value={startsAt} timeZone={timeZone} onChange={setStartsAt} />
-          <PersianDateTimePicker label="پایان" value={endsAt} timeZone={timeZone} onChange={setEndsAt} />
+          <PersianDateTimePicker
+            label="شروع"
+            value={startsAt}
+            timeZone={timeZone}
+            min={fixedDate ? zonedDateTimeToISO(fixedDate, "00:00", timeZone) : undefined}
+            max={fixedDate ? zonedDateTimeToISO(fixedDate, "23:59", timeZone) : undefined}
+            onChange={setStartsAt}
+          />
+          <PersianDateTimePicker
+            label="پایان"
+            value={endsAt}
+            timeZone={timeZone}
+            min={fixedDate ? zonedDateTimeToISO(fixedDate, "00:00", timeZone) : undefined}
+            max={fixedDate ? zonedDateTimeToISO(fixedDate, "23:59", timeZone) : undefined}
+            onChange={setEndsAt}
+          />
         </div>
         <CompactMultiSelector
           label="افراد مرتبط"

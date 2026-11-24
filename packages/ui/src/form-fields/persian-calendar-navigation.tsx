@@ -21,12 +21,14 @@ export function PersianCalendarNavigation({
   timeZone,
   description = "تقویم شمسی",
   disabled = false,
+  showDatePicker = true,
 }: {
   value: string;
   onChange: (date: string) => void;
   timeZone?: string;
   description?: string;
   disabled?: boolean;
+  showDatePicker?: boolean;
 }) {
   const todayValue = zonedDateTime(new Date(), timeZone)?.date ?? "";
   const today = parseDateOnly(todayValue)!;
@@ -110,19 +112,21 @@ export function PersianCalendarNavigation({
             options={years.map((year) => ({ id: String(year), title: persianDigits(year) }))}
           />
         </div>
-        <div className="persian-navigation-date">
-          <span>رفتن به یک روز مشخص</span>
-          <PersianDatePicker
-            label="رفتن به تاریخ"
-            value={validValue}
-            timeZone={timeZone}
-            disabled={disabled}
-            allowClear={false}
-            onChange={(date) => {
-              if (parseDateOnly(date)) onChange(date);
-            }}
-          />
-        </div>
+        {showDatePicker && (
+          <div className="persian-navigation-date">
+            <span>رفتن به یک روز مشخص</span>
+            <PersianDatePicker
+              label="رفتن به تاریخ"
+              value={validValue}
+              timeZone={timeZone}
+              disabled={disabled}
+              allowClear={false}
+              onChange={(date) => {
+                if (parseDateOnly(date)) onChange(date);
+              }}
+            />
+          </div>
+        )}
       </div>
     </section>
   );

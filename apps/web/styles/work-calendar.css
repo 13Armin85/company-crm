@@ -13,6 +13,209 @@
   display: grid;
   gap: 16px;
 }
+.work-day-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+.work-day-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgb(17 24 39 / 62%);
+  backdrop-filter: blur(4px);
+}
+.work-day-panel {
+  position: relative;
+  width: min(900px, 100%);
+  max-height: min(850px, calc(100dvh - 40px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: var(--surface);
+  box-shadow: 0 24px 80px rgb(0 0 0 / 22%);
+}
+.work-day-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 24px 26px 18px;
+  background: linear-gradient(115deg, color-mix(in srgb, var(--accent) 13%, var(--surface)), var(--surface));
+}
+.work-day-header-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex: none;
+  border-radius: 13px;
+  color: var(--accent);
+  background: var(--surface);
+}
+.work-day-header span {
+  color: var(--accent);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+.work-day-header h2 {
+  margin: 2px 0 5px;
+  font-size: clamp(1.2rem, 3vw, 1.7rem);
+}
+.work-day-header p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+}
+.work-day-close {
+  margin-inline-start: auto;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  background: var(--surface);
+  cursor: pointer;
+}
+.work-day-tabs {
+  display: flex;
+  gap: 5px;
+  overflow-x: auto;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--border);
+}
+.work-day-tabs button {
+  flex: none;
+  padding: 12px 13px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+.work-day-tabs button.active {
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+  font-weight: 700;
+}
+.work-day-content {
+  min-height: 180px;
+  overflow: auto;
+  padding: 22px 26px 28px;
+}
+.work-day-overview {
+  display: grid;
+  gap: 16px;
+}
+.work-day-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.work-day-summary button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--accent);
+  border-radius: 9px;
+  padding: 8px 12px;
+  background: var(--accent);
+  color: white;
+  cursor: pointer;
+}
+.work-day-state {
+  margin: 0;
+  padding: 18px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  color: var(--text-secondary);
+  background: var(--surface-soft);
+}
+.work-day-events {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.work-day-events li {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 13px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.work-day-event-marker {
+  width: 8px;
+  height: 36px;
+  flex: none;
+  border-radius: 6px;
+  background: var(--accent);
+}
+.work-day-events li > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.work-day-events small {
+  color: var(--text-secondary);
+}
+.work-day-events time {
+  margin-inline-start: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+}
+.work-day-settings {
+  display: grid;
+  gap: 20px;
+}
+.work-day-settings-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.work-fixed-date {
+  margin: 0;
+  font-weight: 700;
+}
+@media (max-width: 600px) {
+  .work-day-dialog {
+    padding: 0;
+    align-items: end;
+  }
+  .work-day-panel {
+    max-height: 95dvh;
+    border-radius: 18px 18px 0 0;
+  }
+  .work-day-header {
+    padding: 18px 16px 14px;
+  }
+  .work-day-tabs {
+    padding: 0 12px;
+  }
+  .work-day-content {
+    padding: 18px 14px 24px;
+  }
+  .work-day-events li {
+    flex-wrap: wrap;
+  }
+  .work-day-events time {
+    margin-inline-start: 20px;
+  }
+}
 .work-chip-tasks {
   --chip: var(--layer-tasks);
 }

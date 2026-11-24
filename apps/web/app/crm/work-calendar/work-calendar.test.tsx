@@ -3,7 +3,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WorkCalendarData } from "../api/work-calendar";
 import { IssueCalendar } from "../issue-calendar";
 import { monthRange } from "../pages/calendar";
-import { LayerChips, LayerFilter, PendingConfirmations, PresenceToday, WeeklyScheduleEditor } from "./components";
+import {
+  ExceptionForm,
+  LayerChips,
+  LayerFilter,
+  PendingConfirmations,
+  PresenceToday,
+  WeeklyScheduleEditor,
+  WorkEventForm,
+} from "./components";
 import { ALL_LAYERS, dayChips, defaultWeek, validateWeek } from "./model";
 import type { LayerId } from "./model";
 
@@ -80,6 +88,22 @@ const event = (kind: "meeting" | "mission" | "event", title: string, start: stri
 });
 
 describe("work calendar layers", () => {
+  it("prepares day actions for the selected date inside the form", () => {
+    const eventHtml = renderToStaticMarkup(
+      <WorkEventForm
+        fixedDate="2027-01-07"
+        people={[{ id: "u1", name: "کارمند", relation: "self", can_view: true, can_edit: true, can_schedule: true }]}
+        defaultParticipant="u1"
+        timeZone="Asia/Tehran"
+        onSubmit={() => undefined}
+      />
+    );
+    const exceptionHtml = renderToStaticMarkup(<ExceptionForm fixedDate="2027-01-07" onSubmit={() => undefined} />);
+    expect(eventHtml).toContain("رویداد کاری جدید");
+    expect(eventHtml).toContain("رویداد برای");
+    expect(exceptionHtml).toContain("تاریخ استثنا");
+    expect(exceptionHtml).not.toContain("تا تاریخ (اختیاری)");
+  });
   it("labels schedule, exception, non-working day, presence and leave with distinct layers", () => {
     const chips = (date: string) => dayChips(base, date, ALL_LAYERS);
     expect(chips("2027-01-02")).toEqual([
