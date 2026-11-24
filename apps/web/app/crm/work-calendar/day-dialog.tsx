@@ -1,6 +1,15 @@
 import { Dialog, DialogPanel, DialogTitle } from "@headlessui/react";
 import { zonedDateTime } from "@plane/ui";
-import { CalendarDays, CalendarPlus, Clock3, SlidersHorizontal, X } from "lucide-react";
+import {
+  CalendarDays,
+  CalendarPlus,
+  ChevronLeft,
+  Clock3,
+  CalendarRange,
+  ListFilter,
+  SlidersHorizontal,
+  X,
+} from "lucide-react";
 import { useState } from "react";
 import {
   useCancelPresence,
@@ -78,26 +87,44 @@ export function WorkCalendarDayDialog({
           },
         ]
       : [];
-  const tabs: { id: Section; label: string; visible: boolean }[] = [
-    { id: "day", label: "برنامهٔ روز", visible: true },
-    { id: "event", label: "ثبت رویداد", visible: Boolean(calendar?.can_schedule) },
-    { id: "exception", label: "استثنای روز", visible: Boolean(calendar?.can_edit) },
-    { id: "schedule", label: "برنامهٔ هفتگی", visible: Boolean(calendar?.can_edit) },
-    { id: "settings", label: "نمایش", visible: true },
-  ];
+  const tabs = [
+    { id: "day", label: "برنامهٔ روز", hint: "رویدادها و وضعیت", icon: CalendarDays, visible: true },
+    {
+      id: "event",
+      label: "ثبت رویداد",
+      hint: "جلسه، مأموریت و رویداد",
+      icon: CalendarPlus,
+      visible: Boolean(calendar?.can_schedule),
+    },
+    {
+      id: "exception",
+      label: "استثنای روز",
+      hint: "تغییر برنامهٔ این روز",
+      icon: Clock3,
+      visible: Boolean(calendar?.can_edit),
+    },
+    {
+      id: "schedule",
+      label: "برنامهٔ هفتگی",
+      hint: "ساعت کار روزهای هفته",
+      icon: CalendarRange,
+      visible: Boolean(calendar?.can_edit),
+    },
+    { id: "settings", label: "نمایش تقویم", hint: "فرد و لایه‌های نمایشی", icon: ListFilter, visible: true },
+  ] as const;
+  const currentTab = tabs.find((tab) => tab.id === section) ?? tabs[0];
 
   return (
     <Dialog open onClose={onClose} className="work-day-dialog">
       <div className="work-day-backdrop" aria-hidden="true" />
       <DialogPanel className="work-day-panel" dir="rtl">
         <header className="work-day-header">
-          <div className="work-day-header-icon">
-            <CalendarDays size={22} aria-hidden="true" />
-          </div>
-          <div>
-            <span>برنامهٔ انتخاب‌شده</span>
+          <div className="work-day-header-copy">
+            <span className="work-day-eyebrow">
+              <CalendarDays size={15} aria-hidden="true" /> تقویم کاری
+            </span>
             <DialogTitle>{persianDate(date, { weekday: "long", year: "numeric" })}</DialogTitle>
-            <p>رویدادها و اقدام‌های این روز از سامانه دریافت و در آن ثبت می‌شوند.</p>
+            <p>{calendar?.user.name ? `برنامهٔ ${calendar.user.name}` : "جزئیات و برنامهٔ روز انتخاب‌شده"}</p>
           </div>
           <button type="button" className="work-day-close" aria-label="بستن" onClick={onClose}>
             <X size={19} />
@@ -110,7 +137,7 @@ export function WorkCalendarDayDialog({
             دریافت برنامهٔ این روز انجام نشد.
           </p>
         ) : (
-          <>
+          <div className="work-day-layout">
             <nav className="work-day-tabs" aria-label="بخش‌های روز">
               {tabs
                 .filter((tab) => tab.visible)
@@ -122,11 +149,27 @@ export function WorkCalendarDayDialog({
                     aria-current={section === tab.id ? "page" : undefined}
                     onClick={() => setSection(tab.id)}
                   >
-                    {tab.label}
+                    <tab.icon size={18} aria-hidden="true" />
+                    <span>
+                      <strong>{tab.label}</strong>
+                      <small>{tab.hint}</small>
+                    </span>
+                    <ChevronLeft className="work-day-tab-arrow" size={16} aria-hidden="true" />
                   </button>
                 ))}
             </nav>
-            <div className="work-day-content">
+            <div className="work-day-content" key={section}>
+              <div className="work-day-section-head">
+                <span className="work-day-section-icon">
+                  <currentTab.icon size={21} aria-hidden="true" />
+                </span>
+                <div>
+                  <h3>{currentTab.label}</h3>
+                  <p>
+                    {currentTab.hint} · {persianDate(date)}
+                  </p>
+                </div>
+              </div>
               {section === "day" && (
                 <div className="work-day-overview">
                   <div className="work-day-summary">
@@ -241,7 +284,7 @@ export function WorkCalendarDayDialog({
                 </div>
               )}
             </div>
-          </>
+          </div>
         )}
       </DialogPanel>
     </Dialog>

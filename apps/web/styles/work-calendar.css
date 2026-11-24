@@ -19,7 +19,7 @@
   z-index: 1300;
   display: grid;
   place-items: center;
-  padding: 20px;
+  padding: 24px;
 }
 .work-day-backdrop {
   position: fixed;
@@ -35,43 +35,40 @@ body:has(.work-day-dialog) .selector-single-options {
 }
 .work-day-panel {
   position: relative;
-  width: min(1080px, 100%);
+  width: min(1040px, 100%);
   min-width: 0;
-  max-height: min(850px, calc(100dvh - 40px));
+  height: min(820px, calc(100dvh - 48px));
   display: flex;
   flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 22px;
+  border-radius: 20px;
   background: var(--surface);
   box-shadow: 0 24px 80px rgb(0 0 0 / 22%);
 }
 .work-day-header {
   display: flex;
   flex: none;
-  align-items: flex-start;
   gap: 16px;
-  padding: 24px 26px 18px;
-  background: linear-gradient(115deg, color-mix(in srgb, var(--accent) 13%, var(--surface)), var(--surface));
+  align-items: center;
+  padding: 22px 28px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
 }
-.work-day-header-icon {
-  display: grid;
-  place-items: center;
-  width: 42px;
-  height: 42px;
-  flex: none;
-  border-radius: 13px;
-  color: var(--accent);
-  background: var(--surface);
+.work-day-header-copy {
+  min-width: 0;
 }
-.work-day-header span {
+.work-day-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   color: var(--accent);
   font-size: var(--fs-sm);
   font-weight: 700;
 }
 .work-day-header h2 {
-  margin: 2px 0 5px;
-  font-size: clamp(1.2rem, 3vw, 1.7rem);
+  margin: 4px 0 3px;
+  font-size: clamp(1.25rem, 3vw, 1.65rem);
 }
 .work-day-header p {
   margin: 0;
@@ -91,30 +88,60 @@ body:has(.work-day-dialog) .selector-single-options {
   background: var(--surface);
   cursor: pointer;
 }
+.work-day-layout {
+  display: grid;
+  grid-template-columns: 238px minmax(0, 1fr);
+  min-height: 0;
+  flex: 1;
+}
 .work-day-tabs {
   display: flex;
-  flex: none;
-  gap: 7px;
-  overflow-x: auto;
-  overscroll-behavior-inline: contain;
-  scrollbar-width: thin;
-  padding: 10px 24px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 20px 12px;
+  border-inline-end: 1px solid var(--border);
+  background: var(--surface-soft);
 }
 .work-day-tabs button {
-  flex: none;
-  padding: 9px 13px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 11px 12px;
   border: 1px solid transparent;
-  border-radius: 10px;
+  border-radius: 12px;
   background: transparent;
   color: var(--text-secondary);
   font: inherit;
-  font-size: var(--fs-sm);
+  text-align: start;
   cursor: pointer;
 }
+.work-day-tabs button > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.work-day-tabs button strong {
+  font-size: var(--fs-sm);
+}
+.work-day-tabs button small {
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.work-day-tabs button > svg:first-child {
+  flex: none;
+}
+.work-day-tab-arrow {
+  margin-inline-start: auto;
+  opacity: 0;
+}
 .work-day-tabs button:hover {
-  background: var(--surface-soft);
+  background: var(--surface);
   color: var(--text-primary);
 }
 .work-day-tabs button.active {
@@ -123,14 +150,49 @@ body:has(.work-day-dialog) .selector-single-options {
   color: var(--accent);
   font-weight: 700;
 }
+.work-day-tabs button.active .work-day-tab-arrow {
+  opacity: 1;
+}
+.work-day-tabs button:focus-visible,
+.work-day-close:focus-visible,
+.work-day-summary button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 .work-day-content {
   min-width: 0;
   min-height: 0;
-  flex: 1 1 auto;
+  height: 100%;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 22px 26px 28px;
+  padding: 26px 30px 32px;
+}
+.work-day-section-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.work-day-section-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex: none;
+  border-radius: 12px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+}
+.work-day-section-head h3 {
+  margin: 0 0 3px;
+  color: var(--text-primary);
+  font-size: var(--fs-lg);
+}
+.work-day-section-head p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
 }
 .work-day-overview {
   display: grid;
@@ -139,6 +201,25 @@ body:has(.work-day-dialog) .selector-single-options {
 .work-day-content .work-schedule-editor {
   min-width: 0;
   overflow: visible;
+}
+.work-day-content .work-week-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+.work-day-content .work-week-day {
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+.work-day-content .work-week-day-fields {
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  align-items: end;
+}
+.work-day-content .work-week-breaks {
+  grid-column: 1 / -1;
+}
+.work-day-content :is(.work-event-form, .work-schedule-editor, .work-exception-form) {
+  border: 0;
+  padding: 0;
+  background: transparent;
 }
 .work-day-content .work-schedule-editor > .work-muted {
   padding: 12px 14px;
@@ -211,15 +292,45 @@ body:has(.work-day-dialog) .selector-single-options {
 }
 .work-day-settings {
   display: grid;
-  gap: 20px;
+  gap: 18px;
+  align-content: start;
 }
 .work-day-settings-title {
   display: flex;
   align-items: center;
   gap: 7px;
+  padding: 15px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+.work-day-settings .work-person-picker,
+.work-day-settings .work-layer-filter {
+  width: 100%;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.work-day-settings .work-person-picker {
+  gap: 10px;
+}
+.work-day-content .work-event-form .work-event-pair {
+  gap: 16px;
+}
+.work-day-content .work-event-form .work-field textarea {
+  min-height: 116px;
+}
+.work-day-content :is(.work-event-form, .work-schedule-editor, .work-exception-form) > .work-form-actions {
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
 }
 .work-fixed-date {
   margin: 0;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: var(--surface-soft);
   font-weight: 700;
 }
 @media (max-width: 600px) {
@@ -229,14 +340,31 @@ body:has(.work-day-dialog) .selector-single-options {
   }
   .work-day-panel {
     width: 100%;
-    max-height: 95dvh;
+    height: 96dvh;
     border-radius: 18px 18px 0 0;
   }
   .work-day-header {
     padding: 18px 16px 14px;
   }
+  .work-day-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
   .work-day-tabs {
-    padding: 0 12px;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 10px 12px;
+    border-inline-end: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .work-day-tabs button {
+    flex: none;
+    padding: 8px 10px;
+  }
+  .work-day-tabs button small,
+  .work-day-tab-arrow {
+    display: none;
   }
   .work-day-content {
     padding: 18px 14px 24px;
@@ -246,6 +374,24 @@ body:has(.work-day-dialog) .selector-single-options {
   }
   .work-day-events time {
     margin-inline-start: 20px;
+  }
+  .work-day-content .work-week-day-fields,
+  .work-day-content .work-week-time-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (min-width: 601px) and (max-width: 760px) {
+  .work-day-layout {
+    grid-template-columns: 188px minmax(0, 1fr);
+  }
+  .work-day-tabs button small {
+    display: none;
+  }
+  .work-day-content {
+    padding: 20px;
+  }
+  .work-day-content .work-week-day-fields {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 .work-chip-tasks {
