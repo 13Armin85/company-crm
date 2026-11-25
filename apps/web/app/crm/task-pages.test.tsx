@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Issue, Member } from "./types";
 
-const state = vi.hoisted(() => ({ issues: [] as Issue[], admin: false }));
+const state = vi.hoisted(() => ({ issues: [] as Issue[], admin: false, canCreate: true }));
 const user: Member = {
   id: "owner",
   displayName: "Receiver",
@@ -17,7 +17,10 @@ const user: Member = {
 vi.mock("./api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./api")>()),
   useCurrentUser: () => ({ data: user, isLoading: false }),
-  useWorkspaceAccess: () => ({ data: { is_admin: state.admin, can: () => true }, isLoading: false }),
+  useWorkspaceAccess: () => ({
+    data: { is_admin: state.admin, can: (code: string) => code !== "Issue.Create" || state.canCreate },
+    isLoading: false,
+  }),
   useTaskHistory: () => ({ data: state.issues, isLoading: false }),
   useIssues: () => ({ data: state.issues, isLoading: false }),
   useProjects: () => ({ data: [], isLoading: false }),
@@ -86,6 +89,7 @@ const renderPage = (element: ReactNode) =>
   );
 beforeEach(() => {
   state.admin = false;
+  state.canCreate = true;
   state.issues = [
     task("received-from-manager"),
     task("legacy-self-created", { senderId: user.id }),
@@ -95,7 +99,7 @@ beforeEach(() => {
 });
 
 describe("member task pages", () => {
-  it("shows current received work with transfer actions but no creation or status controls in My Work", () => {
+  it("shows current received work and a task creation action in My Work", () => {
     const html = renderPage(<MyWorkPage />);
     expect(html).toContain("received-from-manager");
     expect(html).not.toContain("legacy-self-created");
@@ -104,11 +108,17 @@ describe("member task pages", () => {
     expect(html).not.toContain('aria-label="انتقال به عضو دیگر"');
     expect(html).not.toContain('aria-label="تغییر وضعیت');
     expect(html).not.toContain("افزودن کار");
+    expect(html).toContain("تسک / کار جدید");
     expect(html).toContain('aria-label="عملیات کار"');
     expect(html).not.toContain("has-inline-transfer");
     expect(html).toContain("personal-work-table");
     expect(html).toContain('aria-label="خلاصه کارهای من"');
     expect(html).toContain("جستجوی عنوان، شناسه یا فرستنده");
+  });
+  it("hides My Work creation when the user lacks Issue.Create", () => {
+    state.canCreate = false;
+    const html = renderPage(<MyWorkPage />);
+    expect(html).not.toContain("تسک / کار جدید");
   });
   it("does not include another person's tasks in the My Work summary or table", () => {
     state.issues = [task("another-persons-task", { assignee: { ...user, id: "other" } })];
@@ -153,7 +163,7 @@ describe("member task pages", () => {
     expect(html).toContain('aria-label="عملیات کار"');
     expect(html).toContain('aria-expanded="false"');
     expect(html).not.toContain("افزودن کار");
-    expect(html).not.toContain("کار جدید");
+    expect(html).toContain("تسک / کار جدید");
   });
   it.each([false, true])("offers task creation in All Tasks for administrator=%s", (admin) => {
     state.admin = admin;

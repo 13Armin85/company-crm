@@ -424,6 +424,8 @@ def schema_fields(entity, subtype=None, draft=False):
             continue
         field = deepcopy(library[code])
         field["binding"] = binding
+        if is_ticket_recipient_alias(entity, field):
+            field["config"]["depends_on"] = "project"
         if (entity.parent or entity).adapter == "user" and binding.get(
             "source"
         ) == "password":
@@ -454,6 +456,16 @@ def schema_fields(entity, subtype=None, draft=False):
     if cache is not None:
         cache[cache_key] = deepcopy((layout, result))
     return layout, result
+
+
+def is_ticket_recipient_alias(entity, field):
+    """Older published work forms use a single `assignee` input without a native binding."""
+    return (
+        entity.adapter == "ticket"
+        and field.get("code") == "assignee"
+        and field.get("kind") == "user"
+        and not field.get("binding", {}).get("source")
+    )
 
 
 def role_ids(user, workspace):

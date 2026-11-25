@@ -28,6 +28,7 @@ from plane.app.services.entity_schema import (
     present_schema,
     validate_layout,
     can_field,
+    is_ticket_recipient_alias,
     role_ids,
 )
 from plane.app.services.entity_records import (
@@ -828,7 +829,12 @@ class EngineOptionsEndpoint(EngineAPIView):
             )
             if resolving:
                 rows = rows.filter(id__in=selected)
-            if kind == "user" and field_code == "ticket_assignees" and request.query_params.get("parent"):
+            if (
+                kind == "user"
+                and entity.adapter == "ticket"
+                and (field_code == "ticket_assignees" or is_ticket_recipient_alias(entity, field))
+                and request.query_params.get("parent")
+            ):
                 from plane.db.models import ProjectMember
 
                 rows = rows.filter(

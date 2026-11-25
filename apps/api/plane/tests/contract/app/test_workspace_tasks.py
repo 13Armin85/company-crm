@@ -1,6 +1,11 @@
+from copy import deepcopy
+
 import pytest
 
 from plane.db.models import (
+    EntityType,
+    FormLayout,
+    FormVersion,
     Issue,
     IssueAssignee,
     Project,
@@ -16,6 +21,74 @@ def add_member(workspace, email):
     user = User.objects.create_user(email=email, username=email.split("@", 1)[0], password="SafePass123!")
     WorkspaceMember.objects.create(workspace=workspace, member=user, role=15)
     return user
+
+
+@pytest.mark.django_db
+def test_legacy_single_recipient_form_creates_real_tasks_for_member_and_admin(session_client, workspace, create_user):
+    """A published `assignee` field must assign the native work, not just save sidecar data."""
+    entity = EntityType.objects.get(workspace=workspace, code="ticket")
+    form = FormLayout.objects.get(entity=entity)
+    layout = deepcopy(form.published.schema)
+    recipient_binding = next(
+        binding
+        for section in layout["sections"]
+        for binding in section["bindings"]
+        if binding["field"] == "ticket_assignees"
+    )
+    recipient_binding["field"] = "assignee"
+    recipient_binding.pop("source", None)
+    form.published = FormVersion.objects.create(layout=form, number=form.published.number + 1, schema=layout)
+    form.save(update_fields=["published"])
+
+    sender = add_member(workspace, "alias-sender@example.com")
+    recipient = add_member(workspace, "alias-recipient@example.com")
+    path = f"/api/workspaces/{workspace.slug}/engine/entities/ticket/records/"
+    session_client.force_authenticate(user=sender)
+    rejected = session_client.post(path, {"values": {"title": "Self task", "assignee": str(sender.id)}}, format="json")
+    assert rejected.status_code == 400, rejected.data
+    created = session_client.post(path, {"values": {"title": "Member task", "assignee": str(recipient.id)}}, format="json")
+    assert created.status_code == 201, created.data
+    assert IssueAssignee.objects.filter(issue_id=created.data["id"], assignee=recipient).exists()
+    assert created.data["values"]["assignee"] == str(recipient.id)
+    assert session_client.get(f"{path}{created.data['id']}/").status_code == 200
+
+    session_client.force_authenticate(user=create_user)
+    self_assigned = session_client.post(
+        path, {"values": {"title": "Admin task", "assignee": str(create_user.id)}}, format="json"
+    )
+    assert self_assigned.status_code == 201, self_assigned.data
+    assert IssueAssignee.objects.filter(issue_id=self_assigned.data["id"], assignee=create_user).exists()
+
+
+@pytest.mark.django_db
+def test_legacy_single_recipient_options_follow_project_members(session_client, workspace):
+    entity = EntityType.objects.get(workspace=workspace, code="ticket")
+    form = FormLayout.objects.get(entity=entity)
+    layout = deepcopy(form.published.schema)
+    for section in layout["sections"]:
+        for binding in section["bindings"]:
+            if binding["field"] == "ticket_assignees":
+                binding["field"] = "assignee"
+                binding.pop("source", None)
+    form.published = FormVersion.objects.create(layout=form, number=form.published.number + 1, schema=layout)
+    form.save(update_fields=["published"])
+
+    teammate = add_member(workspace, "alias-project-member@example.com")
+    outsider = add_member(workspace, "alias-project-outsider@example.com")
+    project = Project.objects.create(workspace=workspace, name="Alias project", identifier="ALR")
+    ProjectMember.objects.create(workspace=workspace, project=project, member=teammate, role=15)
+    schema = session_client.get(f"/api/workspaces/{workspace.slug}/engine/entities/ticket/schema/")
+    assert schema.status_code == 200, schema.data
+    field = next(item for item in schema.data["fields"] if item["code"] == "assignee")
+    assert field["config"]["depends_on"] == "project"
+    options = session_client.get(
+        f"/api/workspaces/{workspace.slug}/engine/entities/ticket/options/assignee/",
+        {"parent": str(project.id)},
+    )
+    assert options.status_code == 200, options.data
+    ids = {item["id"] for item in options.data["results"]}
+    assert str(teammate.id) in ids
+    assert str(outsider.id) not in ids
 
 
 @pytest.mark.django_db

@@ -40,7 +40,7 @@ from .access_control import has_permission, can_manage_absence
 from .project_visibility import visible_projects
 from .task_visibility import visible_issues
 from .task_policy import validate_other_assignees, validate_creation_assignees
-from .entity_schema import schema_fields, role_ids, can_field
+from .entity_schema import schema_fields, role_ids, can_field, is_ticket_recipient_alias
 from .entity_rules import empty, normalize, condition, compute, formula_fields
 from .entity_directory import native_value
 
@@ -84,7 +84,7 @@ def field_edit_action(entity, field):
     if entity.adapter in {"task", "ticket"}:
         if source in {"status", "state_id", "work_status"}:
             return "status"
-        if source in {"assignee_id", "assignee_ids"}:
+        if source in {"assignee_id", "assignee_ids"} or is_ticket_recipient_alias(entity, field):
             return "assign"
     return "edit"
 
@@ -237,6 +237,11 @@ def all_values(entity, row=None, native=None, subtype=None):
                     if source == "assignee_ids"
                     else json_value(native_value(entity, native, source))
                 )
+            elif is_ticket_recipient_alias(entity, field):
+                assignees = list(
+                    native.issue_assignee.filter(deleted_at__isnull=True).values_list("assignee_id", flat=True)
+                )
+                values[code] = str(assignees[0]) if assignees else None
     return values
 
 
@@ -861,7 +866,19 @@ def save_native(
                 data[name] = model_field.get_default()
     creating = native is None
     if adapter == "ticket":
-        data["assignee_ids"] = data.get("assignee_ids") or []
+        if creating:
+            data["assignee_ids"] = data.get("assignee_ids") or []
+        if not any(field["binding"].get("source") == "assignee_ids" for field in fields.values()):
+            alias = fields.get("assignee")
+            if alias and is_ticket_recipient_alias(entity, alias):
+                selected = values.get("assignee")
+                current = (
+                    native.issue_assignee.filter(deleted_at__isnull=True).values_list("assignee_id", flat=True).first()
+                    if native
+                    else None
+                )
+                if creating or str(selected or "") != str(current or ""):
+                    data["assignee_ids"] = selected if isinstance(selected, list) else [selected] if selected else []
         if "work_status" in data:
             selected_status = data.pop("work_status")
             if data.get("project_id") or native and native.project_id:
@@ -869,9 +886,6 @@ def save_native(
             else:
                 data["status"] = selected_status or "todo"
     if adapter in {"ticket", "task"}:
-        recipients = data.get(
-            "assignee_ids", [data.get("assignee_id")] if data.get("assignee_id") else []
-        )
         previous_recipients = (
             list(
                 map(
@@ -883,6 +897,10 @@ def save_native(
             )
             if native and adapter == "ticket"
             else [str(native.assignee_id)] if native else []
+        )
+        recipients = data.get(
+            "assignee_ids",
+            previous_recipients if native and adapter == "ticket" else [data.get("assignee_id")] if data.get("assignee_id") else [],
         )
         if creating or sorted(recipients) != sorted(previous_recipients):
             validate_other_assignees(user, entity.workspace.slug, recipients)
@@ -1230,6 +1248,11 @@ def save_record(entity, user, payload, request=None, identifier=None):
                     if source == "assignee_ids"
                     else json_value(native_value(entity, native, source))
                 )
+            elif is_ticket_recipient_alias(entity, field):
+                assignees = list(
+                    native.issue_assignee.filter(deleted_at__isnull=True).values_list("assignee_id", flat=True)
+                )
+                values[code] = str(assignees[0]) if assignees else None
     custom = {
         code: value
         for code, value in values.items()

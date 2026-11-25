@@ -2,10 +2,10 @@ import { ErrorState } from "../error-state";
 import { TicketPresetBar } from "../ticket/preset-bar";
 import type { PresetId } from "../ticket/model";
 import { useState } from "react";
-import { CalendarClock, Check, CheckCheck, ArrowUpLeft, LayoutDashboard, List, ListTodo } from "lucide-react";
+import { CalendarClock, Check, CheckCheck, ArrowUpLeft, LayoutDashboard, List, ListTodo, Plus } from "lucide-react";
 import { zonedDateTime } from "@plane/ui";
 import { useCurrentUser, useUpdateIssueStatus, useWorkspaceAccess, useMembers, useReassignIssue } from "../api";
-import { EmptyState, PageHeader, SearchBox, Skeleton, TabBar } from "../components";
+import { Button, EmptyState, PageHeader, SearchBox, Skeleton, TabBar } from "../components";
 import { WorkTable } from "../engine/work-table";
 import { IssueKanbanBoard } from "../kanban";
 import { useUIStore } from "../store";
@@ -20,6 +20,8 @@ export default function MyWorkPage() {
   const [query, setQuery] = useState("");
   const { data: currentUser, isLoading: userLoading } = useCurrentUser();
   const { data: access } = useWorkspaceAccess();
+  const canCreate = access?.can("Issue.Create") === true;
+  const setCreate = useUIStore((state) => state.setCreateOpen);
   const isAdmin = access?.is_admin === true;
   const slug = useUIStore((state) => state.workspaceSlug) ?? "";
   const updateStatus = useUpdateIssueStatus(slug);
@@ -57,6 +59,13 @@ export default function MyWorkPage() {
         eyebrow="فضای شخصی"
         title="کارهای من"
         description="کارهای دریافتی، موعدها و اولویت‌های شما در یک نگاه"
+        actions={
+          canCreate ? (
+            <Button icon={Plus} onClick={() => setCreate(true, "issue")}>
+              تسک / کار جدید
+            </Button>
+          ) : undefined
+        }
       />
       <div className="my-work-overview" aria-label="خلاصه کارهای من">
         {[
