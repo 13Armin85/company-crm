@@ -5802,7 +5802,8 @@ body:has(.engine-workspace) .selector-single-option[data-selected] {
   padding: 12px 14px;
   border: 1px solid var(--border-subtle, #d9dfe8);
   border-radius: 12px;
-  background: var(--surface-2, #f5f7fa);
+  background: var(--surface-soft);
+  color: var(--text-primary);
 }
 .task-note-reply {
   margin-inline-start: 28px;
@@ -5853,7 +5854,8 @@ body:has(.engine-workspace) .selector-single-option[data-selected] {
   justify-content: space-between;
   padding: 8px 10px;
   border-radius: 9px;
-  background: #eef1ff;
+  background: var(--accent-soft);
+  color: var(--text-primary);
 }
 .task-note-reply-target span {
   display: inline-flex;
@@ -5884,6 +5886,20 @@ body:has(.engine-workspace) .selector-single-option[data-selected] {
   border: 1px solid var(--border-subtle, #d9dfe8);
   border-radius: 10px;
   resize: vertical;
+  background: var(--surface);
+  color: var(--text-primary);
+}
+:root[data-theme="dark"] .task-notes {
+  background: var(--surface);
+  color: var(--text-primary);
+}
+:root[data-theme="dark"] .task-notes :is(.task-notes-state, .task-notes-count) {
+  background: var(--surface-soft);
+  color: var(--text-secondary);
+}
+:root[data-theme="dark"] .task-notes :is(.task-notes-heading-icon, .task-note-avatar) {
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 .task-notes form > button {
   justify-self: start;

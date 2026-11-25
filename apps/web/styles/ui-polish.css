@@ -24,9 +24,15 @@
 }
 .leave-template-page {
   gap: 18px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  container-type: inline-size;
 }
 .leave-template-page .leave-card {
   gap: 14px;
+  min-width: 0;
+  overflow: hidden;
   box-shadow: none;
 }
 .leave-template-page .leave-card > h2 {
@@ -39,6 +45,39 @@
 }
 .leave-template-upload .leave-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+.leave-template-upload .leave-grid > :is(label, .leave-field) {
+  width: 100%;
+  min-width: 0;
+  align-content: start;
+}
+.leave-template-upload .leave-upload-control {
+  display: inline-flex;
+  max-width: 100%;
+  width: fit-content;
+  justify-content: center;
+}
+.leave-template-upload .leave-hint,
+.leave-template-versions .leave-template-head a {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.leave-template-upload .leave-field,
+.leave-template-upload .leave-grid > label {
+  align-content: start;
+}
+.leave-template-upload .leave-upload-control {
+  width: fit-content;
+  max-width: 100%;
+}
+.leave-template-upload .leave-hint {
+  overflow-wrap: anywhere;
+}
+.leave-template-page .leave-templates {
+  padding: 0;
+  list-style: none;
+  min-width: 0;
 }
 .leave-template-upload .leave-actions {
   padding-top: 6px;
@@ -49,6 +88,37 @@
 .leave-template-versions .leave-templates {
   display: grid;
   gap: 10px;
+  padding: 0;
+  min-width: 0;
+}
+.leave-template-versions .leave-template {
+  min-width: 0;
+  padding: 18px;
+  background: var(--surface-soft);
+}
+.leave-template-versions .leave-template-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+.leave-template-versions .leave-template-head a {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+.leave-template-versions .leave-actions {
+  align-items: end;
+}
+.leave-template-versions .leave-actions .leave-field {
+  min-width: min(100%, 220px);
+}
+@container (max-width: 680px) {
+  .leave-template-upload .leave-grid,
+  .leave-template-versions .leave-template-head {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .leave-template-versions .leave-template-head a {
+    grid-column: 1;
+  }
 }
 /* Native surfaces and entity forms use the same section cards in the designer. */
 .engine-workspace-surface-panel > .page-studio-editor .page-studio-tabs {
@@ -81,6 +151,12 @@
 @media (max-width: 680px) {
   .leave-template-upload .leave-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .leave-template-versions .leave-template-head {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .leave-template-versions .leave-template-head a {
+    grid-column: 1;
   }
   .leave-template-page .leave-card {
     padding: 16px;

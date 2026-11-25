@@ -1007,7 +1007,7 @@ def _check_project_member(issue, user):
 
 def refer(workspace, actor, issue_id, data, request=None, previous=None):
     """Manual referral assigns the target immediately without a separate acceptance."""
-    from .task_policy import validate_other_assignees
+    from .task_policy import is_workspace_administrator, validate_other_assignees
 
     reason = _reason(data)
     with transaction.atomic():
@@ -1025,7 +1025,7 @@ def refer(workspace, actor, issue_id, data, request=None, previous=None):
                 raise ValidationError("این تیکت یک ارجاع در انتظار پاسخ دارد.")
         target = _member(workspace, data.get("user_id"))
         validate_other_assignees(actor, workspace, [target.id])
-        if target.id == actor.id:
+        if target.id == actor.id and not is_workspace_administrator(actor, workspace):
             raise ValidationError({"user_id": "نمی‌توانید تیکت را به خودتان ارجاع دهید."})
         _check_project_member(issue, target)
         before = _replace_assignee(issue, target)

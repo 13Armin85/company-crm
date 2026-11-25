@@ -235,13 +235,6 @@ export default function SettingsPage() {
                           onChange={(event) => setWorkspaceName(event.target.value)}
                         />
                       </label>
-                      <label>
-                        <span>آدرس اختصاصی</span>
-                        <div className="slug-input">
-                          <span>app.hamkar.ir/</span>
-                          <input dir="ltr" value={workspace?.slug ?? ""} readOnly />
-                        </div>
-                      </label>
                     </div>
                   </SurfaceFields>
                   {workspaces.length > 1 && (

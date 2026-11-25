@@ -10,6 +10,7 @@ from plane.db.models import DashboardConfiguration, OrganizationRole
 from .access_control import has_permission
 from .entity_records import emit_definition
 from .entity_schema import role_ids
+from .task_policy import is_workspace_administrator
 
 
 WIDGETS = {
@@ -133,7 +134,7 @@ def _copy_defaults(default):
 
 def _initial_tabs(workspace, user, default):
     tabs = _copy_defaults(default)
-    if has_permission(user, workspace, "Dashboard.Team.View") and not any(
+    if is_workspace_administrator(user, workspace) and has_permission(user, workspace, "Dashboard.Team.View") and not any(
         widget.get("type") == "team-cards" for tab in tabs for widget in tab.get("widgets", [])
     ):
         tabs.append({"id": str(uuid4()), "title": "تیم من", "widgets": [
@@ -177,6 +178,8 @@ def personal_layout(workspace, user):
                 tabs.append(target)
                 added = True
             for widget in tab.get("widgets", []):
+                if widget.get("type") == "team-cards" and not is_workspace_administrator(user, workspace):
+                    continue
                 if widget["id"] not in existing:
                     new_widget = deepcopy(widget)
                     new_widget["origin"] = widget["id"]
@@ -197,7 +200,11 @@ def shared_tabs(workspace, user):
         for tab in config.tabs:
             share = tab.get("share", {})
             if str(user.id) in share.get("users", []) or roles.intersection(share.get("roles", [])):
-                result.append({"id": tab["id"], "title": tab["title"], "widgets": tab.get("widgets", []), "mode": share.get("mode", "read"), "owner": str(config.user_id)})
+                widgets = tab.get("widgets", [])
+                if not is_workspace_administrator(user, workspace):
+                    widgets = [widget for widget in widgets if widget.get("type") != "team-cards"]
+                if widgets:
+                    result.append({"id": tab["id"], "title": tab["title"], "widgets": widgets, "mode": share.get("mode", "read"), "owner": str(config.user_id)})
     return result
 
 
@@ -215,9 +222,16 @@ def save_layout(workspace, user, tabs, revision, *, role=None, request=None):
     if target and revision != target.revision:
         raise ValidationError("داشبورد در دستگاه دیگری تغییر کرده است؛ دوباره بارگذاری کنید.")
     clean = validate_tabs(tabs, allow_locked=True)
+    if not is_workspace_administrator(user, workspace) and any(
+        widget.get("type") == "team-cards" for tab in clean for widget in tab.get("widgets", [])
+    ):
+        raise PermissionDenied()
     if not role:
         defaults = default_layout(workspace, user)
-        required = {w["id"] for tab in (defaults.tabs if defaults else []) for w in tab.get("widgets", []) if w.get("locked")}
+        required = {
+            w["id"] for tab in (defaults.tabs if defaults else []) for w in tab.get("widgets", [])
+            if w.get("locked") and (w.get("type") != "team-cards" or is_workspace_administrator(user, workspace))
+        }
         retained = {w["id"] for tab in clean for w in tab.get("widgets", [])}
         if not required.issubset(retained):
             raise ValidationError("ویجت قفل‌شدهٔ داشبورد پیش‌فرض را نمی‌توان حذف کرد.")
@@ -249,7 +263,7 @@ def add_widget(workspace, user, kind, tab_id, tabs, revision, *, role=None, requ
         raise PermissionDenied()
     if kind not in WIDGETS:
         raise ValidationError("نوع ویجت معتبر نیست.")
-    if kind == "team-cards" and not has_permission(user, workspace, "Dashboard.Team.View", request=request):
+    if kind == "team-cards" and (not is_workspace_administrator(user, workspace) or not has_permission(user, workspace, "Dashboard.Team.View", request=request)):
         raise PermissionDenied()
     current = (
         DashboardConfiguration.objects.filter(workspace=workspace, role=role).first()

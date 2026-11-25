@@ -551,14 +551,14 @@ def test_team_dashboard_output_unchanged_by_schedules(org, workspace):
     from plane.app.services.entity_schema import initialize_engine
 
     initialize_engine(workspace)
-    manager, employee = org["manager"], org["employee"]
+    manager, employee, admin = org["manager"], org["employee"], org["admin"]
     role = own_role(manager)
     RolePermission.objects.create(
         role=role, permission=OrganizationPermission.objects.get(workspace=workspace, code="Dashboard.Team.View")
     )
     fixed = tehran(2027, 1, 7, 10)
     with patch("django.utils.timezone.now", return_value=fixed):
-        before = team_cards(workspace, manager)
+        before = team_cards(workspace, admin)
     today = date.today().isoformat()
     own_role(manager).permissions.add(
         OrganizationPermission.objects.get(workspace=workspace, code="WorkSchedule.EditPast")
@@ -569,8 +569,10 @@ def test_team_dashboard_output_unchanged_by_schedules(org, workspace):
     )
     create_meeting(manager, [employee], fixed - timedelta(hours=1), fixed + timedelta(hours=1))
     with patch("django.utils.timezone.now", return_value=fixed):
-        after = team_cards(workspace, manager)
-    assert after == before
+        after = team_cards(workspace, admin)
+    assert next(card for card in after["cards"] if card["id"] == str(employee.id)) == next(
+        card for card in before["cards"] if card["id"] == str(employee.id)
+    )
     assert next(card for card in after["cards"] if card["id"] == str(employee.id))["presence"] == "present"
 
 

@@ -50,6 +50,28 @@ def test_administrator_may_still_assign_to_self(session_client, workspace, creat
     assert response.status_code == 201, response.data
 
 
+def test_administrator_can_transfer_workspace_task_to_self(session_client, workspace, create_user):
+    recipient = member(workspace, "admin-transfer-recipient")
+    task = authored_task(workspace, create_user, recipient)
+    response = session_client.patch(f"/api/workspaces/{workspace.slug}/tasks/{task.id}/", {
+        "assignee_id": str(create_user.id),
+    }, format="json")
+    assert response.status_code == 200, response.data
+    task.refresh_from_db()
+    assert task.assignee_id == create_user.id
+
+
+def test_administrator_can_refer_workspace_task_to_self(session_client, workspace, create_user):
+    recipient = member(workspace, "admin-referral-recipient")
+    task = authored_task(workspace, create_user, recipient)
+    response = session_client.post(f"/api/workspaces/{workspace.slug}/tickets/{task.id}/refer/", {
+        "user_id": str(create_user.id), "reason": "پیگیری توسط مدیر",
+    }, format="json")
+    assert response.status_code == 201, response.data
+    task.refresh_from_db()
+    assert task.assignee_id == create_user.id
+
+
 def test_self_transfer_is_rejected_without_modifying_received_task(session_client, workspace, create_user):
     actor = member(workspace, "policy-owner")
     task = authored_task(workspace, create_user, actor)

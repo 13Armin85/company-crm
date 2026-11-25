@@ -352,7 +352,6 @@ export default function DashboardPage() {
               }}
             >
               <span>{tab.title}</span>
-              <small aria-hidden="true">{tab.widgets.length.toLocaleString("fa-IR")}</small>
             </button>
             {editing && (
               <div className="dashboard-tab-tools">

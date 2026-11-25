@@ -931,3 +931,106 @@
     animation: none;
   }
 }
+.team-directory {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+  color: var(--text-primary);
+}
+.team-directory-header,
+.team-directory-filters {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.team-directory-header h3 {
+  margin: 6px 0 2px;
+  font-size: 1.5rem;
+}
+.team-directory-header p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+.team-directory-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--accent);
+  font-weight: 700;
+}
+.team-directory-filters .team-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 240px;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-secondary);
+}
+.team-directory-filters .team-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-primary);
+}
+.team-directory-filters select {
+  flex: 0 1 210px;
+  min-height: 40px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-primary);
+  padding-inline: 10px;
+}
+.team-directory-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  gap: 12px;
+}
+.team-directory-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.team-directory-avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 700;
+  overflow: hidden;
+}
+.team-directory-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.team-directory-card > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.team-directory-card :is(strong, span, small) {
+  overflow-wrap: anywhere;
+}
+.team-directory-card > div > :is(span, small),
+.team-directory-empty {
+  color: var(--text-secondary);
+}
