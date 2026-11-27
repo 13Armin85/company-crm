@@ -111,16 +111,14 @@ export default function LeaveTemplatesPage() {
           {upload.isError && <ErrorNotice message={errorMessage(upload.error, "بارگذاری قالب ممکن نشد.")} />}
         </section>
         <section className="leave-card leave-template-slots" aria-label="جایگاه‌های داده">
-          <h2>جایگاه‌های داده</h2>
-          <p className="workflow-muted">
-            جایگاه‌ها را دقیقاً به همین شکل در فایل Word بنویسید. جایگاه ناشناخته یا نبودِ جایگاه الزامی، قالب را نامعتبر
-            می‌کند.
-          </p>
-          <p className="workflow-muted">
-            هنگام ساخت فرم، کدهای داخل آکولاد با دادهٔ درخواست جایگزین می‌شوند. جایگاه ساعت شروع و پایان در مرخصی روزانه
-            خالی می‌ماند.
-          </p>
-          {data && <PlaceholderTable placeholders={data.placeholders} />}
+          <div className="leave-placeholder-section-head">
+            <div>
+              <span>راهنمای طراحی سند</span>
+              <h2>جایگاه‌های داده</h2>
+            </div>
+            <p>برای معتبر بودن قالب، همهٔ جایگاه‌های الزامی را در فایل Word قرار دهید.</p>
+          </div>
+          {data ? <PlaceholderTable placeholders={data.placeholders} /> : <Skeleton rows={3} />}
         </section>
         <section className="leave-card leave-template-versions" aria-label="نسخه‌ها">
           <h2>نسخه‌ها</h2>

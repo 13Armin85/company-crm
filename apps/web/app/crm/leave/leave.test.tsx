@@ -265,6 +265,24 @@ describe("versions, templates and lists", () => {
     expect(placeholders).toContain("{{employee_name}}");
   });
 
+  it("groups Word placeholders and marks required and optional items", () => {
+    const html = render(
+      <PlaceholderTable
+        placeholders={[
+          { key: "employee_name", title: "نام کارمند", required: true },
+          { key: "start_time", title: "ساعت شروع", required: false },
+          { key: "extra_field", title: "فیلد افزوده", required: false },
+        ]}
+      />
+    );
+    expect(html).toContain("مشخصات درخواست‌دهنده");
+    expect(html).toContain("بازه و مدت مرخصی");
+    expect(html).toContain("جایگاه‌های دیگر");
+    expect(html).toContain("{{extra_field}}");
+    expect(html).toContain("الزامی");
+    expect(html).toContain("اختیاری");
+  });
+
   it("lists requests with status and current holder", () => {
     const row: LeaveRequestSummary = {
       id: "r1",

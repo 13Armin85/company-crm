@@ -428,29 +428,85 @@ export function MySignatureCard({
   );
 }
 
+const PLACEHOLDER_GROUPS = [
+  {
+    title: "مشخصات درخواست‌دهنده",
+    description: "اطلاعات فردی و جانشین که از درخواست ثبت‌شده خوانده می‌شود.",
+    keys: ["employee_name", "employee_id", "unit", "substitute"],
+  },
+  {
+    title: "بازه و مدت مرخصی",
+    description: "تاریخ، شیوه و مدت مرخصی؛ ساعت‌ها فقط برای مرخصی ساعتی مقدار دارند.",
+    keys: ["mode", "start", "end", "start_time", "end_time", "duration"],
+  },
+  {
+    title: "اطلاعات درخواست و امضا",
+    description: "شماره، زمان ثبت، دلیل و محل درج تصویر امضای درخواست‌دهنده.",
+    keys: ["request_number", "submitted_at", "reason", "signature"],
+  },
+] as const;
+
 export function PlaceholderTable({ placeholders }: { placeholders: TemplateOverview["placeholders"] }) {
+  const groupedKeys = new Set<string>(PLACEHOLDER_GROUPS.flatMap((group) => group.keys));
+  const groups = [
+    ...PLACEHOLDER_GROUPS.map((group) => ({
+      title: group.title,
+      description: group.description,
+      rows: group.keys.map((key) => placeholders.find((item) => item.key === key)).filter((row) => row !== undefined),
+    })),
+    {
+      title: "جایگاه‌های دیگر",
+      description: "جایگاه‌های جدیدی که برای این نسخهٔ قالب در دسترس‌اند.",
+      rows: placeholders.filter((row) => !groupedKeys.has(row.key)),
+    },
+  ].filter((group) => group.rows.length > 0);
+  const requiredCount = placeholders.filter((row) => row.required).length;
+  const example = placeholders.find((row) => row.key === "employee_name") ?? placeholders[0];
+
   return (
-    <div className="leave-table-scroll" role="region" aria-label="راهنمای جایگاه‌های Word" tabIndex={0}>
-      <SurfaceTable code="leave-placeholders" className="leave-table">
-        <thead>
-          <tr>
-            <th>جایگاه</th>
-            <th>معنا</th>
-            <th>الزامی</th>
-          </tr>
-        </thead>
-        <tbody>
-          {placeholders.map((row) => (
-            <tr key={row.key}>
-              <td dir="ltr">
-                <code>{`{{${row.key}}}`}</code>
-              </td>
-              <td>{row.title}</td>
-              <td>{row.required ? "بله" : "خیر"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </SurfaceTable>
+    <div className="leave-placeholder-catalog" aria-label="راهنمای جایگاه‌های Word">
+      <div className="leave-placeholder-overview">
+        <div>
+          <strong>راهنمای جایگاه‌های قالب</strong>
+          <p>هر کد را با دو آکولاد، دقیقاً به شکل نشان‌داده‌شده، در فایل Word قرار دهید.</p>
+        </div>
+        <div className="leave-placeholder-counts" aria-label="شمار جایگاه‌ها">
+          <span>
+            <b>{requiredCount.toLocaleString("fa-IR")}</b> الزامی
+          </span>
+          <span>
+            <b>{(placeholders.length - requiredCount).toLocaleString("fa-IR")}</b> اختیاری
+          </span>
+        </div>
+      </div>
+      {example && (
+        <div className="leave-placeholder-example">
+          <span>نمونهٔ جایگذاری در Word</span>
+          <code dir="ltr">{`{{${example.key}}}`}</code>
+          <span>← هنگام ساخت سند، با «{example.title}» جایگزین می‌شود.</span>
+        </div>
+      )}
+      {groups.map((group) => (
+        <section className="leave-placeholder-group" key={group.title} aria-label={group.title}>
+          <header>
+            <h3>{group.title}</h3>
+            <p>{group.description}</p>
+          </header>
+          <div className="leave-placeholder-grid">
+            {group.rows.map((row) => (
+              <article className="leave-placeholder-item" key={row.key}>
+                <div className="leave-placeholder-item-head">
+                  <code dir="ltr">{`{{${row.key}}}`}</code>
+                  <span className={row.required ? "is-required" : "is-optional"}>
+                    {row.required ? "الزامی" : "اختیاری"}
+                  </span>
+                </div>
+                <strong>{row.title}</strong>
+              </article>
+            ))}
+          </div>
+        </section>
+      ))}
     </div>
   );
 }

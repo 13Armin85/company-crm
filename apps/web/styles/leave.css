@@ -445,6 +445,159 @@ a.leave-file-name:hover {
 .leave-table a:hover {
   text-decoration: underline;
 }
+
+/* Word template placeholder guide */
+.leave-template-slots {
+  gap: 20px;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 5%, var(--surface)), var(--surface) 38%);
+}
+.leave-placeholder-section-head,
+.leave-placeholder-overview,
+.leave-placeholder-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.leave-placeholder-section-head {
+  flex-wrap: wrap;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border);
+}
+.leave-placeholder-section-head span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--accent);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+.leave-placeholder-section-head p,
+.leave-placeholder-overview p,
+.leave-placeholder-group header p {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.8;
+  font-size: var(--fs-sm);
+}
+.leave-placeholder-section-head p {
+  max-width: 36rem;
+}
+.leave-placeholder-catalog {
+  display: grid;
+  gap: 22px;
+  min-width: 0;
+}
+.leave-placeholder-overview {
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.leave-placeholder-overview strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: var(--fs-md);
+}
+.leave-placeholder-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.leave-placeholder-counts span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  font-size: var(--fs-xs);
+}
+.leave-placeholder-counts b {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.leave-placeholder-example {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 14px 16px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 45%, var(--border));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  line-height: 1.7;
+}
+.leave-placeholder-example > span:first-child {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+.leave-placeholder-example code,
+.leave-placeholder-item code {
+  display: inline-block;
+  direction: ltr;
+  unicode-bidi: isolate;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--accent);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  user-select: all;
+}
+.leave-placeholder-group {
+  display: grid;
+  gap: 12px;
+}
+.leave-placeholder-group header h3 {
+  margin: 0 0 4px;
+  font-size: var(--fs-md);
+}
+.leave-placeholder-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 10px;
+}
+.leave-placeholder-item {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+  padding: 15px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--text-primary) 3%, transparent);
+}
+.leave-placeholder-item-head {
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.leave-placeholder-item-head span {
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.leave-placeholder-item-head .is-required {
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  color: var(--accent);
+}
+.leave-placeholder-item-head .is-optional {
+  background: var(--surface-soft);
+  color: var(--text-secondary);
+}
+.leave-placeholder-item > strong {
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+  font-size: var(--fs-sm);
+}
 .leave-form-intro {
   margin: 0;
   padding: 12px 16px;
