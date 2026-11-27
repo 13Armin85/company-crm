@@ -58,9 +58,10 @@ export default function TeamPage() {
   const [query, setQuery] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const passwordGuard = useNoAutofill();
-  const usernameGuard = useNoAutofill();
   const [form, setForm] = useState({
     email: "",
+    first_name: "",
+    last_name: "",
     display_name: "",
     username: "",
     password: "",
@@ -194,7 +195,16 @@ export default function TeamPage() {
           busy={createUser.isPending}
           onClose={() => {
             setCreateOpen(false);
-            setForm({ email: "", username: "", display_name: "", password: "", role_ids: [], unit_ids: [] });
+            setForm({
+              email: "",
+              username: "",
+              first_name: "",
+              last_name: "",
+              display_name: "",
+              password: "",
+              role_ids: [],
+              unit_ids: [],
+            });
           }}
         >
           <SurfaceForm
@@ -212,12 +222,39 @@ export default function TeamPage() {
                 {
                   onSuccess: () => {
                     setCreateOpen(false);
-                    setForm({ email: "", username: "", display_name: "", password: "", role_ids: [], unit_ids: [] });
+                    setForm({
+                      email: "",
+                      username: "",
+                      first_name: "",
+                      last_name: "",
+                      display_name: "",
+                      password: "",
+                      role_ids: [],
+                      unit_ids: [],
+                    });
                   },
                 }
               );
             }}
           >
+            <label>
+              <span>نام</span>
+              <input
+                required
+                disabled={createUser.isPending}
+                value={form.first_name}
+                onChange={(event) => setForm({ ...form, first_name: event.target.value })}
+              />
+            </label>
+            <label>
+              <span>نام خانوادگی</span>
+              <input
+                required
+                disabled={createUser.isPending}
+                value={form.last_name}
+                onChange={(event) => setForm({ ...form, last_name: event.target.value })}
+              />
+            </label>
             <label>
               <span>نام نمایشی</span>
               <input
@@ -247,7 +284,8 @@ export default function TeamPage() {
                 minLength={3}
                 maxLength={32}
                 pattern="[A-Za-z0-9_.-]{3,32}"
-                {...usernameGuard}
+                type="text"
+                autoComplete="off"
                 value={form.username}
                 onChange={(event) => setForm({ ...form, username: event.target.value })}
               />

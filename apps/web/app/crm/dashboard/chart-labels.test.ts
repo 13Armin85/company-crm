@@ -6,6 +6,7 @@ import {
   chartNumber,
   chartTooltipValue,
   tableValueLabel,
+  tableRecordLabel,
 } from "./chart-labels";
 
 describe("Persian dashboard chart labels", () => {
@@ -15,6 +16,9 @@ describe("Persian dashboard chart labels", () => {
     expect(tableValueLabel("ticket_state", "وضعیت", "state-id", "مرحله سفارشی")).toBe("مرحله سفارشی");
     expect(tableValueLabel("ticket_state", "وضعیت", "12345678-1234-1234-1234-123456789012")).toBe("وضعیت نامشخص");
     expect(tableValueLabel("title", "عنوان", "یادداشت")).toBe("یادداشت");
+    expect(tableValueLabel("owner", "مسئول", "3ba024f9-a535-4103-88bc-0ec22e939ee2")).toBe("نامشخص");
+    expect(tableValueLabel("priority", "اولویت", "high")).toBe("زیاد");
+    expect(tableRecordLabel("3ba024f9-a535-4103-88bc-0ec22e939ee2")).toBe("مشاهده رکورد");
   });
   it("uses the configured choice title and Persian digits", () => {
     expect(chartLabel("custom-code", { "custom-code": "مرحله 2" })).toBe("مرحله ۲");
@@ -33,6 +37,14 @@ describe("Persian dashboard chart labels", () => {
     expect(activityEventLabel("unknown.event")).toBe("فعالیت ثبت شد");
   });
   it("names the actor, record, changed field, and readable values", () => {
+    expect(
+      activityDescription({
+        actor: "3ba024f9-a535-4103-88bc-0ec22e939ee2",
+        record: "task_code",
+        field: "status_code",
+        event: "record.field_changed",
+      })
+    ).toBe("کاربر یکی از فیلدها «رکورد» را تغییر داد");
     expect(
       activityDescription({
         actor: "سارا",

@@ -516,7 +516,26 @@ export default function DashboardPage() {
                     )}
                   </div>
                 </header>
-                <WidgetContent widget={widget} />
+                <WidgetContent
+                  widget={widget}
+                  onSaveNote={
+                    !sharedActive && !roleId && access?.can("Dashboard.Personal.Manage")
+                      ? async (text) => {
+                          const next = tabs.map((tab) =>
+                            Object.assign({}, tab, {
+                              widgets: tab.widgets.map((item) =>
+                                item.id === widget.id ? { ...item, config: { ...item.config, text } } : item
+                              ),
+                            })
+                          );
+                          const result = await save.mutateAsync({ tabs: next, revision });
+                          setTabs(duplicate(result.tabs));
+                          setRevision(result.revision);
+                          toast("یادداشت ذخیره شد", "success");
+                        }
+                      : undefined
+                  }
+                />
                 {editing && !sharedActive && (
                   <footer className="dashboard-resize">
                     <button

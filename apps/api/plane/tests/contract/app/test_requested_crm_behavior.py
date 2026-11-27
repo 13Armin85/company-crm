@@ -123,11 +123,45 @@ def test_deleted_users_login_name_can_be_reused_without_deleting_history(workspa
         reserve_username("REUSABLE")
     user.refresh_from_db()
     assert user.username != "reusable"
+    assert user.email != "reusable@example.com"
     assert not user.is_active
+    assert not user.has_usable_password()
     replacement = User.objects.create_user(email="replacement@example.com", username="reusable", password="SafePassword!2026")
     assert replacement.id != user.id
     task.refresh_from_db()
     assert task.assignee_id == user.id
+
+
+def test_page_data_permissions_are_independent(workspace):
+    from plane.app.services.entity_records import permission as page_permission
+    from plane.app.services.permission_registry import sync_permission_catalog
+    from plane.db.models import EntityType, OrganizationPermission, UserPermissionException
+
+    user = member(workspace, "page-reader")
+    page = EntityType.objects.create(workspace=workspace, code="townhall", title="شهرداری")
+    sync_permission_catalog(workspace)
+    codes = {action: OrganizationPermission.objects.get(workspace=workspace, code=f"Page.townhall.{action}") for action in ("View", "Edit", "Delete")}
+    UserPermissionException.objects.create(workspace=workspace, user=user, permission=codes["View"], effect="ALLOW")
+    UserPermissionException.objects.create(workspace=workspace, user=user, permission=codes["Edit"], effect="DENY")
+    UserPermissionException.objects.create(workspace=workspace, user=user, permission=codes["Delete"], effect="DENY")
+    assert page_permission(page, user, "view")
+    assert page_permission(page, user, "view_all")
+    assert not page_permission(page, user, "edit")
+    assert not page_permission(page, user, "delete")
+    other = member(workspace, "other-page-reader")
+    assert page_permission(page, other, "view")
+
+
+def test_direct_access_can_be_deleted(session_client, workspace):
+    from plane.db.models import OrganizationPermission, UserPermissionException
+
+    user = member(workspace, "access-target")
+    grant = OrganizationPermission.objects.get(workspace=workspace, code="User.View")
+    row = UserPermissionException.objects.create(workspace=workspace, user=user, permission=grant, effect="ALLOW")
+    path = f"/api/workspaces/{workspace.slug}/organization/users/{user.id}/exceptions/{row.id}/"
+    response = session_client.delete(path)
+    assert response.status_code == 204, response.data
+    assert not UserPermissionException.all_objects.filter(id=row.id).exists()
 
 
 def test_active_username_cannot_be_reused(workspace):
@@ -138,6 +172,17 @@ def test_active_username_cannot_be_reused(workspace):
         reserve_username("reserved")
     user.refresh_from_db()
     assert user.username == "reserved"
+
+
+def test_created_user_keeps_first_and_last_name(session_client, workspace):
+    response = session_client.post(
+        f"/api/workspaces/{workspace.slug}/members/",
+        {"email": "full-name@example.com", "username": "full_name", "password": "SafePassword!2026", "first_name": "سارا", "last_name": "احمدی", "display_name": "سارا احمدی"},
+        format="json",
+    )
+    assert response.status_code == 201, response.data
+    user = User.objects.get(username="full_name")
+    assert (user.first_name, user.last_name) == ("سارا", "احمدی")
 
 
 def test_builtin_administrator_retains_all_permissions_despite_legacy_denials(workspace, create_user):

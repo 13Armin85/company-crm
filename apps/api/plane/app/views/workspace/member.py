@@ -61,6 +61,8 @@ class WorkSpaceMemberViewSet(BaseViewSet):
         email = str(request.data.get("email", "")).strip().lower()
         password = str(request.data.get("password", ""))
         display_name = str(request.data.get("display_name", "")).strip()
+        first_name = str(request.data.get("first_name", "")).strip()
+        last_name = str(request.data.get("last_name", "")).strip()
         username = str(request.data.get("username", "")).strip().lower()
         try:
             role = int(request.data.get("role", ROLE.MEMBER.value))
@@ -124,6 +126,8 @@ class WorkSpaceMemberViewSet(BaseViewSet):
                         email=email,
                         username=username or f"u-{uuid.uuid4().hex[:24]}",
                         display_name=display_name or email.split("@", 1)[0],
+                        first_name=first_name,
+                        last_name=last_name,
                         is_email_verified=True,
                         is_managed=True,
                         is_active=True,

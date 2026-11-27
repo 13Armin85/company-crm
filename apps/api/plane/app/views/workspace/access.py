@@ -206,10 +206,9 @@ class UserExceptionDetailEndpoint(BaseAPIView):
         row = get_object_or_404(UserPermissionException, workspace=workspace, user=user, id=exception_id)
         try:
             with access_transaction(workspace):
-                row.is_active = False
-                row.save(update_fields=["is_active", "updated_at"])
+                row.delete(soft=False)
                 audit_access(request, workspace, "user.exception_remove", row.id)
-        except ValidationError as exc:
+        except (ValidationError, IntegrityError) as exc:
             return bad_request(exc)
         return Response(status=204)
 

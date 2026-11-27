@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useId } from "react";
 import { PersianDatePicker } from "@plane/ui";
 import { api } from "../api";
 import { useUIStore } from "../store";
@@ -27,6 +28,8 @@ export function DashboardWidgetSettings({
   update: (value: DashboardWidget) => void;
 }) {
   const slug = useUIStore((state) => state.workspaceSlug) || "";
+  const periodStartId = useId();
+  const periodEndId = useId();
   const entity = String(widget.config.entity || "ticket");
   const views = useQuery({
     queryKey: ["dashboard-views", slug, entity],
@@ -152,18 +155,20 @@ export function DashboardWidgetSettings({
         </>
       )}
       <h3>بازه زمانی</h3>
-      <label>
+      <label htmlFor={periodStartId}>
         از
         <PersianDatePicker
+          id={periodStartId}
           label="شروع بازه زمانی"
           value={period?.start || ""}
           max={period?.end}
           onChange={(start) => set("period", { ...period, start })}
         />
       </label>
-      <label>
+      <label htmlFor={periodEndId}>
         تا
         <PersianDatePicker
+          id={periodEndId}
           label="پایان بازه زمانی"
           value={period?.end || ""}
           min={period?.start}
@@ -345,12 +350,6 @@ export function DashboardWidgetSettings({
               ))}
           </select>
           <small>برای انتخاب چند ستون، Ctrl را نگه دارید؛ بدون انتخاب، ستون‌های جدول ذخیره‌شده استفاده می‌شود.</small>
-        </label>
-      )}
-      {widget.type === "note" && (
-        <label>
-          یادداشت
-          <textarea value={String(widget.config.text || "")} onChange={(event) => set("text", event.target.value)} />
         </label>
       )}
       {widget.type === "links" && (

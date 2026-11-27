@@ -244,6 +244,37 @@
   padding: 1rem;
   white-space: pre-wrap;
 }
+.dashboard-note-editor {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.75rem;
+}
+.dashboard-note-editor textarea {
+  width: 100%;
+  min-height: 110px;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.7rem;
+  background: var(--surface);
+  color: var(--text-primary);
+}
+.dashboard-note-editor > div {
+  display: flex;
+  justify-content: flex-end;
+}
+.dashboard-note-editor button {
+  border: 0;
+  border-radius: 7px;
+  background: var(--accent);
+  color: white;
+  padding: 0.45rem 0.9rem;
+  cursor: pointer;
+}
+.dashboard-note-editor button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
 .dashboard-links,
 .dashboard-age {
   display: grid;

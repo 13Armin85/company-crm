@@ -44,15 +44,21 @@ const readableValue = (value: unknown): string | undefined => {
   return stateNameFa(chartLabel(raw)).slice(0, 80);
 };
 
+const safeActivityText = (value: unknown, fallback: string): string => {
+  const text = plainText(value || "").trim();
+  if (!text || /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(text) || /^[a-z][a-z0-9_.-]*$/.test(text)) return fallback;
+  return text;
+};
+
 export function activityDescription(item: Record<string, unknown>): string {
-  const actor = plainText(item.actor || "کاربر");
-  const record = plainText(item.record || "رکورد").slice(0, 100);
+  const actor = safeActivityText(item.actor, "کاربر");
+  const record = safeActivityText(item.record, "رکورد").slice(0, 100);
   const target = `«${record}»`;
   if (item.event === "record.created") return `${actor} ${target} را ایجاد کرد`;
   if (item.event === "record.deleted") return `${actor} ${target} را حذف کرد`;
   if (item.event === "surface.values.updated") return `${actor} اطلاعات فرم ${target} را ویرایش کرد`;
   if (item.event === "record.field_changed" || item.event === "record.status_changed") {
-    const field = plainText(item.field || (item.event === "record.status_changed" ? "وضعیت" : "یکی از فیلدها"));
+    const field = safeActivityText(item.field, item.event === "record.status_changed" ? "وضعیت" : "یکی از فیلدها");
     const before = readableValue(item.before);
     const after = readableValue(item.after);
     if (before && after && before !== after)
@@ -79,7 +85,15 @@ export function tableValueLabel(field: string, title: string, value: unknown, di
     if (!displayValue && /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(String(raw))) return "وضعیت نامشخص";
     return plainText(stateNameFa(chartLabel(raw))) || "—";
   }
-  return plainText(displayValue ?? persianDateValue(value)) || "—";
+  const shown = plainText(displayValue ?? persianDateValue(value));
+  if (/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(shown)) return "نامشخص";
+  if (knownLabels[shown.toLowerCase()]) return knownLabels[shown.toLowerCase()];
+  if (/^[a-z][a-z0-9_.-]*$/i.test(shown)) return "مقدار ثبت‌شده";
+  return toFa(shown) || "—";
+}
+
+export function tableRecordLabel(title: unknown): string {
+  return safeActivityText(title, "مشاهده رکورد");
 }
 
 export function chartNumber(value: unknown): string {

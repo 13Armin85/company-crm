@@ -228,7 +228,7 @@ def widget_data(widget, request, workspace):
         raise ValidationError("نوع ویجت شناخته نشده است.")
     config = widget.get("config", {})
     if kind in {"links", "note"}:
-        return {"type": kind, "value": config.get("links", []) if kind == "links" else _display_text(config.get("text", ""))}
+        return {"type": kind, "value": config.get("links", []) if kind == "links" else str(config.get("text", ""))[:10000]}
     if kind == "team-cards":
         from .dashboard_team import team_cards
 

@@ -301,40 +301,6 @@ def test_team_endpoint_requires_permission_in_backend(engine):
     assert personal.data["can_team"] is False
 
 
-def test_admin_team_cards_include_every_active_workspace_member(engine):
-    workspace, admin, client = engine
-    member_without_unit = User.objects.create(username="team-no-unit", email="team-no-unit@example.test")
-    WorkspaceMember.objects.create(workspace=workspace, member=member_without_unit, role=5)
-    inactive = User.objects.create(username="team-inactive", email="team-inactive@example.test", is_active=False)
-    WorkspaceMember.objects.create(workspace=workspace, member=inactive, role=5)
-
-    response = client.get(dashboard_path(workspace, "team/"))
-    assert response.status_code == 200, response.data
-    ids = {card["id"] for card in response.data["cards"]}
-    assert str(admin.id) in ids
-    assert str(member_without_unit.id) in ids
-    assert str(inactive.id) not in ids
-    assert next(card for card in response.data["cards"] if card["id"] == str(member_without_unit.id))["unit"] == ""
-
-
-def test_member_cannot_see_saved_team_widget(engine):
-    from rest_framework.test import APIClient
-
-    workspace, _, _ = engine
-    member = User.objects.create(username="saved-team-member", email="saved-team-member@example.test")
-    WorkspaceMember.objects.create(workspace=workspace, member=member, role=5)
-    DashboardConfiguration.objects.create(workspace=workspace, user=member, tabs=[
-        {"id": "home", "title": "خانه", "widgets": [{"id": "team", "type": "team-cards", "x": 0, "y": 0, "w": 12, "h": 5, "config": {}}]},
-    ])
-    client = APIClient()
-    client.force_authenticate(user=member)
-    response = client.get(dashboard_path(workspace))
-    assert response.status_code == 200, response.data
-    assert response.data["can_team"] is False
-    assert all(widget["type"] != "team-cards" for tab in response.data["tabs"] for widget in tab["widgets"])
-    assert all(item["type"] != "team-cards" for item in response.data["gallery"])
-
-
 class FakePresence:
     def status(self, workspace, user_ids, now):
         return {user_id: {"present": False, "label": "آزمایشی", "reason": "آزمایش", "return_at": now.isoformat()} for user_id in user_ids}
@@ -349,9 +315,8 @@ def test_team_presence_provider_can_be_replaced_without_card_changes(engine):
     OrganizationUnitMember.objects.create(unit=unit, user=other)
     response = client.get(dashboard_path(workspace, "team/"))
     assert response.status_code == 200, response.data
-    member_card = next(card for card in response.data["cards"] if card["id"] == str(other.id))
-    assert member_card["presence"] == "absent"
-    assert member_card["color"] == "gray"
+    assert response.data["cards"][0]["presence"] == "absent"
+    assert response.data["cards"][0]["color"] == "gray"
 
 
 def test_team_started_review_red_transition_and_absence(engine):

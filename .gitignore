@@ -120,6 +120,10 @@ packages/i18n/src/types/keys.generated.ts
 # Local security notes (not for version control)
 /security/
 
+# Local deployment packages and generated request patch
+.deploy/
+/crm-request.patch
+
 # Python
 __pycache__/
 *.py[cod]

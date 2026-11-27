@@ -12,7 +12,6 @@ from plane.app.services.access_control import has_permission
 from plane.app.services.dashboard_layout import WIDGETS, add_widget, default_layout, make_tab, personal_layout, save_layout, shared_tabs, starter_widgets
 from plane.app.services.dashboard_team import settings_for, save_team_settings, subordinate_units, team_cards, validate_rules, color_for
 from plane.app.services.dashboard_widgets import widget_data
-from plane.app.services.task_policy import is_workspace_administrator
 from plane.app.services.work_calendar import calendar_zone
 from plane.app.services.entity_records import emit_definition, get_record, record_payload, save_record
 from plane.db.models import (
@@ -28,20 +27,12 @@ class DashboardEndpoint(EngineAPIView):
         if not has_permission(request.user, workspace, "Dashboard.Personal.Manage", request=request):
             raise PermissionDenied()
         config, added = personal_layout(workspace, request.user)
-        can_team = is_workspace_administrator(request.user, workspace) and has_permission(request.user, workspace, "Dashboard.Team.View", request=request)
-        tabs = config.tabs if can_team else [
-            {**tab, "widgets": [widget for widget in tab.get("widgets", []) if widget.get("type") != "team-cards"]}
-            for tab in config.tabs
-            if any(widget.get("type") != "team-cards" for widget in tab.get("widgets", [])) or not tab.get("widgets")
-        ]
-        if not tabs:
-            tabs = [make_tab()]
         return Response({
-            "tabs": tabs, "revision": config.revision,
+            "tabs": config.tabs, "revision": config.revision,
             "default_updated": added, "shared_tabs": shared_tabs(workspace, request.user),
-            "gallery": [{"type": key, "title": title} for key, title in WIDGETS.items() if key != "team-cards" or can_team],
+            "gallery": [{"type": key, "title": title} for key, title in WIDGETS.items()],
             "can_share": has_permission(request.user, workspace, "Dashboard.Share", request=request),
-            "can_team": can_team,
+            "can_team": has_permission(request.user, workspace, "Dashboard.Team.View", request=request),
             "can_manage_defaults": has_permission(request.user, workspace, "Dashboard.Default.Manage", request=request),
         })
 
@@ -72,7 +63,7 @@ class DashboardRoleEndpoint(EngineAPIView):
         return Response({
             "role": str(role.id), "tabs": row.tabs if row else [starter], "revision": row.revision if row else 0,
             "gallery": [{"type": key, "title": title} for key, title in WIDGETS.items()],
-            "can_team": is_workspace_administrator(request.user, workspace) and has_permission(request.user, workspace, "Dashboard.Team.View", request=request),
+            "can_team": has_permission(request.user, workspace, "Dashboard.Team.View", request=request),
             "can_manage_defaults": True,
         })
 
@@ -161,7 +152,7 @@ def _issue_idle_alerts(workspace, manager, result):
 class DashboardTeamSettingsEndpoint(EngineAPIView):
     def get(self, request, slug):
         workspace = self.workspace(slug)
-        if not is_workspace_administrator(request.user, workspace) or not has_permission(request.user, workspace, "Dashboard.Team.View", request=request):
+        if not has_permission(request.user, workspace, "Dashboard.Team.View", request=request):
             raise PermissionDenied()
         row = settings_for(workspace, request.user)
         return Response({"rules": row.rules, "alert_enabled": row.alert_enabled, "alert_minutes": row.alert_minutes, "workday_start": row.workday_start, "workday_end": row.workday_end, "capacity": row.capacity})
@@ -181,7 +172,7 @@ class DashboardTeamSettingsEndpoint(EngineAPIView):
 
 
 def _target(workspace, manager, user_id, request):
-    if not is_workspace_administrator(manager, workspace) or not has_permission(manager, workspace, "Dashboard.Team.View", request=request):
+    if not has_permission(manager, workspace, "Dashboard.Team.View", request=request):
         raise PermissionDenied()
     units, _ = subordinate_units(workspace, manager, True)
     membership = OrganizationUnitMember.objects.filter(unit_id__in=units, user_id=user_id, is_active=True, user__is_active=True).select_related("user").first()

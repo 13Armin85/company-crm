@@ -1,4 +1,5 @@
 import { ScrollableTable } from "@plane/ui";
+import { useEffect, useState } from "react";
 import { ErrorState } from "../error-state";
 import { Link, useNavigate } from "react-router";
 import {
@@ -21,7 +22,15 @@ import { useWidgetData } from "./api";
 import { DashboardCalendar } from "./calendar";
 import { TeamWidget } from "./team";
 import type { DashboardWidget } from "./types";
-import { activityDescription, chartLabel, chartNumber, chartTooltipValue, tableValueLabel } from "./chart-labels";
+import {
+  activityDescription,
+  chartLabel,
+  chartNumber,
+  chartTooltipValue,
+  tableRecordLabel,
+  tableValueLabel,
+} from "./chart-labels";
+import { AutoScrollText } from "../auto-scroll-text";
 
 const colors = ["#5865d9", "#33a187", "#e4a93a", "#d57577", "#8c76d4"];
 const displayDate = (value: unknown) =>
@@ -34,17 +43,23 @@ const displayDate = (value: unknown) =>
 const activityTime = (value: unknown) =>
   value ? persianDate(String(value), { year: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
 
-export function WidgetContent({ widget }: { widget: DashboardWidget }) {
+export function WidgetContent({
+  widget,
+  onSaveNote,
+}: {
+  widget: DashboardWidget;
+  onSaveNote?: (text: string) => Promise<void>;
+}) {
   return widget.type === "team-cards" ? (
     <TeamWidget />
   ) : widget.type === "calendar" ? (
     <DashboardCalendar widget={widget} />
   ) : (
-    <DataWidget widget={widget} />
+    <DataWidget widget={widget} onSaveNote={onSaveNote} />
   );
 }
 
-function DataWidget({ widget }: { widget: DashboardWidget }) {
+function DataWidget({ widget, onSaveNote }: { widget: DashboardWidget; onSaveNote?: (text: string) => Promise<void> }) {
   const result = useWidgetData(widget);
   const navigate = useNavigate();
   const entity = String(widget.config.entity || "ticket");
@@ -112,16 +127,20 @@ function DataWidget({ widget }: { widget: DashboardWidget }) {
               <tr key={row.id} draggable onDragStart={(event) => event.dataTransfer.setData("task-id", row.id)}>
                 {headers.map((header) => (
                   <td key={header.field}>
-                    {tableValueLabel(
-                      header.field,
-                      header.title,
-                      row.values?.[header.field],
-                      row.display_values?.[header.field]
-                    )}
+                    <AutoScrollText>
+                      {tableValueLabel(
+                        header.field,
+                        header.title,
+                        row.values?.[header.field],
+                        row.display_values?.[header.field]
+                      )}
+                    </AutoScrollText>
                   </td>
                 ))}
                 <td>
-                  <Link to={`/entities/${entity}/${row.id}`}>{plainText(row.number || row.title)}</Link>
+                  <Link to={`/entities/${entity}/${row.id}`}>
+                    <AutoScrollText>{tableRecordLabel(row.title)}</AutoScrollText>
+                  </Link>
                 </td>
               </tr>
             ))}
@@ -246,8 +265,7 @@ function DataWidget({ widget }: { widget: DashboardWidget }) {
         ))}
       </div>
     );
-  if (widget.type === "note")
-    return <p className="dashboard-note">{plainText(data.value || "یادداشتی ثبت نشده است.")}</p>;
+  if (widget.type === "note") return <NoteWidget text={String(data.value || "")} onSave={onSaveNote} />;
   if (widget.type === "links")
     return (
       <div className="dashboard-links">
@@ -310,4 +328,44 @@ function DataWidget({ widget }: { widget: DashboardWidget }) {
       <div className="dashboard-empty-small">کاری ارجاع نشده است.</div>
     );
   return <div className="dashboard-empty-small">داده‌ای برای نمایش وجود ندارد.</div>;
+}
+
+export function NoteWidget({ text, onSave }: { text: string; onSave?: (text: string) => Promise<void> }) {
+  const [draft, setDraft] = useState(text);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => setDraft(text), [text]);
+  if (!onSave) return <p className="dashboard-note">{text || "یادداشتی ثبت نشده است."}</p>;
+  return (
+    <form
+      className="dashboard-note-editor"
+      onSubmit={async (event) => {
+        event.preventDefault();
+        if (saving || draft === text) return;
+        setSaving(true);
+        setError("");
+        try {
+          await onSave(draft);
+        } catch {
+          setError("ذخیره یادداشت انجام نشد. دوباره تلاش کنید.");
+        } finally {
+          setSaving(false);
+        }
+      }}
+    >
+      <textarea
+        aria-label="یادداشت شخصی"
+        placeholder="یادداشت خود را اینجا بنویسید…"
+        value={draft}
+        maxLength={10000}
+        onChange={(event) => setDraft(event.target.value)}
+      />
+      <div>
+        <button type="submit" disabled={saving || draft === text}>
+          {saving ? "در حال ذخیره…" : "ذخیره یادداشت"}
+        </button>
+      </div>
+      {error && <p role="alert">{error}</p>}
+    </form>
+  );
 }

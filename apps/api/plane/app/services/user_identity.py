@@ -18,10 +18,16 @@ def can_release_username(user):
 
 
 def release_username(user):
-    # Preserve primary keys and every historical task reference.
-    user.username = f"deleted-{uuid.uuid4().hex}"
+    # Preserve historical foreign keys while releasing unique login identifiers.
+    token = uuid.uuid4().hex
+    user.username = f"deleted-{token}"
+    user.email = f"deleted-{token}@invalid.local"
+    user.first_name = ""
+    user.last_name = ""
+    user.display_name = "کاربر حذف‌شده"
     user.is_active = False
-    user.save(update_fields=["username", "is_active"])
+    user.set_unusable_password()
+    user.save(update_fields=["username", "email", "first_name", "last_name", "display_name", "is_active", "password"])
 
 
 def reserve_username(username):

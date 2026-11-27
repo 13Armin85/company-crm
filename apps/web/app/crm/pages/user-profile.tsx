@@ -1,7 +1,7 @@
 import { ErrorState } from "../error-state";
 import { useEffect, useMemo, useState } from "react";
-import { Save, UserRound } from "lucide-react";
-import { Navigate, useParams } from "react-router";
+import { ArrowRight, Building2, Mail, Save, ShieldCheck, UserRound } from "lucide-react";
+import { Link, Navigate, useParams } from "react-router";
 import {
   useOrganizationRoles,
   useOrganizationUnits,
@@ -12,7 +12,7 @@ import {
 } from "../api";
 import { MultiSelector } from "../access/components";
 import { UserAccessPanel } from "../access/user-access";
-import { Button, PageHeader, Skeleton } from "../components";
+import { Button, Skeleton } from "../components";
 import { useUIStore } from "../store";
 import type { OrganizationUserProfile } from "../types";
 import type { FormValues } from "@plane/ui";
@@ -46,65 +46,88 @@ export default function UserProfilePage() {
   if (isLoading || !form) return <Skeleton rows={7} />;
   const canEdit = access.can("User.Edit");
   const canSave = canEdit || access.can("User.Role.Assign") || access.can("OrganizationUnit.Member.Manage");
+  const initials = (form.displayName || `${form.firstName} ${form.lastName}`).trim().slice(0, 2) || "؟";
   return (
-    <div>
-      <PageHeader
-        eyebrow="مدیریت کاربران"
-        title={form.displayName || "پروفایل کاربر"}
-        description="اطلاعات هویتی و دسترسی‌های کاربر در این شرکت"
-        actions={
-          canSave && (
-            <Button
-              icon={Save}
-              disabled={update.isPending || (!isDirty && !customValues)}
-              onClick={() =>
-                update.mutate(
-                  {
-                    ...(canEdit && customValues ? { custom_values: customValues } : {}),
-                    ...(canEdit
-                      ? {
-                          first_name: form.firstName,
-                          last_name: form.lastName,
-                          display_name: form.displayName,
-                          username: form.username,
-                          email: form.email,
-                          is_active: form.isActive,
-                        }
-                      : {}),
-                    role_ids:
-                      access.can("User.Role.Assign") &&
-                      form.isActive &&
-                      profile?.isActive &&
-                      JSON.stringify(form.roleIds) !== JSON.stringify(profile.roleIds)
-                        ? form.roleIds
-                        : undefined,
-                    unit_ids:
-                      access.can("OrganizationUnit.Member.Manage") &&
-                      form.isActive &&
-                      profile?.isActive &&
-                      JSON.stringify(form.unitIds) !== JSON.stringify(profile.unitIds)
-                        ? form.unitIds
-                        : undefined,
+    <div className="user-profile-page">
+      <div className="user-profile-topbar">
+        <Link to="/team" className="user-profile-back">
+          <ArrowRight size={17} /> بازگشت به اعضای تیم
+        </Link>
+        {canSave && (
+          <Button
+            icon={Save}
+            disabled={update.isPending || (!isDirty && !customValues)}
+            onClick={() =>
+              update.mutate(
+                {
+                  ...(canEdit && customValues ? { custom_values: customValues } : {}),
+                  ...(canEdit
+                    ? {
+                        first_name: form.firstName,
+                        last_name: form.lastName,
+                        display_name: form.displayName,
+                        username: form.username,
+                        email: form.email,
+                        is_active: form.isActive,
+                      }
+                    : {}),
+                  role_ids:
+                    access.can("User.Role.Assign") &&
+                    form.isActive &&
+                    profile?.isActive &&
+                    JSON.stringify(form.roleIds) !== JSON.stringify(profile.roleIds)
+                      ? form.roleIds
+                      : undefined,
+                  unit_ids:
+                    access.can("OrganizationUnit.Member.Manage") &&
+                    form.isActive &&
+                    profile?.isActive &&
+                    JSON.stringify(form.unitIds) !== JSON.stringify(profile.unitIds)
+                      ? form.unitIds
+                      : undefined,
+                },
+                {
+                  onSuccess: () => {
+                    setForm(undefined);
+                    setCustomValues(undefined);
                   },
-                  {
-                    onSuccess: () => {
-                      setForm(undefined);
-                      setCustomValues(undefined);
-                    },
-                  }
-                )
-              }
-            >
-              ذخیره تغییرات
-            </Button>
-          )
-        }
-      />
+                }
+              )
+            }
+          >
+            ذخیره تغییرات
+          </Button>
+        )}
+      </div>
+      <header className="user-profile-hero">
+        <span className="user-profile-avatar" aria-hidden="true">
+          {initials}
+        </span>
+        <div className="user-profile-hero-copy">
+          <span className="user-profile-eyebrow">پروفایل عضو تیم</span>
+          <h1>{form.displayName || "پروفایل کاربر"}</h1>
+          <div className="user-profile-meta">
+            <span dir="ltr">@{form.username}</span>
+            <span>
+              <Mail size={15} /> <bdi>{form.email}</bdi>
+            </span>
+          </div>
+        </div>
+        <span className={`user-profile-status ${form.isActive ? "is-active" : ""}`}>
+          <i aria-hidden="true" />
+          {form.isActive ? "عضو فعال" : "عضو غیرفعال"}
+        </span>
+      </header>
       <SurfaceFields code="users" recordId={userId} onChange={setCustomValues} disabled={!canEdit || update.isPending}>
         <section className="panel user-profile-admin">
           <header>
-            <UserRound size={24} />
-            <h2>اطلاعات حساب</h2>
+            <span className="user-profile-section-icon">
+              <UserRound size={20} />
+            </span>
+            <div>
+              <h2>اطلاعات حساب</h2>
+              <p>مشخصات هویتی و راه‌های شناسایی این عضو</p>
+            </div>
           </header>
           <fieldset disabled={!canEdit || update.isPending}>
             <div className="form-grid">
@@ -156,7 +179,15 @@ export default function UserProfilePage() {
         </section>
         <div className="profile-assignment-grid">
           <section className="panel assignment-card">
-            <h2>نقش‌ها</h2>
+            <header>
+              <span className="user-profile-section-icon">
+                <ShieldCheck size={19} />
+              </span>
+              <div>
+                <h2>نقش‌ها</h2>
+                <p>سطح دسترسی از نقش‌های سازمانی</p>
+              </div>
+            </header>
             {!form.isActive && <p>برای تغییر نقش، ابتدا عضویت کاربر را فعال و ذخیره کنید.</p>}
             <MultiSelector
               label="نقش‌های سازمانی"
@@ -172,7 +203,15 @@ export default function UserProfilePage() {
             />
           </section>
           <section className="panel assignment-card">
-            <h2>واحدهای سازمانی</h2>
+            <header>
+              <span className="user-profile-section-icon">
+                <Building2 size={19} />
+              </span>
+              <div>
+                <h2>واحدهای سازمانی</h2>
+                <p>تیم‌ها و واحدهای مرتبط با این عضو</p>
+              </div>
+            </header>
             <MultiSelector
               label="واحدها"
               disabled={

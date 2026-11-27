@@ -18,7 +18,6 @@ from plane.db.models import (
 from .access_control import has_permission
 from .entity_query import EntityQuery
 from .entity_records import emit_definition
-from .task_policy import is_workspace_administrator
 
 
 class AbsencePresenceProvider:
@@ -107,7 +106,7 @@ def settings_for(workspace, manager):
 
 def save_team_settings(workspace, manager, data, request=None):
     required = "Dashboard.Team.Rules" if "rules" in data else "Dashboard.Team.View"
-    if not is_workspace_administrator(manager, workspace) or not has_permission(manager, workspace, required, request=request):
+    if not has_permission(manager, workspace, required, request=request):
         raise PermissionDenied()
     row = settings_for(workspace, manager)
     before = {"rules": row.rules, "alert_enabled": row.alert_enabled, "alert_minutes": row.alert_minutes}
@@ -144,28 +143,22 @@ def save_team_settings(workspace, manager, data, request=None):
 
 
 def team_cards(workspace, manager, request=None, options=None):
-    if not is_workspace_administrator(manager, workspace) or not has_permission(manager, workspace, "Dashboard.Team.View", request=request):
+    if not has_permission(manager, workspace, "Dashboard.Team.View", request=request):
         raise PermissionDenied("مجوز مشاهده تیم من را ندارید.")
     options = options or {}
-    unit_map = {row["id"]: row for row in OrganizationUnit.objects.filter(workspace=workspace, is_active=True).values("id", "parent_id", "manager_id", "title")}
-    unit_ids = set(unit_map)
+    unit_ids, unit_map = subordinate_units(workspace, manager, bool(options.get("descendants")))
     memberships = list(OrganizationUnitMember.objects.filter(
         unit_id__in=unit_ids, is_active=True, user__is_active=True,
         user__member_workspace__workspace=workspace,
         user__member_workspace__is_active=True,
     ).select_related("user", "unit"))
-    unit_by_user = {}
+    by_user = {}
     for membership in memberships:
-        unit_by_user.setdefault(membership.user_id, membership)
-    by_user = {
-        row.member_id: (row.member, unit_by_user.get(row.member_id))
-        for row in WorkspaceMember.objects.filter(
-            workspace=workspace, is_active=True, deleted_at__isnull=True, member__is_active=True, member__is_bot=False,
-        ).select_related("member")
-    }
+        if membership.user_id != manager.id:
+            by_user.setdefault(membership.user_id, membership)
     user_ids = set(by_user)
     if not user_ids:
-        return {"cards": [], "summary": {}, "settings": {"refresh_seconds": 45}, "empty": "عضو فعالی در سامانه پیدا نشد."}
+        return {"cards": [], "summary": {}, "settings": {"refresh_seconds": 45}, "empty": "زیردستی در دامنهٔ مدیریتی شما پیدا نشد."}
     now = timezone.now()
     def unit_tree(unit_id):
         names, seen = [], set()
@@ -201,25 +194,22 @@ def team_cards(workspace, manager, request=None, options=None):
     capacities = {row.user_id: row.capacity for row in DashboardTeamSettings.objects.filter(workspace=workspace, user_id__in=user_ids)}
     manager_settings = settings_for(workspace, manager)
     cards = {}
-    for uid, (user, membership) in by_user.items():
+    for uid, membership in by_user.items():
         absence = absences.get(uid)
         last = activity.get(uid)
-        unit_id = membership.unit_id if membership else None
-        unit_name = membership.unit.title if membership else ""
-        path = unit_tree(unit_id) if unit_id else []
         cards[uid] = {
-            "id": str(uid), "name": user.display_name,
-            "avatar": getattr(user, "avatar", "") or "",
+            "id": str(uid), "name": membership.user.display_name,
+            "avatar": getattr(membership.user, "avatar", "") or "",
             "position": roles[uid][0]["name"] if roles[uid] else "",
-            "roles": roles[uid], "unit_id": str(unit_id) if unit_id else "",
-            "unit": unit_name, "team": unit_name,
-            "unit_depth": max(0, len(path) - 1),
-            "unit_path": " / ".join(path),
+            "roles": roles[uid], "unit_id": str(membership.unit_id),
+            "unit": membership.unit.title, "team": membership.unit.title,
+            "unit_depth": max(0, len(unit_tree(membership.unit_id)) - 1),
+            "unit_path": " / ".join(unit_tree(membership.unit_id)),
             "presence": "absent" if absence else "present",
             "presence_label": absence["label"] if absence else "حاضر",
             "reason": absence["reason"] if absence else "",
             "return_at": absence["return_at"] if absence else None,
-            "substitute": delegates[unit_id][0] if unit_id and delegates[unit_id] else None,
+            "substitute": delegates[membership.unit_id][0] if delegates[membership.unit_id] else None,
             "active_tasks": [], "in_progress_count": 0, "open_count": 0,
             "overdue_count": 0, "capacity": capacities.get(uid, 8),
             "last_activity": last.isoformat() if last else None,
@@ -252,4 +242,4 @@ def team_cards(workspace, manager, request=None, options=None):
     summary = defaultdict(int)
     for card in cards.values():
         summary[card["color"]] += 1
-    return {"cards": result, "summary": dict(summary), "settings": {"refresh_seconds": 45, "alert_enabled": manager_settings.alert_enabled, "alert_minutes": manager_settings.alert_minutes}, "empty": "عضوی با این مشخصات پیدا نشد." if not result else None}
+    return {"cards": result, "summary": dict(summary), "settings": {"refresh_seconds": 45, "alert_enabled": manager_settings.alert_enabled, "alert_minutes": manager_settings.alert_minutes}, "empty": "زیردستی در دامنهٔ مدیریتی شما پیدا نشد." if not result else None}
