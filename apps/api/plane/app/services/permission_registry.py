@@ -109,6 +109,8 @@ TICKET_SIX_PERMISSIONS = {
     "UniqueRule.Manage": "مدیریت قاعده یکتایی",
     "NumberingRule.Manage": "مدیریت شماره‌گذاری خودکار",
     "Relation.View": "مشاهده ارتباط‌ها",
+    "Page.Record.ViewAll": "مشاهده همه داده‌های صفحات سفارشی",
+    "FormDesigner.Access": "دسترسی کامل به طراحی فرم‌ها و جدول‌ها",
     "Relation.Create": "ایجاد ارتباط",
     "Relation.Edit": "ویرایش ارتباط",
     "Relation.Delete": "حذف ارتباط",
@@ -279,6 +281,46 @@ ADMIN_ONLY_PERMISSIONS = frozenset(
     code for code in PERMISSION_REGISTRY if code.startswith(("Report.", "Routing."))
 ) | {"DailyReport.Team.View", "DailyReport.Reminder.Manage"}
 
+DESIGNER_PERMISSIONS = frozenset(
+    code for code in PERMISSION_REGISTRY
+    if code.startswith((
+        "EntityType.", "Field.", "Lookup.", "FormLayout.", "FormDesigner.",
+        "Relation.", "UniqueRule.", "NumberingRule.", "ConditionalFormat.",
+    )) and code != "FormDesigner.Access"
+) | {"View.Official.Manage", "View.Manage.All", "Workflow.Design"}
+
+
+def page_permission_registry(workspace):
+    """Three independent data capabilities for each custom page."""
+    from plane.db.models import EntityType
+
+    permissions = {}
+    for page in EntityType.objects.filter(workspace=workspace, adapter="", parent__isnull=True, is_active=True):
+        for action, title in (("View", "مشاهده داده‌ها"), ("Edit", "ایجاد و ویرایش داده"), ("Delete", "حذف داده")):
+            code = f"Page.{page.code}.{action}"
+            name = f"{title} در صفحهٔ {page.title}"
+            permissions[code] = {
+                "name": name[:150], "description": name, "category": f"صفحهٔ {page.title}"[:80],
+                "is_delegatable": False, "is_active": True,
+            }
+    return permissions
+
+
+def permission_registry(workspace):
+    return {**PERMISSION_REGISTRY, **page_permission_registry(workspace)}
+
+
+def sync_page_permissions(workspace):
+    """Expose custom page capabilities without rewriting existing grants or catalog rows."""
+    from plane.db.models import OrganizationPermission
+
+    definitions = page_permission_registry(workspace)
+    existing = set(OrganizationPermission.objects.filter(workspace=workspace, code__in=definitions).values_list("code", flat=True))
+    OrganizationPermission.objects.bulk_create(
+        [OrganizationPermission(workspace=workspace, code=code, **details) for code, details in definitions.items() if code not in existing],
+        ignore_conflicts=True,
+    )
+
 
 @transaction.atomic
 def sync_permission_catalog(workspace):
@@ -292,7 +334,8 @@ def sync_permission_catalog(workspace):
     now = timezone.now()
     created, changed = [], []
     fields = ("name", "description", "category", "is_delegatable", "is_active")
-    for code, defaults in PERMISSION_REGISTRY.items():
+    registry = permission_registry(workspace)
+    for code, defaults in registry.items():
         row = existing.get(code)
         if row is None:
             created.append(OrganizationPermission(workspace=workspace, code=code, created_by_id=actor_id, **defaults))
@@ -305,7 +348,7 @@ def sync_permission_catalog(workspace):
     OrganizationPermission.objects.bulk_update(changed, [*fields, "updated_at", "updated_by"], batch_size=500)
     # Preserve historical definitions and assignments, but unknown codes grant nothing.
     OrganizationPermission.objects.filter(workspace=workspace, is_active=True).exclude(
-        code__in=PERMISSION_REGISTRY
+        code__in=registry
     ).update(is_active=False, updated_at=now, updated_by_id=actor_id)
 
 

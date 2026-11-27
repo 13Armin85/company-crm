@@ -4,6 +4,7 @@ import { useDebouncedValue, useTablePaging } from "../table-query";
 import { TablePagination } from "../table-pagination";
 import { ErrorNotice } from "../error-state";
 import { useState } from "react";
+import { KeyRound, LockKeyhole, Plus, Search, ShieldCheck } from "lucide-react";
 import { normalizePersianSearch, PersianDateTimePicker, SearchableSelect } from "@plane/ui";
 import { useCurrentUser, useOrganizationPermissions, useWorkspaceAccess, errorMessage } from "../api";
 import { Button, Skeleton } from "../components";
@@ -105,13 +106,51 @@ export function UserAccessPanel({ userId }: { userId: string }) {
     return null;
   return (
     <section className="panel user-access-panel">
-      <h2>دسترسی کاربر</h2>
+      <header className="user-access-header">
+        <span className="user-access-header-icon">
+          <ShieldCheck size={23} />
+        </span>
+        <div>
+          <h2>دسترسی‌های کاربر</h2>
+          <p>مجوزهای نقش‌ها و دسترسی‌های مستقیم این عضو را از اینجا مدیریت کنید.</p>
+        </div>
+      </header>
+      <div className="user-access-summary">
+        {access.can("Access.EffectivePermission.View") && (
+          <div>
+            <span>مجوزهای نقش</span>
+            <strong>{grants.length.toLocaleString("fa-IR")}</strong>
+          </div>
+        )}
+        {access.can("Access.UserException.View") && (
+          <div>
+            <span>دسترسی مستقیم</span>
+            <strong>{exceptions.length.toLocaleString("fa-IR")}</strong>
+          </div>
+        )}
+      </div>
       {access.can("Access.EffectivePermission.View") && (
-        <section>
-          <h3>مجوزهای ناشی از نقش‌ها</h3>
-          <label>
+        <section className="user-access-section">
+          <div className="user-access-section-heading">
+            <span className="user-access-section-icon">
+              <KeyRound size={19} />
+            </span>
+            <div>
+              <h3>مجوزهای ناشی از نقش‌ها</h3>
+              <p>این مجوزها از نقش‌های سازمانی عضو به دست آمده‌اند.</p>
+            </div>
+          </div>
+          <label className="user-access-search">
             <span>جستجوی مجوزهای نقش</span>
-            <input type="search" value={roleQuery} onChange={(event) => setRoleQuery(event.target.value)} />
+            <span className="user-access-search-input">
+              <Search size={17} />
+              <input
+                type="search"
+                placeholder="نام مجوز یا نقش را جستجو کنید"
+                value={roleQuery}
+                onChange={(event) => setRoleQuery(event.target.value)}
+              />
+            </span>
           </label>
           {effectiveQuery.error ? (
             <ErrorNotice message={errorMessage(effectiveQuery.error, "دریافت مجوزهای مؤثر این کاربر انجام نشد")} />
@@ -143,7 +182,9 @@ export function UserAccessPanel({ userId }: { userId: string }) {
                           </td>
                           <td>{row.role_names?.join("، ")}</td>
                           <td>
-                            {final?.granted ? "مجاز" : "غیرمجاز"}
+                            <span className={`user-access-badge ${final?.granted ? "is-allowed" : "is-denied"}`}>
+                              {final?.granted ? "مجاز" : "غیرمجاز"}
+                            </span>
                             {final?.source === "user_deny" && <small>منع مستقیم؛ منشأ نقش حفظ شده است.</small>}
                             {final?.source === "admin_only" && <small>این بخش فقط برای مدیر سامانه فعال است.</small>}
                             {final?.has_conflict && <small>تعارض؛ منع اولویت دارد.</small>}
@@ -162,7 +203,7 @@ export function UserAccessPanel({ userId }: { userId: string }) {
           code="exceptions"
           key={`${editing?.id || "new"}:${exceptions.length}`}
           recordId={editing?.id}
-          className="form-grid"
+          className="form-grid user-access-form"
           onSubmit={(event, custom_values) => {
             event.preventDefault();
             if (mutation.isPending || !permission) return;
@@ -204,7 +245,15 @@ export function UserAccessPanel({ userId }: { userId: string }) {
             );
           }}
         >
-          <h3>{editing ? "ویرایش دسترسی مستقیم" : "افزودن دسترسی مستقیم"}</h3>
+          <div className="user-access-section-heading">
+            <span className="user-access-section-icon">
+              <Plus size={19} />
+            </span>
+            <div>
+              <h3>{editing ? "ویرایش دسترسی مستقیم" : "افزودن دسترسی مستقیم"}</h3>
+              <p>برای این عضو به‌صورت جداگانه اجازه یا منع ثبت کنید.</p>
+            </div>
+          </div>
           <label htmlFor="direct-permission">
             <span>مجوز</span>
             <SearchableSelect
@@ -309,11 +358,27 @@ export function UserAccessPanel({ userId }: { userId: string }) {
         </SurfaceForm>
       )}
       {access.can("Access.UserException.View") && (
-        <section>
-          <h3>دسترسی‌های مستقیم</h3>
-          <label>
+        <section className="user-access-section">
+          <div className="user-access-section-heading">
+            <span className="user-access-section-icon">
+              <LockKeyhole size={19} />
+            </span>
+            <div>
+              <h3>دسترسی‌های مستقیم</h3>
+              <p>مواردی که فقط برای این عضو تعریف شده‌اند.</p>
+            </div>
+          </div>
+          <label className="user-access-search">
             <span>جستجوی دسترسی‌های مستقیم</span>
-            <input type="search" value={directQuery} onChange={(event) => setDirectQuery(event.target.value)} />
+            <span className="user-access-search-input">
+              <Search size={17} />
+              <input
+                type="search"
+                placeholder="نام دسترسی را جستجو کنید"
+                value={directQuery}
+                onChange={(event) => setDirectQuery(event.target.value)}
+              />
+            </span>
           </label>
           {directTable.error ? (
             <ErrorNotice message={errorMessage(directTable.error, "دریافت دسترسی‌های مستقیم این کاربر انجام نشد")} />
@@ -342,7 +407,11 @@ export function UserAccessPanel({ userId }: { userId: string }) {
                           <small>{item.category}</small>
                           <b>{item.name}</b>
                         </td>
-                        <td>{row.effect === "ALLOW" ? "اجازه" : "منع"}</td>
+                        <td>
+                          <span className={`user-access-badge ${row.effect === "ALLOW" ? "is-allowed" : "is-denied"}`}>
+                            {row.effect === "ALLOW" ? "اجازه" : "منع"}
+                          </span>
+                        </td>
                         <td>
                           {activeNow(row) ? "فعال" : row.ends_at && Date.parse(row.ends_at) <= now ? "منقضی" : "آینده"}
                           {(row.starts_at || row.ends_at) && (
@@ -379,7 +448,14 @@ export function UserAccessPanel({ userId }: { userId: string }) {
                                 variant="danger"
                                 disabled={mutation.isPending}
                                 onClick={() =>
-                                  mutation.mutate({ path: `users/${userId}/exceptions/${row.id}/`, method: "delete" })
+                                  mutation.mutate(
+                                    { path: `users/${userId}/exceptions/${row.id}/`, method: "delete" },
+                                    {
+                                      onSuccess: () => {
+                                        if (editing?.id === row.id) reset();
+                                      },
+                                    }
+                                  )
                                 }
                               >
                                 حذف دسترسی

@@ -295,11 +295,15 @@ export function ExtensionDecisionForm({
 
 export function ContactResolveForm({
   channels,
+  customers = [],
+  supportActivityRequired = false,
   pending,
   onSubmit,
   onCancel,
 }: {
   channels: { code: string; title: string }[];
+  customers?: { id: string; title: string }[];
+  supportActivityRequired?: boolean;
   pending?: boolean;
   onSubmit: (payload: {
     channel: string;
@@ -307,6 +311,11 @@ export function ContactResolveForm({
     contact_at: string;
     summary: string;
     outcome: string;
+    customer_id?: string;
+    activity_kind?: "support" | "phone";
+    starts_at?: string;
+    ends_at?: string;
+    confirm_activity?: boolean;
   }) => void;
   onCancel: () => void;
 }) {
@@ -316,9 +325,24 @@ export function ContactResolveForm({
     contact_at: "",
     summary: "",
     outcome: "",
+    customer_id: customers[0]?.id ?? "",
+    activity_kind: "support" as "support" | "phone",
+    starts_at: "",
+    ends_at: "",
+    confirm_activity: false,
   });
   const [submitted, setSubmitted] = useState(false);
-  const errors = contactErrors(value);
+  const startMs = Date.parse(value.starts_at);
+  const endMs = Date.parse(value.ends_at);
+  const errors = [
+    ...contactErrors(value),
+    ...(supportActivityRequired && !value.customer_id ? ["مشتری مرتبط با تیکت را انتخاب کنید."] : []),
+    ...(supportActivityRequired &&
+    (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs || endMs > Date.now())
+      ? ["بازهٔ واقعی فعالیت را با شروع پیش از پایان و در گذشته وارد کنید."]
+      : []),
+    ...(supportActivityRequired && !value.confirm_activity ? ["ثبت زمان واقعی فعالیت را صریحاً تأیید کنید."] : []),
+  ];
   return (
     <form
       className="workflow-form"
@@ -326,7 +350,16 @@ export function ContactResolveForm({
       onSubmit={(event) => {
         event.preventDefault();
         setSubmitted(true);
-        if (!errors.length) onSubmit(value);
+        if (!errors.length)
+          onSubmit(
+            supportActivityRequired
+              ? {
+                  ...value,
+                  starts_at: new Date(startMs).toISOString(),
+                  ends_at: new Date(endMs).toISOString(),
+                }
+              : value
+          );
       }}
     >
       <strong>ثبت تماس و حل</strong>
@@ -357,6 +390,47 @@ export function ContactResolveForm({
       <Field label="نتیجه">
         <textarea value={value.outcome} onChange={(event) => setValue({ ...value, outcome: event.target.value })} />
       </Field>
+      {supportActivityRequired && (
+        <>
+          <SearchableSelect
+            label="مشتری"
+            value={value.customer_id}
+            onChange={(customer_id) => setValue({ ...value, customer_id })}
+            options={customers.map((customer) => ({ id: customer.id, title: customer.title }))}
+          />
+          <SearchableSelect
+            label="نوع فعالیت"
+            value={value.activity_kind}
+            onChange={(activity_kind) => setValue({ ...value, activity_kind: activity_kind as "support" | "phone" })}
+            options={[
+              { id: "support", title: "پشتیبانی/رسیدگی" },
+              { id: "phone", title: "تماس تلفنی" },
+            ]}
+          />
+          <Field label="شروع فعالیت">
+            <input
+              type="datetime-local"
+              value={value.starts_at}
+              onChange={(event) => setValue({ ...value, starts_at: event.target.value })}
+            />
+          </Field>
+          <Field label="پایان فعالیت">
+            <input
+              type="datetime-local"
+              value={value.ends_at}
+              onChange={(event) => setValue({ ...value, ends_at: event.target.value })}
+            />
+          </Field>
+          <label>
+            <input
+              type="checkbox"
+              checked={value.confirm_activity}
+              onChange={(event) => setValue({ ...value, confirm_activity: event.target.checked })}
+            />{" "}
+            زمان واقعی این فعالیت را بررسی و تأیید می‌کنم.
+          </label>
+        </>
+      )}
       <Errors items={submitted ? errors : []} />
       <div className="workflow-form-actions">
         <Button type="submit" disabled={pending}>
@@ -834,6 +908,8 @@ export function WorkflowPanelView({
       {dialog?.kind === "contact" && (
         <ContactResolveForm
           channels={instance.contact_channels}
+          customers={instance.customers}
+          supportActivityRequired={instance.support_activity_required}
           pending={pending}
           onCancel={() => setDialog(null)}
           onSubmit={(body) => send("contact-resolve", body)}

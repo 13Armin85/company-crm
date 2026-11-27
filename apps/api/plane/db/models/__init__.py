@@ -145,3 +145,4 @@ from .leave import (
 )
 from .portal import PORTAL_ATTACHMENT, PortalAccount, PortalAuditLog, PortalSession
 from .daily_report import DailyReport, DailyReportItem, SavedReport
+from .support_activity import SupportActivity

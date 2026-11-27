@@ -106,6 +106,9 @@ def _user_profile_data(workspace, user):
 class OrganizationPermissionListEndpoint(BaseAPIView):
     @require_any_permission("Permission.View", "Role.View", "Role.Permission.Assign", "Access.UserException.Manage")
     def get(self, request, slug):
+        from plane.app.services.permission_registry import sync_page_permissions
+
+        sync_page_permissions(get_object_or_404(Workspace, slug=slug))
         rows = OrganizationPermission.objects.filter(workspace__slug=slug, is_active=True).order_by("category", "code")
         return Response(OrganizationPermissionSerializer(rows, many=True).data)
 

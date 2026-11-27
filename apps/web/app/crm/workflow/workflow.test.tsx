@@ -343,6 +343,18 @@ describe("forms", () => {
     );
     expect(html).toContain("خلاصهٔ گفتگو");
     expect(html).toContain("ثبت تماس و حل");
+    const supportHtml = renderToStaticMarkup(
+      <ContactResolveForm
+        channels={[{ code: "phone", title: "تلفن" }]}
+        customers={[{ id: "customer-1", title: "مشتری الف" }]}
+        supportActivityRequired
+        onSubmit={noop}
+        onCancel={noop}
+      />
+    );
+    expect(supportHtml).toContain("شروع فعالیت");
+    expect(supportHtml).toContain("زمان واقعی این فعالیت");
+    expect(supportHtml).toContain('aria-label="مشتری"');
   });
 
   it("inbox lists my steps and extension requests", () => {

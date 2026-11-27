@@ -106,6 +106,13 @@ class UserNotificationPreference(BaseModel):
     comment = models.BooleanField(default=True)
     mention = models.BooleanField(default=True)
     issue_completed = models.BooleanField(default=True)
+    crm_routing = models.BooleanField(default=True)
+    crm_ticket_status = models.BooleanField(default=True)
+    crm_workflow_action = models.BooleanField(default=True)
+    crm_leave_result = models.BooleanField(default=True)
+    crm_deadline = models.BooleanField(default=True)
+    crm_daily_report = models.BooleanField(default=True)
+    crm_portal = models.BooleanField(default=True)
 
     class Meta:
         verbose_name = "UserNotificationPreference"

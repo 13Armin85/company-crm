@@ -3,7 +3,7 @@
 Single sources of truth:
 - status category: :func:`work_category` / :func:`category_expression` (ن۶);
 - deadline: ``Issue.target_*`` columns (decision 1), computed only through
-  ``work_calendar.add_working_time`` / ``working_minutes_between``;
+  ``work_calendar.add_available_time`` / ``available_minutes_between``;
 - history: ``EntityEvent`` rows on the ticket's public record id (append-only),
   plus ``TicketRoutingDecision`` for the referral chain and ``WorkflowExtension``
   / ``WorkflowDelayReport`` (ticket-level rows, ``issue`` set, ``step_run`` NULL).
@@ -34,7 +34,7 @@ from plane.db.models import (
     WorkflowInstance,
 )
 from .access_control import delegation_context, has_permission, management_relation
-from .work_calendar import add_working_time, calendar_zone, schedule_for, working_minutes_between
+from .work_calendar import add_available_time, available_minutes_between, calendar_zone, schedule_for
 
 TODO, IN_PROGRESS, DONE = "todo", "in_progress", "done"
 CATEGORY_TITLES = {TODO: "انجام‌نشده", IN_PROGRESS: "در حال انجام", DONE: "انجام‌شده"}
@@ -327,7 +327,7 @@ def _store(issue, **values):
 
 
 def _deadline(issue, user, anchor, minutes):
-    return add_working_time(user, anchor, max(minutes, 0), issue.workspace)
+    return add_available_time(user, anchor, max(minutes, 0), issue.workspace)
 
 
 def on_saved(issue, old_category, created, now=None):
@@ -414,8 +414,8 @@ def _remaining(issue, now):
         return None
     user = calendar_user(issue)
     if now <= issue.target_at:
-        return working_minutes_between(user, now, issue.target_at, issue.workspace)
-    return -working_minutes_between(user, issue.target_at, now, issue.workspace)
+        return available_minutes_between(user, now, issue.target_at, issue.workspace)
+    return -available_minutes_between(user, issue.target_at, now, issue.workspace)
 
 
 def _close(issue, actor, now, created=False):
@@ -581,7 +581,7 @@ def preview_extension(workspace, actor, issue_id, data, request=None, now=None):
     owner = _extension_base(issue, actor, now)
     minutes = ensure_minutes(data.get("minutes"))
     approver, why = extension_recipient(owner, workspace, now)
-    requested = add_working_time(calendar_user(issue), issue.target_at, minutes, workspace)
+    requested = add_available_time(calendar_user(issue), issue.target_at, minutes, workspace)
     return {
         "current_target_at": iso(issue.target_at, workspace),
         "current_target_text": fa_moment(issue.target_at, workspace),
@@ -603,7 +603,7 @@ def request_extension(workspace, actor, issue_id, data, request=None, now=None):
         if WorkflowExtension.objects.filter(issue=issue, status=WorkflowExtension.Status.PENDING).exists():
             raise ValidationError("یک درخواست تمدید باز برای این تیکت وجود دارد.")
         approver, why = extension_recipient(owner, workspace, now)
-        requested = add_working_time(calendar_user(issue), issue.target_at, minutes, workspace)
+        requested = add_available_time(calendar_user(issue), issue.target_at, minutes, workspace)
         row = WorkflowExtension.objects.create(
             issue=issue,
             scope=WorkflowExtension.Scope.TICKET,
@@ -687,7 +687,7 @@ def decide_extension(workspace, actor, extension_id, data, request=None, now=Non
         before = issue.target_at
         if approve:
             # The new deadline is computed on the deadline in force at decision time.
-            target = add_working_time(calendar_user(issue), issue.target_at, extension.minutes or 0, workspace)
+            target = add_available_time(calendar_user(issue), issue.target_at, extension.minutes or 0, workspace)
             if not extension.minutes:
                 target = extension.requested_target_at
             calendar = dict(issue.target_calendar or {})
@@ -1201,12 +1201,35 @@ def contact_resolve(workspace, actor, issue_id, data, request=None, now=None):
                     actor,
                     instance.id,
                     {**data, "contact_at": contact["contact_at"], "outcome": "حل شد", "revision": instance.revision},
+                    request=request,
                     now=now,
                 )
             else:
                 workflow_actions.to_standard(
                     workspace, actor, instance.id, {"reason": summary, "revision": instance.revision}, request, now
                 )
+        elif resolved:
+            from plane.db.models import EntityRecord
+
+            subtype = EntityRecord.objects.filter(workspace=workspace, source_id=issue.id).select_related("subtype").first()
+            support_solved = bool(
+                (issue.type_id and issue.type.name == "با پشتیبانی حل شد")
+                or (subtype and subtype.subtype and subtype.subtype.code == "support-solved")
+            )
+            if support_solved:
+                from .support_activities import create as create_support_activity
+
+                activity = create_support_activity(
+                    workspace, actor,
+                    {
+                        "customer_id": data.get("customer_id"), "issue_id": str(issue.id),
+                        "kind": data.get("activity_kind") or ("phone" if channel == "phone" else "support"),
+                        "starts_at": data.get("starts_at"), "ends_at": data.get("ends_at"),
+                        "summary": summary, "confirm": data.get("confirm_activity"),
+                    }, request,
+                )
+                contact["support_activity_id"] = str(activity.id)
+                contact["duration_minutes"] = activity.duration_minutes
         if contact["notified_customer"]:
             from .portal_requests import notify_contact
 
@@ -1309,9 +1332,9 @@ def deadline_states(issues, workspace, now=None):
     States: ``closed`` / ``not_started`` / ``overdue`` / ``near_due`` / ``running``.
     Near-due: remaining time ≤ ``NEAR_DUE_PERCENT`` of the total; for deadlines within a
     week the remaining *working* minutes of the calendar user are used (decision 9).
-    Loads type defaults, calendar users and their schedules in bulk (no per-row queries).
+    Loads type defaults and calendar users in bulk; each near-due row uses the
+    same availability calculation as the ticket detail so meetings count.
     """
-    from .work_calendar import bulk_resolvers
     from .workflow_engine import company_calendar_user
 
     now = now or timezone.now()
@@ -1360,14 +1383,9 @@ def deadline_states(issues, workspace, now=None):
             if user is None and primary.get(issue.id):
                 user = User(id=primary[issue.id])
             users[issue.id] = user or company
-        distinct = {u.id: u for u in users.values()}
-        zone = calendar_zone(workspace)
-        last = max(issue.target_at for issue, _ in near_candidates).astimezone(zone).date()
-        resolvers = bulk_resolvers(workspace, distinct.values(), now.astimezone(zone).date(), last)
         for issue, threshold in near_candidates:
-            resolver = resolvers[users[issue.id].id]
-            seconds = sum((b - a).total_seconds() for a, b in resolver.working_intervals(now, issue.target_at))
-            result[issue.id] = "near_due" if int(seconds // 60) <= threshold else "running"
+            minutes = available_minutes_between(users[issue.id], now, issue.target_at, workspace)
+            result[issue.id] = "near_due" if minutes <= threshold else "running"
     return result
 
 

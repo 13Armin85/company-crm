@@ -27,7 +27,6 @@ from plane.db.models import (
     FormVersion,
     LookupValue,
 )
-from .access_control import has_permission
 from .entity_records import emit_definition
 from .entity_rules import empty, normalize
 
@@ -307,15 +306,6 @@ def validate_relation_values(
         entries = submitted_entries(request, code)
         if values.get(code) == old.get(code) and entries is None:
             continue
-        if not has_permission(
-            actor,
-            entity.workspace,
-            "Relation.Create" if creating else "Relation.Edit",
-            request=request,
-        ):
-            raise PermissionDenied(
-                {code: "مجوز اتصال یا جدا کردن رکورد مرتبط را ندارید."}
-            )
         relation = (
             EntityRelation.objects.select_for_update()
             .select_related("left_field", "right_field", "left_entity", "right_entity")

@@ -344,6 +344,7 @@ def busy_blocks(workspace, user, start, end):
         for row in WorkEvent.objects.filter(
             workspace=workspace,
             status=WorkEvent.Status.PLANNED,
+            deleted_at__isnull=True,
             participant_rows__user=user,
             participant_rows__deleted_at__isnull=True,
             starts_at__lt=end,
@@ -356,6 +357,7 @@ def busy_blocks(workspace, user, start, end):
             workspace=workspace,
             user=user,
             status=UserAbsence.Status.SCHEDULED,
+            deleted_at__isnull=True,
             starts_at__lt=end,
             ends_at__gt=start,
         )
@@ -395,6 +397,40 @@ def availability(user, start, end, workspace):
             {"start": a.astimezone(zone), "end": b.astimezone(zone), "available": state[0], "reason": state[1]}
         )
     return _merge(segments)
+
+
+def available_minutes_between(user, start, end, workspace):
+    """Working minutes actually free for this person, excluding events and leave."""
+    return int(
+        sum(
+            (row["end"] - row["start"]).total_seconds()
+            for row in availability(user, start, end, workspace)
+            if row["available"]
+        )
+        // 60
+    )
+
+
+def add_available_time(user, start, minutes, workspace):
+    """Advance through the person's free working intervals, including calendar events."""
+    if minutes < 0:
+        raise ValueError("مدت زمان کاری نمی‌تواند منفی باشد.")
+    if minutes == 0:
+        return start
+    remaining = timedelta(minutes=minutes)
+    # Most targets span only a few days. Query in short windows to avoid
+    # resolving a full year of schedules and events for every ticket.
+    for offset in range(0, MAX_SEARCH_DAYS + 1, 14):
+        window_start = start + timedelta(days=offset)
+        window_end = start + timedelta(days=min(offset + 14, MAX_SEARCH_DAYS + 1))
+        for row in availability(user, window_start, window_end, workspace):
+            if not row["available"]:
+                continue
+            duration = row["end"] - row["start"]
+            if duration >= remaining:
+                return row["start"] + remaining
+            remaining -= duration
+    raise ValueError("در بازهٔ یک‌ساله زمان کاری کافی برای این محاسبه وجود ندارد.")
 
 
 def is_outside_working_hours(user, start, end, workspace):

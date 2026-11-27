@@ -35,6 +35,7 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError, PermissionDenied
 
 from plane.db.models import (
+    EntityRecord,
     EntityType,
     IssueAssignee,
     TicketRoutingDecision,
@@ -48,6 +49,7 @@ from plane.db.models import (
 )
 from .entity_records import (
     record_queryset,
+    permission,
     require_action,
     ADAPTERS,
     json_value,
@@ -204,17 +206,10 @@ class EntityQuery:
                 and not f["config"].get("hidden")
                 and not f["config"].get("secret")
                 and not f["binding"].get("stage")
-                and (
-                    not f["config"].get("relation_id")
-                    or has_permission(
-                        user, entity.workspace, "Relation.View", request=request
-                    )
-                )
             }
             for field in self.context[key].values():
                 field["config"]["readonly"] = bool(
                     field["config"].get("readonly")
-                    or field["config"].get("editable_after_create") is False
                     or not can_field(field, roles, edit=True)
                     or not self.grants[field_edit_action(entity, field)]
                     or field["kind"] == "computed"
@@ -317,13 +312,14 @@ class EntityQuery:
                 code=field["relation_entity"],
                 parent__isnull=True,
             )
-        return EntityQuery(
+        child = EntityQuery(
             self.context[key],
             self.user,
             self.request,
             depth=self.depth + 1,
             context=self.context,
         )
+        return child
 
     def describe(self, path, capability=None):
         if not isinstance(path, str) or len(path) > 400 or len(path.split(".")) > 4:
@@ -331,6 +327,13 @@ class EntityQuery:
                 "مسیر ستون معتبر نیست؛ حداکثر سه سطح ارتباط مجاز است."
             )
         head, *tail = path.split(".", 1)
+        if (
+            self.depth > 0
+            and not self.entity.adapter
+            and not permission(self.entity, self.user, "view_all", self.request)
+            and head != self.entity.title_field
+        ):
+            raise ValidationError({"field": "برای مشاهده این داده از صفحه مرتبط، دسترسی مشاهده همه داده‌های صفحات لازم است."})
         field = self.fields.get(head)
         if not field:
             raise ValidationError(

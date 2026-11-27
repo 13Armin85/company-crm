@@ -23,6 +23,7 @@ from plane.app.views.workspace.ticket import (
     TicketTypeTargetEndpoint,
 )
 from plane.app.views.workspace.task_history import TaskHistoryEndpoint
+from plane.app.views.workspace.support_activity import SupportActivityDetailEndpoint, SupportActivityListEndpoint, SupportActivitySummaryEndpoint
 from plane.app.views.workspace.task_table import TaskTableEndpoint
 from plane.app.views.workspace.task import TaskNotesEndpoint
 from plane.app.views.workspace.access import (
@@ -87,6 +88,9 @@ from plane.app.views import (
 
 
 urlpatterns = [
+    path("workspaces/<str:slug>/support-activities/", SupportActivityListEndpoint.as_view()),
+    path("workspaces/<str:slug>/support-activities/summary/", SupportActivitySummaryEndpoint.as_view()),
+    path("workspaces/<str:slug>/support-activities/<uuid:activity_id>/", SupportActivityDetailEndpoint.as_view()),
     path("workspaces/<str:slug>/access/me/", AccessMeEndpoint.as_view()),
     path(
         "workspaces/<str:slug>/organization/users/<uuid:user_id>/effective-permissions/",

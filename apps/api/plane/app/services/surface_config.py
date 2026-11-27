@@ -714,8 +714,6 @@ def prepare_surface_request(request):
             raise PermissionDenied({key: "ویرایش این فیلد مجاز نیست."})
         if not field["is_active"] and raw != values.get(key):
             raise ValidationError({key: "فیلد غیرفعال قابل تغییر نیست."})
-        if not creating and field["config"].get("editable_after_create") is False and raw != values.get(key):
-            raise PermissionDenied({key: "این فیلد پس از ثبت قابل تغییر نیست."})
         try:
             values[key] = normalize(field, raw)
         except ValidationError as exc:

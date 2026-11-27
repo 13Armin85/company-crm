@@ -889,8 +889,8 @@ def published_version(definition):
 def definition_for(entity, subtype=None, kind=None):
     """Active definition with a published version; subtype-specific wins over entity-wide."""
     kinds = [kind] if kind else [WorkflowDefinition.Kind.FAST_PATH, WorkflowDefinition.Kind.STANDARD]
-    for wanted in kinds:
-        for scope in ([subtype] if subtype else []) + [None]:
+    for scope in ([subtype] if subtype else []) + [None]:
+        for wanted in kinds:
             row = WorkflowDefinition.objects.filter(entity=entity, subtype=scope, kind=wanted, is_active=True).first()
             if row and published_version(row):
                 return row
@@ -1065,6 +1065,19 @@ def timeline(instance):
     ]
 
 
+def requires_support_activity(instance, row=None, native=None):
+    """The named support-resolved type needs a confirmed interval before closure."""
+    if instance.definition.kind != WorkflowDefinition.Kind.FAST_PATH:
+        return False
+    if row is None and native is None:
+        row, native = record_parts(instance.entity, instance.record_id)
+    subtype = row.subtype if row else None
+    return bool(
+        (subtype and (subtype.code == "support-solved" or subtype.title == "با پشتیبانی حل شد"))
+        or (native and native.type_id and native.type.name == "با پشتیبانی حل شد")
+    )
+
+
 def instance_payload(instance, actor, request=None, now=None):
     now = now or timezone.now()
     workspace = instance.workspace
@@ -1079,6 +1092,13 @@ def instance_payload(instance, actor, request=None, now=None):
         WorkflowExtension.objects.filter(step_run=run, status=WorkflowExtension.Status.PENDING).first() if run else None
     )
     fast = instance.definition.kind == WorkflowDefinition.Kind.FAST_PATH
+    subtype = row.subtype if row else None
+    support_activity_required = requires_support_activity(instance, row, native)
+    customers = []
+    if support_activity_required and native:
+        from .ticket_core import customers_of
+
+        customers = customers_of(native, actor, request)
     actions = {
         "transitions": [
             {
@@ -1121,6 +1141,7 @@ def instance_payload(instance, actor, request=None, now=None):
             }
     return {
         "id": str(instance.id),
+        "record_id": str(instance.record_id),
         "migration_target": migration_target,
         "status": instance.status,
         "revision": instance.revision,
@@ -1129,6 +1150,7 @@ def instance_payload(instance, actor, request=None, now=None):
             "id": str(instance.definition_id),
             "title": instance.definition.title,
             "kind": instance.definition.kind,
+            "subtype": subtype.code if subtype else None,
         },
         "version": {"id": str(instance.version_id), "number": instance.version.number},
         "current_step": {
@@ -1152,6 +1174,8 @@ def instance_payload(instance, actor, request=None, now=None):
         ],
         "timeline": timeline(instance),
         "contact_channels": contact_channels(workspace) if fast else [],
+        "support_activity_required": support_activity_required,
+        "customers": customers,
     }
 
 

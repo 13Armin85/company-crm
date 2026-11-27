@@ -206,6 +206,13 @@ export interface NotificationPreferences {
   comment: boolean;
   mention: boolean;
   issue_completed: boolean;
+  crm_routing: boolean;
+  crm_ticket_status: boolean;
+  crm_workflow_action: boolean;
+  crm_leave_result: boolean;
+  crm_deadline: boolean;
+  crm_daily_report: boolean;
+  crm_portal: boolean;
 }
 export const useNotificationPreferences = () =>
   useQuery({

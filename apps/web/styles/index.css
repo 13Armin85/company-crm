@@ -14,6 +14,15 @@
 @import "./reports.css";
 @import "./advanced-filter.css";
 @import "./column-editor.css";
+.crm-auto-scroll {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 36ch;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
 * {
   box-sizing: border-box;
 }
@@ -3773,10 +3782,25 @@ h4 {
   justify-content: space-between;
   padding: 14px 4px;
   border-bottom: 1px solid var(--border);
+  gap: 16px;
+}
+.notification-preferences label span {
+  min-width: 0;
+  font-weight: 600;
+}
+.notification-preferences label small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.notification-preferences label small {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-weight: 400;
 }
 .notification-preferences input {
   width: 18px;
   height: 18px;
+  flex: none;
   accent-color: var(--accent);
 }
 .profile-avatar-editor {

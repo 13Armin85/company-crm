@@ -21,6 +21,7 @@ from plane.db.models import (
     TicketRoleQueueEntry,
     TicketRoutingRule,
     UserOrganizationRole,
+    UserNotificationPreference,
     Workspace,
     WorkspaceMember,
     WorkspaceTask,
@@ -144,6 +145,36 @@ def test_recipient_scope_excludes_inactive_members_and_bots(workspace, create_us
         title="رویداد",
     )
     assert list(Notification.objects.values_list("receiver_id", flat=True)) == [active.id]
+
+
+def test_crm_event_preference_is_personal_and_checked_before_delivery(session_client, workspace):
+    first = member(workspace, "event-opt-out")
+    second = member(workspace, "event-opt-in")
+    session_client.force_authenticate(user=first)
+    path = "/api/users/me/notification-preferences/"
+    response = session_client.patch(path, {"crm_routing": False, "user": str(second.id)}, format="json")
+    assert response.status_code == 200
+    assert "user" not in response.data
+    assert not UserNotificationPreference.objects.get(user=first).crm_routing
+    assert UserNotificationPreference.objects.get(user=second).crm_routing
+    notify_members(
+        workspace.id,
+        [first.id, second.id],
+        actor_id=None,
+        sender="crm:routing:assigned",
+        entity_name="account",
+        title="ارجاع کار",
+    )
+    assert list(Notification.objects.values_list("receiver_id", flat=True)) == [second.id]
+    notify_members(
+        workspace.id,
+        [first.id, second.id],
+        actor_id=None,
+        sender="crm:daily_report:reminder",
+        entity_name="daily_report",
+        title="یادآوری گزارش",
+    )
+    assert Notification.objects.filter(receiver=first, sender="crm:daily_report:reminder").exists()
 
 
 def routing_rule(workspace, user=None):

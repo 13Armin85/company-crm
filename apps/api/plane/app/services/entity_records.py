@@ -70,6 +70,20 @@ def json_value(value):
 
 
 def permission(entity, user, action, request=None):
+    if not entity.adapter:
+        from plane.db.models import RolePermission, UserPermissionException, WorkspaceMember
+
+        page = entity.parent or entity
+        capability = {"view": "View", "view_all": "View", "create": "Edit", "edit": "Edit", "delete": "Delete"}.get(action)
+        if capability:
+            code = f"Page.{page.code}.{capability}"
+            configured = RolePermission.objects.filter(permission__workspace=entity.workspace, permission__code=code, permission__is_active=True).exists() or UserPermissionException.objects.filter(workspace=entity.workspace, user=user, permission__code=code, is_active=True).exists()
+            if configured or has_permission(user, entity.workspace, code, request=request):
+                return has_permission(user, entity.workspace, code, request=request)
+            if action == "view":
+                return user.is_authenticated and user.is_active and WorkspaceMember.objects.filter(workspace=entity.workspace, member=user, is_active=True).exists()
+            if action == "view_all":
+                return has_permission(user, entity.workspace, "Page.Record.ViewAll", request=request)
     code = entity.record_permissions.get(action)
     return bool(code and has_permission(user, entity.workspace, code, request=request))
 
@@ -354,7 +368,6 @@ def record_payload(entity, user, row=None, native=None, request=None):
             code in permitted
             and can_field(field, roles, edit=True)
             and not field["config"].get("readonly")
-            and field["config"].get("editable_after_create") is not False
             and field["kind"] != "computed"
             and actions[field_edit_action(entity, field)]
             for code, field in fields.items()
@@ -682,6 +695,8 @@ def validate_values(
                 values[code] = normalize(default_field, default)
     for code, value in submitted.items():
         field, config = fields[code], fields[code]["config"]
+        if not creating and value == old.get(code):
+            continue
         if not creating and config.get("secret"):
             raise PermissionDenied(
                 {code: "برای تغییر رمز عبور از عملیات اختصاصی تغییر رمز استفاده کنید."}
@@ -698,12 +713,6 @@ def validate_values(
             raise PermissionDenied({code: "اجازه ویرایش این فیلد را ندارید."})
         if not field["is_active"] and value != old.get(code):
             raise ValidationError({code: "فیلد غیرفعال قابل تغییر نیست."})
-        if (
-            not creating
-            and config.get("editable_after_create") is False
-            and value != old.get(code)
-        ):
-            raise ValidationError({code: "این فیلد پس از ثبت قابل ویرایش نیست."})
         try:
             normalized_field = field
             if field["kind"] in {"user", "unit", "role"} and config.get("multiple"):
@@ -796,7 +805,7 @@ def validate_values(
             config.get("required_if")
             and condition(config["required_if"], values, fields)
         )
-        if required and not hidden and empty(value):
+        if required and not hidden and empty(value) and (creating or not empty(old.get(code))):
             if can_field(field, roles):
                 raise ValidationError({code: "تکمیل این فیلد الزامی است."})
             raise ValidationError(

@@ -7,6 +7,7 @@ from plane.app.services.access_control import has_permission
 from plane.app.services.entity_records import permission
 from plane.app.services.navigation_defaults import DEFAULT_NAVIGATION
 from plane.app.services.surface_config import DESIGNABLE_SURFACES, SURFACES
+from plane.app.services.task_policy import is_workspace_administrator
 from plane.db.models import EntityType, SurfaceConfiguration
 
 DESIGN_PERMISSIONS = (
@@ -24,6 +25,7 @@ PAGE_PERMISSIONS = {
     "/my-work": ("Issue.View",),
     "/daily-report": ("DailyReport.Submit", "DailyReport.Team.View"),
     "/daily-report/team": ("DailyReport.Team.View", "Report.ViewAll"),
+    "/support-activities": ("Issue.Edit", "Report.Team.View", "Report.ViewAll"),
     "/workflow-inbox": ("Workflow.View",),
     "/leave-requests": ("Workflow.View",),
     "/calendar": ("Issue.View",),
@@ -73,6 +75,7 @@ def navigation_document(workspace):
 def navigation_payload(request, workspace):
     document = navigation_document(workspace).definition
     can = lambda code: has_permission(request.user, workspace, code, request=request)
+    is_admin = is_workspace_administrator(request.user, workspace)
     categories, routes, seen = [], [], set()
     # Codes and paths are validated against the application route registry. Database
     # titles are plain text; an edited document cannot introduce executable/external URLs.
@@ -106,7 +109,7 @@ def navigation_payload(request, workspace):
             }
             routes.append({**item, "category": code})
             grants = PAGE_PERMISSIONS.get(path, ())
-            if not grants or any(can(grant) for grant in grants):
+            if (path != "/settings/engine" or is_admin or can("FormDesigner.Access")) and (not grants or any(can(grant) for grant in grants)):
                 category["items"].append(item)
         categories.append(category)
     category_codes = {category["id"] for category in categories}
@@ -127,7 +130,9 @@ def navigation_payload(request, workspace):
         )
 
     pages = []
-    designer = any(can(code) for code in DESIGN_PERMISSIONS) or can("EntityType.View")
+    designer = (is_admin or can("FormDesigner.Access")) and (
+        any(can(code) for code in DESIGN_PERMISSIONS) or can("EntityType.View")
+    )
     entities = list(
         EntityType.objects.filter(workspace=workspace, is_active=True)
         .exclude(code="task")
@@ -148,9 +153,8 @@ def navigation_payload(request, workspace):
         if not designer and not permission(root, request.user, "view", request):
             continue
         path = entity_paths.get(root.adapter, f"/entities/{entity.code}")
-        requested = assignments.get(
-            entity.code,
-            assignments.get(root.code, entity.view_settings.get("navigation_category")),
+        requested = entity.view_settings.get("navigation_category") or assignments.get(
+            entity.code, assignments.get(root.code)
         )
         category = requested if requested in category_codes else category_for_path(path)
         entity_codes.add(entity.code)

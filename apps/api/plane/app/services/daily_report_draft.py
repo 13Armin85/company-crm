@@ -29,10 +29,12 @@ from plane.db.models import (
     Issue,
     IssueActivity,
     IssueComment,
+    SupportActivity,
     WorkEvent,
     WorkflowDecision,
 )
 from .report_scope import visible_ticket_ids
+from .entity_records import permission, record_queryset
 from .ticket_core import CATEGORY_TITLES, DONE, category_of, is_owner
 from .work_calendar import calendar_zone
 
@@ -150,11 +152,15 @@ def suggestions(workspace, user, day, request=None, now=None):
             continue  # no access any more (or not a ticket): never suggested
         number = numbers.get(issue.id) or f"#{issue.sequence_id}"
         category = category_of(issue)
+        description = (issue.description_stripped or "").strip()
+        summary = f"{number} «{issue.name}»: {'، '.join(entry['phrases'])}"
+        if description:
+            summary += f" — {description[:1200]}"
         result.append(
             {
                 "key": f"issue:{issue.id}",
                 "kind": "done" if category == DONE else "in_progress",
-                "text": f"{number} «{issue.name}»: {'، '.join(entry['phrases'])}",
+                "text": summary,
                 "source_kind": "issue",
                 "source_id": str(issue.id),
                 "source_label": f"تیکت {number} — وضعیت فعلی: {CATEGORY_TITLES[category]}",
@@ -189,10 +195,11 @@ def suggestions(workspace, user, day, request=None, now=None):
                 "at": decision.created_at.astimezone(zone).isoformat(),
             }
         )
-    # 6. calendar events of that day that are already over (planned never means done).
+    # 6. Only past events explicitly confirmed as done by this person.
     events = list(
         WorkEvent.objects.filter(
             workspace=workspace,
+            deleted_at__isnull=True,
             participant_rows__user=user,
             participant_rows__deleted_at__isnull=True,
             starts_at__lt=_bounds(day, workspace)[1],
@@ -206,31 +213,67 @@ def suggestions(workspace, user, day, request=None, now=None):
     outcomes = {
         row.source_id: row.outcome
         for row in ActivityConfirmation.objects.filter(
-            workspace=workspace, user=user, source_type="event", source_id__in=[e.id for e in events]
+            workspace=workspace,
+            user=user,
+            source_type="event",
+            source_id__in=[e.id for e in events],
+            deleted_at__isnull=True,
         )
     }
     for event in events:
-        if outcomes.get(event.id) == ActivityConfirmation.Outcome.NOT_DONE:
+        if outcomes.get(event.id) != ActivityConfirmation.Outcome.DONE:
             continue
         result.append(
             {
                 "key": f"event:{event.id}",
                 "kind": "done",
-                "text": EVENT_TEMPLATES[event.kind].format(title=event.title),
+                "text": " — ".join(
+                    part for part in (EVENT_TEMPLATES[event.kind].format(title=event.title), event.description.strip()) if part
+                ),
                 "source_kind": "event",
                 "source_id": str(event.id),
-                "source_label": (
-                    f"{event.get_kind_display()} تقویم — "
-                    + (
-                        "تأییدشده توسط شما"
-                        if outcomes.get(event.id) == ActivityConfirmation.Outcome.DONE
-                        else "پایان‌یافته"
-                    )
-                ),
+                "source_label": f"{event.get_kind_display()} تقویم — تأییدشده توسط شما",
                 "issue": None,
                 "link": "/calendar",
                 "at": event.ends_at.astimezone(zone).isoformat(),
             }
         )
+    # 7. Confirmed support intervals are suggested from their own record.
+    from plane.db.models import EntityType
+
+    customer_entity = EntityType.objects.filter(workspace=workspace, code="customer", parent__isnull=True).first()
+    if customer_entity and permission(customer_entity, user, "view", request):
+        visible_customers = record_queryset(customer_entity, user, request).values("id")
+        activities = SupportActivity.objects.filter(
+            workspace=workspace,
+            supporter=user,
+            customer_id__in=visible_customers,
+            starts_at__gte=start,
+            starts_at__lt=_bounds(day, workspace)[1],
+            confirmed_at__isnull=False,
+        ).select_related("customer", "issue")
+        visible_issues = set(visible_ticket_ids(user, workspace, request).values_list("id", flat=True))
+        for activity in activities:
+            if activity.issue_id and activity.issue_id not in visible_issues:
+                continue
+            title = (activity.customer.data or {}).get(customer_entity.title_field) or activity.customer.number
+            text = activity.summary or (activity.issue.name if activity.issue_id else f"رسیدگی به مشتری «{title}»")
+            result.append(
+                {
+                    "key": f"activity:{activity.id}",
+                    "kind": "done",
+                    "text": f"{text} — {activity.duration_minutes} دقیقهٔ {activity.get_kind_display()}",
+                    "source_kind": "activity",
+                    "source_id": str(activity.id),
+                    "source_label": f"{activity.get_kind_display()} برای «{title}» — زمان تأییدشده",
+                    "issue": (
+                        {"id": str(activity.issue_id), "number": numbers.get(activity.issue_id) or "", "title": activity.issue.name}
+                        if activity.issue_id
+                        else None
+                    ),
+                    "link": f"/edit/ticket/{activity.issue_id}" if activity.issue_id else f"/entities/customer/{activity.customer_id}",
+                    "at": activity.ends_at.astimezone(zone).isoformat(),
+                }
+            )
     result.sort(key=lambda row: row["at"])
     return result

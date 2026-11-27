@@ -115,22 +115,23 @@ export default function SettingsPage() {
       />
       <div className="settings-layout">
         <aside className="settings-nav">
-          {[
-            "EntityType.View",
-            "Lookup.View",
-            "Field.View",
-            "FormDesigner.View",
-            "UniqueRule.Manage",
-            "NumberingRule.Manage",
-            "Relation.View",
-            "View.Official.Manage",
-            "Config.Import",
-            "Config.Export",
-          ].some((code) => access?.can(code)) && (
-            <Link className="button button-secondary" to="/settings/engine">
-              طراحی فرم‌ها و جدول‌ها
-            </Link>
-          )}
+          {(access?.is_admin || access?.can("FormDesigner.Access")) &&
+            [
+              "EntityType.View",
+              "Lookup.View",
+              "Field.View",
+              "FormDesigner.View",
+              "UniqueRule.Manage",
+              "NumberingRule.Manage",
+              "Relation.View",
+              "View.Official.Manage",
+              "Config.Import",
+              "Config.Export",
+            ].some((code) => access?.can(code)) && (
+              <Link className="button button-secondary" to="/settings/engine">
+                طراحی فرم‌ها و جدول‌ها
+              </Link>
+            )}
           {settingsNav
             .filter((item) => item.id !== "members" || canManage)
             .map(({ id, label, icon: Icon }) => (
@@ -173,18 +174,41 @@ export default function SettingsPage() {
                   {notificationPreferences &&
                     (
                       [
-                        ["property_change", "تغییر مشخصات کار"],
-                        ["state_change", "تغییر وضعیت"],
-                        ["comment", "دیدگاه‌ها"],
-                        ["mention", "اشاره به شما"],
-                        ["issue_completed", "تکمیل کار"],
+                        ["property_change", "تغییر مشخصات کار", "وقتی مشخصات کاری که دنبال می‌کنید تغییر کند."],
+                        ["state_change", "تغییر وضعیت", "وقتی وضعیت کار مرتبط با شما عوض شود."],
+                        ["comment", "دیدگاه‌ها", "وقتی برای کار مرتبط با شما دیدگاهی ثبت شود."],
+                        ["mention", "اشاره به شما", "وقتی در دیدگاهی به شما اشاره شود."],
+                        ["issue_completed", "تکمیل کار", "وقتی کار مرتبط با شما انجام شود."],
+                        ["crm_routing", "ارجاع تیکت و کار", "وقتی تیکت یا کاری به شما یا صف نقش شما ارجاع شود."],
+                        ["crm_ticket_status", "تغییر وضعیت تیکت", "وقتی وضعیت تیکتی که در آن نقش دارید تغییر کند."],
+                        [
+                          "crm_workflow_action",
+                          "درخواست اقدام در گردش کار",
+                          "وقتی مرحله‌ای از گردش کار به اقدام شما نیاز داشته باشد.",
+                        ],
+                        [
+                          "crm_leave_result",
+                          "درخواست مرخصی",
+                          "وقتی درخواست مرخصی برای بررسی به شما برسد یا نتیجهٔ درخواست شما ثبت شود.",
+                        ],
+                        [
+                          "crm_deadline",
+                          "موعد و تمدید تیکت",
+                          "وقتی موعد تیکت بگذرد یا درخواست تمدید نیاز به تصمیم شما داشته باشد.",
+                        ],
+                        ["crm_daily_report", "یادآوری گزارش روزانه", "وقتی زمان ثبت گزارش روزانهٔ شما برسد."],
+                        ["crm_portal", "درخواست پورتال مشتری", "وقتی درخواست مشتری برای بررسی به تیم شما برسد."],
                       ] as const
-                    ).map(([key, label]) => (
+                    ).map(([key, label, detail]) => (
                       <label key={key}>
-                        <span>{label}</span>
+                        <span>
+                          {label}
+                          <small>{detail}</small>
+                        </span>
                         <input
                           type="checkbox"
                           checked={notificationPreferences[key]}
+                          disabled={updateNotifications.isPending}
                           onChange={(event) => updateNotifications.mutate({ [key]: event.target.checked })}
                         />
                       </label>

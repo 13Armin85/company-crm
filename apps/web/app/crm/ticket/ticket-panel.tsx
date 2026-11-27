@@ -630,9 +630,25 @@ export function ContactDialog({
   const [summary, setSummary] = useState("");
   const [resolved, setResolved] = useState<boolean | null>(null);
   const [notifyCustomer, setNotifyCustomer] = useState(false);
+  const [customerId, setCustomerId] = useState(card.details.customers?.[0]?.id ?? "");
+  const [activityKind, setActivityKind] = useState<"support" | "phone">("support");
+  const [activityStart, setActivityStart] = useState("");
+  const [activityEnd, setActivityEnd] = useState("");
+  const [confirmActivity, setConfirmActivity] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const mutation = useContactResolve(id);
-  const errors = contactErrors({ channel, contactName, summary, resolved });
+  const needsActivity = resolved === true && card.details.type === "با پشتیبانی حل شد";
+  const startMs = Date.parse(activityStart);
+  const endMs = Date.parse(activityEnd);
+  const errors = [
+    ...contactErrors({ channel, contactName, summary, resolved }),
+    ...(needsActivity && !customerId ? ["مشتری مرتبط با تیکت را انتخاب کنید."] : []),
+    ...(needsActivity &&
+    (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs || endMs > Date.now())
+      ? ["بازهٔ واقعی فعالیت را با شروع پیش از پایان و در گذشته وارد کنید."]
+      : []),
+    ...(needsActivity && !confirmActivity ? ["ثبت زمان واقعی فعالیت را صریحاً تأیید کنید."] : []),
+  ];
   return (
     <Dialog
       bare={bare}
@@ -653,6 +669,15 @@ export function ContactDialog({
             resolved,
             ...(contactAt ? { contact_at: contactAt } : {}),
             ...(card.portal ? { notify_customer: notifyCustomer } : {}),
+            ...(needsActivity
+              ? {
+                  customer_id: customerId,
+                  activity_kind: activityKind,
+                  starts_at: new Date(startMs).toISOString(),
+                  ends_at: new Date(endMs).toISOString(),
+                  confirm_activity: confirmActivity,
+                }
+              : {}),
           },
           { onSuccess: onClose }
         );
@@ -706,6 +731,51 @@ export function ContactDialog({
           <RefreshCw size={18} aria-hidden /> حل نشد — ادامه در مسیر عادی
         </button>
       </div>
+      {needsActivity && (
+        <div className="ticket-contact-activity">
+          <label>
+            <span>مشتری</span>
+            <select value={customerId} onChange={(event) => setCustomerId(event.target.value)}>
+              <option value="">انتخاب مشتری</option>
+              {card.details.customers?.map((customer) => (
+                <option key={customer.id} value={customer.id}>
+                  {customer.title}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>نوع فعالیت</span>
+            <select
+              value={activityKind}
+              onChange={(event) => setActivityKind(event.target.value as "support" | "phone")}
+            >
+              <option value="support">پشتیبانی/رسیدگی</option>
+              <option value="phone">تماس تلفنی</option>
+            </select>
+          </label>
+          <label>
+            <span>شروع فعالیت</span>
+            <input
+              type="datetime-local"
+              value={activityStart}
+              onChange={(event) => setActivityStart(event.target.value)}
+            />
+          </label>
+          <label>
+            <span>پایان فعالیت</span>
+            <input type="datetime-local" value={activityEnd} onChange={(event) => setActivityEnd(event.target.value)} />
+          </label>
+          <label className="ticket-check">
+            <input
+              type="checkbox"
+              checked={confirmActivity}
+              onChange={(event) => setConfirmActivity(event.target.checked)}
+            />
+            <span>زمان واقعی این فعالیت را بررسی و تأیید می‌کنم.</span>
+          </label>
+        </div>
+      )}
       {card.portal && (
         <label className="ticket-check">
           <input

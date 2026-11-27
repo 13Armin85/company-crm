@@ -227,8 +227,11 @@ class EngineCatalogEndpoint(EngineAPIView):
             .exclude(adapter="leave_request")
             .select_related("workspace", "parent", "parent__workspace")
         )
-        designer = has_permission(request.user, workspace, "EntityType.View", request=request) or has_permission(
-            request.user, workspace, "FormDesigner.View", request=request
+        from plane.app.services.task_policy import is_workspace_administrator
+
+        designer = (is_workspace_administrator(request.user, workspace) or has_permission(request.user, workspace, "FormDesigner.Access", request=request)) and (
+            has_permission(request.user, workspace, "EntityType.View", request=request)
+            or has_permission(request.user, workspace, "FormDesigner.View", request=request)
         )
         visible = [e for e in entities if designer or permission(e.parent or e, request.user, "view", request)]
         serialized = EntityTypeSerializer(visible, many=True, context={"workspace": workspace}).data

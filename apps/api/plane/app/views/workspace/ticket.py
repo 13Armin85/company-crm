@@ -82,23 +82,53 @@ class TicketTargetEndpoint(TicketAPIView):
 
 
 class TicketTypeListEndpoint(TicketAPIView):
-    @require_permission("Issue.View")
-    def get(self, request, slug):
+    DEFAULT_ORDER = ("با پشتیبانی حل شد", "خطا", "قابلیت جدید", "به‌روزرسانی", "خدمات IT", "سایر مشکلات")
+
+    def rows(self, workspace):
         from plane.db.models import IssueType
 
+        rows = list(IssueType.objects.filter(workspace=workspace, is_active=True, is_epic=False))
+        priority = {name: index for index, name in enumerate(self.DEFAULT_ORDER)}
+        return sorted(rows, key=lambda row: (row.level if row.level > 0 else priority.get(row.name, 100), row.name, str(row.id)))
+
+    def payload(self, workspace, request):
+        can_set_target = has_permission(request.user, workspace, "Ticket.TargetSet", request=request)
+        can_reorder = has_permission(request.user, workspace, "EntityType.Edit", request=request)
+        return [
+            {"id": str(row.id), "name": row.name, "target_minutes": row.target_minutes,
+             "can_set_target": can_set_target, "can_reorder": can_reorder}
+            for row in self.rows(workspace)
+        ]
+
+    @require_permission("Issue.View")
+    def get(self, request, slug):
         workspace = self.workspace(slug)
-        rows = IssueType.objects.filter(workspace=workspace, is_active=True, is_epic=False).order_by("name")
-        return Response(
-            [
-                {
-                    "id": str(row.id),
-                    "name": row.name,
-                    "target_minutes": row.target_minutes,
-                    "can_set_target": has_permission(request.user, workspace, "Ticket.TargetSet", request=request),
-                }
-                for row in rows
-            ]
-        )
+        return Response(self.payload(workspace, request))
+
+    @transaction.atomic
+    def patch(self, request, slug):
+        from plane.db.models import EntityEvent, IssueType
+
+        workspace = self.workspace(slug)
+        if not has_permission(request.user, workspace, "EntityType.Edit", request=request):
+            raise PermissionDenied("مجوز تغییر ترتیب نوع‌های تیکت را ندارید.")
+        order = request.data.get("order")
+        list(IssueType.objects.select_for_update().filter(workspace=workspace, is_active=True, is_epic=False))
+        rows = self.rows(workspace)
+        before = [str(row.id) for row in rows]
+        if (
+            not isinstance(order, list) or len(order) != len(before)
+            or not all(isinstance(identifier, str) for identifier in order)
+            or set(order) != set(before)
+        ):
+            raise ValidationError({"order": "ترتیب باید همهٔ نوع‌های فعال تیکت را دقیقاً یک‌بار شامل شود."})
+        for position, identifier in enumerate(order, 1):
+            IssueType.objects.filter(id=identifier, workspace=workspace).update(level=position)
+        EntityEvent(
+            workspace=workspace, entity=core.root_entity(workspace.id), event_type="ticket.type_order_changed",
+            before=before, after=order, metadata={"actor_id": str(request.user.id)},
+        ).save(created_by_id=request.user.id)
+        return Response(self.payload(workspace, request))
 
 
 class TicketTypeTargetEndpoint(TicketAPIView):

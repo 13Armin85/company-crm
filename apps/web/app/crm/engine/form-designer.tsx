@@ -91,7 +91,7 @@ export function formDesignState(draft: FormLayoutSchema, saved: FormLayoutSchema
   return "روی فرم اعمال شد";
 }
 
-export function formPreviewSchema(schema: EntityFormSchema, mode: "create" | "edit"): EntityFormSchema {
+export function formPreviewSchema(schema: EntityFormSchema, _mode: "create" | "edit"): EntityFormSchema {
   return entityDisplaySchema({
     ...schema,
     fields: schema.fields.map((field) => ({
@@ -102,11 +102,7 @@ export function formPreviewSchema(schema: EntityFormSchema, mode: "create" | "ed
         ...(field.binding.hidden !== undefined ? { hidden: field.binding.hidden } : {}),
         ...(field.binding.required_if !== undefined ? { required_if: field.binding.required_if } : {}),
         ...(field.binding.visible_if !== undefined ? { visible_if: field.binding.visible_if } : {}),
-        readonly: Boolean(
-          field.binding.readonly ||
-          field.config.readonly ||
-          (mode === "edit" && field.config.editable_after_create === false)
-        ),
+        readonly: Boolean(field.binding.readonly || field.config.readonly),
       },
     })),
   });

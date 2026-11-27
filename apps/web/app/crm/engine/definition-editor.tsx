@@ -2,7 +2,7 @@ import { useState } from "react";
 import { SearchableSelect } from "@plane/ui";
 import { DefaultValueEditor, dynamicDefaultsFor } from "./default-value-editor";
 import type { FieldConfig, FieldKind, FieldValue } from "@plane/ui";
-import { errorMessage, useOrganizationPermissions } from "../api";
+import { errorMessage } from "../api";
 import { Button } from "../components";
 import { useEngineMutation, useEngineDefinitions, useEngineCatalog } from "./api";
 import type { EntityDefinition, FieldDefinition, LookupDefinition, LookupOptionDefinition } from "./api";
@@ -10,6 +10,7 @@ import { ConditionEditor, FormulaEditor, conditionProblems } from "./rule-editor
 import { useUIStore } from "../store";
 import { browserId } from "../browser-id";
 import { InlineLookupEditor } from "./inline-lookup-editor";
+import { useNavigationDocument } from "../navigation";
 
 const textKinds = new Set(["short_text", "long_text", "email", "phone", "url"]);
 const numberKinds = new Set(["integer", "decimal", "money", "percent"]);
@@ -32,6 +33,7 @@ export function DefinitionEditor({
   onSaved?: (row?: EditableDefinition) => void;
 }) {
   const { data: catalog } = useEngineCatalog();
+  const navigation = useNavigationDocument();
   const { data: fields = [] } = useEngineDefinitions<FieldDefinition>("fields", kind === "fields");
   const { data: lookups = [] } = useEngineDefinitions<LookupDefinition>(
     "lookups",
@@ -41,7 +43,6 @@ export function DefinitionEditor({
     "values",
     kind === "fields" || kind === "values"
   );
-  const { data: permissions = [] } = useOrganizationPermissions(undefined, kind === "entities");
   const mutation = useEngineMutation();
   const [previewValue, setPreviewValue] = useState<FieldValue>(null);
   const [data, setData] = useState<EditableDefinition>(() => ({
@@ -108,6 +109,7 @@ export function DefinitionEditor({
                 "title_field",
                 "numbering",
                 "record_permissions",
+                "navigation_category",
               ]
             : kind === "lookups"
               ? ["code", "title", "description", "is_active"]
@@ -241,6 +243,22 @@ export function DefinitionEditor({
       </label>
       {kind === "entities" && (
         <>
+          {!data.adapter && navigation?.categories.length ? (
+            <label>
+              نمایش صفحه در تب سمت راست
+              <select
+                value={data.navigation_category || ""}
+                onChange={(event) => set("navigation_category", event.target.value)}
+              >
+                <option value="">تب پیش‌فرض</option>
+                {navigation.categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           <label>
             آیکون یا ایموجی
             <input value={data.icon || ""} onChange={(e) => set("icon", e.target.value)} />
@@ -283,39 +301,11 @@ export function DefinitionEditor({
           </div>
           {!data.adapter && (
             <details>
-              <summary>مجوزهای عملیات روی رکوردها</summary>
+              <summary>دسترسی‌های مستقل صفحه</summary>
               <p>
-                مجوز مدیریت تعریف از مجوز دسترسی به رکورد مستقل است. بدون «مشاهده همه»، کاربر فقط رکوردهای خودش را
-                می‌بیند.
+                برای این صفحه سه دسترسی مستقل «مشاهده داده‌ها»، «ایجاد و ویرایش داده» و «حذف داده» در بخش اعضا و دسترسی‌ها
+                وجود دارد. آن‌ها را برای هر نقش یا کاربر جداگانه تنظیم کنید.
               </p>
-              {[
-                ["view", "مشاهده"],
-                ["view_all", "مشاهده همه"],
-                ["create", "ایجاد"],
-                ["edit", "ویرایش"],
-                ["delete", "حذف"],
-              ].map(([key, title]) => (
-                <SearchableSelect
-                  key={key}
-                  label={title}
-                  value={
-                    data.record_permissions?.[key] ||
-                    `Issue.${key === "view_all" ? "ViewAll" : key[0].toUpperCase() + key.slice(1)}`
-                  }
-                  options={permissions.map((p) => ({ id: p.code, title: p.name }))}
-                  onChange={(v) =>
-                    set("record_permissions", {
-                      view: "Issue.View",
-                      view_all: "Issue.ViewAll",
-                      create: "Issue.Create",
-                      edit: "Issue.Edit",
-                      delete: "Issue.Delete",
-                      ...data.record_permissions,
-                      [key]: v,
-                    })
-                  }
-                />
-              ))}
             </details>
           )}
         </>
@@ -468,14 +458,6 @@ export function DefinitionEditor({
                   </label>
                 ))}
               </div>
-              <label className="engine-checkbox">
-                <input
-                  type="checkbox"
-                  checked={config.editable_after_create !== false}
-                  onChange={(e) => updateConfig({ editable_after_create: e.target.checked })}
-                />
-                بعد از ثبت هم قابل ویرایش باشد
-              </label>
               <div className="engine-editor-grid">
                 {[
                   ["min", "کمترین مقدار مجاز"],

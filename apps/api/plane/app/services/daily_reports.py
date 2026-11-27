@@ -629,7 +629,7 @@ def _clean_items(workspace, actor, day, raw_items, request=None, now=None):
         raise ValidationError({"items": "فهرست موارد گزارش معتبر نیست."})
     if len(raw_items) > MAX_ITEMS:
         raise ValidationError({"items": f"حداکثر {fa(MAX_ITEMS)} مورد در یک گزارش مجاز است."})
-    issue_ids, project_ids, event_ids = set(), set(), set()
+    issue_ids, project_ids, event_ids, activity_ids = set(), set(), set(), set()
     cleaned = []
     positions = {}
     for index, raw in enumerate(raw_items):
@@ -682,6 +682,11 @@ def _clean_items(workspace, actor, day, raw_items, request=None, now=None):
                 event_ids.add(UUID(source_id))
             except ValueError:
                 raise ValidationError({"items": "رویداد تقویمی معتبر نیست."})
+        if source_kind == "activity":
+            try:
+                activity_ids.add(UUID(source_id))
+            except ValueError:
+                raise ValidationError({"items": "فعالیت پشتیبانی معتبر نیست."})
         cleaned.append(item)
     if issue_ids:
         allowed = set(
@@ -707,10 +712,21 @@ def _clean_items(workspace, actor, day, raw_items, request=None, now=None):
             for row in WorkEvent.objects.filter(
                 workspace=workspace,
                 id__in=event_ids,
+                deleted_at__isnull=True,
                 participant_rows__user=actor,
                 participant_rows__deleted_at__isnull=True,
             ).distinct()
         }
+        confirmed = set(
+            ActivityConfirmation.objects.filter(
+                workspace=workspace,
+                user=actor,
+                source_type="event",
+                source_id__in=event_ids,
+                outcome=ActivityConfirmation.Outcome.DONE,
+                deleted_at__isnull=True,
+            ).values_list("source_id", flat=True)
+        )
         for item in cleaned:
             if item["source_kind"] != "event":
                 continue
@@ -722,6 +738,23 @@ def _clean_items(workspace, actor, day, raw_items, request=None, now=None):
             # Decision 8.3: planned never means done; a future event cannot be reported as done.
             if item["kind"] == DailyReportItem.Kind.DONE and event.ends_at > now:
                 raise ValidationError({"items": "رویداد آینده یا در حال انجام را نمی‌توان «انجام‌شده» ثبت کرد."})
+            if item["kind"] == DailyReportItem.Kind.DONE and event.id not in confirmed:
+                raise ValidationError({"items": "ابتدا انجام این رویداد را در تقویم تأیید کنید."})
+    if activity_ids:
+        from .support_activities import visible_rows
+
+        start, end = _day_bounds(day, calendar_zone(workspace))
+        available = set(
+            visible_rows(workspace, actor, request).filter(
+                id__in=activity_ids,
+                supporter=actor,
+                starts_at__gte=start,
+                starts_at__lt=end,
+                confirmed_at__isnull=False,
+            ).values_list("id", flat=True)
+        )
+        if activity_ids - available:
+            raise ValidationError({"items": "فعالیت پشتیبانی تأییدشدهٔ این روز پیدا نشد."})
     return cleaned
 
 

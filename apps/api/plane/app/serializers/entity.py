@@ -44,7 +44,12 @@ class ScopedDefinitionSerializer(serializers.ModelSerializer):
 
 
 class EntityTypeSerializer(ScopedDefinitionSerializer):
+    navigation_category = serializers.CharField(required=False, allow_blank=True)
+
     def create(self, validated_data):
+        category = validated_data.pop("navigation_category", "")
+        if category:
+            validated_data["view_settings"] = {"navigation_category": category}
         row = super().create(validated_data)
         from plane.app.services.entity_issue_types import native_type_for_subtype
 
@@ -52,6 +57,9 @@ class EntityTypeSerializer(ScopedDefinitionSerializer):
         return row
 
     def update(self, instance, validated_data):
+        category = validated_data.pop("navigation_category", None)
+        if category is not None:
+            validated_data["view_settings"] = {**instance.view_settings, "navigation_category": category}
         row = super().update(instance, validated_data)
         from plane.app.services.entity_issue_types import native_type_for_subtype
 
@@ -75,8 +83,22 @@ class EntityTypeSerializer(ScopedDefinitionSerializer):
             "title_field",
             "numbering",
             "record_permissions",
+            "navigation_category",
         )
         read_only_fields = ("id", "adapter")
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["navigation_category"] = instance.view_settings.get("navigation_category", "")
+        return data
+
+    def validate_navigation_category(self, value):
+        from plane.app.services.navigation import navigation_document
+
+        categories = {row.get("id") for row in navigation_document(self.context["workspace"]).definition.get("categories", [])}
+        if value and value not in categories:
+            raise serializers.ValidationError("تب انتخاب‌شده معتبر نیست.")
+        return value
 
     def validate(self, attrs):
         parent = attrs.get("parent", self.instance.parent if self.instance else None)

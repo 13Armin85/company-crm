@@ -11,7 +11,7 @@ import type { NavigationDocument } from "../navigation-paths";
 const entity = (code: string, title: string, extra: Partial<EntityDefinition> = {}) =>
   ({ id: code, code, title, is_active: true, parent: null, adapter: "", ...extra }) as EntityDefinition;
 
-function render(entities: EntityDefinition[], canCreate: boolean, navigation?: NavigationDocument) {
+function render(entities: EntityDefinition[], canCreate: boolean, navigation?: NavigationDocument, category?: string) {
   const client = new QueryClient();
   useUIStore.setState({ workspaceSlug: "" });
   client.setQueryData(["entity-engine", "", "catalog", "catalog/"], { entities });
@@ -19,7 +19,7 @@ function render(entities: EntityDefinition[], canCreate: boolean, navigation?: N
     <QueryClientProvider client={client}>
       <MemoryRouter>
         <NavigationContext.Provider value={navigation}>
-          <SidebarPages canCreate={canCreate} collapsed={false} onNavigate={() => {}} />
+          <SidebarPages canCreate={canCreate} collapsed={false} onNavigate={() => {}} category={category} />
         </NavigationContext.Provider>
       </MemoryRouter>
     </QueryClientProvider>
@@ -70,6 +70,22 @@ describe("sidebar pages", () => {
     expect(html).not.toContain('href="/entities"');
     expect(html).not.toContain('href="/sections/data/entities"');
     expect(html).toContain("نمایش بیشتر (۱۰)");
+  });
+
+  it("shows a custom page only in its selected main tab", () => {
+    const pages = [entity("townhall", "شهرداری"), entity("report-page", "گزارش ویژه")];
+    const navigation = {
+      categories: [],
+      entities: [
+        { code: "townhall", category: "work" },
+        { code: "report-page", category: "reports" },
+      ],
+      routes: [],
+    } as unknown as NavigationDocument;
+    const work = render(pages, false, navigation, "work");
+    expect(work).toContain("شهرداری");
+    expect(work).not.toContain("گزارش ویژه");
+    expect(render(pages, false, navigation, "reports")).toContain("گزارش ویژه");
   });
 
   it("keeps the section visible when empty without offering creation to members", () => {

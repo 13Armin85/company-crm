@@ -184,10 +184,11 @@ export interface InstanceActions {
 
 export interface WorkflowInstanceView {
   id: string;
+  record_id?: string;
   status: "running" | "completed" | "cancelled" | "error";
   revision: number;
   error_message: string;
-  definition: { id: string; title: string; kind: "standard" | "fast_path" };
+  definition: { id: string; title: string; kind: "standard" | "fast_path"; subtype?: string | null };
   version: { id: string; number: number };
   current_step: { code: string; title: string; type: StepType };
   steps: { code: string; title: string; type: StepType }[];
@@ -201,6 +202,8 @@ export interface WorkflowInstanceView {
   extensions: ExtensionView[];
   timeline: TimelineEntry[];
   contact_channels: { code: string; title: string }[];
+  support_activity_required?: boolean;
+  customers?: { id: string; title: string }[];
   /** Latest published version when the viewer may move this record onto it. */
   migration_target: { id: string; number: number; steps: { code: string; title: string }[] } | null;
 }

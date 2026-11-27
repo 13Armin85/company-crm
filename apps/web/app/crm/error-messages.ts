@@ -1,4 +1,11 @@
 const persian = /[\u0600-\u06ff]/;
+const unsafeDetail =
+  /[<>{}]|&(?:lt|gt|#\d+);|(?:^|\s)(?:Traceback|Exception|[A-Za-z_]+Error|stack trace|File\s+["']|at\s+\w+\s*\()|\b(?:password|passwd|secret|token|api[_-]?key)\s*[:=]|\b(?:plane\.app|django\.|rest_framework\.|node_modules\/)|^\s*[[{]/im;
+
+function safePersianDetail(value: string): string | undefined {
+  const trimmed = value.trim();
+  return persian.test(trimmed) && !unsafeDetail.test(trimmed) ? trimmed : undefined;
+}
 const messages: Record<string, string> = {
   "This email is already in use.": "این ایمیل ثبت شده است",
   "This username is already in use.": "این نام کاربری قبلاً انتخاب شده است",
@@ -11,7 +18,8 @@ const messages: Record<string, string> = {
 export function localizeError(value: string, fallback = "عملیات انجام نشد؛ دوباره تلاش کنید."): string {
   if (messages[value]) return messages[value];
   if (/email/i.test(value) && /already|unique|exists/i.test(value)) return "این ایمیل ثبت شده است";
-  if (persian.test(value)) return value;
+  const safe = safePersianDetail(value);
+  if (safe) return safe;
   return persian.test(fallback) ? fallback : "عملیات انجام نشد؛ دوباره تلاش کنید.";
 }
 
@@ -173,17 +181,19 @@ export function describeError(error: unknown, fallback: string): string {
     if (failure?.code === "ERR_NETWORK" || failure?.message === "Network Error")
       return withAction(action, "اتصال به سرور برقرار نشد؛ اتصال شبکه یا روشن‌بودن سرور را بررسی و دوباره تلاش کنید.");
     const local = typeof failure?.message === "string" ? failure.message : "";
-    return persian.test(local) ? withAction(action, local) : localizeError(local, fallback);
+    const safe = safePersianDetail(local);
+    return safe ? withAction(action, safe) : localizeError(local, fallback);
   }
   const { status = 0, data } = failure.response;
   const supportCode = status >= 500 ? ` (کد خطا ${faDigits(status)})` : "";
+  if (status >= 500) return `${sentence(action)}: ${statusReasons[status] ?? statusReasons[500]}${supportCode}`;
   // Proxies answer 502/504 with an HTML page; that body is not a reason.
   const found = typeof data === "string" && /^\s*</.test(data) ? undefined : locatedError(data);
   if (found) {
     const { key, label } = errorLocation(found.path);
     if (/email/i.test(found.path.join(".") + found.message) && /already|unique|exists/i.test(found.message))
       return "این ایمیل ثبت شده است";
-    const known = messages[found.message] ?? (persian.test(found.message) ? found.message : undefined);
+    const known = messages[found.message] ?? safePersianDetail(found.message);
     if (known === messages["This email is already in use."]) return known;
     if (known) {
       const located =

@@ -89,6 +89,95 @@ def create_record(engine, entity, values, expected=201, **payload):
     return response.data
 
 
+def test_relation_options_and_grid_respect_target_record_scope(engine):
+    from rest_framework.test import APIClient
+    from plane.db.models import OrganizationPermission, UserPermissionException
+    from plane.app.services.permission_registry import bootstrap_workspace_access
+
+    workspace, _, admin_client = engine
+    municipality, _ = make_entity(engine, code="municipality")
+    source, _ = make_entity(engine, fields=[{
+        "code": "municipality_relation", "title": "شهرداری", "kind": "relation",
+        "relation_entity": municipality, "config": {},
+    }], code="work-relations")
+    created = create_record(engine, municipality, {"title": "شهرداری مرکز"})
+    source_record = create_record(engine, source, {
+        "title": "کار مرتبط", "municipality_relation": str(created["id"]),
+    })
+    create_record(engine, source, {"title": "کار دیگر"})
+    member = User.objects.create_user(email="relation-reader@example.test", username="relation-reader", password="SafePassword!2026")
+    WorkspaceMember.objects.create(workspace=workspace, member=member, role=15)
+    bootstrap_workspace_access(workspace)
+    EntityRecord.objects.filter(entity=source, id=source_record["id"]).update(created_by=member)
+    client = APIClient()
+    client.force_authenticate(member)
+
+    catalog = client.get(endpoint(workspace, "catalog/"))
+    assert catalog.status_code == 200, catalog.data
+    assert source.code in {item["code"] for item in catalog.data["entities"]}
+    options_path = endpoint(workspace, f"entities/{source.code}/options/municipality_relation/")
+    options = client.get(options_path)
+    assert options.status_code == 200, options.data
+    assert str(created["id"]) not in {item["id"] for item in options.data["results"]}
+    resolved = client.get(options_path, {"resolve": "true", "selected": str(created["id"])})
+    assert resolved.status_code == 200, resolved.data
+    assert resolved.data["results"] == []
+    source_path = endpoint(workspace, f"entities/{source.code}/records/")
+    own_records = client.get(source_path)
+    assert own_records.status_code == 200, own_records.data
+    assert own_records.data["count"] == 1
+    assert own_records.data["results"][0]["values"]["municipality_relation"] is None
+
+    from plane.app.services.entity_records import validate_reference
+    from plane.app.services.entity_schema import schema_fields
+    from rest_framework.exceptions import ValidationError
+
+    relation = schema_fields(source)[1]["municipality_relation"]
+    with pytest.raises(ValidationError):
+        validate_reference(source, member, relation, str(created["id"]), {})
+
+    from plane.app.services.entity_query import EntityQuery
+    from plane.app.services.entity_view_export import value_labels
+    query = EntityQuery(source, member)
+    query.prepare({"version": 1, "columns": [{"field": "municipality_relation", "width": 180}]})
+    projected = query.execute(1, 10)["results"]
+    assert projected[0]["values"]["municipality_relation"] is None
+    assert str(created["id"]) not in value_labels(query, projected)["municipality_relation"]
+
+    permission = OrganizationPermission.objects.get(workspace=workspace, code="Page.Record.ViewAll")
+    UserPermissionException.objects.create(workspace=workspace, user=member, permission=permission, effect="ALLOW")
+    options = client.get(options_path)
+    assert str(created["id"]) in {item["id"] for item in options.data["results"]}
+    after = client.get(source_path)
+    assert after.status_code == 200, after.data
+    assert after.data["count"] == 2
+    assert next(row for row in after.data["results"] if row["id"] == source_record["id"])["values"]["municipality_relation"] == str(created["id"])
+    query = EntityQuery(source, member)
+    query.prepare({"version": 1, "columns": [{"field": "municipality_relation", "width": 180}]})
+    projected = query.execute(1, 10)["results"]
+    linked = next(row for row in projected if row["id"] == source_record["id"])
+    assert linked["values"]["municipality_relation"] == str(created["id"])
+    assert value_labels(query, projected)["municipality_relation"][str(created["id"])]["title"] == "شهرداری مرکز"
+
+
+def test_designer_access_is_one_gate_for_ordinary_member(engine):
+    from plane.db.models import OrganizationPermission, UserPermissionException
+    from plane.app.services.access_control import get_effective_permissions
+    from plane.app.services.permission_registry import bootstrap_workspace_access
+
+    workspace, _, _ = engine
+    member = User.objects.create_user(email="designer-member@example.test", username="designer-member", password="SafePassword!2026")
+    WorkspaceMember.objects.create(workspace=workspace, member=member, role=15)
+    bootstrap_workspace_access(workspace)
+    before = get_effective_permissions(member, workspace)["permissions"]
+    assert "FormDesigner.View" not in before
+    assert "EntityType.Create" not in before
+    permission = OrganizationPermission.objects.get(workspace=workspace, code="FormDesigner.Access")
+    UserPermissionException.objects.create(workspace=workspace, user=member, permission=permission, effect="ALLOW")
+    after = get_effective_permissions(member, workspace)["permissions"]
+    assert {"FormDesigner.Access", "FormDesigner.View", "EntityType.Create", "Field.Edit", "Relation.Edit"} <= set(after)
+
+
 @pytest.mark.django_db(transaction=True)
 def test_concurrent_numbering_and_unique_values_are_serialized(engine):
     from concurrent.futures import ThreadPoolExecutor

@@ -311,6 +311,7 @@
   border: 1px solid var(--border);
   background: var(--surface-soft);
   min-width: 0;
+  color: var(--text-primary);
 }
 .portal-message.is-customer {
   background: var(--surface);
@@ -320,7 +321,7 @@
   border-inline-start: 3px solid var(--green);
 }
 .portal-message.is-note {
-  background: var(--surface-sunken);
+  background: color-mix(in srgb, var(--orange) 8%, var(--surface));
   border-inline-start: 3px dashed var(--orange);
 }
 .portal-message header {
@@ -344,6 +345,7 @@
   margin: 6px 0 0;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  color: var(--text-primary);
 }
 .portal-files {
   display: grid;

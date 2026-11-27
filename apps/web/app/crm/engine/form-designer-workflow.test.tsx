@@ -49,7 +49,7 @@ describe("مسیر سادهٔ طراحی فرم", () => {
     const edit = formPreviewSchema(schema, "edit");
     expect(create.layout.sections[0].bindings.map((binding) => binding.field)).toEqual(["name", "number"]);
     expect(create.fields[1].config.readonly).toBe(false);
-    expect(edit.fields[1].config.readonly).toBe(true);
+    expect(edit.fields[1].config.readonly).toBe(false);
     const html = renderToStaticMarkup(
       <SchemaDrivenForm schema={edit} values={{}} errors={{}} editing onChange={() => {}} />
     );

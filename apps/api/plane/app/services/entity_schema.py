@@ -489,6 +489,8 @@ def role_ids(user, workspace):
 
 
 def can_field(field, roles, edit=False):
+    if field.get("kind") == "relation":
+        return True
     binding = field.get("binding", {})
     view = binding.get("view_roles")
     if view is not None and not set(view).intersection(roles):

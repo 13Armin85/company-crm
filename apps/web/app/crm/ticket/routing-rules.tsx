@@ -5,6 +5,7 @@ import { CompactMultiSelector, ModalCore, SearchableSelect } from "@plane/ui";
 import { AlertTriangle, ArrowDown, ArrowUp, Edit3, FlaskConical, GripVertical, Plus, XCircle } from "lucide-react";
 import {
   usePreviewRouting,
+  useReorderTicketTypes,
   useReorderRoutingRules,
   useRoutingRules,
   useSaveRoutingRule,
@@ -382,80 +383,107 @@ function TestPanel() {
 export function TypeTargets() {
   const types = useTicketTypes();
   const save = useSetTypeTarget();
+  const reorderTypes = useReorderTicketTypes();
   const [editing, setEditing] = useState<{ id: string; hours: string; minutes: string; reason: string } | null>(null);
   if (types.isLoading) return <Skeleton rows={2} />;
   const rows = types.data ?? [];
-  if (!rows.length || !rows[0].can_set_target) return null;
+  if (!rows.length || (!rows[0].can_set_target && !rows[0].can_reorder)) return null;
+  const moveType = (index: number, delta: number) => {
+    const next = rows.map((row) => row.id);
+    [next[index], next[index + delta]] = [next[index + delta], next[index]];
+    reorderTypes.mutate(next);
+  };
   return (
     <section className="management-section" aria-labelledby="type-target-title">
       <header className="section-heading">
         <div>
-          <h2 id="type-target-title">مدت هدف پیش‌فرض انواع تیکت</h2>
-          <p>به ساعت/دقیقهٔ کاری؛ مقدار هر تیکت بر این پیش‌فرض مقدم است.</p>
+          <h2 id="type-target-title">نوع‌های تیکت و مدت هدف</h2>
+          <p>ترتیب نمایش نوع‌ها را تنظیم کنید. مدت هدف هر نوع بر حسب زمان کاری ثبت می‌شود.</p>
         </div>
       </header>
       <ul className="ticket-list">
-        {rows.map((row) => (
+        {rows.map((row, index) => (
           <li key={row.id} className="ticket-inbox-row">
             <div>
               <strong>{row.name}</strong>
               <small>{row.target_minutes ? formatWorkingMinutes(row.target_minutes) : "بدون مدت هدف"}</small>
             </div>
-            {editing?.id === row.id ? (
-              <form
-                className="ticket-actions"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  if (!editing.reason.trim()) return;
-                  save.mutate(
-                    { typeId: row.id, minutes: minutesFrom(editing.hours, editing.minutes), reason: editing.reason },
-                    { onSuccess: () => setEditing(null) }
-                  );
-                }}
-              >
-                <input
-                  aria-label="ساعت کاری"
-                  type="number"
-                  min={0}
-                  value={editing.hours}
-                  onChange={(e) => setEditing({ ...editing, hours: e.target.value })}
-                />
-                <input
-                  aria-label="دقیقهٔ کاری"
-                  type="number"
-                  min={0}
-                  max={59}
-                  value={editing.minutes}
-                  onChange={(e) => setEditing({ ...editing, minutes: e.target.value })}
-                />
-                <input
-                  aria-label="دلیل تغییر"
-                  placeholder="دلیل (اجباری)"
-                  value={editing.reason}
-                  onChange={(e) => setEditing({ ...editing, reason: e.target.value })}
-                />
-                <Button type="submit" disabled={!editing.reason.trim() || save.isPending}>
-                  ذخیره
+            {row.can_reorder && (
+              <div className="ticket-actions">
+                <Button
+                  variant="secondary"
+                  aria-label={`انتقال ${row.name} به بالا`}
+                  disabled={index === 0 || reorderTypes.isPending}
+                  onClick={() => moveType(index, -1)}
+                >
+                  <ArrowUp size={16} />
                 </Button>
-                <Button variant="secondary" onClick={() => setEditing(null)}>
-                  انصراف
+                <Button
+                  variant="secondary"
+                  aria-label={`انتقال ${row.name} به پایین`}
+                  disabled={index === rows.length - 1 || reorderTypes.isPending}
+                  onClick={() => moveType(index, 1)}
+                >
+                  <ArrowDown size={16} />
                 </Button>
-              </form>
-            ) : (
-              <Button
-                variant="secondary"
-                onClick={() =>
-                  setEditing({
-                    id: row.id,
-                    hours: String(Math.floor((row.target_minutes ?? 0) / 60)),
-                    minutes: String((row.target_minutes ?? 0) % 60),
-                    reason: "",
-                  })
-                }
-              >
-                تعیین مدت هدف
-              </Button>
+              </div>
             )}
+            {row.can_set_target &&
+              (editing?.id === row.id ? (
+                <form
+                  className="ticket-actions"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    if (!editing.reason.trim()) return;
+                    save.mutate(
+                      { typeId: row.id, minutes: minutesFrom(editing.hours, editing.minutes), reason: editing.reason },
+                      { onSuccess: () => setEditing(null) }
+                    );
+                  }}
+                >
+                  <input
+                    aria-label="ساعت کاری"
+                    type="number"
+                    min={0}
+                    value={editing.hours}
+                    onChange={(e) => setEditing({ ...editing, hours: e.target.value })}
+                  />
+                  <input
+                    aria-label="دقیقهٔ کاری"
+                    type="number"
+                    min={0}
+                    max={59}
+                    value={editing.minutes}
+                    onChange={(e) => setEditing({ ...editing, minutes: e.target.value })}
+                  />
+                  <input
+                    aria-label="دلیل تغییر"
+                    placeholder="دلیل (اجباری)"
+                    value={editing.reason}
+                    onChange={(e) => setEditing({ ...editing, reason: e.target.value })}
+                  />
+                  <Button type="submit" disabled={!editing.reason.trim() || save.isPending}>
+                    ذخیره
+                  </Button>
+                  <Button variant="secondary" onClick={() => setEditing(null)}>
+                    انصراف
+                  </Button>
+                </form>
+              ) : (
+                <Button
+                  variant="secondary"
+                  onClick={() =>
+                    setEditing({
+                      id: row.id,
+                      hours: String(Math.floor((row.target_minutes ?? 0) / 60)),
+                      minutes: String((row.target_minutes ?? 0) % 60),
+                      reason: "",
+                    })
+                  }
+                >
+                  تعیین مدت هدف
+                </Button>
+              ))}
           </li>
         ))}
       </ul>

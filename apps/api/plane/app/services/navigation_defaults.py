@@ -103,6 +103,13 @@ DEFAULT_NAVIGATION = json.loads(r"""
           "label": "گزارش روزانهٔ تیم",
           "icon": "Users",
           "end": false
+        },
+        {
+          "code": "support-activities",
+          "path": "/support-activities",
+          "label": "فعالیت و زمان پشتیبانی",
+          "icon": "Clock3",
+          "end": false
         }
       ]
     },

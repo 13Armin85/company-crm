@@ -27,13 +27,24 @@ export function customPages(entities: EntityDefinition[] = []) {
 
 export const suggestCode = () => `page-${Math.random().toString(36).slice(2, 7)}`;
 
-export function NewPageDialog({ onClose, initialTitle = "" }: { onClose: () => void; initialTitle?: string }) {
+export function NewPageDialog({
+  onClose,
+  initialTitle = "",
+  initialCategory,
+}: {
+  onClose: () => void;
+  initialTitle?: string;
+  initialCategory?: string;
+}) {
   const slug = useEngineSlug();
   const client = useQueryClient();
   const navigate = useNavigate();
   const navigation = useNavigationDocument();
   const [category, setCategory] = useState(
-    navigation?.categories.find((item) => item.id === "data")?.id ?? navigation?.categories[0]?.id ?? ""
+    initialCategory ??
+      navigation?.categories.find((item) => item.id === "data")?.id ??
+      navigation?.categories[0]?.id ??
+      ""
   );
   const [title, setTitle] = useState(initialTitle);
   const [code, setCode] = useState(suggestCode);
@@ -137,17 +148,21 @@ export function SidebarPages({
   canCreate,
   collapsed,
   onNavigate,
+  category,
 }: {
   canCreate: boolean;
   collapsed: boolean;
   onNavigate: () => void;
+  category?: string;
 }) {
   const catalog = useEngineCatalog();
   const navigation = useNavigationDocument();
   const [creating, setCreating] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const pages = customPages(catalog.data?.entities).filter(
-    (page) => !navigation || navigation.entities.some((item) => item.code === page.code)
+    (page) =>
+      !navigation ||
+      navigation.entities.some((item) => item.code === page.code && (!category || item.category === category))
   );
   return (
     <div className="recent-projects sidebar-pages">
@@ -188,7 +203,7 @@ export function SidebarPages({
           <span>اولین صفحه را بسازید</span>
         </button>
       )}
-      {creating && <NewPageDialog onClose={() => setCreating(false)} />}
+      {creating && <NewPageDialog onClose={() => setCreating(false)} initialCategory={category} />}
     </div>
   );
 }

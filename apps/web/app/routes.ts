@@ -40,6 +40,7 @@ const crmPages: RouteConfig = [
   // Ticket 8: daily reports and reports.
   route("daily-report", "./crm/daily-report/daily-report-page.tsx"),
   route("daily-report/team", "./crm/daily-report/team-page.tsx"),
+  route("support-activities", "./crm/support-activity/page.tsx"),
   route("daily-report/settings", "./crm/daily-report/settings-page.tsx"),
   route("reports", "./crm/reports/reports-page.tsx"),
   route("reports/source/:code", "./crm/reports/report-page.tsx", { id: "report-source" }),
@@ -72,7 +73,7 @@ export default [
       index("./crm/pages/category.tsx"),
       ...crmPages
         .filter((entry) => entry.path !== undefined)
-        .map((entry) => ({ ...entry, id: `category:${entry.id ?? entry.file}` })),
+        .map((entry) => Object.assign({}, entry, { id: `category:${entry.id ?? entry.file}` })),
     ]),
   ]),
 ] satisfies RouteConfig;

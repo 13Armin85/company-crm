@@ -457,7 +457,6 @@ def mask_native_response(request, response):
             not can_field(f, roles, edit=True)
             or f["config"].get("hidden")
             or f["config"].get("readonly")
-            or f["config"].get("editable_after_create") is False
             or f["config"].get("visible_if")
         )
     ]
@@ -527,7 +526,6 @@ def mask_native_response(request, response):
             if (
                 not can_field(field, roles, edit=True)
                 or field["config"].get("readonly")
-                or field["config"].get("editable_after_create") is False
             ):
                 item["engine_readonly_fields"] = list(
                     set(item.get("engine_readonly_fields", []))

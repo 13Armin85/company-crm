@@ -15,25 +15,16 @@ import {
   Phone,
   Share2,
   Trash2,
-  UserRoundCog,
 } from "lucide-react";
 import { TicketRowDialog } from "../ticket/row-dialogs";
 import type { RowDialog } from "../ticket/row-dialogs";
-import {
-  useCurrentUser,
-  useDeleteIssue,
-  useMembers,
-  useProjects,
-  useReassignIssue,
-  useUpdateIssueStatus,
-  useWorkspaceAccess,
-} from "../api";
+import { useCurrentUser, useDeleteIssue, useUpdateIssueStatus, useWorkspaceAccess } from "../api";
 import { useUIStore } from "../store";
 import type { Issue, Member, Project, Status } from "../types";
 import { persianDate, statusFa } from "../utils";
 import { stateNameFa } from "../issue-status";
 import { issueReference, matchesRecordSearch } from "../identifiers";
-import { canChangeIssueStatus, canTransferIssue } from "../task-access";
+import { canChangeIssueStatus } from "../task-access";
 import { Avatar, StatusBadge, PriorityBadge } from "./primitives";
 
 export function IssueRow({
@@ -163,12 +154,7 @@ export function IssueRow({
 
 export function IssueActionsMenu({
   issue,
-  project,
   readOnly = false,
-  allowTransfer = false,
-  transferMembers,
-  transferDisabled = false,
-  onAssigneeChange,
   statusMutation,
   showStatus = true,
 }: {
@@ -186,23 +172,16 @@ export function IssueActionsMenu({
   const slug = useUIStore((state) => state.workspaceSlug) ?? "";
   const { data: access } = useWorkspaceAccess();
   const { data: currentUser } = useCurrentUser();
-  const { data: projects = [] } = useProjects();
-  const { data: members = [] } = useMembers(undefined, issue.scope === "project" ? issue.projectId : undefined);
   const ownStatusMutation = useUpdateIssueStatus(slug);
   const businessChoices = useContext(ChoiceLabelsContext);
   const updateStatus = statusMutation ?? ownStatusMutation;
   const deleteIssue = useDeleteIssue(slug);
-  const reassignIssue = useReassignIssue(slug);
   const can = (code: string) => access?.can(code) === true;
   const protectedFields = new Set([...(issue.hiddenFields ?? []), ...(issue.readonlyFields ?? [])]);
   const canChangeStatus =
     !readOnly &&
     !protectedFields.has(issue.scope === "project" ? "state_id" : "status") &&
     canChangeIssueStatus(issue, currentUser?.id, can);
-  const canTransfer =
-    (!readOnly || allowTransfer) &&
-    !protectedFields.has(issue.scope === "project" ? "assignee_ids" : "assignee_id") &&
-    canTransferIssue(issue, currentUser?.id, can, project ? [project] : projects);
   const canDelete = !readOnly && can("Issue.Delete");
   // Ticket 5: first-contact resolution and referral straight from the row (the server re-checks both).
   const [ticketDialog, setTicketDialog] = useState<RowDialog | null>(null);
@@ -211,16 +190,6 @@ export function IssueActionsMenu({
   const canContact = !readOnly && issue.status !== "Done" && ownsTicket;
   const canRefer =
     !readOnly && (can("Routing.Route") || (Boolean(currentUser?.id) && issue.assignee?.id === currentUser?.id));
-  const pending = transferDisabled || reassignIssue.isPending;
-  const eligibleMembers = issue.scope === "project" ? members : (transferMembers ?? members);
-  const transferOptions = eligibleMembers
-    .filter((member) => access?.is_admin || member.id !== currentUser?.id)
-    .map((member) => ({
-      id: member.id,
-      title: member.displayName,
-      description: member.email,
-      disabled: member.isActive === false || member.id === issue.assignee?.id,
-    }));
   const statuses: Status[] = ["Todo", "In Progress", "Review", "Done", "Blocked"];
   const semanticStatus: Record<string, Status> = {
     todo: "Todo",
@@ -241,130 +210,102 @@ export function IssueActionsMenu({
               status: semanticStatus[option.id] || ("Todo" as Status),
             }))
         : statuses.map((status) => ({ id: status, title: statusFa[status], status }));
-  if (!canChangeStatus && !canTransfer && !canDelete && !canContact && !canRefer) return null;
+  if (!canChangeStatus && !canDelete && !canContact && !canRefer) return null;
   return (
     <>
-    {ticketDialog && (
-      <TicketRowDialog issueId={issue.id} kind={ticketDialog} onClose={() => setTicketDialog(null)} />
-    )}
-    <Popover className="issue-actions" onPointerDown={(event) => event.stopPropagation()}>
-      {({ close }) => (
-        <>
-          <PopoverButton className="plain-icon" aria-label="عملیات کار" aria-haspopup="menu">
-            <MoreHorizontal size={16} />
-          </PopoverButton>
-          <PopoverPanel className="action-menu issue-action-menu" role="menu" anchor="bottom end" portal dir="rtl">
-            <header className="issue-action-head">
-              <strong title={issue.name}>{issue.name}</strong>
-              <small dir="ltr">{issueReference(issue)}</small>
-            </header>
-            <Link
-              className="issue-action-item"
-              to={`/edit/${issue.scope === "project" ? "ticket" : "task"}/${issue.id}`}
-              onClick={() => close()}
-            >
-              <FileText size={15} aria-hidden="true" />
-              جزئیات و فرم کامل
-            </Link>
-            {canContact && (
-              <button
+      {ticketDialog && <TicketRowDialog issueId={issue.id} kind={ticketDialog} onClose={() => setTicketDialog(null)} />}
+      <Popover className="issue-actions" onPointerDown={(event) => event.stopPropagation()}>
+        {({ close }) => (
+          <>
+            <PopoverButton className="plain-icon" aria-label="عملیات کار" aria-haspopup="menu">
+              <MoreHorizontal size={16} />
+            </PopoverButton>
+            <PopoverPanel className="action-menu issue-action-menu" role="menu" anchor="bottom end" portal dir="rtl">
+              <header className="issue-action-head">
+                <strong title={issue.name}>{issue.name}</strong>
+                <small dir="ltr">{issueReference(issue)}</small>
+              </header>
+              <Link
                 className="issue-action-item"
-                role="menuitem"
-                onClick={() => {
-                  setTicketDialog("contact");
-                  close();
-                }}
+                to={`/edit/${issue.scope === "project" ? "ticket" : "task"}/${issue.id}`}
+                onClick={() => close()}
               >
-                <Phone size={15} aria-hidden="true" />
-                حل در تماس
-              </button>
-            )}
-            {canRefer && (
-              <button
-                className="issue-action-item"
-                role="menuitem"
-                onClick={() => {
-                  setTicketDialog("refer");
-                  close();
-                }}
-              >
-                <Share2 size={15} aria-hidden="true" />
-                {issue.assignee ? "ارجاع" : "ارجاع تیکت بدون مسئول"}
-              </button>
-            )}
-            {canChangeStatus && showStatus && (
-              <section className="issue-action-section" aria-label="تغییر وضعیت">
-                <small>تغییر وضعیت</small>
-                <div className="issue-action-statuses">
-                  {statusChoices.map((option) => {
-                    const current = option.id === (issue.stateId || issue.statusCode || issue.status);
-                    return (
-                      <button
-                        key={option.id}
-                        role="menuitemradio"
-                        aria-checked={current}
-                        className={current ? "is-current" : undefined}
-                        disabled={current || updateStatus.isPending}
-                        onClick={() => {
-                          updateStatus.mutate({
-                            issue,
-                            status: option.status,
-                            ...(option.id !== option.status ? { nativeValue: option.id } : {}),
-                          });
-                          close();
-                        }}
-                      >
-                        {current && <Check size={13} aria-hidden="true" />}
-                        {option.title}
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
-            {canTransfer && (
-              <section className="issue-action-section issue-transfer-control">
-                <label htmlFor={`issue-transfer-${issue.id}`}>
-                  <UserRoundCog size={14} aria-hidden="true" />
-                  انتقال به شخص دیگر
-                </label>
-                <SearchableSelect
-                  id={`issue-transfer-${issue.id}`}
-                  label="انتقال به عضو دیگر"
-                  optionClassName="member-transfer-options"
-                  containedOptions
-                  value={issue.assignee?.id ?? ""}
-                  selectedLabel={issue.assignee?.displayName ?? "بدون مسئول"}
-                  placeholder="نام شخص را جستجو کنید"
-                  disabled={pending || !transferOptions.some((option) => !option.disabled)}
-                  onChange={(id) => {
-                    if (id && id !== issue.assignee?.id && !pending) {
-                      if (onAssigneeChange) onAssigneeChange(issue, id);
-                      else reassignIssue.mutate({ issue, assigneeId: id });
-                      close();
-                    }
+                <FileText size={15} aria-hidden="true" />
+                جزئیات و فرم کامل
+              </Link>
+              {canContact && (
+                <button
+                  className="issue-action-item"
+                  role="menuitem"
+                  onClick={() => {
+                    setTicketDialog("contact");
+                    close();
                   }}
-                  options={transferOptions}
-                />
-              </section>
-            )}
-            {canDelete && (
-              <button
-                className="danger-action issue-action-item"
-                disabled={deleteIssue.isPending}
-                onClick={() => {
-                  if (window.confirm(`کار «${issue.name}» حذف شود؟`)) deleteIssue.mutate(issue);
-                  close();
-                }}
-              >
-                <Trash2 size={15} aria-hidden="true" />
-                حذف کار
-              </button>
-            )}
-          </PopoverPanel>
-        </>
-      )}
-    </Popover>
+                >
+                  <Phone size={15} aria-hidden="true" />
+                  حل در تماس
+                </button>
+              )}
+              {canRefer && (
+                <button
+                  className="issue-action-item"
+                  role="menuitem"
+                  onClick={() => {
+                    setTicketDialog("refer");
+                    close();
+                  }}
+                >
+                  <Share2 size={15} aria-hidden="true" />
+                  {issue.assignee ? "ارجاع" : "ارجاع تیکت بدون مسئول"}
+                </button>
+              )}
+              {canChangeStatus && showStatus && (
+                <section className="issue-action-section" aria-label="تغییر وضعیت">
+                  <small>تغییر وضعیت</small>
+                  <div className="issue-action-statuses">
+                    {statusChoices.map((option) => {
+                      const current = option.id === (issue.stateId || issue.statusCode || issue.status);
+                      return (
+                        <button
+                          key={option.id}
+                          role="menuitemradio"
+                          aria-checked={current}
+                          className={current ? "is-current" : undefined}
+                          disabled={current || updateStatus.isPending}
+                          onClick={() => {
+                            updateStatus.mutate({
+                              issue,
+                              status: option.status,
+                              ...(option.id !== option.status ? { nativeValue: option.id } : {}),
+                            });
+                            close();
+                          }}
+                        >
+                          {current && <Check size={13} aria-hidden="true" />}
+                          {option.title}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
+              {canDelete && (
+                <button
+                  className="danger-action issue-action-item"
+                  disabled={deleteIssue.isPending}
+                  onClick={() => {
+                    if (window.confirm(`کار «${issue.name}» حذف شود؟`)) deleteIssue.mutate(issue);
+                    close();
+                  }}
+                >
+                  <Trash2 size={15} aria-hidden="true" />
+                  حذف کار
+                </button>
+              )}
+            </PopoverPanel>
+          </>
+        )}
+      </Popover>
     </>
   );
 }

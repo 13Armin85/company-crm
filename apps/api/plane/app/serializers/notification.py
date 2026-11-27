@@ -52,4 +52,8 @@ class NotificationSerializer(BaseSerializer):
 class UserNotificationPreferenceSerializer(BaseSerializer):
     class Meta:
         model = UserNotificationPreference
-        fields = "__all__"
+        fields = (
+            "property_change", "state_change", "comment", "mention", "issue_completed",
+            "crm_routing", "crm_ticket_status", "crm_workflow_action", "crm_leave_result",
+            "crm_deadline", "crm_daily_report", "crm_portal",
+        )

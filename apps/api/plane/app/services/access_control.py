@@ -16,7 +16,7 @@ from plane.db.models import (
     Workspace,
     WorkspaceMember,
 )
-from .permission_registry import ADMIN_ONLY_PERMISSIONS, PERMISSION_REGISTRY
+from .permission_registry import ADMIN_ONLY_PERMISSIONS, DESIGNER_PERMISSIONS, PERMISSION_REGISTRY, permission_registry
 
 
 def active_period(queryset, now):
@@ -38,7 +38,6 @@ def role_permissions(user_id, workspace_id):
             permission__workspace_id=workspace_id,
             permission__is_active=True,
             permission__deleted_at__isnull=True,
-            permission__code__in=PERMISSION_REGISTRY,
         )
         .values("permission__code", "permission__is_delegatable", "role_id", "role__name")
         .distinct()
@@ -95,6 +94,7 @@ def delegation_context(workspace, now=None):
 
 def get_effective_permissions(user, workspace, *, now=None, include_delegation=True, admin_override=True):
     workspace_id = getattr(workspace, "id", workspace)
+    registry = permission_registry(workspace if hasattr(workspace, "id") else Workspace.objects.get(pk=workspace_id))
     now = now or timezone.now()
     if (
         not user.is_authenticated
@@ -104,7 +104,7 @@ def get_effective_permissions(user, workspace, *, now=None, include_delegation=T
         return {"permissions": [], "explanations": [], "role_grants": [], "is_admin": False}
     catalog = list(
         OrganizationPermission.objects.filter(
-            workspace_id=workspace_id, is_active=True, code__in=PERMISSION_REGISTRY
+            workspace_id=workspace_id, is_active=True, code__in=registry
         ).values("id", "code", "name", "category", "description")
     )
     system_roles = set(UserOrganizationRole.objects.filter(
@@ -114,7 +114,7 @@ def get_effective_permissions(user, workspace, *, now=None, include_delegation=T
     # Built-in administrators retain full access in their own workspace.
     if admin_override and "admin" in system_roles:
         explanations = [{**permission, "source": "role", "granted": True} for permission in catalog]
-        return {"permissions": sorted(PERMISSION_REGISTRY), "explanations": explanations,
+        return {"permissions": sorted(registry), "explanations": explanations,
                 "role_grants": explanations, "is_admin": True}
     sources = {}
     # This built-in capability also applies to existing member roles without a data migration.
@@ -188,6 +188,14 @@ def get_effective_permissions(user, workspace, *, now=None, include_delegation=T
     if "admin" not in system_roles:
         for code in ADMIN_ONLY_PERMISSIONS:
             sources[code] = {"source": "admin_only"}
+        designer_access = sources.get("FormDesigner.Access", {}).get("source") not in {
+            None, "user_deny", "admin_only"
+        }
+        for code in DESIGNER_PERMISSIONS:
+            if designer_access:
+                sources[code] = {"source": "designer_access"}
+            else:
+                sources[code] = {"source": "designer_required"}
     explanations = [
         {
             **permission,
@@ -195,7 +203,7 @@ def get_effective_permissions(user, workspace, *, now=None, include_delegation=T
             "exception_effects": sorted(effects.get(permission["code"], set())),
             "has_conflict": len(effects.get(permission["code"], set())) > 1,
             "granted": permission["code"] in sources
-            and sources[permission["code"]]["source"] not in {"user_deny", "admin_only"},
+            and sources[permission["code"]]["source"] not in {"user_deny", "admin_only", "designer_required"},
         }
         for permission in catalog
     ]
@@ -208,8 +216,6 @@ def get_effective_permissions(user, workspace, *, now=None, include_delegation=T
 
 
 def has_permission(user, workspace, permission_code, *, request=None):
-    if permission_code not in PERMISSION_REGISTRY:
-        return False
     if isinstance(workspace, str):
         workspaces = getattr(request, "_crm_workspaces", {}) if request is not None else {}
         if workspace not in workspaces:
@@ -218,6 +224,14 @@ def has_permission(user, workspace, permission_code, *, request=None):
             request._crm_workspaces = workspaces
         workspace = workspaces[workspace]
         if workspace is None:
+            return False
+    if permission_code not in PERMISSION_REGISTRY:
+        from plane.db.models import EntityType
+
+        parts = permission_code.split(".")
+        if len(parts) != 3 or parts[0] != "Page" or parts[2] not in {"View", "Edit", "Delete"}:
+            return False
+        if not EntityType.objects.filter(workspace=workspace, code=parts[1], adapter="", parent__isnull=True, is_active=True).exists():
             return False
     key = (str(user.id), str(getattr(workspace, "id", workspace)))
     if request is None:

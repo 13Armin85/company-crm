@@ -197,7 +197,12 @@ export function ShellNavigation({
             </section>
           )}
           <section className="shell-section shell-section-pages" aria-label="صفحه‌های ساخته‌شده">
-            <SidebarPages collapsed={false} canCreate={canCreatePage} onNavigate={onCloseMobile} />
+            <SidebarPages
+              collapsed={false}
+              canCreate={canCreatePage}
+              onNavigate={onCloseMobile}
+              category={current?.id}
+            />
           </section>
         </div>
       </aside>

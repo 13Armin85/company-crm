@@ -233,7 +233,7 @@ ACTIONS = {
     "resume": lambda w, r, i: actions.resume(w, r.user, i, r.data),
     "delay-report": lambda w, r, i: actions.delay_report(w, r.user, i, r.data),
     "extension": lambda w, r, i: actions.request_extension(w, r.user, i, r.data),
-    "contact-resolve": lambda w, r, i: actions.contact_resolve(w, r.user, i, r.data),
+    "contact-resolve": lambda w, r, i: actions.contact_resolve(w, r.user, i, r.data, r),
     "to-standard": lambda w, r, i: actions.to_standard(w, r.user, i, r.data, r),
     "migrate": lambda w, r, i: actions.migrate(w, r.user, i, r.data, r),
     "cancel": lambda w, r, i: actions.cancel(w, r.user, i, r.data, r),

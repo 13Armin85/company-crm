@@ -16,6 +16,7 @@ export interface EntityDefinition {
   title_field: string;
   numbering: { prefix?: string; padding?: number };
   record_permissions: Record<string, string>;
+  navigation_category?: string;
   can_create?: boolean;
   page_management?: {
     can_manage: boolean;

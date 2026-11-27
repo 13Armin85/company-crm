@@ -1,9 +1,8 @@
-import { useCurrentUser, useWorkspaceAccess, useProjects, useMembers } from "./api";
+import { useCurrentUser, useWorkspaceAccess } from "./api";
 import { TicketDeadlineBadge } from "./ticket/deadline-badge";
 import { CATEGORY_TITLES, UI_STATUS_CATEGORY, workCategory } from "./ticket/model";
 import type { WorkCategoryId } from "./ticket/model";
-import { canChangeIssueStatus, canTransferIssue } from "./task-access";
-import { SearchableSelect } from "@plane/ui";
+import { canChangeIssueStatus } from "./task-access";
 import { useState } from "react";
 import type { CSSProperties } from "react";
 import {
@@ -77,7 +76,6 @@ export const kanbanGroups = (columns: ReturnType<typeof kanbanColumns>) =>
 function KanbanCard({
   issue,
   project,
-  transferPresentation,
   transferMembers,
   transferDisabled,
   onAssigneeChange,
@@ -95,19 +93,13 @@ function KanbanCard({
 }) {
   const { data: user } = useCurrentUser();
   const { data: access } = useWorkspaceAccess();
-  const { data: projects = [] } = useProjects();
-  const { data: projectMembers = [] } = useMembers(undefined, issue.scope === "project" ? issue.projectId : undefined);
-  const eligibleMembers = issue.scope === "project" ? projectMembers : transferMembers;
   const canChangeStatus = !readOnly && canChangeIssueStatus(issue, user?.id, (code) => access?.can(code) === true);
-  const canTransfer =
-    (!readOnly || allowTransfer) &&
-    canTransferIssue(issue, user?.id, (code) => access?.can(code) === true, project ? [project] : projects);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: issue.id,
     disabled: !canChangeStatus,
     data: { issue },
   });
-  const cardAttributes = { ...attributes, "aria-disabled": !canChangeStatus && !canTransfer };
+  const cardAttributes = { ...attributes, "aria-disabled": !canChangeStatus };
   return (
     <article
       ref={setNodeRef}
@@ -126,7 +118,7 @@ function KanbanCard({
         </span>
         <div className="issue-actions">
           <GripVertical size={16} />
-          {transferPresentation === "menu" && (
+          {
             <IssueActionsMenu
               issue={issue}
               project={project}
@@ -136,7 +128,7 @@ function KanbanCard({
               transferDisabled={transferDisabled}
               onAssigneeChange={onAssigneeChange}
             />
-          )}
+          }
         </div>
       </div>
       <h3>{issue.name}</h3>
@@ -151,35 +143,6 @@ function KanbanCard({
           <span key={label}>{label}</span>
         ))}
       </div>
-      {transferPresentation === "inline" &&
-        canTransfer &&
-        onAssigneeChange &&
-        eligibleMembers &&
-        eligibleMembers.length > 1 && (
-          <div className="kanban-transfer-control" onPointerDown={(event) => event.stopPropagation()}>
-            <label htmlFor={`kanban-transfer-${issue.id}`}>انتقال به شخص دیگر</label>
-            <SearchableSelect
-              id={`kanban-transfer-${issue.id}`}
-              label={`واگذاری ${issue.name} به عضو دیگر`}
-              optionClassName="member-transfer-options"
-              value={issue.assignee?.id ?? ""}
-              selectedLabel={issue.assignee?.displayName ?? "بدون مسئول"}
-              placeholder="نام شخص را جستجو کنید"
-              disabled={transferDisabled}
-              onChange={(id) => {
-                if (id && id !== issue.assignee?.id && !transferDisabled) onAssigneeChange(issue, id);
-              }}
-              options={eligibleMembers
-                .filter((member) => access?.is_admin || member.id !== user?.id)
-                .map((member) => ({
-                  id: member.id,
-                  title: member.displayName,
-                  description: member.email,
-                  disabled: member.isActive === false || member.id === issue.assignee?.id,
-                }))}
-            />
-          </div>
-        )}
       <footer>
         {!issue.hiddenFields?.includes("priority") && (
           <PriorityBadge priority={issue.priority} code={issue.priorityCode} />

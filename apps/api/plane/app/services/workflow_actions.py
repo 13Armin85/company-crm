@@ -519,7 +519,14 @@ def auto_start(entity, subtype, record_id, actor, request=None):
     """Start the published workflow of a new record, if its type has one. Caller holds the transaction."""
     if engine.instance_for(entity, record_id, active_only=True):
         return None
-    definition = engine.definition_for(entity, subtype)
+    kind = None
+    if entity.adapter == "ticket" and subtype:
+        kind = (
+            WorkflowDefinition.Kind.FAST_PATH
+            if subtype.code == "support-solved" or subtype.title == "با پشتیبانی حل شد"
+            else WorkflowDefinition.Kind.STANDARD
+        )
+    definition = engine.definition_for(entity, subtype, kind)
     if definition is None:
         return None
     try:
@@ -586,7 +593,15 @@ def start(workspace, actor, entity_code, record_id, data, request=None):
     get_record(entity, actor, record_id, request)
     if engine.instance_for(entity, record_id, active_only=True):
         raise ValidationError("این رکورد همین حالا یک گردش‌کار فعال دارد.")
-    definition = engine.definition_for(entity, row.subtype if row else None, data.get("kind"))
+    subtype = row.subtype if row else None
+    kind = data.get("kind")
+    if kind is None and entity.adapter == "ticket" and subtype:
+        kind = (
+            WorkflowDefinition.Kind.FAST_PATH
+            if subtype.code == "support-solved" or subtype.title == "با پشتیبانی حل شد"
+            else WorkflowDefinition.Kind.STANDARD
+        )
+    definition = engine.definition_for(entity, subtype, kind)
     if definition is None:
         raise ValidationError("برای این نوع رکورد گردش‌کار منتشرشده و فعالی وجود ندارد.")
     return _start(entity, record_id, actor, definition)
@@ -1006,7 +1021,7 @@ def decide_extension(workspace, actor, extension_id, data, request=None, now=Non
 
 
 @transaction.atomic
-def contact_resolve(workspace, actor, instance_id, data, now=None):
+def contact_resolve(workspace, actor, instance_id, data, request=None, now=None):
     """Fast path: record the contact on this ticket's history and resolve it in one step."""
     now = now or timezone.now()
     instance = _locked_instance(workspace, instance_id, data.get("revision"))
@@ -1044,6 +1059,25 @@ def contact_resolve(workspace, actor, instance_id, data, now=None):
         "summary": summary,
         "outcome": outcome,
     }
+    if engine.requires_support_activity(instance):
+        from .support_activities import create as create_support_activity
+
+        activity = create_support_activity(
+            workspace,
+            actor,
+            {
+                "customer_id": data.get("customer_id"),
+                "issue_id": str(instance.record_id),
+                "kind": data.get("activity_kind") or ("phone" if channel == "phone" else "support"),
+                "starts_at": data.get("starts_at"),
+                "ends_at": data.get("ends_at"),
+                "summary": summary,
+                "confirm": data.get("confirm_activity"),
+            },
+            request,
+        )
+        contact["support_activity_id"] = str(activity.id)
+        contact["duration_minutes"] = activity.duration_minutes
     _run_transition(instance, run, actor, row, outcome, now, data={"contact": contact})
     return instance
 

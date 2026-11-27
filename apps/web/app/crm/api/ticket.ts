@@ -249,6 +249,11 @@ export const useContactResolve = (id: string) =>
     summary: string;
     resolved: boolean;
     notify_customer?: boolean;
+    customer_id?: string;
+    activity_kind?: "support" | "phone";
+    starts_at?: string;
+    ends_at?: string;
+    confirm_activity?: boolean;
   }>(id, (slug) => `${base(slug, id)}contact/`, { success: "تماس ثبت شد", error: "ثبت تماس انجام نشد" });
 
 export const useReferTicket = (id: string) =>
@@ -412,6 +417,7 @@ export interface TicketTypeRow {
   name: string;
   target_minutes: number | null;
   can_set_target: boolean;
+  can_reorder?: boolean;
 }
 
 export function useTicketTypes(enabled = true) {
@@ -421,6 +427,20 @@ export function useTicketTypes(enabled = true) {
     enabled: Boolean(slug) && enabled,
     queryFn: async ({ signal }) =>
       (await api.get<TicketTypeRow[]>(`/api/workspaces/${slug}/ticket-types/`, { signal })).data,
+  });
+}
+
+export function useReorderTicketTypes() {
+  const slug = useSlug() ?? "";
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (order: string[]) =>
+      (await api.patch<TicketTypeRow[]>(`/api/workspaces/${slug}/ticket-types/`, { order })).data,
+    onSuccess: (rows) => {
+      client.setQueryData(["ticket-types", slug], rows);
+      toastSuccess("ترتیب نوع‌های تیکت ذخیره شد.");
+    },
+    onError: (error) => toastError(error, "ذخیرهٔ ترتیب نوع‌های تیکت انجام نشد"),
   });
 }
 

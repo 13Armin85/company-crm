@@ -476,7 +476,7 @@
   "Error fetching estimates": "خطا در دریافت برآوردها",
   "Error fetching the intake work items please try again later.": "خطا در دریافت کارهای ورودی، لطفاً بعداً دوباره امتحان کنید.",
   "Error fetching the paginated intake work items please try again later.": "خطا در دریافت کارهای ورودی با صفحه‌بندی، لطفاً بعداً دوباره امتحان کنید.",
-  "Error while updating work item": "خطا در برآورد کار",
+  "Error while updating work item": "به‌روزرسانی کار انجام نشد؛ دوباره تلاش کنید.",
   "Error while updating work item dates, Please try again Later": "خطا در بروزرسانی تاریخ‌های کار، لطفاً دوباره امتحان کنید.",
   "Error!": "خطا!",
   "Error404VerticalStackIllustration": "نمایش خطا 404",

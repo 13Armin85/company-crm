@@ -49,6 +49,8 @@ from plane.db.models import (
     WorkSchedule,
     WorkScheduleDay,
     WorkScheduleException,
+    WorkEvent,
+    WorkEventParticipant,
     WorkspaceMember,
 )
 
@@ -249,6 +251,59 @@ def test_deadline_follows_the_assignee_calendar(org, start, minutes, expected):
     assert issue.target_calendar["user_id"] == str(org["employee"].id)
 
 
+def test_ticket_deadline_and_remaining_skip_only_the_assignees_active_events(org):
+    workspace, employee, colleague = org["workspace"], org["employee"], org["colleague"]
+    meeting = WorkEvent.objects.create(
+        workspace=workspace,
+        kind=WorkEvent.Kind.MEETING,
+        title="جلسه",
+        starts_at=at(MON_D, 10),
+        ends_at=at(MON_D, 11),
+    )
+    WorkEventParticipant.objects.create(event=meeting, user=employee)
+    other = WorkEvent.objects.create(
+        workspace=workspace,
+        kind=WorkEvent.Kind.MEETING,
+        title="جلسهٔ شخص دیگر",
+        starts_at=at(MON_D, 9),
+        ends_at=at(MON_D, 10),
+    )
+    WorkEventParticipant.objects.create(event=other, user=colleague)
+    cancelled = WorkEvent.objects.create(
+        workspace=workspace,
+        kind=WorkEvent.Kind.MEETING,
+        title="جلسهٔ لغوشده",
+        starts_at=at(MON_D, 8),
+        ends_at=at(MON_D, 9),
+        status=WorkEvent.Status.CANCELLED,
+    )
+    WorkEventParticipant.objects.create(event=cancelled, user=employee)
+
+    issue = started(org, at(MON_D, 8), 180)
+    assert issue.target_at == at(MON_D, 12)
+    assert core._remaining(issue, at(MON_D, 9)) == 120
+    meeting.status = WorkEvent.Status.CANCELLED
+    meeting.save(update_fields=["status"])
+    assert core._remaining(issue, at(MON_D, 9)) == 180
+
+
+def test_ticket_list_badge_uses_the_same_free_time_as_detail(org):
+    issue = started(org, at(MON_D, 8), 180)
+    assert issue.target_at == at(MON_D, 11)
+    at_time = at(MON_D, 9, 25)
+    assert core.deadline_states([issue], org["workspace"], now=at_time)[issue.id] == "running"
+    meeting = WorkEvent.objects.create(
+        workspace=org["workspace"],
+        kind=WorkEvent.Kind.MEETING,
+        title="جلسه",
+        starts_at=at(MON_D, 9, 30),
+        ends_at=at(MON_D, 10, 30),
+    )
+    WorkEventParticipant.objects.create(event=meeting, user=org["employee"])
+    assert core._remaining(issue, at_time) == 35
+    assert core.deadline_states([issue], org["workspace"], now=at_time)[issue.id] == "near_due"
+
+
 def test_stored_deadline_does_not_move_when_the_calendar_changes(org):
     issue = started(org, at(SAT_D, 10))
     WorkScheduleException.objects.create(
@@ -314,6 +369,24 @@ def test_type_default_target_needs_permission(org):
     assert client_for(org["employee"]).post(url, {"minutes": 480, "reason": "x"}, format="json").status_code == 403
     response = client_for(org["manager"]).post(url, {"minutes": 480, "reason": "استاندارد"}, format="json")
     assert response.status_code == 200 and response.data["target_minutes"] == 480
+
+
+def test_ticket_type_order_starts_with_support_solved_and_manager_can_reorder(org):
+    workspace = org["workspace"]
+    names = ["سایر مشکلات", "خطا", "با پشتیبانی حل شد"]
+    for name in names:
+        IssueType.objects.create(workspace=workspace, name=name)
+    url = f"/api/workspaces/{workspace.slug}/ticket-types/"
+    admin = client_for(org["admin"])
+    before = admin.get(url)
+    assert before.status_code == 200
+    assert [row["name"] for row in before.data] == ["با پشتیبانی حل شد", "خطا", "سایر مشکلات"]
+    order = [row["id"] for row in reversed(before.data)]
+    assert client_for(org["employee"]).patch(url, {"order": order}, format="json").status_code == 403
+    assert admin.patch(url, {"order": order[:-1]}, format="json").status_code == 400
+    after = admin.patch(url, {"order": order}, format="json")
+    assert after.status_code == 200 and [row["id"] for row in after.data] == order
+    assert EntityEvent.objects.filter(workspace=workspace, event_type="ticket.type_order_changed").exists()
 
 
 # ---------------------------------------------------------------- 6. extensions

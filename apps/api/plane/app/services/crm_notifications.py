@@ -2,7 +2,57 @@
 
 from django.db import transaction
 
-from plane.db.models import IssueSubscriber, Notification, UserOrganizationRole, WorkspaceMember
+from plane.db.models import IssueSubscriber, Notification, User, UserNotificationPreference, UserOrganizationRole, WorkspaceMember
+
+
+def preference_field(sender):
+    """Map a CRM event to the one optional inbox switch that controls it."""
+    if sender.startswith("crm:routing:") or sender == "crm:ticket:referral":
+        return "crm_routing"
+    if sender in {"crm:ticket:extension", "crm:ticket:overdue"}:
+        return "crm_deadline"
+    if sender.startswith("crm:ticket:"):
+        return "crm_ticket_status"
+    if sender == "crm:workflow":
+        return "crm_workflow_action"
+    if sender == "crm:leave":
+        return "crm_leave_result"
+    if sender == "crm:daily_report:reminder":
+        return "crm_daily_report"
+    if sender.startswith("crm:portal:"):
+        return "crm_portal"
+    return None
+
+
+def _may_view_notification(user, workspace_id, entity_name, entity_id):
+    """Check the source before creating a CRM notification or copying its text."""
+    if not entity_id:
+        return True
+    if entity_name == "issue":
+        from rest_framework.exceptions import NotFound, PermissionDenied
+
+        from plane.db.models import Workspace
+        from .ticket_core import visible_ticket
+
+        workspace = Workspace.objects.get(id=workspace_id)
+        try:
+            visible_ticket(workspace, user, entity_id)
+            return True
+        except (NotFound, PermissionDenied):
+            return False
+    if entity_name == "leave_request":
+        from plane.db.models import LeaveRequest
+        from .leave_requests import can_view
+
+        row = LeaveRequest.objects.filter(workspace_id=workspace_id, id=entity_id).first()
+        return bool(row and can_view(user, row))
+    if entity_name == "workflow":
+        from plane.db.models import WorkflowInstance
+        from .workflow_engine import can_view_instance
+
+        instance = WorkflowInstance.objects.filter(workspace_id=workspace_id, record_id=entity_id).order_by("-created_at").first()
+        return bool(instance and can_view_instance(user, instance))
+    return True
 
 
 def notify_members(
@@ -32,6 +82,19 @@ def notify_members(
     )
     if actor_id and not include_actor:
         receivers = receivers.exclude(member_id=actor_id)
+    receiver_ids = list(receivers)
+    field = preference_field(sender)
+    if field:
+        disabled = set(
+            UserNotificationPreference.objects.filter(user_id__in=receiver_ids, **{field: False}).values_list("user_id", flat=True)
+        )
+        receiver_ids = [user_id for user_id in receiver_ids if user_id not in disabled]
+    if sender.startswith("crm:") and entity_name in {"issue", "leave_request", "workflow"}:
+        users = User.objects.in_bulk(receiver_ids)
+        receiver_ids = [
+            user_id for user_id in receiver_ids
+            if user_id in users and _may_view_notification(users[user_id], workspace_id, entity_name, entity_id)
+        ]
     return Notification.objects.bulk_create(
         [
             Notification(
@@ -46,7 +109,7 @@ def notify_members(
                 message_stripped=message,
                 data=data,
             )
-            for receiver_id in receivers
+            for receiver_id in receiver_ids
         ]
     )
 

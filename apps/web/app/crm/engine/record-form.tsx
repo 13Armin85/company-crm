@@ -2,7 +2,7 @@ import { ErrorNotice, ErrorState } from "../error-state";
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
 import { Check } from "lucide-react";
-import { SchemaDrivenForm, validateSchemaValues, fieldVisible } from "@plane/ui";
+import { SchemaDrivenForm, fieldVisible } from "@plane/ui";
 import type { FormValues, OptionsLoader, SchemaField, SchemaOption } from "@plane/ui";
 import type { TFileHandler } from "@plane/editor";
 import { api, errorMessage } from "../api";
@@ -23,6 +23,7 @@ import type { LinkEntry } from "./relation-link-data";
 import type { EngineRecord } from "./api";
 import { entityDisplaySchema } from "./presentation";
 import { DuplicateFeedback, duplicateDetails } from "./duplicate-feedback";
+import { validateRecordEdit } from "./record-validation";
 
 const noEmbeddedUpload = async (): Promise<string> => {
   throw new Error("برای فایل از فیلد آپلود فرم استفاده کنید.");
@@ -214,7 +215,13 @@ export function EngineRecordForm({
     return <ErrorState message={errorMessage(failure, "فرم منتشرشده دریافت نشد. دوباره صفحه را بارگذاری کنید.")} />;
   function relationData() {
     const entries = Object.fromEntries(
-      relationFields.filter((field) => linkFieldsOf(field).length).map((field) => [field.code, linkEntries(field)])
+      relationFields
+        .filter(
+          (field) =>
+            linkFieldsOf(field).length &&
+            (!id || JSON.stringify(linkEntries(field)) !== JSON.stringify(record?.relation_data?.[field.code] || []))
+        )
+        .map((field) => [field.code, linkEntries(field)])
     );
     return Object.keys(entries).length ? entries : null;
   }
@@ -225,8 +232,10 @@ export function EngineRecordForm({
         onSubmit={async (event) => {
           event.preventDefault();
           if (!canEdit || mutation.isPending) return;
-          const invalid = validateSchemaValues(schema, values);
+          const invalid = validateRecordEdit(schema, values, id ? baseline.values : undefined);
           for (const field of relationFields) {
+            if (id && JSON.stringify(linkEntries(field)) === JSON.stringify(record?.relation_data?.[field.code] || []))
+              continue;
             const message = missingLinkData(linkFieldsOf(field), linkEntries(field));
             if (message && !invalid[field.code]) invalid[field.code] = message;
           }
@@ -240,7 +249,6 @@ export function EngineRecordForm({
                   fieldVisible(f, values, schema) &&
                   f.kind !== "computed" &&
                   !f.config.readonly &&
-                  !(id && f.config.editable_after_create === false) &&
                   (id
                     ? JSON.stringify(values[f.code]) !== JSON.stringify(record?.values[f.code])
                     : values[f.code] !== undefined)

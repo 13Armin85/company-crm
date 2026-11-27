@@ -20,6 +20,7 @@ import { useEngineQuery, useEngineSlug, enginePath } from "./api";
 import { EngineRichText } from "./record-form";
 import { persianDate, plainText } from "../utils";
 import { RecordSummaryDrawer } from "./record-drawer";
+import { AutoScrollText } from "../auto-scroll-text";
 import {
   MAIN_TABLE_TAB,
   TableTabPicker,
@@ -655,13 +656,15 @@ function ConnectedTable({ code, dynamicColumns = false, children, ...props }: Su
                 return (
                   <td key={column} data-column={column}>
                     {field ? (
-                      <SurfaceFieldValue
-                        code={code}
-                        recordId={id}
-                        field={field}
-                        value={values.data?.[id]?.[name]}
-                        recordValues={values.data?.[id]}
-                      />
+                      <AutoScrollText>
+                        <SurfaceFieldValue
+                          code={code}
+                          recordId={id}
+                          field={field}
+                          value={values.data?.[id]?.[name]}
+                          recordValues={values.data?.[id]}
+                        />
+                      </AutoScrollText>
                     ) : (
                       "—"
                     )}

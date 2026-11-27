@@ -109,7 +109,7 @@ describe("member task pages", () => {
     expect(html).not.toContain('aria-label="تغییر وضعیت');
     expect(html).not.toContain("افزودن کار");
     expect(html).toContain("تسک / کار جدید");
-    expect(html).toContain('aria-label="عملیات کار"');
+    expect(html).not.toContain("انتقال به شخص دیگر");
     expect(html).not.toContain("has-inline-transfer");
     expect(html).toContain("personal-work-table");
     expect(html).toContain('aria-label="خلاصه کارهای من"');
@@ -155,13 +155,12 @@ describe("member task pages", () => {
     expect(html).not.toContain('aria-label="افزودن کار به');
     expect(html).not.toContain('role="combobox"');
   });
-  it.each([false, true])("offers My Work transfers through the actions menu for administrator=%s", (admin) => {
+  it.each([false, true])("omits transfer controls from My Work for administrator=%s", (admin) => {
     state.admin = admin;
     const html = renderPage(<MyWorkPage />);
     expect(html).not.toContain('aria-label="انتقال به عضو دیگر"');
     expect(html).not.toContain("has-inline-transfer");
-    expect(html).toContain('aria-label="عملیات کار"');
-    expect(html).toContain('aria-expanded="false"');
+    expect(html).not.toContain("انتقال به شخص دیگر");
     expect(html).not.toContain("افزودن کار");
     expect(html).toContain("تسک / کار جدید");
   });
@@ -169,7 +168,7 @@ describe("member task pages", () => {
     state.admin = admin;
     expect(renderPage(<IssuesPage />)).toContain("کار جدید");
   });
-  it("enables only transfer controls on My Work kanban while status dragging and creation remain disabled", () => {
+  it("omits transfer controls on My Work kanban while status dragging and creation remain disabled", () => {
     const html = renderToStaticMarkup(
       <MemoryRouter>
         <IssueKanbanBoard
@@ -183,7 +182,7 @@ describe("member task pages", () => {
         />
       </MemoryRouter>
     );
-    expect(html).toContain('aria-label="عملیات کار"');
+    expect(html).not.toContain("انتقال به شخص دیگر");
     expect(html).not.toContain("kanban-transfer-control");
     expect(html).not.toContain('role="combobox"');
     expect(html).not.toContain('aria-label="افزودن کار به');

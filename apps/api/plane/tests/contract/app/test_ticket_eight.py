@@ -481,11 +481,21 @@ def event(org, user, start, end, kind="meeting", title="جلسهٔ هفتگی"):
     return row
 
 
-def test_future_event_cannot_be_reported_done_but_past_event_can(org):
+def test_future_or_unconfirmed_event_cannot_be_reported_done_but_confirmed_past_event_can(org):
     future = event(org, org["employee"], at(D, 14), at(D, 15))
     past = event(org, org["employee"], at(D, 8), at(D, 9), title="جلسهٔ صبح")
     refused = put_day(org, org["employee"], items=[item("done", "جلسه", source_kind="event", source_id=str(future.id))])
     assert refused.status_code == 400 and "آینده" in str(refused.data)
+    unconfirmed = put_day(org, org["employee"], items=[item("done", "جلسهٔ صبح", source_kind="event", source_id=str(past.id))])
+    assert unconfirmed.status_code == 400 and "تأیید" in str(unconfirmed.data)
+    ActivityConfirmation.objects.create(
+        workspace=ws(org),
+        user=org["employee"],
+        source_type="event",
+        source_id=past.id,
+        outcome=ActivityConfirmation.Outcome.DONE,
+        confirmed_at=at(D, 10),
+    )
     ok = put_day(org, org["employee"], items=[item("done", "جلسهٔ صبح", source_kind="event", source_id=str(past.id))])
     assert ok.status_code == 200
     day = ok.data
@@ -512,6 +522,7 @@ def test_presence_declaration_is_labelled_self_reported(org):
 
 def test_draft_uses_only_own_activity_of_that_day_with_sources_and_merges_per_ticket(org):
     mine = ticket(org, org["employee"], name="تیکت من")
+    Issue.objects.filter(id=mine.id).update(description_stripped="توضیح درخواست مشتری")
     other = ticket(org, org["colleague"], name="تیکت همکار")
     with frozen(at(D, 9)):
         core.record(mine, org["employee"], "ticket.category_changed", after="در حال انجام")
@@ -520,12 +531,21 @@ def test_draft_uses_only_own_activity_of_that_day_with_sources_and_merges_per_ti
     yesterday = core.record(mine, org["employee"], "ticket.closed")
     EntityEvent.objects.filter(id=yesterday.id).update(created_at=at(D - timedelta(days=1), 10))
     past = event(org, org["employee"], at(D, 8), at(D, 9), title="جلسهٔ صبح")
+    ActivityConfirmation.objects.create(
+        workspace=ws(org),
+        user=org["employee"],
+        source_type="event",
+        source_id=past.id,
+        outcome=ActivityConfirmation.Outcome.DONE,
+        confirmed_at=at(D, 10),
+    )
     event(org, org["employee"], at(D, 15), at(D, 16), title="جلسهٔ عصر")
     items = draft.suggestions(ws(org), org["employee"], D, now=NOW)
     by_kind = {row["source_kind"]: row for row in items}
     ticket_rows = [row for row in items if row["source_kind"] == "issue"]
     assert len(ticket_rows) == 1 and ticket_rows[0]["source_id"] == str(mine.id)
     assert "تغییر وضعیت به «در حال انجام»" in ticket_rows[0]["text"] and "ارجاع تیکت" in ticket_rows[0]["text"]
+    assert "توضیح درخواست مشتری" in ticket_rows[0]["text"]
     assert "بستن" not in ticket_rows[0]["text"]  # yesterday's action is not today's work
     assert by_kind["event"]["source_id"] == str(past.id)
     assert "جلسهٔ عصر" not in all_cells(items)
@@ -589,6 +609,32 @@ def test_event_marked_not_done_is_not_suggested(org):
         confirmed_at=at(D, 10),
     )
     assert draft.suggestions(ws(org), org["employee"], D, now=NOW) == []
+
+
+def test_draft_suggests_only_confirmed_past_events_with_their_description(org):
+    past = event(org, org["employee"], at(D, 8), at(D, 9), title="جلسهٔ صبح")
+    past.description = "بررسی درخواست مشتری"
+    past.save(update_fields=["description"])
+    future = event(org, org["employee"], at(D, 14), at(D, 15))
+    cancelled = event(org, org["employee"], at(D, 9), at(D, 10))
+    cancelled.status = WorkEvent.Status.CANCELLED
+    cancelled.save(update_fields=["status"])
+    assert draft.suggestions(ws(org), org["employee"], D, now=NOW) == []
+    ActivityConfirmation.objects.create(
+        workspace=ws(org),
+        user=org["employee"],
+        source_type="event",
+        source_id=past.id,
+        outcome=ActivityConfirmation.Outcome.DONE,
+        confirmed_at=at(D, 10),
+    )
+    suggestions = draft.suggestions(ws(org), org["employee"], D, now=NOW)
+    assert len(suggestions) == 1
+    assert suggestions[0]["source_id"] == str(past.id)
+    assert "جلسهٔ صبح" in suggestions[0]["text"]
+    assert "بررسی درخواست مشتری" in suggestions[0]["text"]
+    assert "تأییدشده توسط شما" in suggestions[0]["source_label"]
+    assert str(future.id) not in str(suggestions) and str(cancelled.id) not in str(suggestions)
 
 
 # ---------------------------------------------------------------- 5. reminders

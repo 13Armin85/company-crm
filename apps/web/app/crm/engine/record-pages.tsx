@@ -67,7 +67,7 @@ export function EntityDirectoryPage() {
             {access?.can("EntityType.Create") && access.can("FormDesigner.Publish") && (
               <Button onClick={() => setCreatingPage(true)}>ساخت صفحهٔ جدید</Button>
             )}
-            {access?.can("EntityType.View") && (
+            {(access?.is_admin || access?.can("FormDesigner.Access")) && access.can("EntityType.View") && (
               <Link className="button button-secondary" to={categoryUrl(navigation, "/settings/engine")}>
                 <Settings2 size={16} aria-hidden="true" /> مدیریت فرم‌ها
               </Link>

@@ -20,8 +20,13 @@ from plane.app.services.work_calendar import availability, busy_blocks
 from plane.db.models import (
     EntityEvent,
     EntityRecord,
+    EntityRelation,
+    EntityRelationLink,
     EntityType,
+    FieldDefinition,
     Issue,
+    IssueType,
+    SupportActivity,
     Notification,
     OrganizationPermission,
     OrganizationRole,
@@ -851,6 +856,61 @@ def test_extension_only_direct_manager_decides_and_old_deadline_stays_in_history
 
 
 # ------------------------------------------------------------------ 10. fast path
+
+
+def test_ticket_subtype_workflow_wins_over_general_fast_path(org):
+    workspace = org["workspace"]
+    root = entity(workspace, "ticket")
+    subtype = EntityType.objects.create(workspace=workspace, parent=root, code="ordinary-ticket", title="خطا")
+    general = WorkflowDefinition.objects.create(workspace=workspace, entity=root, kind="fast_path", title="مسیر کوتاه")
+    ordinary = WorkflowDefinition.objects.create(
+        workspace=workspace, entity=root, subtype=subtype, kind="standard", title="مسیر عادی"
+    )
+    for definition in (general, ordinary):
+        WorkflowVersion.objects.create(definition=definition, number=1, status="published", graph={})
+    assert engine.definition_for(root, subtype) == ordinary
+    assert engine.definition_for(root) == general
+
+
+def test_support_solved_fast_path_requires_confirmed_activity_before_closing(org):
+    workspace, admin, employee = org["workspace"], org["admin"], org["employee"]
+    create_workflow(admin, workspace, None, kind="fast_path", title="مسیر کوتاه")
+    issue = ticket(workspace, employee)
+    issue.type = IssueType.objects.create(workspace=workspace, name="با پشتیبانی حل شد")
+    issue.save(disable_auto_set_user=True)
+    instance = start(workspace, issue, employee)
+    response = act(
+        employee, instance, "contact-resolve", workspace,
+        channel="phone", contact_name="مشتری", contact_at=timezone.now().isoformat(),
+        summary="راه‌حل ثبت شد", outcome="حل شد",
+    )
+    assert response.status_code == 400
+    instance.refresh_from_db()
+    issue.refresh_from_db()
+    assert instance.status == "running" and issue.status != "done"
+
+    grant(employee, "Issue.Edit")
+    customer_type = EntityType.objects.create(workspace=workspace, code="customer", title="مشتری")
+    customer = EntityRecord.objects.create(workspace=workspace, entity=customer_type, number="C-1", data={"title": "مشتری الف"})
+    left = FieldDefinition.objects.create(workspace=workspace, code="support_customer", title="مشتری", kind="relation")
+    right = FieldDefinition.objects.create(workspace=workspace, code="support_ticket", title="تیکت", kind="relation")
+    relation = EntityRelation.objects.create(
+        left_entity=customer_type, right_entity=entity(workspace), left_field=left, right_field=right, kind="one_to_many"
+    )
+    EntityRelationLink.objects.create(relation=relation, left_id=customer.id, right_id=issue.id)
+    end = timezone.now().replace(second=0, microsecond=0) - timedelta(minutes=5)
+    response = act(
+        employee, instance, "contact-resolve", workspace,
+        channel="phone", contact_name="مشتری", contact_at=end.isoformat(),
+        summary="راه‌حل ثبت شد", outcome="حل شد", customer_id=str(customer.id),
+        activity_kind="phone", starts_at=(end - timedelta(minutes=30)).isoformat(),
+        ends_at=end.isoformat(), confirm_activity=True,
+    )
+    assert response.status_code == 200, response.data
+    issue.refresh_from_db()
+    assert issue.status == "done"
+    activity = SupportActivity.objects.get(issue=issue)
+    assert activity.customer_id == customer.id and activity.duration_minutes == 30
 
 
 def test_fast_path_contact_resolution_and_conversion_to_standard(org):
